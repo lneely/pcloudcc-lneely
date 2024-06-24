@@ -1,1 +1,0 @@
-/usr/bin/c++ -rdynamic CMakeFiles/pcloudcc.dir/main.cpp.o -o pcloudcc  -Wl,-rpath,/home/lkn/src/my/pcloud/console-client/pCloudCC: libpcloudcc_lib.so /usr/lib/libboost_system.a /usr/lib/libboost_program_options.a lib/pclsync/psynclib.a lib/mbedtls/library/libmbedtls.a -lfuse -lpthread libsqlite3.a -lz -ldl -ludev
