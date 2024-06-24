@@ -1,5 +1,5 @@
-*.o
-*.a
+**/*.o
+**/*.a
 /pCloudCC/lib/pclsync/.cache/
 /pCloudCC/lib/pclsync/compile_commands.json
 /pCloudCC/lib/mbedtls/Makefile
@@ -19,3 +19,5 @@ a.out
 pcloudcc
 /pCloudCC/.cache/
 /pCloudCC/compile_commands.json
+CMakeFiles
+CMakeCache.txt
