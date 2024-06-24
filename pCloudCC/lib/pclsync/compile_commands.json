@@ -1,0 +1,28 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-Wall",
+      "-Wpointer-arith",
+      "-O2",
+      "-g",
+      "-fno-stack-protector",
+      "-fomit-frame-pointer",
+      "-mtune=core2",
+      "-I../sqlite",
+      "-DP_ELECTRON",
+      "-fPIC",
+      "-DP_OS_LINUX",
+      "-D_FILE_OFFSET_BITS=64",
+      "-DP_SSL_MBEDTLS",
+      "-I../mbedtls/include",
+      "-c",
+      "-o",
+      "psynclib.o",
+      "psynclib.c"
+    ],
+    "directory": "/home/lkn/src/pcloud/console-client/pCloudCC/lib/pclsync",
+    "file": "/home/lkn/src/pcloud/console-client/pCloudCC/lib/pclsync/psynclib.c",
+    "output": "/home/lkn/src/pcloud/console-client/pCloudCC/lib/pclsync/psynclib.o"
+  }
+]

@@ -1,0 +1,8 @@
+[ 20%] Built target sqlite3
+[ 80%] Built target pcloudcc_lib
+[100%] Built target pcloudcc
+Install the project...
+-- Install configuration: ""
+-- Installing: /build/pcloudcc/pkg/pcloudcc/usr/local/bin/pcloudcc
+-- Set non-toolchain portion of runtime path of "/build/pcloudcc/pkg/pcloudcc//usr/local/bin/pcloudcc" to ""
+-- Installing: /build/pcloudcc/pkg/pcloudcc/usr/local/lib/libpcloudcc_lib.so
