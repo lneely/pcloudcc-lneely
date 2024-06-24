@@ -21,3 +21,5 @@ pcloudcc
 /pCloudCC/compile_commands.json
 CMakeFiles
 CMakeCache.txt
+/pCloudCC/arch/*.log
+/pCloudCC/arch/*.tar.*
