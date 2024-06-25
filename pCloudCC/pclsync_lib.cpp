@@ -43,6 +43,14 @@
 namespace cc = console_client;
 namespace clib = cc::clibrary;
 
+static const std::string client_name = "pCloud CC v3.0.0";
+
+clib::pclsync_lib::pclsync_lib() : status_(new pstatus_struct_()),
+								   was_init_(false),
+								   setup_crypto_(false) {}
+
+clib::pclsync_lib::~pclsync_lib() {}
+
 const std::string&
 clib::pclsync_lib::get_username() {
   return username_;
@@ -99,7 +107,6 @@ void
 clib::pclsync_lib::set_status_callback(status_callback_t p) { 
   status_callback_ = p;
 }
-
 
 clib::pclsync_lib &
 clib::pclsync_lib::get_lib() {
@@ -167,27 +174,28 @@ clib::pclsync_lib::do_get_pass_from_console(std::string &password) {
   std::cout << "Please, enter password" << std::endl;
   getline(std::cin, password);
   SetConsoleMode(hStdin, modeon);
-  // std::cout << "Password is " << password << std::endl;
 #endif
 }
 
-void event_handler(psync_eventtype_t event, psync_eventdata_t eventdata) {
+void 
+event_handler(psync_eventtype_t event, psync_eventdata_t eventdata) {
   if (event < PEVENT_FIRST_USER_EVENT) {
-    if (event & PEVENT_TYPE_FOLDER)
+    if (event & PEVENT_TYPE_FOLDER) {
       std::cout << "folder event=" << event
                 << ", syncid=" << eventdata.folder->syncid
                 << ", folderid=" << eventdata.folder->folderid
                 << ", name=" << eventdata.folder->name
                 << ", local=" << eventdata.folder->localpath
                 << ", remote=" << eventdata.folder->remotepath << std::endl;
-    else
+    } else {
       std::cout << "file event=" << event
                 << ", syncid=" << eventdata.folder->syncid
                 << ", file=" << eventdata.file->fileid
                 << ", name=" << eventdata.file->name
                 << ", local=" << eventdata.file->localpath
                 << ", remote=" << eventdata.file->remotepath << std::endl;
-  } else if (event >= PEVENT_FIRST_SHARE_EVENT)
+	}
+  } else if (event >= PEVENT_FIRST_SHARE_EVENT) {
     std::cout << "share event=" << event
               << ", folderid=" << eventdata.share->folderid
               << ", sharename=" << eventdata.share->sharename
@@ -201,24 +209,26 @@ void event_handler(psync_eventtype_t event, psync_eventdata_t eventdata) {
               << ", cancreate=" << eventdata.share->cancreate
               << ", canmodify=" << eventdata.share->canmodify
               << ", candelete=" << eventdata.share->candelete << std::endl;
-  else
+  } else {
     std::cout << "event" << event << std::endl;
+  }
 }
 
-static int lib_setup_cripto() {
+static int 
+lib_setup_cripto() {
   int ret = 0;
   ret = psync_crypto_issetup();
   if (ret) {
-    ret = psync_crypto_start(
-        clib::pclsync_lib::get_lib().get_crypto_pass().c_str());
+    ret = psync_crypto_start(clib::pclsync_lib::get_lib()
+							 .get_crypto_pass().c_str());
     std::cout << "crypto is setup, login result=" << ret << std::endl;
   } else {
     std::cout << "crypto is not setup" << std::endl;
-    ret = psync_crypto_setup(
-        clib::pclsync_lib::get_lib().get_crypto_pass().c_str(), "no hint");
-    if (ret)
+    ret = psync_crypto_setup(clib::pclsync_lib::get_lib()
+							 .get_crypto_pass().c_str(), "no hint");
+    if (ret) {
       std::cout << "crypto setup failed" << std::endl;
-    else {
+    } else {
       ret = psync_crypto_start(
           clib::pclsync_lib::get_lib().get_crypto_pass().c_str());
       std::cout << "crypto setup successful, start=" << ret << std::endl;
@@ -226,11 +236,12 @@ static int lib_setup_cripto() {
       std::cout << "creating folder=" << ret << std::endl;
     }
   }
-  return ret;
   clib::pclsync_lib::get_lib().crypto_on_ = true;
+  return ret;
 }
 
-static char const *status2string(uint32_t status) {
+static const char *
+status2string(uint32_t status) {
   switch (status) {
   case PSTATUS_READY:
     return "READY";
@@ -269,7 +280,8 @@ static char const *status2string(uint32_t status) {
   }
 }
 
-static void status_change(pstatus_t *status) {
+static void 
+status_change(pstatus_t *status) {
   static int cryptocheck = 0;
   static int mount_set = 0;
 
@@ -280,8 +292,10 @@ static void status_change(pstatus_t *status) {
             << ", status is " << status2string(status->status) << std::endl;
   *clib::pclsync_lib::get_lib().status_ = *status;
   if (status->status == PSTATUS_LOGIN_REQUIRED) {
-    if (clib::pclsync_lib::get_lib().get_password().empty())
+    if (clib::pclsync_lib::get_lib().get_password().empty()) {
       clib::pclsync_lib::get_lib().get_pass_from_console();
+	}
+	
     // std::cout << "Username: " <<
     // clib::pclsync_lib::get_lib().get_username().c_str() << "| Password: " <<
     // clib::pclsync_lib::get_lib().get_password().c_str() << std::endl;
@@ -298,8 +312,8 @@ static void status_change(pstatus_t *status) {
     } else {
       std::cout << "registering" << std::endl;
       if (psync_register(clib::pclsync_lib::get_lib().get_username().c_str(),
-                         clib::pclsync_lib::get_lib().get_password().c_str(), 1,
-                         "bineapi.pcloud.com", 2, &err)) {
+                         clib::pclsync_lib::get_lib().get_password().c_str(),
+						 1, "bineapi.pcloud.com", 2, &err)) {
         std::cout << "both login and registration failed" << std::endl;
         exit(1);
       } else {
@@ -321,46 +335,58 @@ static void status_change(pstatus_t *status) {
     }
     psync_fs_start();
   }
-  if (clib::pclsync_lib::get_lib().status_callback_)
-    clib::pclsync_lib::get_lib().status_callback_(
-        (int)status->status, status2string(status->status));
+  if (clib::pclsync_lib::get_lib().status_callback_) {
+    clib::pclsync_lib::get_lib()
+	  .status_callback_((int)status->status,
+						status2string(status->status));
+  }
 }
 
-int clib::pclsync_lib::start_crypto(const char *pass, void *rep) {
+int
+clib::pclsync_lib::start_crypto(const char *pass, void *rep) {
   std::cout << "calling startcrypto pass: " << pass << std::endl;
   get_lib().crypto_pass_ = pass;
   return lib_setup_cripto();
 }
-int clib::pclsync_lib::stop_crypto(const char *path, void *rep) {
+
+int
+clib::pclsync_lib::stop_crypto(const char *path, void *rep) {
   int res = -1;
   psync_crypto_stop();
   get_lib().crypto_on_ = false;
   return res;
 }
-int clib::pclsync_lib::finalize(const char *path, void *rep) {
+
+int 
+clib::pclsync_lib::finalize(const char *path, void *rep) {
   psync_destroy();
   exit(0);
 }
 
-int clib::pclsync_lib::list_sync_folders(const char *path, void *rep) {
+int 
+clib::pclsync_lib::list_sync_folders(const char *path, void *rep) {
   psync_folder_list_t *folders = psync_get_sync_list();
   rep = psync_malloc(sizeof(*folders));
   memcpy(rep, folders, sizeof(*folders));
   return 0;
 }
 
-static const std::string client_name = "pCloud CC v3.0.0";
-int clib::pclsync_lib::init() // std::string& username, std::string& password,
-                              // std::string* crypto_pass, int setup_crypto, int
-                              // usesrypto_userpass)
+int 
+clib::pclsync_lib::init() 
 {
-  std::string software_string;
+  // std::string& username, std::string& password,
+  // std::string* crypto_pass, int setup_crypto, int usesrypto_userpass)
   // std::string software_string = exec("lsb_release -ds");
+
+  std::string software_string;
+  int isfsautostart;
+  char *username_old;
 
   psync_set_software_string(client_name.c_str());
 
-  if (setup_crypto_ && crypto_pass_.empty())
+  if (setup_crypto_ && crypto_pass_.empty()) {
     return 3;
+  }
 
   if (psync_init()) {
     std::cout << "init failed\n";
@@ -368,16 +394,17 @@ int clib::pclsync_lib::init() // std::string& username, std::string& password,
   }
 
   was_init_ = true;
-  if (!get_mount().empty())
+  
+  if (!get_mount().empty()) {
     psync_set_string_setting("fsroot", get_mount().c_str());
+  }
 
   // _tunnel  = psync_ssl_tunnel_start("127.0.0.1", 9443, "62.210.116.50", 443);
 
-  int isfsautostart = psync_get_bool_setting("autostartfs");
-
+  isfsautostart = psync_get_bool_setting("autostartfs");
   psync_start_sync(status_change, event_handler);
-  char *username_old = psync_get_username();
 
+  username_old = psync_get_username();
   if (username_old) {
     if (username_.compare(username_old) != 0) {
       std::cout << "logged in with user " << username_old << ", not "
@@ -397,7 +424,8 @@ int clib::pclsync_lib::init() // std::string& username, std::string& password,
   return 0;
 }
 
-int clib::pclsync_lib::login(const char *user, const char *pass, int save) {
+int
+clib::pclsync_lib::login(const char *user, const char *pass, int save) {
   set_username(user);
   set_password(pass);
   set_savepass(bool(save));
@@ -405,20 +433,18 @@ int clib::pclsync_lib::login(const char *user, const char *pass, int save) {
   return 0;
 }
 
-int clib::pclsync_lib::logout() {
+int 
+clib::pclsync_lib::logout() {
   set_password("");
   psync_logout();
   return 0;
 }
 
-int clib::pclsync_lib::unlink() {
+int 
+clib::pclsync_lib::unlink() {
   set_username("");
   set_password("");
   psync_unlink();
   return 0;
 }
 
-clib::pclsync_lib::pclsync_lib()
-    : status_(new pstatus_struct_()), was_init_(false), setup_crypto_(false) {}
-
-clib::pclsync_lib::~pclsync_lib() {}
