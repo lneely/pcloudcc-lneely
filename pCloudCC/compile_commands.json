@@ -3,72 +3,17 @@
     "arguments": [
       "/usr/bin/c++",
       "-Dpcloudcc_lib_EXPORTS",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/sqlite",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/pclsync",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/poverlay_linux",
-      "-g",
-      "-fPIC",
-      "-c",
-      "-o",
-      "CMakeFiles/pcloudcc_lib.dir/pclsync_lib_c.cpp.o",
-      "/home/lkn/src/pcloud/console-client/pCloudCC/pclsync_lib_c.cpp"
-    ],
-    "directory": "/home/lkn/src/pcloud/console-client/pCloudCC",
-    "file": "/home/lkn/src/pcloud/console-client/pCloudCC/pclsync_lib_c.cpp",
-    "output": "/home/lkn/src/pcloud/console-client/pCloudCC/CMakeFiles/pcloudcc_lib.dir/pclsync_lib_c.cpp.o"
-  },
-  {
-    "arguments": [
-      "/usr/bin/c++",
-      "-Dpcloudcc_lib_EXPORTS",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/sqlite",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/pclsync",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/poverlay_linux",
-      "-g",
+      "-I/home/lkn/src/my/pcloudcc-lneely/pCloudCC/lib/sqlite",
+      "-I/home/lkn/src/my/pcloudcc-lneely/pCloudCC/lib/pclsync",
+      "-I/home/lkn/src/my/pcloudcc-lneely/pCloudCC/lib/poverlay_linux",
       "-fPIC",
       "-c",
       "-o",
       "CMakeFiles/pcloudcc_lib.dir/pclsync_lib.cpp.o",
-      "/home/lkn/src/pcloud/console-client/pCloudCC/pclsync_lib.cpp"
+      "/home/lkn/src/my/pcloudcc-lneely/pCloudCC/pclsync_lib.cpp"
     ],
-    "directory": "/home/lkn/src/pcloud/console-client/pCloudCC",
-    "file": "/home/lkn/src/pcloud/console-client/pCloudCC/pclsync_lib.cpp",
-    "output": "/home/lkn/src/pcloud/console-client/pCloudCC/CMakeFiles/pcloudcc_lib.dir/pclsync_lib.cpp.o"
-  },
-  {
-    "arguments": [
-      "/usr/bin/c++",
-      "-Dpcloudcc_lib_EXPORTS",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/sqlite",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/pclsync",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/poverlay_linux",
-      "-g",
-      "-fPIC",
-      "-c",
-      "-o",
-      "CMakeFiles/pcloudcc_lib.dir/control_tools.cpp.o",
-      "/home/lkn/src/pcloud/console-client/pCloudCC/control_tools.cpp"
-    ],
-    "directory": "/home/lkn/src/pcloud/console-client/pCloudCC",
-    "file": "/home/lkn/src/pcloud/console-client/pCloudCC/control_tools.cpp",
-    "output": "/home/lkn/src/pcloud/console-client/pCloudCC/CMakeFiles/pcloudcc_lib.dir/control_tools.cpp.o"
-  },
-  {
-    "arguments": [
-      "/usr/bin/c++",
-      "-DBOOST_PROGRAM_OPTIONS_NO_LIB",
-      "-DBOOST_SYSTEM_NO_LIB",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/sqlite",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/pclsync",
-      "-I/home/lkn/src/pcloud/console-client/pCloudCC/lib/poverlay_linux",
-      "-g",
-      "-c",
-      "-o",
-      "CMakeFiles/pcloudcc.dir/main.cpp.o",
-      "/home/lkn/src/pcloud/console-client/pCloudCC/main.cpp"
-    ],
-    "directory": "/home/lkn/src/pcloud/console-client/pCloudCC",
-    "file": "/home/lkn/src/pcloud/console-client/pCloudCC/main.cpp",
-    "output": "/home/lkn/src/pcloud/console-client/pCloudCC/CMakeFiles/pcloudcc.dir/main.cpp.o"
+    "directory": "/home/lkn/src/my/pcloudcc-lneely/pCloudCC",
+    "file": "/home/lkn/src/my/pcloudcc-lneely/pCloudCC/pclsync_lib.cpp",
+    "output": "/home/lkn/src/my/pcloudcc-lneely/pCloudCC/CMakeFiles/pcloudcc_lib.dir/pclsync_lib.cpp.o"
   }
 ]

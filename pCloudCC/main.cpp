@@ -5,10 +5,11 @@
 
 namespace po = boost::program_options;
 namespace ct = control_tools;
-
+namespace cc = console_client;
 static std::string version = "2.0.1";
 
-int main(int argc, char **argv) {
+int
+main(int argc, char **argv) {
   std::cout << "pCloud console client v." << version << std::endl;
   std::string username;
   std::string password;
@@ -19,44 +20,34 @@ int main(int argc, char **argv) {
   bool passwordsw = false;
   bool save_pass = false;
   bool crypto = false;
+  po::variables_map vm;
 
   try {
     po::options_description desc("Allowed options");
-    desc.add_options()("help,h", "produce help message")(
-        "username,u", po::value<std::string>(&username),
-        "pCloud account name")("password,p", po::bool_switch(&passwordsw),
-                               "Ask pCloud account password")(
-        "crypto,c", po::bool_switch(&crypto),
-        "Ask crypto password")("passascrypto,y", po::value<std::string>(),
-                               "Use user password as crypto password also.")(
-        "daemonize,d", po::bool_switch(&daemon), "Daemonize the process.")(
-        "commands ,o", po::bool_switch(&commands),
-        "Parent stays alive and processes commands. ")(
-        "mountpoint,m", po::value<std::string>(),
-        "Mount point where drive to be mounted.")(
-        "commands_only,k", po::bool_switch(&commands_only),
-        "Daemon already started pass only commands")(
-        "newuser,n", po::bool_switch(&newuser),
-        "Switch if this is a new user to be registered.")(
-        "savepassword,s", po::bool_switch(&save_pass),
-        "Save password in database.");
-
-    po::variables_map vm;
+    desc.add_options()
+	  ("help,h",
+	   "Show this help message.")
+	  ("username,u", po::value<std::string>(&username),
+	   "pCloud account name.")
+	  ("password,p", po::bool_switch(&passwordsw),
+	   "Ask for pCloud account password.")
+	  ("crypto,c", po::bool_switch(&crypto),
+	   "Ask for crypto password.")
+	  ("passascrypto,y", po::value<std::string>(),								 "User password is the same as crypto password.")
+	  ("daemonize,d", po::bool_switch(&daemon),
+	   "Run the process as a background daemon.")
+	  ("commands ,o", po::bool_switch(&commands),
+	   "Keep parent process alive and process commands. ")
+	  ("mountpoint,m", po::value<std::string>(),
+	   "Specify where pCloud filesystem is mounted.")
+	  ("commands_only,k", po::bool_switch(&commands_only),
+	   "Open command prompt to interact with running daemon.")
+	  ("newuser,n", po::bool_switch(&newuser),
+	   "Register a new pCloud user account.")
+	  ("savepassword,s", po::bool_switch(&save_pass),
+	   "Save user password in the database.");
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
-
-    if (commands_only) {
-      ct::process_commands();
-      exit(0);
-    }
-
-    for (int i = 1; i < argc; ++i)
-      memset(argv[i], 0, strlen(argv[i]));
-    if (daemon) {
-      strncpy(argv[0], "pCloudDriveDeamon", strlen(argv[0]));
-    } else {
-      strncpy(argv[0], "pCloudDrive", strlen(argv[0]));
-    }
 
     if (vm.count("help")) {
       std::cout << desc << "\n";
@@ -64,52 +55,66 @@ int main(int argc, char **argv) {
     }
 
     if ((!vm.count("username"))) {
-      std::cout << "Username option is required!!!"
-                << "\n";
+      std::cout << "Username option is required, specify with " <<
+		"-u or --username." << std::endl;
       return 1;
     }
-    console_client::clibrary::pclsync_lib::get_lib().set_username(username);
 
-    if (passwordsw) {
-      console_client::clibrary::pclsync_lib::get_lib().get_pass_from_console();
+    if (commands_only) {
+      ct::process_commands();
+      exit(0);
     }
 
+    for (int i = 1; i < argc; ++i) {
+      memset(argv[i], 0, strlen(argv[i]));
+	}
+    if (daemon) {
+      strncpy(argv[0], "pCloudDriveDeamon", strlen(argv[0]));
+    } else {
+      strncpy(argv[0], "pCloudDrive", strlen(argv[0]));
+    }
+
+    cc::clibrary::pclsync_lib::get_lib().set_username(username);
+    if (passwordsw) {
+      cc::clibrary::pclsync_lib::get_lib().get_pass_from_console();
+    }
     if (crypto) {
-      console_client::clibrary::pclsync_lib::get_lib().setup_crypto_ = true;
-      if (vm.count("passascrypto"))
-        console_client::clibrary::pclsync_lib::get_lib().set_crypto_pass(
-            password);
-      else {
-        std::cout << "Enter crypto password."
-                  << "\n";
-        console_client::clibrary::pclsync_lib::get_lib()
-            .get_cryptopass_from_console();
+      cc::clibrary::pclsync_lib::get_lib().setup_crypto_ = true;
+      if (vm.count("passascrypto")) {
+        cc::clibrary::pclsync_lib::get_lib()
+		  .set_crypto_pass(password);
+	  } else {
+        std::cout << "Enter crypto password." << std::endl;
+        cc::clibrary::pclsync_lib::get_lib()
+		  .get_cryptopass_from_console();
       }
     } else
-      console_client::clibrary::pclsync_lib::get_lib().setup_crypto_ = false;
+      cc::clibrary::pclsync_lib::get_lib().setup_crypto_ = false;
 
-    if (vm.count("mountpoint"))
-      console_client::clibrary::pclsync_lib::get_lib().set_mount(
-          vm["mountpoint"].as<std::string>());
+    if (vm.count("mountpoint")) {
+      cc::clibrary::pclsync_lib::get_lib().set_mount(
+													 vm["mountpoint"].as<std::string>());
+	}
 
-    console_client::clibrary::pclsync_lib::get_lib().newuser_ = newuser;
-    console_client::clibrary::pclsync_lib::get_lib().set_savepass(save_pass);
-    console_client::clibrary::pclsync_lib::get_lib().set_daemon(daemon);
+    cc::clibrary::pclsync_lib::get_lib().newuser_ = newuser;
+    cc::clibrary::pclsync_lib::get_lib().set_savepass(save_pass);
+    cc::clibrary::pclsync_lib::get_lib().set_daemon(daemon);
   } catch (std::exception &e) {
-    std::cerr << "error: " << e.what() << "\n";
+    std::cerr << "error: " << e.what() << std::endl;
     return 1;
   } catch (...) {
-    std::cerr << "Exception of unknown type!\n";
+    std::cerr << "Exception of unknown type!" << std::endl;
   }
 
-  if (daemon)
+  if (daemon) {
     ct::daemonize(commands);
-  else {
-    if (commands)
-      std::cout << "Option commnads/o  ignored."
-                << "\n";
-    if (!console_client::clibrary::pclsync_lib::get_lib().init())
+  } else {
+    if (commands) {
+      std::cout << "Option commands /o ignored." << std::endl;
+	}
+    if (!cc::clibrary::pclsync_lib::get_lib().init()) {
       sleep(360000);
+	}
   }
 
   return 0;
