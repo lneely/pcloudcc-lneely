@@ -8,5 +8,11 @@ all:
 clean:
 	make -C pCloudCC/lib/pclsync clean
 	make -C pCloudCC/lib/mbedtls clean
+	rm -rf pCloudCC/lib/mbedtls/CMakeFiles
+	rm pCloudCC/lib/mbedtls/CMakeCache.txt
+	rm pCloudCC/lib/mbedtls/Makefile
 	make -C pCloudCC clean
+	rm -rf pCloudCC/CMakeFiles
+	rm pCloudCC/CMakeCache.txt
+	rm pCloudCC/Makefile
 

@@ -8,7 +8,7 @@ void psync_fs_pause_until_login();
 typedef void (*status_callback_t)(int status, const char *stat_string);
 
 int init();
-int statrt_crypto(const char *pass);
+int start_crypto(const char *pass);
 int stop_crypto();
 int finalize();
 char *get_token();

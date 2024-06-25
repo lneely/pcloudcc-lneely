@@ -43,7 +43,66 @@
 namespace cc = console_client;
 namespace clib = cc::clibrary;
 
-clib::pclsync_lib &clib::pclsync_lib::get_lib() {
+const std::string&
+clib::pclsync_lib::get_username() {
+  return username_;
+}
+
+const std::string &
+clib::pclsync_lib::get_password() {
+  return password_;
+}
+
+const std::string &
+clib::pclsync_lib::get_crypto_pass() {
+  return crypto_pass_;
+};
+
+const std::string &
+clib::pclsync_lib::get_mount() {
+  return mount_;
+}
+
+void 
+clib::pclsync_lib::set_username(const std::string &arg) {
+  username_ = arg;
+}
+void 
+clib::pclsync_lib::set_password(const std::string &arg) { 
+  password_ = arg; 
+}
+void 
+clib::pclsync_lib::set_crypto_pass(const std::string &arg) { 
+  crypto_pass_ = arg;
+};
+void 
+clib::pclsync_lib::set_mount(const std::string &arg) {
+  mount_ = arg; 
+}
+void 
+clib::pclsync_lib::set_savepass(bool s) {
+  save_pass_ = s; 
+}
+void 
+clib::pclsync_lib::setupsetup_crypto(bool p) {
+  setup_crypto_ = p; 
+}
+void 
+clib::pclsync_lib::set_newuser(bool p) {
+  newuser_ = p; 
+}
+void 
+clib::pclsync_lib::set_daemon(bool p) {
+  daemon_ = p; 
+}
+void 
+clib::pclsync_lib::set_status_callback(status_callback_t p) { 
+  status_callback_ = p;
+}
+
+
+clib::pclsync_lib &
+clib::pclsync_lib::get_lib() {
   static clib::pclsync_lib g_lib;
   return g_lib;
 }
@@ -67,17 +126,21 @@ exec(const char *cmd) {
   return result;
 }
 
-char *clib::pclsync_lib::get_token() { return psync_get_token(); }
+char *
+clib::pclsync_lib::get_token() { return psync_get_token(); }
 
-void clib::pclsync_lib::get_pass_from_console() {
+void
+clib::pclsync_lib::get_pass_from_console() {
   do_get_pass_from_console(password_);
 }
 
-void clib::pclsync_lib::get_cryptopass_from_console() {
+void
+clib::pclsync_lib::get_cryptopass_from_console() {
   do_get_pass_from_console(crypto_pass_);
 }
 
-void clib::pclsync_lib::do_get_pass_from_console(std::string &password) {
+void
+clib::pclsync_lib::do_get_pass_from_console(std::string &password) {
   if (daemon_) {
     std::cout << "Not able to read password when started as daemon."
               << std::endl;
@@ -263,7 +326,7 @@ static void status_change(pstatus_t *status) {
         (int)status->status, status2string(status->status));
 }
 
-int clib::pclsync_lib::statrt_crypto(const char *pass, void *rep) {
+int clib::pclsync_lib::start_crypto(const char *pass, void *rep) {
   std::cout << "calling startcrypto pass: " << pass << std::endl;
   get_lib().crypto_pass_ = pass;
   return lib_setup_cripto();
@@ -326,7 +389,7 @@ int clib::pclsync_lib::init() // std::string& username, std::string& password,
     psync_free(username_old);
   }
 
-  psync_add_overlay_callback(20, &clib::pclsync_lib::statrt_crypto);
+  psync_add_overlay_callback(20, &clib::pclsync_lib::start_crypto);
   psync_add_overlay_callback(21, &clib::pclsync_lib::stop_crypto);
   psync_add_overlay_callback(22, &clib::pclsync_lib::finalize);
   psync_add_overlay_callback(23, &clib::pclsync_lib::list_sync_folders);

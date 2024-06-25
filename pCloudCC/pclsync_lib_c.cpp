@@ -15,8 +15,8 @@ extern "C" {
 	else return 0;
   }
 
-  int statrt_crypto (const char* pass) {
-	return cc::pclsync_lib::statrt_crypto (pass, NULL);
+  int start_crypto (const char* pass) {
+	return cc::pclsync_lib::start_crypto (pass, NULL);
   }
   int stop_crypto () {
 	return cc::pclsync_lib::stop_crypto (NULL, NULL);
