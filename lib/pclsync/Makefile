@@ -16,40 +16,32 @@ CFLAGS=-Wall -Wpointer-arith -O2 -g -fno-stack-protector -fomit-frame-pointer -m
 #CFLAGS=-Wall -Wpointer-arith -O2 -g -mtune=core2 -I../../psync32/zlib -I../../psync32/sqlite -m32 -D_FILE_OFFSET_BITS=64
 
 LIB_A=psynclib.a
-#LIB_A=libpsynclib.a
-
-
-ifeq ($(OS),Windows_NT)
-    CFLAGS += -DP_OS_WINDOWS
-    LIB_A=psynclib.dll
-    AR=$(CC) -shared -o
-    RANLIB=strip --strip-unneeded
-    LDFLAGS=-s
-else
-    UNAME_S := $(shell uname -s)
-    UNAME_V := $(shell uname -v)
-    ifeq ($(UNAME_S),Linux)
-        CFLAGS += -DP_OS_LINUX -D_FILE_OFFSET_BITS=64
-            ifneq (,$(findstring Debian,$(UNAME_V)))
-                CFLAGS += -DP_OS_DEBIAN
-            endif
-	LDFLAGS += -lssl -lcrypto -lfuse -lpthread -lsqlite3 -lzlib
-    endif
-    ifeq ($(UNAME_S),Darwin)
-        CFLAGS += -DP_OS_MACOSX -I/usr/local/ssl/include/
-        CFLAGS += -DP_OS_MACOSX -I/usr/local/include/osxfuse/
-	LDFLAGS += -lssl -lcrypto -losxfuse -lsqlite3 -framework Cocoa -L/usr/local/ssl/lib
-        #USESSL=securetransport
-    endif
+UNAME_S := $(shell uname -s)
+UNAME_V := $(shell uname -v)
+ifeq ($(UNAME_S),Linux)
+    CFLAGS += -DP_OS_LINUX -D_FILE_OFFSET_BITS=64
+        ifneq (,$(findstring Debian,$(UNAME_V)))
+            CFLAGS += -DP_OS_DEBIAN
+        endif
+LAGS += -lssl -lcrypto -lfuse -lpthread -lsqlite3 -lzlib
 endif
 
-OBJ=pcompat.o psynclib.o plocks.o plibs.o pcallbacks.o pdiff.o pstatus.o papi.o ptimer.o pupload.o pdownload.o pfolder.o\
-     psyncer.o ptasks.o psettings.o pnetlibs.o pcache.o pscanner.o plist.o plocalscan.o plocalnotify.o pp2p.o\
-     pcrypto.o pssl.o pfileops.o ptree.o ppassword.o prunratelimit.o pmemlock.o pnotifications.o pexternalstatus.o publiclinks.o\
-     pbusinessaccount.o pcontacts.o poverlay.o poverlay_lin.o poverlay_mac.o poverlay_win.o pcompression.o pasyncnet.o ppathstatus.o\
-     pdevice_monitor.o ptools.o
+ifeq ($(UNAME_S),Darwin)
+    CFLAGS += -DP_OS_MACOSX -I/usr/local/ssl/include/
+    CFLAGS += -DP_OS_MACOSX -I/usr/local/include/osxfuse/
+	LDFLAGS += -lssl -lcrypto -losxfuse -lsqlite3 -framework Cocoa -L/usr/local/ssl/lib
+endif
 
-OBJFS=pfs.o ppagecache.o pfsfolder.o pfstasks.o pfsupload.o pintervaltree.o pfsxattr.o pcloudcrypto.o pfscrypto.o pcrc32c.o pfsstatic.o plocks.o
+
+OBJ=pcompat.o psynclib.o plocks.o plibs.o pcallbacks.o pdiff.o pstatus.o papi.o ptimer.o\
+	pupload.o pdownload.o pfolder.o psyncer.o ptasks.o psettings.o pnetlibs.o pcache.o\
+	pscanner.o plist.o plocalscan.o plocalnotify.o pp2p.o pcrypto.o pssl.o pfileops.o\
+	ptree.o ppassword.o prunratelimit.o pmemlock.o pnotifications.o pexternalstatus.o\
+	publiclinks.o pbusinessaccount.o pcontacts.o poverlay.o poverlay_lin.o poverlay_mac.o\
+	poverlay_win.o pcompression.o pasyncnet.o ppathstatus.o pdevice_monitor.o ptools.o
+
+OBJFS=pfs.o ppagecache.o pfsfolder.o pfstasks.o pfsupload.o pintervaltree.o pfsxattr.o\
+	pcloudcrypto.o pfscrypto.o pcrc32c.o pfsstatic.o plocks.o
 
 OBJNOFS=pfsfake.o
 
@@ -83,7 +75,7 @@ debugfs: fs
 
 cli: fs
 	$(CC) $(CFLAGS) -o cli cli.c $(LIB_A) $(LDFLAGS)
-	
+
 overlay_client:
 	cd ./lib/poverlay_linux && make
 
