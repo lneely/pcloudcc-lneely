@@ -33,15 +33,7 @@ Also there are several commands that the running service can execute. Commands a
 or starting the daemon with -o to run a command prompt after starting the daemon.
 > pcloudcc -o
 
-## Command Prompt
-
-> startcrypto <crypto pass> - use your password to unlock the crypto folder
-
-> stopcrypto – lock the crypto folder
-
-> finalize – stops the running daemon.
-
-> quit, q  - exits the command prompt, daemon continues running in background
+## Usage Scenarios
 
 ### First Use
 
@@ -74,13 +66,15 @@ Use the command prompt to interact with a running daemon.
 
 > pcloudcc -u example@myemail.com -k
 
-Test unlocking and locking crypto if you have subscription for it.
+Command Reference:
 
-> startcrypto {yourpassword}
+> startcrypto <crypto pass> - use your password to unlock the crypto folder
 
-> stopcrypto
+> stopcrypto – lock the crypto folder
 
-> quit
+> finalize – stops the running daemon.
+
+> quit, q  - exits the command prompt, daemon continues running in background
 
 ### Startup
 
