@@ -43,8 +43,6 @@ OBJ=pcompat.o psynclib.o plocks.o plibs.o pcallbacks.o pdiff.o pstatus.o papi.o 
 OBJFS=pfs.o ppagecache.o pfsfolder.o pfstasks.o pfsupload.o pintervaltree.o pfsxattr.o\
 	pcloudcrypto.o pfscrypto.o pcrc32c.o pfsstatic.o plocks.o
 
-OBJNOFS=pfsfake.o
-
 ifeq ($(USESSL),openssl)
   OBJ += pssl-openssl.o
   CFLAGS += -DP_SSL_OPENSSL
@@ -62,8 +60,8 @@ OBJ1=overlay_client.o
 
 all: $(LIB_A)
 
-$(LIB_A): $(OBJ) $(OBJNOFS)
-	$(AR) $@ $(OBJ) $(OBJNOFS)
+$(LIB_A): $(OBJ) 
+	$(AR) $@ $(OBJ) 
 	$(RANLIB) $@
 
 fs: $(OBJ) $(OBJFS)
@@ -73,12 +71,9 @@ fs: $(OBJ) $(OBJFS)
 debugfs: fs
 	CFLAGS += -DDEBUG_LEVEL=${DEBUG}
 
-cli: fs
-	$(CC) $(CFLAGS) -o cli cli.c $(LIB_A) $(LDFLAGS)
-
 overlay_client:
-	cd ./lib/poverlay_linux && make
+	cd ../poverlay_linux && make
 
 clean:
-	rm -f *~ *.o $(LIB_A) ./lib/poverlay_linux/*.o ./lib/poverlay_linux/overlay_client
+	rm -f *~ *.o $(LIB_A) ../poverlay_linux/*.o ../poverlay_linux/overlay_client
 
