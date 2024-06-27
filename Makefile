@@ -2,7 +2,7 @@ all:
 	make -C lib/pclsync fs
 	cmake -H./lib/mbedtls -B./lib/mbedtls/build
 	make -C lib/mbedtls/build
-	mkdir build
+	mkdir -pf build
 	cmake -H. -B./build
 	make -C build
 
