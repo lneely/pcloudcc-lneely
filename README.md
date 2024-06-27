@@ -29,7 +29,7 @@ This version of pcloudcc is independently maintained by me, whose only affiliati
 
 Terminal command is pcloudcc and -h option prints short options description.
 
-> pcloudcc -u example@myemail.com -h
+> pcloudcc -h
 
 ### First Use
 
