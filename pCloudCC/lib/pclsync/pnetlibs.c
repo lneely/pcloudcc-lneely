@@ -43,7 +43,6 @@
 #include "papi.h"
 #include "pcache.h"
 #include "ptree.h"
-#include "gitcommit.h"
 
 struct time_bytes {
   time_t tm;
@@ -2446,7 +2445,7 @@ int psync_send_debug(int thread, const char *file, const char *function, int uns
     file=lsl+1;
 #endif
   ret=psync_deviceid();
-  snprintf(format, sizeof(format), "%s %s %s: %s:%u (function %s): %s\n", ret, GIT_COMMIT_DATE, psync_thread_name, file, line, function, fmt);
+  snprintf(format, sizeof(format), "%s %s: %s:%u (function %s): %s\n", ret, psync_thread_name, file, line, function, fmt);
   psync_free(ret);
   format[sizeof(format)-1]=0;
   ret=NULL;

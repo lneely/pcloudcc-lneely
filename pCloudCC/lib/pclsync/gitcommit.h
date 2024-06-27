@@ -1,8 +1,0 @@
-#ifndef _GITCOMMIT_H
-#define _GITCOMMIT_H
-
-#define GIT_PREV_COMMIT_ID "a449ee9ac09ecbd9411d5a911aac26a0deacb4d9"
-#define GIT_PREV_COMMIT_DATE "2021-03-11 13:21:49 +0200"
-#define GIT_COMMIT_DATE "2021-03-11 13:23:14 +0200"
-
-#endif
