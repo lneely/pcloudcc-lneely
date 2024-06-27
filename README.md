@@ -24,16 +24,12 @@ This version of pcloudcc is independently maintained by me, whose only affiliati
 > make
 
 ## Usage
+
+### Getting Help
+
 Terminal command is pcloudcc and -h option prints short options description.
-> pcloudcc -h
 
-Also there are several commands that the running service can execute. Commands are passed using 
-> pcloudcc -k 
-
-or starting the daemon with -o to run a command prompt after starting the daemon.
-> pcloudcc -o
-
-## Usage Scenarios
+> pcloudcc -u example@myemail.com -h
 
 ### First Use
 
