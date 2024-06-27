@@ -10,7 +10,7 @@
 **/*.so
 /install_manifest.txt
 a.out
-**/*/pcloudcc
+cmd/pcloudcc/build/pcloudcc
 **/*/.cache/
 **/*/compile_commands.json
 
