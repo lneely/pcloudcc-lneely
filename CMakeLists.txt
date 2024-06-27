@@ -14,9 +14,9 @@ link_directories(${Boost_LIBRARY_DIR})
 #set (CMAKE_CXX_FLAGS "-static -Wl,-Bstatic")
 #set (CMAKE_CXX_FLAGS "-Wl,-Bstatic")
 set (CMAKE_C_FLAGS "-fPIC")
-set (PCLSYNC_PATH ${CMAKE_SOURCE_DIR}/../lib/pclsync)
-set (MBEDTLS_PATH ${CMAKE_SOURCE_DIR}/../lib/mbedtls)
-set (SQLITE3_PATH ${CMAKE_SOURCE_DIR}/../lib/sqlite)
+set (PCLSYNC_PATH ${CMAKE_SOURCE_DIR}/lib/pclsync)
+set (MBEDTLS_PATH ${CMAKE_SOURCE_DIR}/lib/mbedtls)
+set (SQLITE3_PATH ${CMAKE_SOURCE_DIR}/lib/sqlite)
 
 #add_subdirectory(${MBEDTLS_PATH})
 
