@@ -38,8 +38,11 @@ or starting the daemon with -o to run a command prompt after starting the daemon
 ## Command Prompt
 
 > startcrypto <crypto pass> - use your password to unlock the crypto folder
+
 > stopcrypto – lock the crypto folder
+
 > finalize – stops the running daemon.
+
 > quit, q  - exits the command prompt, daemon continues running in background
 
 ### First Use
@@ -76,7 +79,9 @@ Use the command prompt to interact with a running daemon.
 Test unlocking and locking crypto if you have subscription for it.
 
 > startcrypto {yourpassword}
+
 > stopcrypto
+
 > quit
 
 ### Startup
