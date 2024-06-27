@@ -22,25 +22,12 @@ set (CMD_PATH ${CMAKE_SOURCE_DIR}/cmd/pcloudcc)
 #add_subdirectory(${MBEDTLS_PATH})
 
 include_directories(${SQLITE3_PATH})
-# add_custom_target(
-#   sqlite3_lib
-#   COMMAND ./configure && make
-#   WORKING_DIRECTORY ${SQLITE3_PATH}
-# )
-
 include_directories(${PCLSYNC_PATH})
-# add_custom_target(
-#   pclsync_clean
-#   COMMAND make clean
-#   WORKING_DIRECTORY ${PCLSYNC_PATH}
-# )
-
 add_custom_target(
   pclsync
   COMMAND make fs
   WORKING_DIRECTORY ${PCLSYNC_PATH}
 )
-
 add_custom_target(
   mbedtls
   COMMAND cmake . && make
@@ -65,10 +52,6 @@ target_link_libraries(pcloudcc pcloudcc_lib)
 target_link_libraries(pcloudcc ${Boost_LIBRARIES})
 
 link_directories(${PCLSYNC_PATH} ${MBEDTLS_PATH}/build/library ${SQLITE3_PATH} ${OVERLAY_CLENT_PATH})
-
-#add_dependencies(pclsync sqlite3_lib)
-
-#add_dependencies(pcloudcc sqlite3_lib mbedtls pclsync )
 
 install(TARGETS pcloudcc RUNTIME DESTINATION bin)
 install(TARGETS pcloudcc_lib LIBRARY DESTINATION lib)
