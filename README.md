@@ -72,14 +72,6 @@ Command Reference:
 
 > quit, q  - exits the command prompt, daemon continues running in background
 
-### Startup
-
-When everything is configured, you can run pcloudcc as a daemon on
-system startup by adding the following command to your startup scripts
-(distribution-specific):
-
-> pcloudcc -u example@myemail.com -d
-
 ## Warning
 
 **Stopping daemon will break pending background transfers!**
