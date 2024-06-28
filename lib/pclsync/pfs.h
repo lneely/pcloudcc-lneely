@@ -142,7 +142,7 @@ typedef struct {
   int dummy[0];
 } psync_fs_index_header;
 
-#if IS_DEBUG && (defined(P_OS_LINUX) || defined(P_OS_WINDOWS))
+#if IS_DEBUG && defined(P_OS_LINUX) 
 #define psync_fs_lock_file(of) psync_fs_do_lock_file(of, __FILE__, __LINE__)
 
 static inline void psync_fs_do_lock_file(psync_openfile_t *of, const char *file, unsigned long line){

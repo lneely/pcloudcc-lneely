@@ -46,11 +46,6 @@
 #define psync_fs_set_thread_name() do {} while (0)
 #endif
 
-// Do we have this in Win?
-#if !defined(P_OS_WINDOWS)
-#include <sys/xattr.h>
-#else
-// No xattr in win.
 // Value get from standard xattr.h
 enum
 {
@@ -59,7 +54,7 @@ enum
   XATTR_REPLACE = 2	/* set value, fail if attr does not exist.  */
 #define XATTR_REPLACE	XATTR_REPLACE
 };
-#endif
+
 
 #ifndef ENODATA
 #define ENODATA 61

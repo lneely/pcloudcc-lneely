@@ -984,39 +984,6 @@ static void handle_async_error(download_task_t *dt, psync_async_result_t *res){
     psync_timer_register(free_task_timer, 1, dt);
 }
 
-#if defined(P_OS_WINDOWS)
-
-typedef struct {
-  psync_async_result_t res;
-  download_task_t *dt;
-} async_res_dt_t;
-
-static void rename_create_thread(void *ptr){
-  async_res_dt_t *ard;
-  ard=(async_res_dt_t *)ptr;
-  if (rename_and_create_local(ard->dt, ard->res.file.sha1hex, ard->res.file.size, ard->res.file.hash)){
-    set_task_inprogress(ard->dt->taskid, 0);
-    free_download_task(ard->dt);
-    psync_free(ard);
-    psync_send_status_update();
-    psync_wake_download();
-  }
-  else{
-    delete_task(ard->dt->taskid);
-    psync_path_status_sync_folder_task_completed(ard->dt->dwllist.syncid, ard->dt->localfolderid);
-    free_download_task(ard->dt);
-    psync_free(ard);
-    psync_status_recalc_to_download_async();
-  }
-}
-
-static void rename_create_timer(psync_timer_t timer, void *ptr){
-  psync_timer_stop(timer);
-  psync_run_thread1("small file dwl db ins", rename_create_thread, ptr);
-}
-
-#endif
-
 static void finish_async_download(void *ptr, psync_async_result_t *res){
   download_task_t *dt=(download_task_t *)ptr;
   if (res->error)
@@ -1027,13 +994,6 @@ static void finish_async_download(void *ptr, psync_async_result_t *res){
       psync_file_delete(dt->tmpname);
       return;
     }
-#if defined(P_OS_WINDOWS)
-    async_res_dt_t *ard;
-    ard=psync_new(async_res_dt_t);
-    memcpy(&ard->res, res, sizeof(psync_async_result_t));
-    ard->dt=dt;
-    psync_timer_register(rename_create_timer, 2, ard);
-#else
     if (rename_and_create_local(dt, res->file.sha1hex, res->file.size, res->file.hash))
       psync_timer_register(free_task_timer, 1, dt);
     else{
@@ -1042,7 +1002,6 @@ static void finish_async_download(void *ptr, psync_async_result_t *res){
       free_download_task(dt);
       psync_status_recalc_to_download_async();
     }
-#endif
   }
 }
 

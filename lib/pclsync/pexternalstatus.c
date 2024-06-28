@@ -41,11 +41,7 @@
 
 #define MAX_RECURS_DEPTH 31
 
-#ifdef P_OS_WINDOWS
-#define SLASHCHAR '\\'
-#else
 #define SLASHCHAR '/'
-#endif
 
 static int sync_offline() {
   if  (psync_status_is_offline() || 
