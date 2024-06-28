@@ -1,6 +1,6 @@
 # pCloud Console Client (undead)
 
-This is a simple **linux** console client for pCloud cloud storage, originally developed by pCloud.
+This is a simple **linux** console client for pCloud cloud storage, derived from the console-client developed by pCloud.
 
 ## Braaaaaains (Fork, please)
 
