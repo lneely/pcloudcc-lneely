@@ -29,7 +29,6 @@
 #ifndef OVERLAY_CLIENT_H
 #define OVERLAY_CLIENT_H
 
-//#define P_OS_MACOS
 #define PCLOUD_TESTING
 #ifdef __cplusplus
 extern "C" {

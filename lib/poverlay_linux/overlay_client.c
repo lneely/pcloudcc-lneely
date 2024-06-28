@@ -57,11 +57,7 @@ static int read_x_bytes(int socket, unsigned int x, char * buffer){
   return result;
 }
 
-#if defined(P_OS_MACOS)
-uint32_t clport = 8989 ;
-#else
 const char *clsoc = "/tmp/pcloud_unix_soc.sock" ;
-#endif
 
 int QueryState( pCloud_FileState *state, char * path) {
   int rep = 0 ;
@@ -85,11 +81,7 @@ return 0 ;
 }
 
 int SendCall( int id /*IN*/ ,const char * path /*IN*/ , int * ret /*OUT*/ , char **out /*OUT*/ ) {
-  #if defined(P_OS_MACOS)
-  struct sockaddr_in addr;
-  #else
   struct sockaddr_un addr;
-  #endif
 
   int fd,rc;
   int path_size = strlen (path);
@@ -105,23 +97,6 @@ int SendCall( int id /*IN*/ ,const char * path /*IN*/ , int * ret /*OUT*/ , char
 
   debug ( D_NOTICE , "SendCall id[%d] path[%s]\n" , id, path);
 
-  #if defined(P_OS_MACOS)
-  if ( (fd = socket ( AF_INET , SOCK_STREAM , 0 )) == - 1 ) {
-    *out = strndup ( "Unable to create INET socket" , 28 );
-    *ret = - 1 ;
-    return - 1 ;
-  }
-
-  memset (&addr, 0 , sizeof (addr));
-  addr. sin_family = AF_INET ;
-  addr. sin_addr . s_addr = htonl ( INADDR_LOOPBACK );
-  addr. sin_port = htons ( clport );
-  if ( connect (fd, ( struct sockaddr *)&addr, sizeof ( struct sockaddr )) == - 1 ) {
-    *out = strndup ( "Unable to connect to INET socket" , 32 );
-    *ret = - 2 ;
-    return - 2 ;
-  }
-  #else
   if ( (fd = socket(AF_UNIX, SOCK_STREAM, 0 )) == - 1 ) {
     *out = strndup( "Unable to create UNIX socket" , 27 );
     *ret = - 3 ;
@@ -136,7 +111,7 @@ int SendCall( int id /*IN*/ ,const char * path /*IN*/ , int * ret /*OUT*/ , char
     *ret = - 4 ;
     return - 4 ;
   }
-  #endif
+
 
   message * mes = ( message *)sendbuf;
   memset (mes, 0 , mess_size);
