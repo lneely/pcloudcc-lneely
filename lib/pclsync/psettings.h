@@ -136,11 +136,9 @@
 #define PSYNC_SSL_SESSION_CACHE_TIMEOUT (24*3600)
 
 #define PSYNC_DEFAULT_POSIX_DBNAME ".pclouddb"
-#define PSYNC_DEFAULT_WINDOWS_DBNAME "pcloud.db"
 
 #define PSYNC_DEFAULT_DB_NAME "data.db"
 #define PSYNC_DEFAULT_POSIX_DIR ".pcloud"
-#define PSYNC_DEFAULT_WINDOWS_DIR "pCloud"
 
 #define PSYNC_DEFAULT_TMP_DIR "temp"
 #define PSYNC_DEFAULT_NTF_THUMB_DIR "ntfthumbs"
@@ -274,10 +272,6 @@ pagefile.sys;\
 $RECYCLE.BIN;\
 *.part;\
 .pcloud;"
-
-#if defined (P_OS_WINDOWS)
-#define PSYNC_IGNORE_PATHS_DEFAULT "C:\\$Recycle.Bin;C:\\$WinREAgent;C:\\Windows;C:\\Program Files;C:\\Program Files (x86);"
-#endif
 
 #if defined (P_OS_MACOSX)
 #define PSYNC_IGNORE_PATHS_DEFAULT "/Applications;/Library;/private;/System;/bin;/etc;/sbin;/usr;"

@@ -35,24 +35,14 @@
 int overlays_running = 1;
 int callbacks_running = 1;
 
-#if defined(P_OS_WINDOWS)
-
-#include "poverlay_win.c"
-
-#elif defined(P_OS_LINUX)
-
+#if defined(P_OS_LINUX)
 #include "poverlay_lin.c"
-
 #elif defined(P_OS_MACOSX)
-
 #include "poverlay_mac.c"
-
 #else
-
 void overlay_main_loop(VOID){}
 void instance_thread(LPVOID){}
-
-#endif //defined(P_OS_WINDOWS)
+#endif 
 
 poverlay_callback * callbacks;
 static int callbacks_size = 15;

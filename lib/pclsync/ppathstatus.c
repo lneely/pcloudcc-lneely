@@ -729,11 +729,7 @@ void psync_path_status_sync_folder_deleted(psync_syncid_t syncid, psync_folderid
 }
 
 static inline int is_slash(char ch) {
-#if defined(P_OS_WINDOWS)
-  return ch=='/' || ch=='\\';
-#else
   return ch=='/';
-#endif
 }
 
 static inline int valid_last_char(char ch) {
@@ -1290,16 +1286,7 @@ static int psync_path_is_prefix_of(const char *prefix, size_t prefix_len, const 
         return 0;
       continue;
     }
-#if defined(P_OS_WINDOWS)
-    if (tolower(*prefix)!=tolower(*path))
-      return 0;
-    prefix++;
-    path++;
-    prefix_len--;
-    path_len--;
-#else
     return 0;
-#endif
   }
   if (!prefix_len && valid_last_char(*path)) {
     *ppath=path;

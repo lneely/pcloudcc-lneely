@@ -68,17 +68,7 @@
 //Parser delimeter symbols
 #define DELIM_SEMICOLON ';'
 
-#if defined(P_OS_WINDOWS)
-#define DELIM_DIR   '\\'
-#endif
-
-#if defined(P_OS_LINUX)
 #define DELIM_DIR  '/'
-#endif
-
-#if defined(P_OS_MACOSX)
-#define DELIM_DIR  '/'
-#endif
 
 typedef struct _eventParams {
   int paramCnt;

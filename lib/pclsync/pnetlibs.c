@@ -2438,12 +2438,6 @@ int psync_send_debug(int thread, const char *file, const char *function, int uns
   va_list ap;
   char *ret;
   int sz, l;
-#if defined(P_OS_WINDOWS)
-  const char *lsl;
-  lsl=strrchr(file, '\\');
-  if (lsl)
-    file=lsl+1;
-#endif
   ret=psync_deviceid();
   snprintf(format, sizeof(format), "%s %s: %s:%u (function %s): %s\n", ret, psync_thread_name, file, line, function, fmt);
   psync_free(ret);

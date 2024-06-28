@@ -39,14 +39,6 @@
 #include "stdlib.h"
 #include "pnetlibs.h"
 
-#if defined(P_OS_WINDOWS)
-#define _CRT_SECURE_NO_WARNINGS
-#pragma comment(lib, "iphlpapi.lib")
-
-#include <Iphlpapi.h>
-//#include <Windows.h>
-#endif
-
 #if defined(P_OS_LINUX)
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -64,28 +56,6 @@ char* getMACaddr() {
   char  buffer[128];
 
   memset(buffer, 0, sizeof(buffer));
-
-#if defined(P_OS_WINDOWS)
-  PIP_ADAPTER_INFO AdapterInfo;
-  DWORD dwBufLen = sizeof(IP_ADAPTER_INFO);
-
-  AdapterInfo = (IP_ADAPTER_INFO*)malloc(sizeof(IP_ADAPTER_INFO));
-
-  if (GetAdaptersInfo(AdapterInfo, &dwBufLen) == ERROR_BUFFER_OVERFLOW) {
-    free(AdapterInfo);
-    AdapterInfo = (IP_ADAPTER_INFO*)malloc(dwBufLen);
-
-    if (AdapterInfo == NULL) {
-      debug(D_CRITICAL, "Error allocating memory needed to call GetAdaptersinfo!");
-    }
-    else {
-      if (GetAdaptersInfo(AdapterInfo, &dwBufLen) == NO_ERROR) {
-        sprintf(buffer, "%.2x%.2x%.2x%.2x%.2x%.2x", AdapterInfo->Address[0], AdapterInfo->Address[1], AdapterInfo->Address[2], AdapterInfo->Address[3], AdapterInfo->Address[4], AdapterInfo->Address[5]);
-      }
-      free(AdapterInfo);
-    }
-  }
-#endif
 
 #if defined(P_OS_LINUX)
   int fd;
@@ -388,13 +358,6 @@ char* get_machine_name() {
 
   pcName[0] = 0;
 
-#if defined(P_OS_WINDOWS)
-  int   res;
-
-  nameSize = MAX_COMPUTERNAME_LENGTH + 1;
-  res = GetComputerNameA(pcName, &nameSize);
-#endif
-
 #if defined(P_OS_LINUX)
   gethostname(pcName, nameSize);
 #endif
@@ -412,9 +375,6 @@ char* get_machine_name() {
 #endif
 
   if (pcName[0] == 0) {
-#if defined(P_OS_WINDOWS)
-    strcpy(pcName,"WinMachine");
-#endif
 
 #if defined(P_OS_LINUX)
     strcpy(pcName, "LinuxMachine");
