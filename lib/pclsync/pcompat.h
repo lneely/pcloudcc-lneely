@@ -29,62 +29,19 @@
 */
 
 
-#ifndef _PSYNC_COMPAT_H
 #define _PSYNC_COMPAT_H
 
 #include "pcompiler.h"
-
-#if !defined(P_OS_LINUX) && !defined(P_OS_BSD) && !defined(P_OS_POSIX)
-#if defined(__CYGWIN__)
-#define P_OS_POSIX
-#elif defined(__linux__)
-#define P_OS_LINUX
-#define P_OS_POSIX
-#elif defined(__sun)
-#define P_OS_POSIX
-#elif defined(__FreeBSD__)
-#define P_OS_POSIX
-#define P_OS_BSD
-#elif defined(__DragonFly__)
-#define P_OS_POSIX
-#define P_OS_BSD
-#elif defined(__NetBSD__)
-#define P_OS_POSIX
-#define P_OS_BSD
-#elif defined(__OpenBSD__)
-#define P_OS_POSIX
-#define P_OS_BSD
-#elif defined(__unix__)
-#define P_OS_POSIX
-#endif
-#endif
-
-#if (defined(P_OS_LINUX) || defined(P_OS_BSD)) && !defined(P_OS_POSIX)
-#define P_OS_POSIX
-#endif
-
-#if !defined(P_OS_LINUX) && !defined(P_OS_POSIX)
-#warning "You OS may not be supported, trying to build POSIX compatible source"
-#define P_OS_POSIX
-#endif
+#define P_OS_LINUX // XXX: goal is to remove; target os needs no #define
+#define P_OS_POSIX // XXX: goal is to remove
 
 #if defined(P_OS_LINUX)
-
 #define P_OS_ID 7
-
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
-
 #else
-
 #define P_OS_ID 0
-
-#endif
-
-#ifdef P_ELECTRON
-#undef P_OS_ID
-#define P_OS_ID 9
 #endif
 
 #define _FILE_OFFSET_BITS 64
@@ -131,27 +88,30 @@ typedef unsigned long psync_uint_t;
 #define psync_fstat fstat
 #define psync_stat_isfolder(s) S_ISDIR((s)->st_mode)
 #define psync_stat_size(s) ((s)->st_size)
-#ifdef _DARWIN_FEATURE_64_BIT_INODE
-#define psync_stat_birthtime(s) ((s)->st_birthtime)
-#define PSYNC_HAS_BIRTHTIME
-#else
 #define psync_stat_birthtime(s) ((s)->st_mtime)
-#endif
 #define psync_stat_ctime(s) ((s)->st_ctime)
 #define psync_stat_mtime(s) ((s)->st_mtime)
 
 #if defined(st_mtime)
+
 #if defined(st_mtimensec)
 #define psync_stat_mtime_native(s) ((s)->st_mtime*1000000ULL+(s)->st_mtimensec/1000)
+
 #else
-#define psync_stat_mtime_native(s) \
+
+#define psync_stat_mtime_native(s)				\
   ((s)->st_mtime*1000000ULL+\
   ((struct timespec *)(&(s)->st_mtime))->tv_nsec/1000)
+
 #endif
+
 #define psync_mtime_native_to_mtime(n) ((n)/1000000ULL)
+
 #else
+
 #define psync_stat_mtime_native(s) ((s)->st_mtime)
 #define psync_mtime_native_to_mtime(n) (n)
+
 #endif
 
 #define psync_stat_inode(s) ((s)->st_ino)
@@ -408,4 +368,4 @@ int psync_get_page_size();
 
 void psync_rebuild_icons();
 
-#endif
+
