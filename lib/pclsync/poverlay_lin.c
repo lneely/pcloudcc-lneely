@@ -29,8 +29,6 @@
 #include "pcompat.h"
 #include "plibs.h"
 
-#if defined(P_OS_LINUX) || defined(P_OS_BSD)
-
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -133,4 +131,3 @@ void instance_thread(void* lpvParam)
   return;
 };
 
-#endif //defined(P_OS_LINUX) || defined(P_OS_BSD)

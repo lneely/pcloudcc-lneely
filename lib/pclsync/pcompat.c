@@ -2301,25 +2301,7 @@ psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime){
 
 int 
 psync_set_crtime_mtime_by_fd(psync_file_t fd, const char *path, time_t crtime, time_t mtime){
-#if defined(_BSD_SOURCE) || defined(P_OS_BSD)
-  if (mtime){
-    struct timeval tm[2];
-    tm[0].tv_sec=mtime;
-    tm[0].tv_usec=0;
-    tm[1].tv_sec=mtime;
-    tm[1].tv_usec=0;
-    if (unlikely(futimes(fd, tm))){
-      debug(D_NOTICE, "got errno %d while setting modification time of %s to %lu: %s", errno, path, (unsigned long)mtime, strerror(errno));
-      return -1;
-    }
-    else
-      return 0;
-  }
-  else
-    return 0;
-#else
   return psync_set_crtime_mtime(path, crtime, mtime);
-#endif
 }
 
 typedef struct {
