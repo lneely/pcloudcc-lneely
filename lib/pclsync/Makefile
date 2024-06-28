@@ -19,10 +19,6 @@ LIB_A=psynclib.a
 UNAME_S := $(shell uname -s)
 UNAME_V := $(shell uname -v)
 CFLAGS += -DP_OS_LINUX -D_FILE_OFFSET_BITS=64
-# XXX: remove, debian is not special
-ifneq (,$(findstring Debian,$(UNAME_V)))
-    CFLAGS += -DP_OS_DEBIAN
-endif
 LDFLAGS += -lssl -lcrypto -lfuse -lpthread -lsqlite3 -lzlib
 
 OBJ=pcompat.o psynclib.o plocks.o plibs.o pcallbacks.o pdiff.o pstatus.o papi.o ptimer.o\
