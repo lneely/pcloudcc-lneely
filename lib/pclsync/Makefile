@@ -5,7 +5,7 @@ RANLIB=ranlib
 USESSL=mbed
 
 #CFLAGS=-Wall -Wpointer-arith -O2 -g -mtune=core2
-CFLAGS=-Wall -Wpointer-arith -O2 -g -fno-stack-protector -fomit-frame-pointer -mtune=core2 -I../sqlite -DP_ELECTRON -fPIC
+CFLAGS=-Wall -Wpointer-arith -Wunused-function -Wunused-but-set-parameter -Wunused-but-set-variable -Wunused-label -Wunused-macros -Wunused-variable -Wuse-after-free -Wuseless-cast -Wunused-value -Wunused-parameter -Wunused-local-typedefs -O2 -g -fno-stack-protector -fomit-frame-pointer -mtune=core2 -I../sqlite -DP_ELECTRON -fPIC
 
 #CFLAGS=-Wall -Wpointer-arith -O2 -g -fsanitize=address -mtune=core2
 #CFLAGS=-Wall -Wpointer-arith -O2 -g -fsanitize=address -mtune=core2 -I../sqlite
