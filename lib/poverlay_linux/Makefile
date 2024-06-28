@@ -7,20 +7,8 @@ CFLAGS=-Wall -Wpointer-arith -O2 -g -fno-stack-protector -fomit-frame-pointer -m
 
 UNAME_S := $(shell uname -s)
 UNAME_V := $(shell uname -v)
-ifeq ($(UNAME_S),Linux)
-    CFLAGS += -DP_OS_LINUX
-        ifneq (,$(findstring Debian,$(UNAME_V)))
-            CFLAGS += -DP_OS_DEBIAN
-        endif
-LAGS += -lssl -lcrypto -lpthread
-endif
-ifeq ($(UNAME_S),Darwin)
-    CFLAGS += -DP_OS_MACOSX -I/usr/local/ssl/include/
-    CFLAGS += -DP_OS_MACOSX -I/usr/local/include/osxfuse/
-	LDFLAGS += -lssl -lcrypto -lpthread -L/usr/local/ssl/lib
-    #USESSL=securetransport
-endif
-
+CFLAGS += -DP_OS_LINUX
+LDFLAGS += -lssl -lcrypto -lpthread
 
 OBJ=overlay_client.o  debug.o
 

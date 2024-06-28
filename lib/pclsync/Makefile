@@ -18,27 +18,19 @@ CFLAGS=-Wall -Wpointer-arith -Wunused-function -Wunused-but-set-parameter -Wunus
 LIB_A=psynclib.a
 UNAME_S := $(shell uname -s)
 UNAME_V := $(shell uname -v)
-ifeq ($(UNAME_S),Linux)
-    CFLAGS += -DP_OS_LINUX -D_FILE_OFFSET_BITS=64
-        ifneq (,$(findstring Debian,$(UNAME_V)))
-            CFLAGS += -DP_OS_DEBIAN
-        endif
-LAGS += -lssl -lcrypto -lfuse -lpthread -lsqlite3 -lzlib
+CFLAGS += -DP_OS_LINUX -D_FILE_OFFSET_BITS=64
+# XXX: remove, debian is not special
+ifneq (,$(findstring Debian,$(UNAME_V)))
+    CFLAGS += -DP_OS_DEBIAN
 endif
-
-ifeq ($(UNAME_S),Darwin)
-    CFLAGS += -DP_OS_MACOSX -I/usr/local/ssl/include/
-    CFLAGS += -DP_OS_MACOSX -I/usr/local/include/osxfuse/
-	LDFLAGS += -lssl -lcrypto -losxfuse -lsqlite3 -framework Cocoa -L/usr/local/ssl/lib
-endif
-
+LDFLAGS += -lssl -lcrypto -lfuse -lpthread -lsqlite3 -lzlib
 
 OBJ=pcompat.o psynclib.o plocks.o plibs.o pcallbacks.o pdiff.o pstatus.o papi.o ptimer.o\
 	pupload.o pdownload.o pfolder.o psyncer.o ptasks.o psettings.o pnetlibs.o pcache.o\
 	pscanner.o plist.o plocalscan.o plocalnotify.o pp2p.o pcrypto.o pssl.o pfileops.o\
 	ptree.o ppassword.o prunratelimit.o pmemlock.o pnotifications.o pexternalstatus.o\
-	publiclinks.o pbusinessaccount.o pcontacts.o poverlay.o poverlay_lin.o poverlay_mac.o\
-	pcompression.o pasyncnet.o ppathstatus.o pdevice_monitor.o ptools.o
+	publiclinks.o pbusinessaccount.o pcontacts.o poverlay.o poverlay_lin.o pcompression.o\
+	pasyncnet.o ppathstatus.o pdevice_monitor.o ptools.o
 
 OBJFS=pfs.o ppagecache.o pfsfolder.o pfstasks.o pfsupload.o pintervaltree.o pfsxattr.o\
 	pcloudcrypto.o pfscrypto.o pcrc32c.o pfsstatic.o plocks.o

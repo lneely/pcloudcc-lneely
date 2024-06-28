@@ -37,8 +37,6 @@ int callbacks_running = 1;
 
 #if defined(P_OS_LINUX)
 #include "poverlay_lin.c"
-#elif defined(P_OS_MACOSX)
-#include "poverlay_mac.c"
 #else
 void overlay_main_loop(VOID){}
 void instance_thread(LPVOID){}

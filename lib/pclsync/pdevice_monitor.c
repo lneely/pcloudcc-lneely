@@ -162,145 +162,11 @@ void devmon_activity_timer_start(){
 //	print_device_info(pDevExtInfo);
 //}
 
-#ifdef P_OS_MACOSX
-#include <stdio.h>
-#include <stdlib.h>
-
-#include <CoreFoundation/CoreFoundation.h>
-#include <IOKit/IOKitLib.h>
-#include <IOKit/IOMessage.h>
-#include <IOKit/IOCFPlugIn.h>
-#include <IOKit/usb/IOUSBLib.h>
-
-typedef struct MyPrivateData {
-    io_object_t notification;
-    const char* systempath;
-} MyPrivateData;
-
-static IONotificationPortRef    gNotifyPort;
-static io_iterator_t            gAddedIter;
-static CFRunLoopRef             gRunLoop;
-
-void DeviceNotification(void *refCon, io_service_t service, natural_t messageType, void *messageArgument)
-{
-  kern_return_t   kr;
-  MyPrivateData   *privateDataRef = (MyPrivateData *) refCon;
-
-  if (messageType == kIOMessageServiceIsTerminated) {
-//    remove_device(privateDataRef->systempath);
-//    debug(D_NOTICE, "Device removed. Mountpoint: %s\n", privateDataRef->systempath);
-    free(privateDataRef->systempath);
-    kr = IOObjectRelease(privateDataRef->notification);
-    free(privateDataRef);
-    devmon_activity_timer_start();
-  }
-}
-
-void DeviceAdded(void *refCon, io_iterator_t iterator)
-{
-  kern_return_t kr;
-  io_service_t usbDevice;
-  CFStringRef     deviceNameAsCFString;
-  static int first_call=1;
-
-  while ((usbDevice = IOIteratorNext(iterator))) {
-    io_name_t deviceName;
-    MyPrivateData *privateDataRef = NULL;
-    privateDataRef = malloc(sizeof(MyPrivateData));
-    bzero(privateDataRef, sizeof(MyPrivateData));
-  // Ought to work now, regardless of version of OSX being ran.
-    CFStringRef usbSerial = (CFStringRef) IORegistryEntrySearchCFProperty(
-      usbDevice,
-      kIOServicePlane,
-      CFSTR("USB Serial Number"),
-      kCFAllocatorDefault,
-      kIORegistryIterateRecursively
-      );
-//    if (!usbSerial) continue;
-    // Ought to work now, regardless of version of OSX being ran.
-    CFStringRef usbVendor = (CFStringRef) IORegistryEntrySearchCFProperty(
-      usbDevice,
-      kIOServicePlane,
-      CFSTR("USB Vendor Name"),
-      kCFAllocatorDefault,
-      kIORegistryIterateRecursively
-      );
-//    if (!usbVendor) continue;
-    // Get the USB device's name.
-    kr = IORegistryEntryGetName(usbDevice, deviceName);
-    if (KERN_SUCCESS != kr) {
-      deviceName[0] = '\0';
-    }
-    deviceNameAsCFString = CFStringCreateWithCString(kCFAllocatorDefault, deviceName,
-                                                    kCFStringEncodingASCII);
-//    if (!deviceNameAsCFString) continue;
-    if (!first_call){
-      debug(D_NOTICE, "start deviceactivity timer");
-      devmon_activity_timer_start();
-    }
-    // Register for an interest notification of this device being removed. Use a reference to our
-    // private data as the refCon which will be passed to the notification callback.
-    kr = IOServiceAddInterestNotification(gNotifyPort,                      // notifyPort
-                                          usbDevice,                        // service
-                                          kIOGeneralInterest,               // interestType
-                                          DeviceNotification,               // callback
-                                          privateDataRef,                   // refCon
-                                          &(privateDataRef->notification)   // notification
-                                          );
-    if (KERN_SUCCESS != kr) {
-      debug(D_NOTICE, "IOServiceAddInterestNotification returned 0x%08x.\n", kr);
-    }
-    // Done with this USB device; release the reference added by IOIteratorNext
-    kr = IOObjectRelease(usbDevice);
-  }
-  first_call=0;
-}
-
-void device_monitor_thread() {
-    CFMutableDictionaryRef  matchingDict;
-    CFRunLoopSourceRef      runLoopSource;
-//    CFNumberRef             numberRef;
-    kern_return_t           kr;
-    matchingDict = IOServiceMatching(kIOUSBDeviceClassName);    // Interested in instances of class
-                                                                // IOUSBDevice and its subclasses
-    if (matchingDict == NULL) {
-        debug(D_NOTICE, "IOServiceMatching returned NULL.\n");
-        return;
-    }
-    gNotifyPort = IONotificationPortCreate(kIOMasterPortDefault);
-    runLoopSource = IONotificationPortGetRunLoopSource(gNotifyPort);
-    gRunLoop = CFRunLoopGetCurrent();
-    CFRunLoopAddSource(gRunLoop, runLoopSource, kCFRunLoopDefaultMode);
-    // Now set up a notification to be called when a device is first matched by I/O Kit.
-    kr = IOServiceAddMatchingNotification(gNotifyPort,                  // notifyPort
-                                          kIOFirstMatchNotification,    // notificationType
-                                          matchingDict,                 // matching
-                                          DeviceAdded,                  // callback
-                                          NULL,                         // refCon
-                                          &gAddedIter                   // notification
-                                          );
-    // Iterate once to get already-present devices and arm the notification
-    DeviceAdded(NULL, gAddedIter);
-    // Start the run loop. Now we'll receive notifications.
-    debug(D_NOTICE, "Starting run loop.\n\n");
-    CFRunLoopRun();
-    // We should never get here
-    debug(D_NOTICE, "Unexpectedly back from CFRunLoopRun()!");
-    return;
-}
-
-void psync_devmon_init(){
-  psync_run_thread("Device monitor main thread", device_monitor_thread);
-}
-#endif //P_OS_MACOSX
-
-#ifdef P_OS_LINUX
 #include <libudev.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <locale.h>
 #include <unistd.h>
-
 
 void enumerate_devices (struct udev *udev,device_event event) {
   devmon_activity_timer_start();
@@ -365,4 +231,3 @@ void device_monitor_thread(){
 void psync_devmon_init(){
   psync_run_thread("libusb handle events completed thread", device_monitor_thread);
 }
-#endif //P_OS_LINUX

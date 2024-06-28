@@ -35,11 +35,7 @@
 #include "pcompat.h"
 #include "psynclib.h"
 
-#if defined(P_OS_MACOSX)
-#define PFS_XATTR_IGN , uint32_t ign
-#else
 #define PFS_XATTR_IGN
-#endif
 
 int psync_fs_setxattr(const char *path, const char *name, const char *value, size_t size, int flags PFS_XATTR_IGN);
 int psync_fs_getxattr(const char *path, const char *name, char *value, size_t size PFS_XATTR_IGN);

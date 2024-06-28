@@ -44,12 +44,6 @@
 #include <sys/sysinfo.h>
 #endif
 
-#if defined(P_OS_MACOSX)
-#include <sys/sysctl.h>
-#include <sys/attr.h>
-#include <SystemConfiguration/SystemConfiguration.h>
-#endif
-
 #if defined(P_OS_POSIX)
 
 #include <sys/types.h>
@@ -118,7 +112,6 @@ PSYNC_THREAD const char *psync_thread_name="no name";
 static pthread_mutex_t socket_mutex=PTHREAD_MUTEX_INITIALIZER;
 
 const unsigned char psync_invalid_filename_chars[256]={
-#if defined(P_OS_LINUX)
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
@@ -135,61 +128,11 @@ const unsigned char psync_invalid_filename_chars[256]={
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-#elif defined(P_OS_MACOSX)
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-#else
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-#endif
 };
 
-int psync_user_is_admin(){
-#if defined(P_OS_MACOSX)
-  struct group *ag;
-  int i;
-  if (psync_uid==0)
-    return 1;
-  else if (psync_gids_cnt==0)
-    return 0;
-  ag=getgrnam("admin");
-  if (!ag)
-    return 0;
-  for (i=0; i<psync_gids_cnt; i++)
-    if (ag->gr_gid==psync_gids[i])
-      return 1;
+int
+psync_user_is_admin(){
   return 0;
-#else
-  return 0;
-#endif
 }
 
 void 
@@ -459,11 +402,7 @@ psync_milisleep(uint64_t millisec){
 
 time_t 
 psync_time(){
-#if defined(P_OS_MACOSX)
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return tv.tv_sec;
-#elif defined(_POSIX_TIMERS) && _POSIX_TIMERS>0
+#if defined(_POSIX_TIMERS) && _POSIX_TIMERS>0
   struct timespec ts;
   if (likely_log(clock_gettime(CLOCK_REALTIME, &ts)==0))
     return ts.tv_sec;
@@ -948,22 +887,6 @@ resolve_callback(void *h, void *ptr){
   psync_task_complete(h, res);
 }
 
-#if defined(P_OS_MACOSX) && 0
-
-#define PSYNC_HAS_PROXY_CODE
-
-const void *
-get_value_cstr(CFDictionaryRef dict, const char *key) {
-  CFStringRef str;
-  const void *ret;
-  str=CFStringCreateWithCString(NULL, key, kCFStringEncodingUTF8);
-  ret=CFDictionaryGetValue(dict, str);
-  CFRelease(str);
-  return ret;
-}
-
-#endif
-
 #if defined(PSYNC_HAS_PROXY_CODE)
 static int 
 recent_detect(){
@@ -1041,9 +964,6 @@ connect_socket_direct(const char *host, const char *port){
 #if defined(P_OS_LINUX)
     setsockopt(sock, SOL_TCP, TCP_NODELAY, (char *)&sock_opt, sizeof(sock_opt));
     setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *)&sock_opt, sizeof(sock_opt));
-#elif defined(P_OS_MACOSX) || defined(P_OS_BSD)
-    setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char  *)&sock_opt, sizeof(sock_opt));
-    setsockopt(sock, IPPROTO_TCP, TCP_KEEPALIVE, (char*)&sock_opt, sizeof(sock_opt));
 #endif
 #if defined(SOL_TCP)
 #if defined(TCP_KEEPCNT)
@@ -2127,10 +2047,6 @@ psync_list_dir(const char *path, psync_list_dir_callback callback, void *ptr){
     if (de->d_name[0]!='.' || (de->d_name[1]!=0 && (de->d_name[1]!='.' || de->d_name[2]!=0))){
       psync_strlcpy(cpath+pl, de->d_name, namelen+1);
       if (likely_log(!lstat(cpath, &pst.stat)) && (S_ISREG(pst.stat.st_mode) || S_ISDIR(pst.stat.st_mode))){
-#if defined(P_OS_MACOSX)
-        if (pst.stat.st_flags&(UF_HIDDEN|UF_IMMUTABLE|SF_IMMUTABLE))
-          continue;
-#endif
         pst.name=de->d_name;
         callback(ptr, &pst);
       }
@@ -2146,9 +2062,6 @@ err1:
 
 int 
 psync_list_dir_fast(const char *path, psync_list_dir_callback_fast callback, void *ptr){
-#if defined(P_OS_MACOSX)
-  return psync_list_dir(path, callback, ptr);
-#elif defined(P_OS_POSIX)
   psync_pstat_fast pst;
   struct stat st;
   DIR *dh;
@@ -2204,7 +2117,6 @@ psync_list_dir_fast(const char *path, psync_list_dir_callback_fast callback, voi
 err1:
   psync_error=PERROR_LOCAL_FOLDER_NOT_FOUND;
   return -1;
-#endif
 }
 
 int64_t 
@@ -2361,44 +2273,12 @@ psync_file_dup(psync_file_t fd){
 
 int 
 psync_file_set_creation(psync_file_t fd, time_t ctime){
-#if defined(P_OS_MACOSX)
-  struct attrlist attr;
-  struct timespec crtime;
-  memset(&attr, 0, sizeof(attr));
-  attr.bitmapcount=ATTR_BIT_MAP_COUNT;
-  attr.commonattr=ATTR_CMN_CRTIME;
-  crtime.tv_sec=ctime;
-  crtime.tv_nsec=0;
-  return fsetattrlist(fd, &attr, &crtime, sizeof(struct timespec), FSOPT_NOFOLLOW);
-#else
   return -1;
-#endif
 }
 
 int 
 psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime){
-#if defined(P_OS_MACOSX)
-  if (crtime){
-    struct attrlist attr;
-    struct timespec crtimes;
-    memset(&attr, 0, sizeof(attr));
-    attr.bitmapcount=ATTR_BIT_MAP_COUNT;
-    attr.commonattr=ATTR_CMN_CRTIME;
-    crtimes.tv_sec=crtime;
-    crtimes.tv_nsec=0;
-    if (setattrlist(path, &attr, &crtimes, sizeof(struct timespec), FSOPT_NOFOLLOW))
-      return -1;
-  }
-  if (mtime){
-    struct timeval tm[2];
-    tm[0].tv_sec=mtime;
-    tm[0].tv_usec=0;
-    tm[1].tv_sec=mtime;
-    tm[1].tv_usec=0;
-    return utimes(path, tm);
-  }
-  return 0;
-#elif defined(P_OS_POSIX)
+#if defined(P_OS_POSIX)
   if (mtime){
     struct timeval tm[2];
     tm[0].tv_sec=mtime;
@@ -2421,28 +2301,7 @@ psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime){
 
 int 
 psync_set_crtime_mtime_by_fd(psync_file_t fd, const char *path, time_t crtime, time_t mtime){
-#if defined(P_OS_MACOSX)
-  if (crtime){
-    struct attrlist attr;
-    struct timespec crtimes;
-    memset(&attr, 0, sizeof(attr));
-    attr.bitmapcount=ATTR_BIT_MAP_COUNT;
-    attr.commonattr=ATTR_CMN_CRTIME;
-    crtimes.tv_sec=crtime;
-    crtimes.tv_nsec=0;
-    if (fsetattrlist(fd, &attr, &crtimes, sizeof(struct timespec), FSOPT_NOFOLLOW))
-      return -1;
-  }
-  if (mtime){
-    struct timeval tm[2];
-    tm[0].tv_sec=mtime;
-    tm[0].tv_usec=0;
-    tm[1].tv_sec=mtime;
-    tm[1].tv_usec=0;
-    return futimes(fd, tm);
-  }
-  return 0;
-#elif defined(_BSD_SOURCE) || defined(P_OS_BSD)
+#if defined(_BSD_SOURCE) || defined(P_OS_BSD)
   if (mtime){
     struct timeval tm[2];
     tm[0].tv_sec=mtime;
@@ -2650,33 +2509,7 @@ psync_appname(){
 char *
 psync_deviceid(){
   char *device;
-#if defined(P_OS_MACOSX)
-  struct utsname un;
-  const char *ver;
-  size_t len;
-  char versbuff[64], modelname[256];
-  int v;
-  if (uname(&un))
-    ver="Mac OS X";
-  else{
-    v=atoi(un.release);
-    switch (v){
-      case 16: ver="macOS 10.12 Sierra"; break;
-      case 15: ver="OS X 10.11 El Capitan"; break;
-      case 14: ver="OS X 10.10 Yosemite"; break;
-      case 13: ver="OS X 10.9 Mavericks"; break;
-      case 12: ver="OS X 10.8 Mountain Lion"; break;
-      case 11: ver="OS X 10.7 Lion"; break;
-      case 10: ver="OS X 10.6 Snow Leopard"; break;
-      default: psync_slprintf(versbuff, sizeof(versbuff), "Mac/Darwin %s", un.release); ver=versbuff;
-    }
-  }
-  len=sizeof(modelname);
-  if (sysctlbyname("hw.model", modelname, &len, NULL, 0))
-    psync_strlcpy(modelname, "Mac", sizeof(modelname));
-  versbuff[sizeof(versbuff)-1]=0;
-  device=psync_strcat(modelname, ", ", ver, NULL);
-#elif defined(P_OS_LINUX)
+#if defined(P_OS_LINUX)
   DIR *dh;
   struct dirent entry, *de;
   const char *hardware;
@@ -2709,18 +2542,11 @@ psync_deviceid(){
   return device;
 }
 
+#define PSYNC_RUN_CMD "xdg-open" // XXX: verify this...
+
 int 
 psync_run_update_file(const char *path){
-#if defined(P_OS_LINUX) || defined(P_OS_MACOSX)
 #if defined(P_OS_LINUX)
-#if defined(P_OS_DEBIAN)
-#define PSYNC_RUN_CMD "/usr/lib/psyncgui/debinstall.sh"
-#else
-#define PSYNC_RUN_CMD "qapt-deb-installer"
-#endif
-#else
-#define PSYNC_RUN_CMD "open"
-#endif
   pid_t pid;
   debug(D_NOTICE, "running %s with "PSYNC_RUN_CMD, path);
   pid=fork();
@@ -2765,22 +2591,6 @@ psync_invalidate_os_cache_needed(){
 
 extern int overlays_running;
 
-#if defined(P_OS_MACOSX)
-
-void 
-psync_rebuild_icons(){
-  int ret = 0;
-
-  if (!overlays_running)
-    return;
-
-  debug(D_NOTICE, "Stopping finder plugin to refresh all icons.");
-  ret = system("/bin/sh -c \"pluginkit -e ignore -i com.pcloud.pcloud.macos.pCloudFinderExt;sleep 0.5;pluginkit -e use -i com.pcloud.pcloud.macos.pCloudFinderExt;\"");
-  debug(D_ERROR, "Reseting Finder Ext");
-}
-
-#else
-
 void 
 psync_rebuild_icons(){
   if (!overlays_running)
@@ -2788,69 +2598,9 @@ psync_rebuild_icons(){
   return;
 }
 
-#endif
-
 int 
 psync_invalidate_os_cache(const char *path){
-#if defined(P_OS_MACOSX)
-  int pfds[2];
-  pid_t pid;
-  debug(D_NOTICE, "running osascript to refresh finder");
-  if (unlikely(pipe(pfds))){
-    debug(D_ERROR, "pipe failed");
-    return -1;
-  }
-  pid=fork();
-  if (unlikely(pid==-1)){
-    close(pfds[0]);
-    close(pfds[1]);
-    debug(D_ERROR, "fork failed");
-    return -1;
-  }
-  else if (pid){
-    const char *cmd="tell application \"Finder\"\n\
-  repeat with i from 1 to count of Finder windows\n\
-    tell window i\n\
-      try\n\
-        update every item in every folder with necessity\n\
-      end try\n\
-    end tell\n\
-  end repeat\n\
-end tell\n";
-    int status;
-    close(pfds[0]);
-    status=strlen(cmd);
-    if (write(pfds[1], cmd, status)!=status || close(pfds[1])!=0){
-      debug(D_ERROR, "write to pipe failed");
-      kill(pid, SIGKILL);
-      waitpid(pid, &status, 0);
-      return -1;
-    }
-    if (waitpid(pid, &status, 0)==0 && WIFEXITED(status) && WEXITSTATUS(status)==0){
-      debug(D_NOTICE, "execution of osascript succeded");
-      return 0;
-    }
-    else{
-      debug(D_ERROR, "execution of osascript failed");
-      return -1;
-    }
-  }
-  else{
-    int fd;
-    close(pfds[1]);
-    dup2(pfds[0], STDIN_FILENO);
-    close(pfds[0]);
-    fd=open("/dev/null", O_RDWR);
-    dup2(fd, STDOUT_FILENO);
-    dup2(fd, STDERR_FILENO);
-    close(fd);
-    execl("/bin/sh", "/bin/sh", "-c", "osascript", NULL);
-    debug(D_ERROR, "exec of \"/bin/sh -c osascript\" failed");
-    exit(1);
-  }
-#else
   return 0;
-#endif
 }
 
 void *

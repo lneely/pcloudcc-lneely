@@ -69,11 +69,6 @@ typedef off_t fuse_off_t;
 #include <signal.h>
 #endif
 
-#if defined(P_OS_MACOSX)
-#include <sys/mount.h>
-#include <sys/mount.h>
-#endif
-
 #if defined(P_OS_LINUX)
 #include <sys/mount.h>
 #endif
@@ -89,16 +84,6 @@ typedef off_t fuse_off_t;
 
 #define FS_BLOCK_SIZE 4096
 #define FS_MAX_WRITE  16*1024*1024
-
-#if defined(P_OS_MACOSX)
-#define FS_MAX_ACCEPTABLE_FILENAME_LEN 255
-#define FUSE_HAS_SETCRTIME 1
-
-#if defined(_DARWIN_FEATURE_64_BIT_INODE)
-#define FUSE_STAT_HAS_BIRTHTIME
-#endif
-
-#endif
 
 #if defined(P_OS_LINUX)
 #define PSYNC_FS_ERR_CRYPTO_EXPIRED EROFS
@@ -3221,11 +3206,6 @@ static void psync_fs_do_stop(void){
   debug(D_NOTICE, "stopping");
   pthread_mutex_lock(&start_mutex);
   if (started==1){
-#if defined(P_OS_MACOSX)
-    debug(D_NOTICE, "running unmount");
-    unmount(psync_current_mountpoint, MNT_FORCE);
-    debug(D_NOTICE, "unmount exited");
-#endif
 
 #if defined(P_OS_LINUX)
 	char *mp;
@@ -3331,11 +3311,6 @@ static void psync_fuse_thread(){
   pthread_mutex_lock(&start_mutex);
   fuse_destroy(psync_fuse);
   debug(D_NOTICE, "fuse_destroy exited");
-/*#if defined(P_OS_MACOSX)
-  debug(D_NOTICE, "calling unmount");
-  unmount(psync_current_mountpoint, MNT_FORCE);
-  debug(D_NOTICE, "unmount exited");
-#endif*/
   psync_free(psync_current_mountpoint);
   started=0;
   pthread_cond_broadcast(&start_cond);
@@ -3385,17 +3360,6 @@ static int psync_fs_do_start(){
 //  fuse_opt_add_arg(&args, "-d");
 #endif
 
-#if defined(P_OS_MACOSX)
-  fuse_opt_add_arg(&args, "argv");
-  fuse_opt_add_arg(&args, "-ovolname="DEFAULT_FUSE_VOLUME_NAME);
-  fuse_opt_add_arg(&args, "-ofsname="DEFAULT_FUSE_MOUNT_POINT".fs");
-  //fuse_opt_add_arg(&args, "-olocal");
-  if (psync_user_is_admin())
-    fuse_opt_add_arg(&args, "-oallow_root");
-  fuse_opt_add_arg(&args, "-onolocalcaches");
-  fuse_opt_add_arg(&args, "-ohard_remove");
-#endif
-
   memset(&psync_oper, 0, sizeof(psync_oper));
 
   psync_oper.init     = psync_fs_init;
@@ -3442,10 +3406,6 @@ static int psync_fs_do_start(){
   if (started)
     goto err00;
   mp=psync_fuse_get_mountpoint();
-
-#if defined(P_OS_MACOSX)
-  unmount(mp, MNT_FORCE);
-#endif
 
   psync_fuse_channel=fuse_mount(mp, &args);
   if (unlikely_log(!psync_fuse_channel))

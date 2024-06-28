@@ -46,11 +46,6 @@
 #include <net/if.h>
 #endif
 
-#if defined(P_OS_MACOSX)
-#include <unistd.h>
-#include <stdio.h>
-#endif
-
 /*************************************************************/
 char* getMACaddr() {
   char  buffer[128];
@@ -76,17 +71,6 @@ char* getMACaddr() {
 
   sprintf(buffer, "%.2x%.2x%.2x%.2x%.2x%.2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   buffer[12] = 0;
-#endif
-
-#if defined(P_OS_MACOSX)
-  int   byteRead = 0;
-  FILE* stream = popen("ifconfig en0 | grep ether | cut -c 8-24", "r");
-
-  while (!feof(stream) && !ferror(stream)) {
-    byteRead = fread(buffer, 1, 128, stream);
-  }
-  
-  buffer[byteRead] = 0;
 #endif
 
   if (buffer[0] == 0) {
@@ -362,27 +346,12 @@ char* get_machine_name() {
   gethostname(pcName, nameSize);
 #endif
 
-#if defined(P_OS_MACOSX)
-  int byteRead;
-  FILE* stream = popen("system_profiler SPSoftwareDataType | grep \"Computer Name\" | cut -d: -f2", "r");
-
-  while (!feof(stream) && !ferror(stream)) {
-    byteRead = fread(pcName, 1, 128, stream);
-  }
-  if(byteRead > 0) {
-    pcName[byteRead-1] = 0;
-  }
-#endif
-
   if (pcName[0] == 0) {
 
 #if defined(P_OS_LINUX)
     strcpy(pcName, "LinuxMachine");
 #endif
 
-#if defined(P_OS_MACOSX)
-    strcpy(pcName, "MacMachine");
-#endif
   }
 
   return psync_strdup(pcName);

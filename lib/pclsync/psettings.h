@@ -148,11 +148,7 @@
 #define PSYNC_DEFAULT_CACHE_FOLDER "Cache"
 #define PSYNC_DEFAULT_READ_CACHE_FILE "cached"
 
-#if defined(P_OS_MACOSX)
-#define PSYNC_DEFAULT_FS_FOLDER "pCloud Drive"
-#else
 #define PSYNC_DEFAULT_FS_FOLDER "pCloudDrive"
-#endif
 
 #define PSYNC_DEFAULT_POSIX_FOLDER_MODE 0755
 #define PSYNC_DEFAULT_POSIX_FILE_MODE 0644
@@ -273,10 +269,7 @@ $RECYCLE.BIN;\
 *.part;\
 .pcloud;"
 
-#if defined (P_OS_MACOSX)
-#define PSYNC_IGNORE_PATHS_DEFAULT "/Applications;/Library;/private;/System;/bin;/etc;/sbin;/usr;"
-#endif
-
+// XXX: wtf??
 #if defined (P_OS_LINUX)
 #define PSYNC_IGNORE_PATHS_DEFAULT "/Applications;/Library;/private;/System;/bin;/dev;/etc;/net;/sbin;/usr;/Developer;"
 #endif

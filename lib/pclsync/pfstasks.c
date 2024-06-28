@@ -1918,9 +1918,7 @@ void psync_fstask_add_banned_folder(psync_fsfolderid_t folderid, const char *nam
 }
 
 void psync_fstask_add_banned_folders(){
-#if defined(P_OS_MACOSX)
-  psync_fstask_add_banned_folder(0, ".TemporaryItems");
-#endif
+  // noop
 }
 
 void psync_fstask_init(){

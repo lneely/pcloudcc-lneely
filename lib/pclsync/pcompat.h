@@ -34,15 +34,8 @@
 
 #include "pcompiler.h"
 
-#if !defined(P_OS_LINUX) && !defined(P_OS_MACOSX) && !defined(P_OS_BSD) && !defined(P_OS_POSIX)
-#if defined(__ANDROID__)
-#define P_OS_LINUX
-#define P_OS_POSIX
-#elif defined(__APPLE__)
-#define P_OS_MACOSX
-#define P_OS_BSD
-#define P_OS_POSIX
-#elif defined(__CYGWIN__)
+#if !defined(P_OS_LINUX) && !defined(P_OS_BSD) && !defined(P_OS_POSIX)
+#if defined(__CYGWIN__)
 #define P_OS_POSIX
 #elif defined(__linux__)
 #define P_OS_LINUX
@@ -66,22 +59,16 @@
 #endif
 #endif
 
-#if (defined(P_OS_LINUX) || defined(P_OS_MACOSX) || defined(P_OS_BSD)) && !defined(P_OS_POSIX)
+#if (defined(P_OS_LINUX) || defined(P_OS_BSD)) && !defined(P_OS_POSIX)
 #define P_OS_POSIX
 #endif
 
-#if !defined(P_OS_LINUX) && !defined(P_OS_MACOSX) && !defined(P_OS_POSIX)
+#if !defined(P_OS_LINUX) && !defined(P_OS_POSIX)
 #warning "You OS may not be supported, trying to build POSIX compatible source"
 #define P_OS_POSIX
 #endif
 
-#if defined(P_OS_MACOSX)
-
-#define P_OS_ID 6
-
-#define _DARWIN_USE_64_BIT_INODE
-
-#elif defined(P_OS_LINUX)
+#if defined(P_OS_LINUX)
 
 #define P_OS_ID 7
 
@@ -168,17 +155,9 @@ typedef unsigned long psync_uint_t;
 #endif
 
 #define psync_stat_inode(s) ((s)->st_ino)
-#if defined(P_OS_MACOSX)
-#define psync_stat_device(s) ((s)->st_dev>>24)
-#else
 #define psync_stat_device(s) ((s)->st_dev)
-#endif
 #define psync_stat_device_full(s) ((s)->st_dev)
-#if defined(P_OS_MACOSX)
-#define psync_deviceid_short(deviceid) (deviceid>>24)
-#else
 #define psync_deviceid_short(deviceid) (deviceid)
-#endif
 
 typedef struct stat psync_stat_t;
 
@@ -264,16 +243,11 @@ typedef struct {
   psync_stat_t stat;
 } psync_pstat;
 
-#if defined(P_OS_MACOSX)
-typedef psync_pstat psync_pstat_fast;
-#define psync_stat_fast_isfolder(a) psync_stat_isfolder(&(a)->stat)
-#else
 typedef struct {
   const char *name;
   uint8_t isfolder;
 } psync_pstat_fast;
 #define psync_stat_fast_isfolder(a) ((a)->isfolder)
-#endif
 
 typedef struct {
   struct sockaddr_storage address;

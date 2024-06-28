@@ -29,7 +29,7 @@
 #include "pcompat.h"
 #include "plibs.h"
 
-#if defined(P_OS_LINUX) || defined(P_OS_MACOSX) || defined(P_OS_BSD)
+#if defined(P_OS_LINUX) || defined(P_OS_BSD)
 
 #include <stdio.h>
 #include <sys/socket.h>
@@ -133,4 +133,4 @@ void instance_thread(void* lpvParam)
   return;
 };
 
-#endif //defined(P_OS_LINUX) || definef(P_OS_MACOSX) || defined(P_OS_BSD)
+#endif //defined(P_OS_LINUX) || defined(P_OS_BSD)
