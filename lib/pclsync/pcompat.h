@@ -34,38 +34,14 @@
 
 #include "pcompiler.h"
 
-#if !defined(P_OS_LINUX) && !defined(P_OS_BSD) && !defined(P_OS_POSIX)
-#if defined(__CYGWIN__)
+// figure out which OS...
+// XXX: goal is to remove
+// --- 
+#if !defined(P_OS_LINUX) || !defined(P_OS_POSIX)
 #define P_OS_POSIX
-#elif defined(__linux__)
+#if defined(__linux__)
 #define P_OS_LINUX
-#define P_OS_POSIX
-#elif defined(__sun)
-#define P_OS_POSIX
-#elif defined(__FreeBSD__)
-#define P_OS_POSIX
-#define P_OS_BSD
-#elif defined(__DragonFly__)
-#define P_OS_POSIX
-#define P_OS_BSD
-#elif defined(__NetBSD__)
-#define P_OS_POSIX
-#define P_OS_BSD
-#elif defined(__OpenBSD__)
-#define P_OS_POSIX
-#define P_OS_BSD
-#elif defined(__unix__)
-#define P_OS_POSIX
 #endif
-#endif
-
-#if (defined(P_OS_LINUX) || defined(P_OS_BSD)) && !defined(P_OS_POSIX)
-#define P_OS_POSIX
-#endif
-
-#if !defined(P_OS_LINUX) && !defined(P_OS_POSIX)
-#warning "You OS may not be supported, trying to build POSIX compatible source"
-#define P_OS_POSIX
 #endif
 
 #if defined(P_OS_LINUX)
@@ -82,10 +58,9 @@
 
 #endif
 
-#ifdef P_ELECTRON
-#undef P_OS_ID
-#define P_OS_ID 9
-#endif
+
+// "actual" header begins here
+// ---
 
 #define _FILE_OFFSET_BITS 64
 
@@ -113,7 +88,11 @@ typedef unsigned long psync_uint_t;
 #define NTO_STR(s) TO_STR(s)
 #define TO_STR(s) #s
 
-#if defined(P_OS_POSIX)
+
+
+
+
+#if defined(P_OS_POSIX) // P_OS_POSIX
 
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -131,12 +110,7 @@ typedef unsigned long psync_uint_t;
 #define psync_fstat fstat
 #define psync_stat_isfolder(s) S_ISDIR((s)->st_mode)
 #define psync_stat_size(s) ((s)->st_size)
-#ifdef _DARWIN_FEATURE_64_BIT_INODE
-#define psync_stat_birthtime(s) ((s)->st_birthtime)
-#define PSYNC_HAS_BIRTHTIME
-#else
 #define psync_stat_birthtime(s) ((s)->st_mtime)
-#endif
 #define psync_stat_ctime(s) ((s)->st_ctime)
 #define psync_stat_mtime(s) ((s)->st_mtime)
 
@@ -148,8 +122,12 @@ typedef unsigned long psync_uint_t;
   ((s)->st_mtime*1000000ULL+\
   ((struct timespec *)(&(s)->st_mtime))->tv_nsec/1000)
 #endif
+
 #define psync_mtime_native_to_mtime(n) ((n)/1000000ULL)
-#else
+
+
+#else // !P_OS_POSIX
+
 #define psync_stat_mtime_native(s) ((s)->st_mtime)
 #define psync_mtime_native_to_mtime(n) (n)
 #endif
