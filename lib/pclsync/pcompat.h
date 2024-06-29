@@ -37,19 +37,30 @@
 // figure out which OS...
 // XXX: goal is to remove
 // --- 
+#if !defined(P_OS_LINUX) || !defined(P_OS_POSIX)
+#define P_OS_POSIX
 #if defined(__linux__)
 #define P_OS_LINUX
 #endif
+#endif
 
 #if defined(P_OS_LINUX)
-#define P_OS_ID 7  // linux
+
+#define P_OS_ID 7
+
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+
 #else
-#define P_OS_ID 0  // non-linux posix-compliant OS
+
+#define P_OS_ID 0
+
 #endif
 
+
+// "actual" header begins here
+// ---
 
 #define _FILE_OFFSET_BITS 64
 
@@ -77,6 +88,12 @@ typedef unsigned long psync_uint_t;
 #define NTO_STR(s) TO_STR(s)
 #define TO_STR(s) #s
 
+
+
+
+
+#if defined(P_OS_POSIX) // P_OS_POSIX
+
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <sys/time.h>
@@ -101,17 +118,23 @@ typedef unsigned long psync_uint_t;
 #if defined(st_mtimensec)
 #define psync_stat_mtime_native(s) ((s)->st_mtime*1000000ULL+(s)->st_mtimensec/1000)
 #else
-#define psync_stat_mtime_native(s)						\
-  ((s)->st_mtime*1000000ULL+							\
-   ((struct timespec *)(&(s)->st_mtime))->tv_nsec/1000)
+#define psync_stat_mtime_native(s) \
+  ((s)->st_mtime*1000000ULL+\
+  ((struct timespec *)(&(s)->st_mtime))->tv_nsec/1000)
 #endif
 
 #define psync_mtime_native_to_mtime(n) ((n)/1000000ULL)
 
+
+#else // !P_OS_POSIX
+
+#define psync_stat_mtime_native(s) ((s)->st_mtime)
+#define psync_mtime_native_to_mtime(n) (n)
+#endif
+
 #define psync_stat_inode(s) ((s)->st_ino)
 #define psync_stat_device(s) ((s)->st_dev)
 #define psync_stat_device_full(s) ((s)->st_dev)
-
 #define psync_deviceid_short(deviceid) (deviceid)
 
 typedef struct stat psync_stat_t;

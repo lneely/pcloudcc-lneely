@@ -152,6 +152,7 @@ clib::pclsync_lib::do_get_pass_from_console(std::string &password) {
               << std::endl;
     exit(1);
   }
+#ifdef P_OS_POSIX
   termios oldt;
   tcgetattr(STDIN_FILENO, &oldt);
   termios newt = oldt;
@@ -160,6 +161,19 @@ clib::pclsync_lib::do_get_pass_from_console(std::string &password) {
   std::cout << "Please, enter password" << std::endl;
   getline(std::cin, password);
   tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+#else
+  HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+  DWORD modeoff;
+  DWORD modeon;
+  DWORD mode;
+  GetConsoleMode(hStdin, &mode);
+  modeoff = mode & ~ENABLE_ECHO_INPUT;
+  modeon = mode | ENABLE_ECHO_INPUT;
+  SetConsoleMode(hStdin, modeoff);
+  std::cout << "Please, enter password" << std::endl;
+  getline(std::cin, password);
+  SetConsoleMode(hStdin, modeon);
+#endif
 }
 
 void 

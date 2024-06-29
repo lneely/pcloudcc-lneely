@@ -117,8 +117,12 @@ PSYNC_PURE static const char *p2p_get_address(void *addr){
   if (((struct sockaddr_in *)addr)->sin_family==AF_INET)
     return inet_ntoa(((struct sockaddr_in *)addr)->sin_addr);
   else{
+#if defined(P_OS_POSIX)
     static char buff[80];
     return inet_ntop(AF_INET6, &((struct sockaddr_in6 *)addr)->sin6_addr, buff, sizeof(buff));
+#else
+    return "IPv6 address"; /* inet_ntop on Windows is Vista+ */
+#endif
   }
 }
 
@@ -126,8 +130,12 @@ PSYNC_PURE static const char *p2p_get_peer_address(){
   if (paddr.ss_family==AF_INET)
     return inet_ntoa(((struct sockaddr_in *)&paddr)->sin_addr);
   else{
+#if defined(P_OS_POSIX)
     static char buff[80];
     return inet_ntop(AF_INET6, &((struct sockaddr_in6 *)&paddr)->sin6_addr, buff, sizeof(buff));
+#else
+    return "IPv6 address"; /* inet_ntop on Windows is Vista+ */
+#endif
   }
 }
 
