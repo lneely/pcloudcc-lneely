@@ -38,16 +38,17 @@
 // XXX: goal is to remove
 // --- 
 #if defined(__linux__)
+// linux os
+#ifndef P_OS_LINUX // HACK: need to rework includes
 #define P_OS_LINUX
 #endif
-
-#if defined(P_OS_LINUX)
 #define P_OS_ID 7  // linux
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 #else
-#define P_OS_ID 0  // non-linux posix-compliant OS
+// non-linux posix-compliant OS
+#define P_OS_ID 0  
 #endif
 
 
