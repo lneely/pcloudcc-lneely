@@ -2129,9 +2129,9 @@ psync_file_sync(psync_file_t fd){
       if (!fcntl(fd, F_FULLFSYNC))
         return 0;
     }
-    debug(D_NOTICE, "got error %d, when doing fcntl(F_FULLFSYNC), trying fsync()", (int)errno);
+    debug(D_NOTICE, "got error %d, when doing fcntl(F_FULLFSYNC), trying fsync()", errno);
     if (fsync(fd)){
-      debug(D_NOTICE, "fsync also failed, error %d", (int)errno);
+      debug(D_NOTICE, "fsync also failed, error %d", errno);
       return -1;
     }
     else{
@@ -2152,7 +2152,7 @@ psync_file_sync(psync_file_t fd){
       if (!fsync(fd))
         return 0;
     }
-    debug(D_NOTICE, "got error %d", (int)errno);
+    debug(D_NOTICE, "got error %d", errno);
     return -1;
   }
   else
@@ -2169,17 +2169,17 @@ psync_file_schedulesync(psync_file_t fd){
   void *fmap;
   int ret;
   if (unlikely(fstat(fd, &st))){
-    debug(D_NOTICE, "fstat failed, errno=%d", (int)errno);
+    debug(D_NOTICE, "fstat failed, errno=%d", errno);
     return -1;
   }
   fmap=mmap(NULL, st.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
   if (unlikely(fmap==MAP_FAILED)){
-    debug(D_NOTICE, "mmap failed, errno=%d", (int)errno);
+    debug(D_NOTICE, "mmap failed, errno=%d", errno);
     return -1;
   }
   ret=msync(fmap, st.st_size, MS_ASYNC);
   if (unlikely(ret))
-    debug(D_NOTICE, "msync failed, errno=%d", (int)errno);
+    debug(D_NOTICE, "msync failed, errno=%d", errno);
   munmap(fmap, st.st_size);
   return ret;
 #else
@@ -2192,11 +2192,11 @@ psync_folder_sync(const char *path){
   int fd, ret;
   fd=open(path, O_RDONLY);
   if (fd==-1){
-    debug(D_NOTICE, "could not open folder %s, error %d", path, (int)errno);
+    debug(D_NOTICE, "could not open folder %s, error %d", path, errno);
     return -1;
   }
   if (unlikely(psync_file_sync(fd))){
-    debug(D_NOTICE, "could not fsync folder %s, error %d", path, (int)errno);
+    debug(D_NOTICE, "could not fsync folder %s, error %d", path, errno);
     ret=-1;
   }
   else
@@ -2224,7 +2224,7 @@ psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime){
     tm[1].tv_sec=mtime;
     tm[1].tv_usec=0;
     if (unlikely(utimes(path, tm))){
-      debug(D_NOTICE, "got errno %d while setting modification time of %s to %lu: %s", errno, path, (unsigned long)mtime, strerror(errno));
+      debug(D_NOTICE, "got errno %d while setting modification time of %s to %lu: %s", errno, path, mtime, strerror(errno));
       return -1;
     }
     else
@@ -2300,7 +2300,7 @@ psync_file_read(psync_file_t fd, void *buf, size_t count){
       if (ret!=-1)
         return ret;
     }
-    debug(D_NOTICE, "got error %d", (int)errno);
+    debug(D_NOTICE, "got error %d", errno);
   }
   return ret;
 }
@@ -2316,7 +2316,7 @@ psync_file_pread(psync_file_t fd, void *buf, size_t count, uint64_t offset){
       if (ret!=-1)
         return ret;
     }
-    debug(D_NOTICE, "got error %d", (int)errno);
+    debug(D_NOTICE, "got error %d", errno);
   }
   return ret;
 }
@@ -2333,7 +2333,7 @@ psync_file_write(psync_file_t fd, const void *buf, size_t count){
         return ret;
 
     }
-    debug(D_NOTICE, "got error %d", (int)errno);
+    debug(D_NOTICE, "got error %d", errno);
   }
   return ret;
 }
@@ -2349,7 +2349,7 @@ psync_file_pwrite(psync_file_t fd, const void *buf, size_t count, uint64_t offse
       if (ret!=-1)
         return ret;
     }
-    debug(D_NOTICE, "got error %d", (int)errno);
+    debug(D_NOTICE, "got error %d", errno);
   }
   return ret;
 }
@@ -2370,7 +2370,7 @@ psync_file_truncate(psync_file_t fd){
         if (!ftruncate(fd, off))
           return 0;
       }
-      debug(D_NOTICE, "got error %d", (int)errno);
+      debug(D_NOTICE, "got error %d", errno);
       return -1;
     }
     else
@@ -2532,13 +2532,13 @@ psync_mmap_anon(size_t size){
 PSYNC_NOINLINE static void *
 psync_mmap_anon_emergency(size_t size){
   void *ret;
-  debug(D_WARNING, "could not allocate %lu bytes", (unsigned long)size);
+  debug(D_WARNING, "could not allocate %lu bytes", size);
   psync_try_free_memory();
   ret=psync_mmap_anon(size);
   if (likely(ret))
     return ret;
   else{
-    debug(D_CRITICAL, "could not allocate %lu bytes even after freeing some memory, aborting", (unsigned long)size);
+    debug(D_CRITICAL, "could not allocate %lu bytes even after freeing some memory, aborting", size);
     abort();
     return NULL;
   }

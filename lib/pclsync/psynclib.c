@@ -99,7 +99,7 @@ extern int tfa;
 
 PSYNC_NOINLINE void *psync_emergency_malloc(size_t size){
   void *ret;
-  debug(D_WARNING, "could not allocate %lu bytes", (unsigned long)size);
+  debug(D_WARNING, "could not allocate %lu bytes", size);
   psync_try_free_memory();
   ret=psync_real_malloc(size);
   if (likely(ret))
@@ -109,7 +109,7 @@ PSYNC_NOINLINE void *psync_emergency_malloc(size_t size){
     return ret;
 #endif
   else{
-    debug(D_CRITICAL, "could not allocate %lu bytes even after freeing some memory, aborting", (unsigned long)size);
+    debug(D_CRITICAL, "could not allocate %lu bytes even after freeing some memory, aborting", size);
     abort();
     return NULL;
   }
@@ -130,13 +130,13 @@ void *psync_malloc(size_t size){
 
 PSYNC_NOINLINE void *psync_emergency_realloc(void *ptr, size_t size){
   void *ret;
-  debug(D_WARNING, "could not reallocate %lu bytes", (unsigned long)size);
+  debug(D_WARNING, "could not reallocate %lu bytes", size);
   psync_try_free_memory();
   ret=psync_real_realloc(ptr, size);
   if (likely(ret))
     return ret;
   else{
-    debug(D_CRITICAL, "could not reallocate %lu bytes even after freeing some memory, aborting", (unsigned long)size);
+    debug(D_CRITICAL, "could not reallocate %lu bytes even after freeing some memory, aborting", size);
     abort();
     return NULL;
   }
