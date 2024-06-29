@@ -1950,7 +1950,8 @@ psync_list_dir(const char *path, psync_list_dir_callback callback, void *ptr){
   char *cpath;
   size_t pl, entrylen;
   long namelen;
-  struct dirent *entry, *de;
+  struct dirent *entry; // XXX: still useful?
+  struct dirent *de;
   dh=opendir(path);
   if (unlikely(!dh)){
     debug(D_WARNING, "could not open directory %s", path);
@@ -1969,7 +1970,9 @@ psync_list_dir(const char *path, psync_list_dir_callback callback, void *ptr){
   if (!pl || cpath[pl-1]!=PSYNC_DIRECTORY_SEPARATORC)
     cpath[pl++]=PSYNC_DIRECTORY_SEPARATORC;
   pst.path=cpath;
-  while (!readdir_r(dh, entry, &de) && de)
+
+  //while (!readdir_r(dh, entry, &de) && de) {// DELETEME: deprecated
+  while((de = readdir(dh))) {
     if (de->d_name[0]!='.' || (de->d_name[1]!=0 && (de->d_name[1]!='.' || de->d_name[2]!=0))){
       psync_strlcpy(cpath+pl, de->d_name, namelen+1);
       if (likely_log(!lstat(cpath, &pst.stat)) && (S_ISREG(pst.stat.st_mode) || S_ISDIR(pst.stat.st_mode))){
@@ -1977,6 +1980,11 @@ psync_list_dir(const char *path, psync_list_dir_callback callback, void *ptr){
         callback(ptr, &pst);
       }
     }
+  }
+
+
+	
+
   psync_free(entry);
   psync_free(cpath);
   closedir(dh);
@@ -1994,7 +2002,8 @@ psync_list_dir_fast(const char *path, psync_list_dir_callback_fast callback, voi
   char *cpath;
   size_t pl, entrylen;
   long namelen;
-  struct dirent *entry, *de;
+  struct dirent *entry; // XXX: still useful?
+  struct dirent *de;
   dh=opendir(path);
   if (unlikely_log(!dh))
     goto err1;
@@ -2010,8 +2019,10 @@ psync_list_dir_fast(const char *path, psync_list_dir_callback_fast callback, voi
   memcpy(cpath, path, pl);
   if (!pl || cpath[pl-1]!=PSYNC_DIRECTORY_SEPARATORC)
     cpath[pl++]=PSYNC_DIRECTORY_SEPARATORC;
-  while (!readdir_r(dh, entry, &de) && de)
+  //while (!readdir_r(dh, entry, &de) && de) { // DELETEME: deprecated
+  while((de=readdir(dh))) {
     if (de->d_name[0]!='.' || (de->d_name[1]!=0 && (de->d_name[1]!='.' || de->d_name[2]!=0))){
+
 #if defined(DT_UNKNOWN) && defined(DT_DIR) && defined(DT_REG)
       pst.name=de->d_name;
       if (de->d_type==DT_UNKNOWN){
@@ -2035,7 +2046,9 @@ psync_list_dir_fast(const char *path, psync_list_dir_callback_fast callback, voi
         callback(ptr, &pst);
       }
 #endif
+
     }
+  }
   psync_free(entry);
   psync_free(cpath);
   closedir(dh);
@@ -2413,14 +2426,17 @@ psync_deviceid(){
   char *device;
 #if defined(P_OS_LINUX)
   DIR *dh;
-  struct dirent entry, *de;
+  //struct dirent entry; // DELETEME: not used
+  struct dirent *de;
   const char *hardware;
   char *path, buf[8];
   int fd;
   hardware="Desktop";
   dh=opendir("/sys/class/power_supply");
   if (dh){
-    while (!readdir_r(dh, &entry, &de) && de)
+	
+    //while (!readdir_r(dh, &entry, &de) && de) { // DELETEME: deprecated
+	while((de=readdir(dh))) {
       if (de->d_name[0]!='.' || (de->d_name[1]!=0 && (de->d_name[1]!='.' || de->d_name[2]!=0))){
         path=psync_strcat("/sys/class/power_supply/", de->d_name, "/type", NULL);
         fd=open(path, O_RDONLY);
@@ -2434,6 +2450,7 @@ psync_deviceid(){
         }
         close(fd);
       }
+	}
     closedir(dh);
   }
   device=psync_strcat(hardware, ", Linux", NULL);
