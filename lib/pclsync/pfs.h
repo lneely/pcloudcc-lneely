@@ -46,14 +46,8 @@
 #include "plibs.h"
 #include <pthread.h>
 
-
-#if defined(P_OS_POSIX)
 #define psync_fs_need_per_folder_refresh() psync_fs_need_per_folder_refresh_f()
 #define psync_fs_need_per_folder_refresh_const() 1
-#else
-#define psync_fs_need_per_folder_refresh() (psync_invalidate_os_cache_needed() && psync_fs_need_per_folder_refresh_f())
-#define psync_fs_need_per_folder_refresh_const() 1
-#endif
 
 extern char *psync_fake_prefix;
 extern size_t psync_fake_prefix_len;

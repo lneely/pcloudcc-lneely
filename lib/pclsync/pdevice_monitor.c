@@ -44,9 +44,7 @@
 #include "plocalscan.h"
 #include "ptimer.h"
 
-#ifdef P_OS_POSIX
 #define _strdup strdup
-#endif //P_OS_POSIX
 #define DEV_MONITOR_ACTIVITY_TIMER_INT 20
 
 static pthread_mutex_t devmon_mutex=PTHREAD_MUTEX_INITIALIZER;

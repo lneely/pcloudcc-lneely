@@ -65,9 +65,7 @@
 typedef off_t fuse_off_t;
 #endif
 
-#if defined(P_OS_POSIX)
 #include <signal.h>
-#endif
 
 #if defined(P_OS_LINUX)
 #include <sys/mount.h>
@@ -418,10 +416,8 @@ static void psync_row_to_folder_stat(psync_variant_row row, struct FUSE_STAT *st
   stbuf->st_mode=S_IFDIR | 0755;
   stbuf->st_nlink=psync_get_number(row[4])+2;
   stbuf->st_size=FS_BLOCK_SIZE;
-#if defined(P_OS_POSIX)
   stbuf->st_blocks=1;
   stbuf->st_blksize=FS_BLOCK_SIZE;
-#endif
   stbuf->st_uid=myuid;
   stbuf->st_gid=mygid;
 }
@@ -442,10 +438,8 @@ static void psync_row_to_file_stat(psync_variant_row row, struct FUSE_STAT *stbu
   stbuf->st_mode=S_IFREG | 0644;
   stbuf->st_nlink=1;
   stbuf->st_size=size;
-#if defined(P_OS_POSIX)
   stbuf->st_blocks=(size+511)/512;
   stbuf->st_blksize=FS_BLOCK_SIZE;
-#endif
   stbuf->st_uid=myuid;
   stbuf->st_gid=mygid;
 }
@@ -472,10 +466,8 @@ static void psync_mkdir_to_folder_stat(psync_fstask_mkdir_t *mk, struct FUSE_STA
   stbuf->st_mode=S_IFDIR | 0755;
   stbuf->st_nlink=mk->subdircnt+2;
   stbuf->st_size=FS_BLOCK_SIZE;
-#if defined(P_OS_POSIX)
   stbuf->st_blocks=1;
   stbuf->st_blksize=FS_BLOCK_SIZE;
-#endif
   stbuf->st_uid=myuid;
   stbuf->st_gid=mygid;
 }
@@ -506,10 +498,8 @@ static int psync_creat_stat_fake_file(struct FUSE_STAT *stbuf){
   stbuf->st_mode=S_IFREG | 0644;
   stbuf->st_nlink=1;
   stbuf->st_size=0;
-#if defined(P_OS_POSIX)
   stbuf->st_blocks=0;
   stbuf->st_blksize=FS_BLOCK_SIZE;
-#endif
   stbuf->st_uid=myuid;
   stbuf->st_gid=mygid;
   return 0;
@@ -634,10 +624,8 @@ static int psync_creat_local_to_file_stat(psync_fstask_creat_t *cr, struct FUSE_
     size=psync_stat_size(&st);
     stbuf->st_size=size;
   }
-#if defined(P_OS_POSIX)
   stbuf->st_blocks=(size+511)/512;
   stbuf->st_blksize=FS_BLOCK_SIZE;
-#endif
   stbuf->st_uid=myuid;
   stbuf->st_gid=mygid;
   return 0;
@@ -657,10 +645,8 @@ static int psync_creat_static_to_file_stat(psync_fstask_creat_t *cr, struct FUSE
   stbuf->st_mode=S_IFREG | 0644;
   stbuf->st_nlink=1;
   stbuf->st_size=lc->datalen;
-#if defined(P_OS_POSIX)
   stbuf->st_blocks=(lc->datalen+511)/512;
   stbuf->st_blksize=FS_BLOCK_SIZE;
-#endif
   stbuf->st_uid=myuid;
   stbuf->st_gid=mygid;
   return 0;
@@ -2185,11 +2171,7 @@ PSYNC_NOINLINE static int psync_fs_do_check_write_space(psync_openfile_t *of, si
     if (psync_pagecache_free_from_read_cache(size*2)<size*2){
       debug(D_WARNING, "free space is %lu, less than half of minimum %lu+%lu, returning error", (unsigned long)freespc, (unsigned long)minlocal, (unsigned long)size);
       psync_milisleep(5000);
-#if defined(P_OS_POSIX)
       return -EINTR;
-#else
-      return 0;
-#endif
     }
     else{
       debug(D_NOTICE, "free space is %lu, less than half of minimum %lu+%lu, but we managed to free from read cache",
@@ -3236,8 +3218,6 @@ void psync_fs_stop(){
   psync_fs_do_stop();
 }
 
-#if defined(P_OS_POSIX)
-
 static void psync_signal_handler(int sig){
   debug(D_NOTICE, "got signal %d", sig);
   psync_fs_do_stop();
@@ -3275,8 +3255,6 @@ static void psync_setup_signals(){
 #endif
 }
 
-#endif
-
 static void psync_fs_init_once(){
 #if psync_fs_need_per_folder_refresh_const()
   unsigned char rndbuff[16];
@@ -3290,9 +3268,7 @@ static void psync_fs_init_once(){
   psync_fstask_init();
   psync_pagecache_init();
   atexit(psync_fs_do_stop);
-#if defined(P_OS_POSIX)
   psync_setup_signals();
-#endif
   psync_fsstatic_add_files();
   psync_fstask_add_banned_folders();
 }
@@ -3398,10 +3374,8 @@ static int psync_fs_do_start(){
   psync_oper.setcrtime=psync_fs_setcrtime;
 #endif
 
-#if defined(P_OS_POSIX)
   myuid=getuid();
   mygid=getgid();
-#endif
   pthread_mutex_lock(&start_mutex);
   if (started)
     goto err00;
