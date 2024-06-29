@@ -46,7 +46,6 @@
 #include <net/if.h>
 #endif
 
-/*************************************************************/
 char* getMACaddr() {
   char  buffer[128];
 
@@ -81,7 +80,7 @@ char* getMACaddr() {
     return psync_strdup(buffer);
   }
 }
-/*************************************************************/
+
 int create_backend_event(const char*  binapi,
                          const char*  category,
                          const char*  action,
@@ -208,7 +207,7 @@ int create_backend_event(const char*  binapi,
 
   return result;
 }
-/*************************************************************/
+
 int backend_call(const char*  binapi,
                  const char*  wsPath,
                  const char*  payloadName,
@@ -335,7 +334,7 @@ int backend_call(const char*  binapi,
 
   return result;
 }
-/*************************************************************/
+
 char* get_machine_name() {
   int   nameSize = 1024;
   char  pcName[1024];
@@ -356,7 +355,7 @@ char* get_machine_name() {
 
   return psync_strdup(pcName);
 }
-/*************************************************************/
+
 void parse_os_path(char* path, folderPath* folders, char* delim, int mode) {
   char fName[255];
   char* buff;
@@ -404,7 +403,7 @@ void parse_os_path(char* path, folderPath* folders, char* delim, int mode) {
   }
   folders->cnt = j;
 }
-/*************************************************************/
+
 void send_psyncs_event(const char* binapi,
                        const char* auth) {
   psync_folderid_t syncEventFlag = 0;
@@ -457,7 +456,7 @@ void send_psyncs_event(const char* binapi,
     psync_sql_run_free(sql);
   }
 }
-/*************************************************************/
+
 int set_be_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
   int callRes;
   char msgErr[1024];
@@ -515,7 +514,7 @@ int set_be_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
 
   return callRes;
 }
-/*************************************************************/
+
 psync_syncid_t get_sync_id_from_fid(psync_folderid_t fid) {
   psync_sql_res* res;
   psync_variant_row row;
@@ -533,7 +532,7 @@ psync_syncid_t get_sync_id_from_fid(psync_folderid_t fid) {
 
   return syncId;
 }
-/*************************************************************/
+
 char *get_sync_folder_by_syncid(uint64_t syncId) {
   psync_sql_res* res;
   psync_variant_row row;
@@ -558,7 +557,7 @@ char *get_sync_folder_by_syncid(uint64_t syncId) {
 
   return retName;
 }
-/*************************************************************/
+
 char* get_folder_name_from_path(char* path) {
   char* folder;
 
@@ -573,4 +572,4 @@ char* get_folder_name_from_path(char* path) {
 
   return strdup(folder);
 }
-/*************************************************************/
+

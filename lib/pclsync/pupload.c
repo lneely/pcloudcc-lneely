@@ -284,7 +284,7 @@ static int task_renamefile(uint64_t taskid, psync_syncid_t syncid, psync_fileid_
   else
     return task_renameremotefile(fileid, folderid, newname);
 }
-/****************************************************************************/
+
 int handle_api_errors(sync_err_struct *err_struct) {
   int ret = -1;
   event_data_struct *event_data;
@@ -343,7 +343,7 @@ int handle_api_errors(sync_err_struct *err_struct) {
   
   return ret;
 }
-/******************************************************************************/
+
 static int task_renameremotefolder(psync_folderid_t folderid, psync_folderid_t newparentfolderid, const char *newname){
   binparam params[]={P_STR("auth", psync_my_auth), P_NUM("folderid", folderid), P_NUM("tofolderid", newparentfolderid), P_STR("toname", newname),
                      P_STR("timeformat", "timestamp")};
@@ -374,11 +374,6 @@ static int task_renameremotefolder(psync_folderid_t folderid, psync_folderid_t n
     psync_diff_wake();
   }
   else{
-    /*
-    ret=-1;
-    psync_process_api_error(result);
-    debug(D_NOTICE, "command renamefolder returned %lu: %s", (unsigned long)result, psync_find_result(res, "error", PARAM_STR)->str);
-    */
     err_struct.newName = strdup(newname);
     err_struct.err     = result;
     err_struct.err_msg = (char *)psync_find_result(res, "error", PARAM_STR)->str;

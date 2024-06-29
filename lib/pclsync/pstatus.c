@@ -339,42 +339,6 @@ void psync_status_set_upload_speed(uint32_t speed){
   }
 }
 
-/*static void psync_send_status_update_ptr(void *ptr){
-  psync_send_status_update();
-}
-
-void psync_status_inc_downloads_count(){
-  psync_status.filesdownloading++;
-  psync_status.status=psync_calc_status();
-  psync_send_status_update();
-}
-
-void psync_status_dec_downloads_count(){
-  psync_status.filesdownloading--;
-  if (!psync_status.filesdownloading){
-    psync_status.bytesdownloaded=0;
-    psync_status.bytestodownloadcurrent=0;
-  }
-  psync_status.status=psync_calc_status();
-  psync_send_status_update();
-}
-
-void psync_status_inc_uploads_count(){
-  psync_status.filesuploading++;
-  psync_status.status=psync_calc_status();
-  psync_send_status_update();
-}
-
-void psync_status_dec_uploads_count(){
-  psync_status.filesuploading--;
-  if (!psync_status.filesuploading){
-    psync_status.bytesuploaded=0;
-    psync_status.bytestouploadcurrent=0;
-  }
-  psync_status.status=psync_calc_status();
-  psync_send_status_update();
-}*/
-
 void psync_status_send_update(){
   psync_status.status=psync_calc_status();
   psync_send_status_update();

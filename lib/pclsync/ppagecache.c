@@ -543,9 +543,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls){
     debug(D_NOTICE, "got file URLs of fileid %lu, hash %lu", (unsigned long)request->fileid, (unsigned long)request->hash);
     if (likely_log(hosts->length && hosts->array[0]->type==PARAM_STR) && request->of->initialsize>totalreqlen)
       psync_http_connect_and_cache_host(hosts->array[0]->str);
-    /*if (of->initialsize>=PSYNC_FS_FILESIZE_FOR_2CONN && hosts->length>1 && hosts->array[1]->type==PARAM_STR)
-      psync_http_connect_and_cache_host(hosts->array[1]->str);*/
-    set_urls(urls, ret);
+	set_urls(urls, ret);
     if (request->needkey){
       psync_crypto_aes256_sector_encoder_decoder_t enc;
       ret=get_result_thread(api);
@@ -1073,24 +1071,6 @@ static void clean_cache(){
   }
   psync_sql_free_result(res);
   psync_sql_commit_transaction();
-/*  ocnt=(cnt+63)/64;
-  for (j=0; j<ocnt; j++){
-    i=j*64;
-    e=i+64;
-    if (e>cnt)
-      e=cnt;
-    psync_sql_start_transaction();
-    res=psync_sql_prep_statement("UPDATE pagecache SET type="NTO_STR(PAGE_TYPE_FREE)", hash=NULL, pageid=NULL, crc=NULL WHERE id=?");
-    for (; i<e; i++){
-      psync_sql_bind_uint(res, 1, entries[i].id);
-      psync_sql_run(res);
-      free_db_pages++;
-    }
-    psync_sql_free_result(res);
-    psync_sql_commit_transaction();
-    psync_milisleep(5);
-    // 64 pages per 5 millisec is around 50Mb/sec, more than enough
-  }*/
   clean_cache_in_progress=0;
   pthread_mutex_unlock(&clean_cache_mutex);
   psync_free(oentries);
@@ -1253,18 +1233,6 @@ static int flush_pages(int nosleep){
         page->flushpageid=row[0];
       }
       psync_sql_free_result(res);
-  /*    res=psync_sql_query("SELECT id FROM pagecache WHERE type="NTO_STR(PAGE_TYPE_FREE)" ORDER BY id");
-      for (i=0; i<CACHE_HASH; i++)
-        psync_list_for_each_element(page, &cache_hash[i], psync_cache_page_t, list)
-          if (page->type==PAGE_TYPE_READ){
-            if (!(row=psync_sql_fetch_rowint(res)))
-              goto break2;
-            page->flushpageid=row[0];
-            psync_list_add_tail(&pages_to_flush, &page->flushlist);
-          }
-  break2:
-      psync_sql_free_result(res);
-      pthread_mutex_unlock(&cache_mutex);*/
       i=0;
       psync_list_for_each_element(page, &pages_to_flush, psync_cache_page_t, flushlist){
         if (psync_file_pwrite(readcache, page->page, PSYNC_FS_PAGE_SIZE, (uint64_t)page->flushpageid*PSYNC_FS_PAGE_SIZE)!=PSYNC_FS_PAGE_SIZE){

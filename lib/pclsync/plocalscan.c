@@ -708,17 +708,8 @@ static void scan_create_folder(sync_folderlist *fl){
   if (unlikely_log(!psync_sql_affected_rows()))
     return;
   psync_task_create_remote_folder(fl->syncid, localfolderid, fl->name);
-/* this should not be here, as we are in transaction:
- *
- *  localpath=psync_local_path_for_local_folder(localfolderid, fl->syncid, NULL);
-  if (likely_log(localpath)){
-    scanner_scan_folder(localpath, 0, localfolderid, fl->syncid, fl->synctype, fl->deviceid);
-    psync_free(localpath);
-  }*/
   return;
 hasfolder:
-//  psync_list_del(&fl->list);
-///  psync_free(fl);
   return;
 }
 
@@ -787,14 +778,6 @@ static void scan_rename_folder(sync_folderlist *rnfr, sync_folderlist *rnto){
     update_syncid_rec(rnfr->localid, rnto->syncid);
   }
   psync_task_rename_remote_folder(rnfr->syncid, rnto->syncid, rnfr->localid, rnto->localparentfolderid, rnto->name);
-/* remove the scan from here and restart the full scan once we finished with current update makes more sense when we found moved folders
- *
-  localpath=psync_local_path_for_local_folder(rnfr->localid, rnto->syncid, NULL);
-  if (likely_log(localpath)){
-    scanner_scan_folder(localpath, rnfr->remoteid, rnfr->localid, rnto->syncid, rnto->synctype, rnto->deviceid);
-    psync_free(localpath);
-  }
-*/
 }
 
 static void delete_local_folder_rec(psync_folderid_t localfolderid){

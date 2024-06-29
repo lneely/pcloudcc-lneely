@@ -2458,6 +2458,8 @@ static void time_format(time_t tm, unsigned long ns, char *result){
 }
 
 int psync_debug(const char *file, const char *function, int unsigned line, int unsigned level, const char *fmt, ...){
+  if(!IS_DEBUG) return 1;
+  
   static const struct {
     psync_uint_t level;
     const char *name;

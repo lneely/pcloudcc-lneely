@@ -433,14 +433,14 @@ void psync_send_eventdata(psync_eventtype_t eventid, void *eventdata){
   else
     psync_free(eventdata);
 }
-/**********************************************************************************************/
+
 data_event_callback data_event_fptr = NULL;
 
 void psync_init_data_event(void *ptr) {
   data_event_fptr = (data_event_callback)ptr;
   debug(D_NOTICE, "Data event handler set.");
 }
-/**********************************************************************************************/
+
 void data_event_thread(void* ptr) {
   event_data_struct* data = (event_data_struct*)ptr;
 
@@ -450,7 +450,7 @@ void data_event_thread(void* ptr) {
 
   psync_free(ptr);
 }
-/**********************************************************************************************/
+
 void psync_send_data_event(event_data_struct* data) {
   event_data_struct *event_data;
 
@@ -468,8 +468,8 @@ void psync_send_data_event(event_data_struct* data) {
     debug(D_ERROR, "Data event callback function not set.");
   }
 }
-/**********************************************************************************************/
+
 void psync_data_event_test(int eventid, char* str1, char* str2, uint64_t uint1, uint64_t uint2) {
   debug(D_NOTICE, "Test Data event callback. eventid [%d]. String1: [%s], String2: [%s], uInt1: [%lu] uInt2: [%lu]", eventid, str1, str2, uint1, uint2);
 }
-/**********************************************************************************************/
+

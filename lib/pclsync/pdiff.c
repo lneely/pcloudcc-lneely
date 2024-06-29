@@ -2698,17 +2698,6 @@ static void psync_diff_adapter_hash(void *out){
   psync_fast_hash256_ctx ctx;
   psync_interface_list_t *list;
   list=psync_list_ip_adapters();
-/*  if (IS_DEBUG){
-    char buffa[NI_MAXHOST], buffb[NI_MAXHOST], buffn[NI_MAXHOST];
-    size_t i;
-    for (i=0; i<list->interfacecnt; i++) {
-      getnameinfo((struct sockaddr *)&list->interfaces[i].address, list->interfaces[i].addrsize, buffa, sizeof(buffa), NULL, 0, NI_NUMERICHOST);
-      getnameinfo((struct sockaddr *)&list->interfaces[i].broadcast, list->interfaces[i].addrsize, buffb, sizeof(buffb), NULL, 0, NI_NUMERICHOST);
-      getnameinfo((struct sockaddr *)&list->interfaces[i].netmask, list->interfaces[i].addrsize, buffn, sizeof(buffn), NULL, 0, NI_NUMERICHOST);
-      debug(D_NOTICE, "%s %s %s", buffa, buffb, buffn);
-    }
-    debug(D_NOTICE, "list end");
-  } */
   psync_fast_hash256_init(&ctx);
   psync_fast_hash256_update(&ctx, list->interfaces, list->interfacecnt*sizeof(psync_interface_t));
   psync_fast_hash256_final(out, &ctx);

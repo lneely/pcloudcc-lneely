@@ -336,7 +336,7 @@ static void delete_delayed_sync(uint64_t id){
   psync_sql_bind_uint(res, 1, id);
   psync_sql_run_free(res);
 }
-/*********************************************************************************************/
+
 int psync_str_is_prefix(const char *str1, const char *str2){
   size_t len1, len2;
   len1=strlen(str1);
@@ -356,7 +356,7 @@ int psync_str_is_prefix(const char *str1, const char *str2){
   }
   return !psync_filename_cmpn(str1, str2, len1);
 }
-/*********************************************************************************************/
+
 int psync_left_str_is_prefix(const char* str1, const char* str2) {
   size_t len1, len2;
   len1 = strlen(str1);
@@ -374,7 +374,7 @@ int psync_left_str_is_prefix(const char* str1, const char* str2) {
 
   return !psync_filename_cmpn(str1, str2, len1);
 }
-/*********************************************************************************************/
+
 void psync_syncer_check_delayed_syncs(){
   psync_stat_t st;
   psync_sql_res *res, *res2, *stmt;

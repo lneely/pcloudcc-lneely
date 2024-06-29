@@ -218,7 +218,8 @@ void psync_apiserver_init(){
   }
 }
 
-int psync_init(){
+int
+psync_init(){
   psync_thread_name="main app thread";
   debug(D_NOTICE, "initializing library version "PSYNC_LIB_VERSION);
   if (IS_DEBUG){
@@ -544,46 +545,6 @@ void psync_unlink(){
     psync_sql_run_free(res);
     psync_free(deviceid);
   }
-  /*
-    psync_sql_res *res;
-    psync_variant_row row;
-    char *sql;
-    const char *str;
-    size_t len;
-    psync_list list;
-    string_list *le;
-    psync_list_init(&list);
-    res=psync_sql_query("SELECT name FROM sqlite_master WHERE type='index'");
-    while ((row=psync_sql_fetch_row(res))){
-      str=psync_get_lstring(row[0], &len);
-      le=(string_list *)psync_malloc(offsetof(string_list, str)+len+1);
-      memcpy(le->str, str, len+1);
-      psync_list_add_tail(&list, &le->list);
-    }
-    psync_sql_free_result(res);
-    psync_list_for_each_element(le, &list, string_list, list){
-      sql=psync_strcat("DROP INDEX ", le->str, NULL);
-      psync_sql_statement(sql);
-      psync_free(sql);
-    }
-    psync_list_for_each_element_call(&list, string_list, list, psync_free);
-    psync_list_init(&list);
-    res=psync_sql_query("SELECT name FROM sqlite_master WHERE type='table'");
-    while ((row=psync_sql_fetch_row(res))){
-      str=psync_get_lstring(row[0], &len);
-      le=(string_list *)psync_malloc(offsetof(string_list, str)+len+1);
-      memcpy(le->str, str, len+1);
-      psync_list_add_tail(&list, &le->list);
-    }
-    psync_sql_free_result(res);
-    psync_list_for_each_element(le, &list, string_list, list){
-      sql=psync_strcat("DROP TABLE ", le->str, NULL);
-      psync_sql_statement(sql);
-      psync_free(sql);
-    }
-    psync_list_for_each_element_call(&list, string_list, list, psync_free);
-    psync_sql_statement("VACUUM");
-  */
   pthread_mutex_lock(&psync_my_auth_mutex);
   memset(psync_my_auth, 0, sizeof(psync_my_auth));
   psync_my_user=NULL;
@@ -2528,7 +2489,7 @@ int psync_send_publink(const char *code, const char *mail, const char *message, 
 	binparam params[] = { P_STR("auth", psync_my_auth), P_STR("code", code), P_STR("mails", mail), P_STR("message", message), P_NUM("source", 1) };
 	return psync_run_command("sendpublink", params, err);
 }
-/***********************************************************************************************************************************************/
+
 int psync_is_folder_syncable(char*  localPath,
                              char** errMsg) {
   psync_sql_res* sql;
@@ -2597,13 +2558,13 @@ int psync_is_folder_syncable(char*  localPath,
 
   return 0;
 }
-/***********************************************************************************************************************************************/
+
 psync_folder_list_t* psync_get_syncs_bytype(const char* syncType) {
   debug(D_NOTICE, "Get syncs type: [%s]", syncType);
 
   return psync_list_get_list((char *)syncType);
 }
-/***********************************************************************************************************************************************/
+
 psync_folderid_t create_bup_mach_folder(char** msgErr) {
   binresult* rootFolIdObj;
   binresult* retData;
@@ -2658,7 +2619,7 @@ psync_folderid_t create_bup_mach_folder(char** msgErr) {
 	return -1;
   }
 }
-/***********************************************************************************************************************************************/
+
 int psync_create_backup(char*  path,
                         char** errMsg) {
   psync_folderid_t bFId;
@@ -2760,7 +2721,7 @@ int psync_create_backup(char*  path,
 
   return res;
 }
-/***********************************************************************************************************************************************/
+
 int psync_delete_backup(psync_syncid_t syncId,
                         char** errMsg) {
   binresult* retData;
@@ -2819,7 +2780,7 @@ int psync_delete_backup(psync_syncid_t syncId,
 
   return res;
 }
-/***********************************************************************************************************************************************/
+
 void psync_stop_device(psync_folderid_t folderId,
                       char**           errMsg) {
   binresult* retData;
@@ -2864,15 +2825,15 @@ void psync_stop_device(psync_folderid_t folderId,
     debug(D_ERROR, "Can't find device id in local DB.");
   }
 }
-/***********************************************************************************************************************************************/
+
 char* get_backup_root_name() {
   return psync_sql_cellstr("SELECT name FROM setting s JOIN folder f ON s.value = f.id AND s.id = 'BackupRootFoId'");
 }
-/***********************************************************************************************************************************************/
+
 char* get_pc_name() {
   return get_machine_name();
 }
-/***********************************************************************************************************************************************/
+
 void psync_async_delete_sync(void* ptr) {
   psync_syncid_t syncId = *(psync_syncid_t *)ptr;
   int res;
@@ -2885,7 +2846,7 @@ void psync_async_delete_sync(void* ptr) {
     psync_send_eventid(PEVENT_BACKUP_STOP);
   }
 }
-/***********************************************************************************************************************************************/
+
 void psync_async_ui_callback(void* ptr) {
   int eventId = *(int *)ptr;
   time_t currTime = psync_time();
@@ -2898,7 +2859,7 @@ void psync_async_ui_callback(void* ptr) {
     lastBupDelEventTime = currTime;
   }
 }
-/***********************************************************************************************************************************************/
+
 int psync_delete_sync_by_folderid(psync_folderid_t fId) {
   psync_sql_res* sqlRes;
   psync_uint_row row;
@@ -2929,7 +2890,7 @@ int psync_delete_sync_by_folderid(psync_folderid_t fId) {
 
   return 0;
 }
-/***********************************************************************************************************************************************/
+
 int psync_delete_backup_device(psync_folderid_t fId) {
   psync_folderid_t bFId;
 
@@ -2950,7 +2911,7 @@ int psync_delete_backup_device(psync_folderid_t fId) {
 
   return 1;
 }
-/***********************************************************************************************************************************************/
+
 void psync_send_backup_del_event(psync_fileorfolderid_t remoteFId) {
   time_t currTime = psync_time();
 
@@ -2965,7 +2926,7 @@ void psync_send_backup_del_event(psync_fileorfolderid_t remoteFId) {
     lastBupDelEventTime = currTime;
   }
 }
-/***********************************************************************************************************************************************/
+
 userinfo_t* psync_get_userinfo()
 {
   if (psync_my_auth[0]) {
@@ -3046,8 +3007,8 @@ int psync_create_backend_event(const char* category, const char* action, const c
   time(&rawtime);
   return create_backend_event(apiserver, category, action, label, psync_my_auth, P_OS_ID, rawtime, &params, &err);
 }
-/******************************************************************************************************************/
+
 void psync_init_data_event_handler(void* ptr) {
   psync_init_data_event(ptr);
 }
-/******************************************************************************************************************/
+

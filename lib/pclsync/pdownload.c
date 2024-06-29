@@ -146,18 +146,7 @@ static int task_rmdir(const char *path){
     return -1;
   psync_wake_localscan();
   return 0;
-//  if (psync_fs_err()==P_NOENT || psync_fs_err()==P_NOTDIR || psync_fs_err()==P_NOTEMPTY || psync_fs_err()==P_EXIST)
-//    return 0;
 }
-
-/*static int task_rmdir_rec(const char *path){
-  task_wait_no_downloads();
-  if (likely_log(!psync_rmdir_recursive(path)))
-    return 0;
-  if (psync_fs_err()==P_BUSY || psync_fs_err()==P_ROFS)
-    return -1;
-  return 0;
-}*/
 
 static void do_move(void *ptr, psync_pstat *st){
   const char **arr;
@@ -791,7 +780,6 @@ err2:
     psync_http_close(http);
 err1:
   psync_file_close(fd);
-//  psync_send_event_by_id(PEVENT_FILE_DOWNLOAD_FAILED, syncid, name, fileid);
 err0:
   psync_list_for_each_element_call(&ranges, psync_range_list_t, list, psync_free);
   if (tmpold){
