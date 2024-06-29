@@ -86,7 +86,15 @@ void get_answer_to_request(message *request, message *reply)
   psync_path_status_t stat=PSYNC_PATH_STATUS_NOT_OURS;
   memcpy(reply->value, "Ok.", 4);
   reply->length=sizeof(message)+4;
-  debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]", request->type, request->length, request->value);
+  
+  if(request->type == 20 /* STARTCRYPTO, see control_tools.cpp */) {
+	// don't publish the crypto password to the logs in plain text... 
+	debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]", request->type, request->length, "REDACTED");
+  } else {
+	debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]", request->type, request->length, request->value);
+  }
+  
+
   if (request->type < 20 ) {
     if (overlays_running)
       stat=psync_path_status_get(request->value);
