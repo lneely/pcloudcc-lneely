@@ -43,9 +43,9 @@
 #define PSYNC_CRYPTO_LOG_DATA   1
 #define PSYNC_CRYPTO_LOG_INT    2
 
-#define PSYNC_CRYPTO_HASH_TREE_SHIFT 8
+//#define PSYNC_CRYPTO_HASH_TREE_SHIFT 8 // unused, maybe important later
 
-#define PSYNC_LOG_STATUS_INCOMPLETE 0
+//#define PSYNC_LOG_STATUS_INCOMPLETE 0 // unused, maybe important later
 #define PSYNC_LOG_STATUS_FINALIZED  1
 
 #define PSYNC_LOG_HASHID_FH256      0

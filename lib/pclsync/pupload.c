@@ -179,7 +179,9 @@ static int do_run_command(const char *cmd, size_t cmdlen, const binparam *params
 }
 
 #define run_command(cmd, params) do_run_command(cmd, strlen(cmd), params, sizeof(params)/sizeof(binparam))
-#define run_command_res(cmd, params) do_run_command_res(cmd, strlen(cmd), params, sizeof(params)/sizeof(binparam))
+
+// unused, may be important later
+//#define run_command_res(cmd, params) do_run_command_res(cmd, strlen(cmd), params, sizeof(params)/sizeof(binparam))
 
 static int task_createfolder(psync_syncid_t syncid, psync_folderid_t localfolderid, const char *name){
   psync_sql_res *res;

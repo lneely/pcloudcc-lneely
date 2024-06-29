@@ -43,8 +43,9 @@
 #define hash_to_bucket(h) ((h)%CACHE_HASH_SIZE)
 #define hash_to_lock(h)   ((((h)*CACHE_LOCKS)/CACHE_HASH_SIZE)%CACHE_LOCKS)
 
-#define CACHE_WAIT_FOR_TIMER 1
-#define CACHE_TIMER_CALLED   2
+// unused, may be important later
+//#define CACHE_WAIT_FOR_TIMER 1
+//#define CACHE_TIMER_CALLED   2
 
 typedef struct {
   psync_list list;

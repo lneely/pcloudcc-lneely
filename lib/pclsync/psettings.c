@@ -62,7 +62,9 @@ static void fsroot_change(){
 }
 
 #define PSYNC_SETTING_owneremail       16
-#define PSYNC_SETTING_cryptosetup      17
+
+// unused but may be important later
+//#define PSYNC_SETTING_cryptosetup      17 
 
 static psync_setting_t settings[]={
   {"usessl", psync_timer_do_notify_exception, NULL, {PSYNC_USE_SSL_DEFAULT}, PSYNC_TBOOL},

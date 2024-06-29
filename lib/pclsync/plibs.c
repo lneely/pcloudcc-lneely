@@ -1965,7 +1965,7 @@ struct psync_task_t_{
   int status;
 };
 
-#define PSYNC_WAIT_ANYBODY -1
+//#define PSYNC_WAIT_ANYBODY -1 // unused, but may be important later
 #define PSYNC_WAIT_NOBODY  -2
 #define PSYNC_WAIT_FREED   -3
 

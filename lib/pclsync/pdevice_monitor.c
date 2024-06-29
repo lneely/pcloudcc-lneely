@@ -37,14 +37,11 @@
 #include "pbusinessaccount.h"
 #include "pdevicemap.h"
 
-#define P_DEVICE_VERBOSE
-
 #include "pdevice_monitor.h"
 // #include "pdevicemap.h"
 #include "plocalscan.h"
 #include "ptimer.h"
 
-#define _strdup strdup
 #define DEV_MONITOR_ACTIVITY_TIMER_INT 20
 
 static pthread_mutex_t devmon_mutex=PTHREAD_MUTEX_INITIALIZER;

@@ -81,7 +81,7 @@ typedef off_t fuse_off_t;
 #define openfile_to_fh(x) ((uintptr_t)x)
 
 #define FS_BLOCK_SIZE 4096
-#define FS_MAX_WRITE  16*1024*1024
+//#define FS_MAX_WRITE  16*1024*1024 // unused, maybe important later
 
 #if defined(P_OS_LINUX)
 #define PSYNC_FS_ERR_CRYPTO_EXPIRED EROFS

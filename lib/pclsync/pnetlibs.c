@@ -29,7 +29,6 @@
    DAMAGE.
 */
 
-#define __STDC_FORMAT_MACROS
 #include <stdio.h>
 #include <ctype.h>
 #include <stdarg.h>

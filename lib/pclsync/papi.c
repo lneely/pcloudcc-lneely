@@ -35,21 +35,25 @@
 #include <string.h>
 #include <stddef.h>
 
+/*
+  commented definitions are unused, but kept because they may be
+  important later.
+*/
 #define RPARAM_STR1  0
-#define RPARAM_STR2  1
-#define RPARAM_STR3  2
+//#define RPARAM_STR2  1
+//#define RPARAM_STR3  2
 #define RPARAM_STR4  3
 #define RPARAM_RSTR1 4
-#define RPARAM_RSTR2 5
-#define RPARAM_RSTR3 6
+//#define RPARAM_RSTR2 5
+//#define RPARAM_RSTR3 6
 #define RPARAM_RSTR4 7
 #define RPARAM_NUM1  8
-#define RPARAM_NUM2  9
-#define RPARAM_NUM3  10
-#define RPARAM_NUM4  11
-#define RPARAM_NUM5  12
-#define RPARAM_NUM6  13
-#define RPARAM_NUM7  14
+//#define RPARAM_NUM2  9
+//#define RPARAM_NUM3  10
+//#define RPARAM_NUM4  11
+//#define RPARAM_NUM5  12
+//#define RPARAM_NUM6  13
+//#define RPARAM_NUM7  14
 #define RPARAM_NUM8  15
 #define RPARAM_HASH  16
 #define RPARAM_ARRAY 17

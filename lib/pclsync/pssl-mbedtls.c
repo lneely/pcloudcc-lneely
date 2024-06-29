@@ -673,7 +673,7 @@ psync_rsa_signature_t psync_ssl_rsa_sign_sha256_hash(psync_rsa_privatekey_t rsa,
 #define xmm0_xmm3   "0xD8"
 #define xmm0_xmm4   "0xE0"
 #define xmm0_xmm5   "0xE8"
-#define xmm1_xmm0   "0xC1"
+//#define xmm1_xmm0   "0xC1" // unused, may be important later
 #define xmm1_xmm2   "0xD1"
 #define xmm1_xmm3   "0xD9"
 #define xmm1_xmm4   "0xE1"

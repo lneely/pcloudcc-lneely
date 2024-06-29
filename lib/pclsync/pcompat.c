@@ -2506,8 +2506,6 @@ psync_invalidate_os_cache_needed(){
   return 0;
 }
 
-#define REBUILD_ICON_BUFFER_SIZE 1024
-
 extern int overlays_running;
 
 void 
