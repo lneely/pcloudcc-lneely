@@ -42,9 +42,7 @@
 
 #if defined(P_OS_LINUX)
 #include <sys/sysinfo.h>
-#endif
-
-#if defined(P_OS_POSIX)
+#endif // P_OS_LINUX
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -57,7 +55,6 @@
 #include <netinet/tcp.h>
 #include <net/if.h>
 #include <utime.h>
-#include <limits.h>
 #include <unistd.h>
 #include <ifaddrs.h>
 #include <dirent.h>
@@ -75,8 +72,6 @@ extern char **environ;
 #define PSYNC_MAP_ANONYMOUS MAP_ANON
 #endif
 
-#endif
-
 #define PROXY_NONE    0
 #define PROXY_CONNECT 1
 
@@ -91,12 +86,10 @@ typedef struct {
   const char *name;
 } psync_run_data1;
 
-#if defined(P_OS_POSIX)
 static uid_t psync_uid;
 static gid_t psync_gid;
 static gid_t *psync_gids;
 static int psync_gids_cnt;
-#endif
 
 static int proxy_type=PROXY_NONE;
 static int proxy_detected=0;
@@ -137,7 +130,6 @@ psync_user_is_admin(){
 
 void 
 psync_compat_init(){
-#if defined(P_OS_POSIX)
   struct rlimit limit;
   limit.rlim_cur=limit.rlim_max=2048;
   if (setrlimit(RLIMIT_NOFILE, &limit))
@@ -163,15 +155,11 @@ psync_compat_init(){
 #else
   psync_page_size=sysconf(_SC_PAGESIZE);
 #endif
-#else
-  psync_page_size=-1;
-#endif
   debug(D_NOTICE, "detected page size %d", psync_page_size);
 }
 
 int 
 psync_stat_mode_ok(psync_stat_t *buf, unsigned int bits){
-#if defined(P_OS_POSIX)
   int i;
   if (psync_uid==0)
     return 1;
@@ -189,9 +177,6 @@ psync_stat_mode_ok(psync_stat_t *buf, unsigned int bits){
       return (buf->st_mode&bits)==bits;
     }
   return (buf->st_mode&bits)==bits;
-#else
-  return 1;
-#endif
 }
 
 char *
@@ -425,7 +410,6 @@ psync_millitime(){
   return tm.tv_sec*1000+tm.tv_nsec/1000000;
 }
 
-#if defined(P_OS_POSIX)
 static void 
 psync_add_file_to_seed(const char *fn, psync_lhash_ctx *hctx, size_t max){
   char buff[4096];
@@ -447,7 +431,6 @@ psync_add_file_to_seed(const char *fn, psync_lhash_ctx *hctx, size_t max){
     close(fd);
   }
 }
-#endif
 
 #if defined(P_OS_LINUX)
 static void 
@@ -494,20 +477,6 @@ psync_get_random_seed_from_db(psync_lhash_ctx *hctx){
   psync_get_random_seed_from_query(hctx, res);
   res=psync_sql_query_rdlock("SELECT * FROM resolver ORDER BY RANDOM() LIMIT 50");
   psync_get_random_seed_from_query(hctx, res);
-/*  res=psync_sql_query_rdlock("SELECT * FROM filerevision ORDER BY RANDOM() LIMIT 50");
-  psync_get_random_seed_from_query(hctx, res);
-  res=psync_sql_query_rdlock("SELECT * FROM file ORDER BY RANDOM() LIMIT 50");
-  psync_get_random_seed_from_query(hctx, res);
-  res=psync_sql_query_rdlock("SELECT * FROM localfile ORDER BY RANDOM() LIMIT 50");
-  psync_get_random_seed_from_query(hctx, res);
-  res=psync_sql_query_rdlock("SELECT * FROM folder ORDER BY RANDOM() LIMIT 25");
-  psync_get_random_seed_from_query(hctx, res);
-  res=psync_sql_query_rdlock("SELECT * FROM localfolder ORDER BY RANDOM() LIMIT 25");
-  psync_get_random_seed_from_query(hctx, res);
-  res=psync_sql_query_rdlock("SELECT * FROM hashchecksum ORDER BY RANDOM() LIMIT 25");
-  psync_get_random_seed_from_query(hctx, res);
-  res=psync_sql_query_rdlock("SELECT * FROM pagecache WHERE type=1 AND rowid>(ABS(RANDOM())%(SELECT MAX(rowid)+1 FROM pagecache)) ORDER BY rowid LIMIT 50");
-  psync_get_random_seed_from_query(hctx, res); */
   psync_sql_statement("REPLACE INTO setting (id, value) VALUES ('random', RANDOM())");
   psync_nanotime(&tm);
   psync_lhash_update(hctx, &tm, sizeof(&tm));
@@ -570,7 +539,6 @@ psync_get_random_seed(unsigned char *seed, const void *addent, size_t aelen, int
   int64_t i64;
   pthread_t threadid;
   unsigned char lsc[64][PSYNC_LHASH_DIGEST_LEN];
-#if defined(P_OS_POSIX)
   debug(D_NOTICE, "in");
   struct utsname un;
   struct statvfs stfs;
@@ -595,7 +563,6 @@ psync_get_random_seed(unsigned char *seed, const void *addent, size_t aelen, int
   psync_add_file_to_seed("/dev/urandom", &hctx, PSYNC_HASH_DIGEST_LEN);
 #else
   psync_add_file_to_seed("/dev/random", &hctx, PSYNC_HASH_DIGEST_LEN);
-#endif
 #endif
 #if defined(P_OS_LINUX)
   psync_get_random_seed_linux(&hctx);
@@ -1252,7 +1219,7 @@ psync_socket_pendingdata(psync_socket *sock){
 int 
 psync_socket_pendingdata_buf(psync_socket *sock){
   int ret;
-#if defined(P_OS_POSIX) && defined(FIONREAD)
+#if defined(FIONREAD)
   if (ioctl(sock->sock, FIONREAD, &ret))
     return -1;
 #else
@@ -1910,46 +1877,9 @@ empty:
   return ret;
 }
 
-#if !defined(P_OS_POSIX)
-static int 
-psync_compat_socketpair(psync_socket_t sockfd[2]){
-  psync_socket_t sock;
-  struct sockaddr_in addr;
-  socklen_t addrlen;
-  sock=socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (sock==INVALID_SOCKET){
-      goto err0;
-  }
-  memset(&addr, 0, sizeof(addr));
-  addr.sin_family=AF_INET;
-  addr.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
-  addrlen=sizeof(addr);
-  if (bind(sock, (struct sockaddr *)&addr, sizeof(addr))==SOCKET_ERROR ||
-      listen(sock, 1)==SOCKET_ERROR ||
-      getsockname(sock, (struct sockaddr *)&addr, &addrlen)==SOCKET_ERROR ||
-      (sockfd[0]=socket(AF_INET, SOCK_STREAM, IPPROTO_TCP))==INVALID_SOCKET)
-    goto err1;
-  if (connect(sockfd[0], (struct sockaddr *)&addr, addrlen)==SOCKET_ERROR ||
-      (sockfd[1]=accept(sock, NULL, NULL))==INVALID_SOCKET)
-    goto err2;
-  psync_close_socket(sock);
-  return 0;
-err2:
-  psync_close_socket(sockfd[0]);
-err1:
-  psync_close_socket(sock);
-err0:
-  return SOCKET_ERROR;
-}
-#endif
-
 int 
 psync_pipe(psync_socket_t pipefd[2]){
-#if defined(P_OS_POSIX)
   return pipe(pipefd);
-#else
-  return psync_compat_socketpair(pipefd);
-#endif
 }
 
 int 
@@ -1969,11 +1899,7 @@ psync_pipe_write(psync_socket_t pfd, const void *buff, int num){
 
 int 
 psync_socket_pair(psync_socket_t sfd[2]){
-#if defined(P_OS_POSIX)
   return socketpair(AF_UNIX, SOCK_STREAM, 0, sfd);
-#else
-  return psync_compat_socketpair(sfd);
-#endif
 }
 
 int 
@@ -2183,7 +2109,7 @@ psync_file_close(psync_file_t fd){
 
 int 
 psync_file_sync(psync_file_t fd){
-#if defined(F_FULLFSYNC) && defined(P_OS_POSIX)
+#if defined(F_FULLFSYNC)
   if (unlikely(fcntl(fd, F_FULLFSYNC))){
     while (errno==EINTR){
       debug(D_NOTICE, "got EINTR while fsyncing file");
@@ -2202,7 +2128,7 @@ psync_file_sync(psync_file_t fd){
   }
   else
     return 0;
-#elif defined(P_OS_POSIX)
+#else
 #if _POSIX_SYNCHRONIZED_IO>0
   if (unlikely(fdatasync(fd))){
 #else
@@ -2278,7 +2204,6 @@ psync_file_set_creation(psync_file_t fd, time_t ctime){
 
 int 
 psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime){
-#if defined(P_OS_POSIX)
   if (mtime){
     struct timeval tm[2];
     tm[0].tv_sec=mtime;
@@ -2294,9 +2219,6 @@ psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime){
   }
   else
     return 0;
-#else
-  return -1;
-#endif
 }
 
 int 
@@ -2344,15 +2266,13 @@ psync_file_preread(psync_file_t fd, uint64_t offset, size_t count){
 
 int 
 psync_file_readahead(psync_file_t fd, uint64_t offset, size_t count){
-#if defined(P_OS_POSIX) && defined(POSIX_FADV_WILLNEED)
+#if defined(POSIX_FADV_WILLNEED)
   return posix_fadvise(fd, offset, count, POSIX_FADV_WILLNEED);
-#elif defined(P_OS_POSIX) && defined(F_RDADVISE)
+#elif defined(F_RDADVISE)
   struct radvisory ra;
   ra.ra_offset=offset;
   ra.ra_count=count;
   return fcntl(fd, F_RDADVISE, &ra);
-#else
-  return psync_file_preread(fd, offset, count);
 #endif
 }
 
