@@ -25,11 +25,15 @@
   USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
   DAMAGE.
 */
+#include <iostream>
+#include <string>
+
+#include <boost/program_options.hpp>
 
 #include "control_tools.h"
+#include "pclsync_lib_c.h"
+
 #include "pclsync_lib.h"
-#include <boost/program_options.hpp>
-#include <iostream>
 
 namespace po = boost::program_options;
 namespace ct = control_tools;

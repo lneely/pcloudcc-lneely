@@ -25,11 +25,11 @@
   USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
   DAMAGE.
 */
+#include <iostream>
+#include <string>
 
 #include <fcntl.h>
-#include <iostream>
 #include <stdlib.h>
-#include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <syslog.h>
@@ -37,6 +37,8 @@
 
 #include "control_tools.h"
 #include "overlay_client.h"
+#include "pclsync_lib_c.h"
+
 #include "pclsync_lib.h"
 
 namespace cc = console_client;

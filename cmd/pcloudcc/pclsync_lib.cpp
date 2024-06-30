@@ -26,18 +26,18 @@
   DAMAGE.
 */
 
-#include "pclsync_lib.h"
-#include "pcompat.h"
-#include "psynclib.h"
-
+#include <cstring>
 #include <iostream>
-
-#include <iostream>
-#include <stdio.h>
-#include <string.h>
 #include <string>
+
+#include <stdio.h>
 #include <termios.h>
 #include <unistd.h>
+
+#include "pclsync_lib_c.h"
+#include "psynclib.h"
+
+#include "pclsync_lib.h"
 
 namespace cc = console_client;
 namespace clib = cc::clibrary;

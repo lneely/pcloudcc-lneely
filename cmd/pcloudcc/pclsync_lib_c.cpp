@@ -26,7 +26,10 @@
   DAMAGE.
 */
 
+#include <string>
+
 #include "pclsync_lib_c.h"
+
 #include "pclsync_lib.h"
 
 #ifdef __cplusplus

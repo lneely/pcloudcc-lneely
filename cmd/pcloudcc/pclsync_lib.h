@@ -26,11 +26,14 @@
   DAMAGE.
 */
 
+/*
+  Dependencies:
+  - <string>
+  - pclsync_lib_c.h
+*/
+
 #ifndef PCLSYNC_LIB_H
 #define PCLSYNC_LIB_H
-
-#include "pclsync_lib_c.h"
-#include <string>
 
 struct pstatus_struct_;
 

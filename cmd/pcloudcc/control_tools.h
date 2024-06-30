@@ -30,11 +30,13 @@
 #define CONTROL_TOOLS_H
 
 namespace control_tools {
+
 int start_crypto(const char *pass);
 int stop_crypto();
 int finalize();
 int daemonize(bool do_commands);
 void process_commands();
+
 } // namespace control_tools
 
 #endif // CONTROL_TOOLS_H
