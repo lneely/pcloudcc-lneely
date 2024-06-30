@@ -22,18 +22,9 @@ OBJ=pcompat.o psynclib.o plocks.o plibs.o pcallbacks.o pdiff.o pstatus.o papi.o 
 OBJFS=pfs.o ppagecache.o pfsfolder.o pfstasks.o pfsupload.o pintervaltree.o pfsxattr.o\
 	pcloudcrypto.o pfscrypto.o pcrc32c.o pfsstatic.o plocks.o
 
-ifeq ($(USESSL),openssl)
-  OBJ += pssl-openssl.o
-  CFLAGS += -DP_SSL_OPENSSL
-endif
-ifeq ($(USESSL),securetransport)
-  OBJ += pssl-securetransport.o
-  CFLAGS += -DP_SSL_SECURETRANSPORT
-endif
-ifeq ($(USESSL),mbed)
-  OBJ += pssl-mbedtls.o
-  CFLAGS += -DP_SSL_MBEDTLS -I../mbedtls/include
-endif
+# committing to mbedtls
+OBJ += pssl-mbedtls.o
+CFLAGS += -DP_SSL_MBEDTLS -I../mbedtls/include
 
 OBJ1=overlay_client.o
 
