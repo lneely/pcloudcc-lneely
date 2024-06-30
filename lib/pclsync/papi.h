@@ -33,7 +33,6 @@
 #include "pcompat.h"
 #include "pcompiler.h"
 #include <stdint.h>
-#include <string.h>
 
 #define PARAM_STR 0
 #define PARAM_NUM 1
