@@ -15,7 +15,7 @@ link_directories(${Boost_LIBRARY_DIR})
 #set (CMAKE_CXX_FLAGS "-Wl,-Bstatic")
 set (CMAKE_C_FLAGS "-fPIC")
 set (PCLSYNC_PATH ${CMAKE_SOURCE_DIR}/lib/pclsync)
-set (MBEDTLS_PATH ${CMAKE_SOURCE_DIR}/lib/mbedtls)
+set (MBEDTLS_PATH ${CMAKE_SOURCE_DIR}/lib/mbedtls-1.3.10)
 set (CMD_PATH ${CMAKE_SOURCE_DIR}/cmd/pcloudcc)
 
 #add_subdirectory(${MBEDTLS_PATH})
@@ -30,7 +30,7 @@ add_custom_target(
   mbedtls
   COMMAND cmake . && make
   WORKING_DIRECTORY ${MBEDTLS_PATH}
-)
+) 
 
 set (OVERLAY_CLENT_PATH ${CMAKE_SOURCE_DIR}/lib/poverlay_linux)
 include_directories(${OVERLAY_CLENT_PATH})

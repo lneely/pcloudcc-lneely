@@ -2,8 +2,8 @@
 **/*.a
 /lib/pclsync/.cache/
 /lib/pclsync/compile_commands.json
-/lib/mbedtls/build
-/lib/mbedtls/library/Makefile
+/lib/mbedtls-1.3.10/build
+/lib/mbedtls-1.3.10/library/Makefile
 /build
 /CMakeFiles/
 /cmake_install.cmake
