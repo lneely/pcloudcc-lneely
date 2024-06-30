@@ -1,6 +1,6 @@
-/* 
+/*
    Copyright (c) 2013 Anton Titov.
- 
+
    Copyright (c) 2013 pCloud Ltd.  All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -32,9 +32,9 @@
 #ifndef _PSYNC_DOWNLOAD_H
 #define _PSYNC_DOWNLOAD_H
 
-#include "psynclib.h"
 #include "psettings.h"
 #include "pssl.h"
+#include "psynclib.h"
 
 typedef unsigned char psync_hex_hash[PSYNC_HASH_DIGEST_HEXLEN];
 
@@ -45,7 +45,8 @@ typedef struct {
 
 void psync_download_init();
 void psync_wake_download();
-void psync_delete_download_tasks_for_file(psync_fileid_t fileid, psync_syncid_t syncid, int deltemp);
+void psync_delete_download_tasks_for_file(psync_fileid_t fileid,
+                                          psync_syncid_t syncid, int deltemp);
 void psync_stop_file_download(psync_fileid_t fileid, psync_syncid_t syncid);
 void psync_stop_sync_download(psync_syncid_t syncid);
 void psync_stop_all_download();

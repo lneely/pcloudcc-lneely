@@ -1,8 +1,8 @@
-/* 
+/*
    Copyright (c) 2015 Anton Titov.
 
    Copyright (c) 2015 pCloud Ltd.  All rights reserved.
- 
+
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
    are met: Redistributions of source code must retain the above
@@ -14,7 +14,7 @@
    names of its contributors may be used to endorse or promote
    products derived from this software without specific prior written
    permission.
- 
+
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -36,6 +36,7 @@
 
 typedef void (*psync_run_ratelimit_callback0)();
 
-void psync_run_ratelimited(const char *name, psync_run_ratelimit_callback0 call, uint32_t minintervalsec, int runinthread);
+void psync_run_ratelimited(const char *name, psync_run_ratelimit_callback0 call,
+                           uint32_t minintervalsec, int runinthread);
 
 #endif

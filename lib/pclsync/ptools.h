@@ -1,4 +1,4 @@
-/* 
+/*
    Copyright (c) 2013-2015 pCloud Ltd.  All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -37,38 +37,37 @@
 
 #define EVENT_WS "loganalyticsevent"
 
-#define EPARAM_CATEG  "category"
+#define EPARAM_CATEG "category"
 #define EPARAM_ACTION "action"
-#define EPARAM_LABEL  "label"
-#define EPARAM_OS     "os"
-#define EPARAM_TIME   "etime"
-#define EPARAM_AUTH   "auth"
-#define EPARAM_MAC    "mac_address"
-#define EPARAM_KEY    "keys"
+#define EPARAM_LABEL "label"
+#define EPARAM_OS "os"
+#define EPARAM_TIME "etime"
+#define EPARAM_AUTH "auth"
+#define EPARAM_MAC "mac_address"
+#define EPARAM_KEY "keys"
 
-#define INST_EVENT_CATEG  "INSTALLATION_PROCESS"
+#define INST_EVENT_CATEG "INSTALLATION_PROCESS"
 #define INST_EVENT_FLOGIN "FIRST_LOGIN"
 
-//Syncs count constants
-#define PSYNC_SYNCS_COUNT  "syncs_count"
+// Syncs count constants
+#define PSYNC_SYNCS_COUNT "syncs_count"
 
-#define PSYNC_EVENT_CATEG  "SYNCS_EVENTS"
+#define PSYNC_EVENT_CATEG "SYNCS_EVENTS"
 #define PSYNC_EVENT_ACTION "SYNCS_LOG_COUNT"
-#define PSYNC_EVENT_LABEL  "SYNCS_COUNT"
+#define PSYNC_EVENT_LABEL "SYNCS_COUNT"
 
-
-//Payload name constants
+// Payload name constants
 #define FOLDER_META "metadata"
-#define NO_PAYLOAD         ""
+#define NO_PAYLOAD ""
 
-//Parameter name constants
-#define FOLDER_ID          "folderid"
+// Parameter name constants
+#define FOLDER_ID "folderid"
 #define PARENT_FOLDER_NAME "parentname"
 
-//Parser delimeter symbols
+// Parser delimeter symbols
 #define DELIM_SEMICOLON ';'
 
-#define DELIM_DIR  '/'
+#define DELIM_DIR '/'
 
 typedef struct _eventParams {
   int paramCnt;
@@ -77,42 +76,30 @@ typedef struct _eventParams {
 
 typedef struct _folderPath {
   int cnt;
-  char* folders[50];
+  char *folders[50];
 } folderPath;
 
-int create_backend_event(
-  const char* binapi,
-  const char* category,
-  const char* action,
-  const char* label,
-  const char* auth,
-  int          os,
-  time_t          etime,
-  eventParams* params,
-  char** err);
+int create_backend_event(const char *binapi, const char *category,
+                         const char *action, const char *label,
+                         const char *auth, int os, time_t etime,
+                         eventParams *params, char **err);
 
-int backend_call(const char* binapi,
-  const char*  wsPath,
-  const char* payloadName,
-  eventParams* requiredParams,
-  eventParams* optionalParams,
-  binresult**  resData,
-  char** err);
+int backend_call(const char *binapi, const char *wsPath,
+                 const char *payloadName, eventParams *requiredParams,
+                 eventParams *optionalParams, binresult **resData, char **err);
 
-char* getMACaddr();
+char *getMACaddr();
 
-char* get_machine_name();
+char *get_machine_name();
 
-void parse_os_path(char* path, folderPath* folders, char* delim, int mode);
+void parse_os_path(char *path, folderPath *folders, char *delim, int mode);
 
-void send_psyncs_event(const char* binapi,
-                       const char* auth);
+void send_psyncs_event(const char *binapi, const char *auth);
 
 int set_be_file_dates(uint64_t fileid, time_t ctime, time_t mtime);
 
- uint32_t get_sync_id_from_fid(uint64_t fid);
+uint32_t get_sync_id_from_fid(uint64_t fid);
 
- char* get_sync_folder_by_syncid(uint64_t syncId);
- 
- char* get_folder_name_from_path(char* path);
- 
+char *get_sync_folder_by_syncid(uint64_t syncId);
+
+char *get_folder_name_from_path(char *path);

@@ -26,150 +26,142 @@
   DAMAGE.
 */
 
-#include <iostream>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <stdlib.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <syslog.h>
+#include <iostream>
+#include <stdlib.h>
 #include <string>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <syslog.h>
+#include <unistd.h>
 
 #include "control_tools.h"
-#include "pclsync_lib.h"
 #include "overlay_client.h"
+#include "pclsync_lib.h"
 
 namespace cc = console_client;
 
 namespace control_tools {
 
-  static const int STOP = 0;
+static const int STOP = 0;
 
-  enum command_ids_ {
-	STARTCRYPTO = 20,
-	STOPCRYPTO,
-	FINALIZE,
-	LISTSYNC,
-	ADDSYNC,
-	STOPSYNC
-  };
+enum command_ids_ {
+  STARTCRYPTO = 20,
+  STOPCRYPTO,
+  FINALIZE,
+  LISTSYNC,
+  ADDSYNC,
+  STOPSYNC
+};
 
+int start_crypto(const char *pass) {
+  int ret;
+  char *errm;
 
-  int 
-  start_crypto(const char * pass) {
-	int ret;
-	char* errm;
-	
-	if (SendCall(STARTCRYPTO, pass, &ret, &errm)) {
-	  std::cout << "Start Crypto failed. return is " 
-				<< ret << " and message is "<< errm 
-				<< std::endl;
-	} else {
-	  std::cout << "Crypto started. "<< std::endl;
-	}
-
-	free(errm);
-	return ret;
-  }
-  
-  int
-  stop_crypto(){
-	int ret;
-	char* errm;
-
-	if (SendCall(STOPCRYPTO, "", &ret, &errm)) {
-	  std::cout << "Stop Crypto failed. return is " << ret
-				<< " and message is "<<errm << std::endl;
-	} else {
-	  std::cout << "Crypto Stopped. " << std::endl;
-	}
-
-	free(errm);
-	return ret;
-  }
-  
-  int
-  finalize() {
-	int ret;
-	char* errm;
-
-	if (SendCall(FINALIZE, "", &ret, &errm)) {
-	  std::cout << "Finalize failed. return is " 
-				<< ret << " and message is "<< errm 
-				<< std::endl;
-	} else {
-	  std::cout << "Exiting ..."<< std::endl;
-	}
-
-	free(errm);
-	return ret;
+  if (SendCall(STARTCRYPTO, pass, &ret, &errm)) {
+    std::cout << "Start Crypto failed. return is " << ret << " and message is "
+              << errm << std::endl;
+  } else {
+    std::cout << "Crypto started. " << std::endl;
   }
 
-  void
-  process_commands() {
-	std::cout << "Supported commands are:" << std::endl 
-			  << "startcrypto <crypto pass>, "
-			  << "stopcrypto, "
-			  << "finalize, "
-			  << "q, quit" << std::endl;
-	std::cout << "> " ;
-	
-	for (std::string line; std::getline(std::cin, line);) {
-	  if (!line.compare("finalize")) {
-		finalize();
-		break;
-	  } else if (!line.compare("stopcrypto")) {
-		stop_crypto();
-	  } else if (!line.compare(0,11,"startcrypto",0,11)
-				 && (line.length() > 12)) {
-		start_crypto(line.c_str() + 12);
-	  } else if (!line.compare("q") || !line.compare("quit")) {
-		break;
-	  }
-	  std::cout<< "> " ;
-	}
-  }
-
-  int 
-  daemonize(bool do_commands) {
-	pid_t pid, sid;
-
-	pid = fork();
-	if (pid < 0) {
-	  exit(EXIT_FAILURE);
-	} else if (pid > 0) {
-	  std::cout << "Daemon process created. Process id is: " << pid << std::endl;
-	  if (do_commands) {
-		process_commands();
-	  } else {
-		std::cout  << "kill -9 "<< pid << std::endl
-				   << " to stop it." << std::endl;
-	  }
-	  exit(EXIT_SUCCESS);
-	}
-
-	/* Open any logs here */
-	umask(0);
-	sid = setsid();
-	if (sid < 0) {
-	  exit(EXIT_FAILURE);
-	}
-
-	if ((chdir("/")) < 0) {
-	  exit(EXIT_FAILURE);
-	}
-	
-	close(STDIN_FILENO);
-	close(STDOUT_FILENO);
-	close(STDERR_FILENO);
-
-	if (cc::clibrary::pclsync_lib::get_lib().init()) {
-	  exit(EXIT_FAILURE);
-	}
-	
-	while (1) {
-	  sleep(10);
-	}
-  }
-
+  free(errm);
+  return ret;
 }
+
+int stop_crypto() {
+  int ret;
+  char *errm;
+
+  if (SendCall(STOPCRYPTO, "", &ret, &errm)) {
+    std::cout << "Stop Crypto failed. return is " << ret << " and message is "
+              << errm << std::endl;
+  } else {
+    std::cout << "Crypto Stopped. " << std::endl;
+  }
+
+  free(errm);
+  return ret;
+}
+
+int finalize() {
+  int ret;
+  char *errm;
+
+  if (SendCall(FINALIZE, "", &ret, &errm)) {
+    std::cout << "Finalize failed. return is " << ret << " and message is "
+              << errm << std::endl;
+  } else {
+    std::cout << "Exiting ..." << std::endl;
+  }
+
+  free(errm);
+  return ret;
+}
+
+void process_commands() {
+  std::cout << "Supported commands are:" << std::endl
+            << "startcrypto <crypto pass>, "
+            << "stopcrypto, "
+            << "finalize, "
+            << "q, quit" << std::endl;
+  std::cout << "> ";
+
+  for (std::string line; std::getline(std::cin, line);) {
+    if (!line.compare("finalize")) {
+      finalize();
+      break;
+    } else if (!line.compare("stopcrypto")) {
+      stop_crypto();
+    } else if (!line.compare(0, 11, "startcrypto", 0, 11) &&
+               (line.length() > 12)) {
+      start_crypto(line.c_str() + 12);
+    } else if (!line.compare("q") || !line.compare("quit")) {
+      break;
+    }
+    std::cout << "> ";
+  }
+}
+
+int daemonize(bool do_commands) {
+  pid_t pid, sid;
+
+  pid = fork();
+  if (pid < 0) {
+    exit(EXIT_FAILURE);
+  } else if (pid > 0) {
+    std::cout << "Daemon process created. Process id is: " << pid << std::endl;
+    if (do_commands) {
+      process_commands();
+    } else {
+      std::cout << "kill -9 " << pid << std::endl
+                << " to stop it." << std::endl;
+    }
+    exit(EXIT_SUCCESS);
+  }
+
+  /* Open any logs here */
+  umask(0);
+  sid = setsid();
+  if (sid < 0) {
+    exit(EXIT_FAILURE);
+  }
+
+  if ((chdir("/")) < 0) {
+    exit(EXIT_FAILURE);
+  }
+
+  close(STDIN_FILENO);
+  close(STDOUT_FILENO);
+  close(STDERR_FILENO);
+
+  if (cc::clibrary::pclsync_lib::get_lib().init()) {
+    exit(EXIT_FAILURE);
+  }
+
+  while (1) {
+    sleep(10);
+  }
+}
+
+} // namespace control_tools

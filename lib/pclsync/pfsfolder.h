@@ -2,7 +2,7 @@
   Copyright (c) 2014 Anton Titov.
 
   Copyright (c) 2014 pCloud Ltd.  All rights reserved.
- 
+
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions
   are met: Redistributions of source code must retain the above
@@ -13,7 +13,7 @@
   the distribution.  Neither the name of pCloud Ltd nor the names of
   its contributors may be used to endorse or promote products derived
   from this software without specific prior written permission.
- 
+
   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -49,11 +49,16 @@ typedef struct {
 
 psync_fspath_t *psync_fsfolder_resolve_path(const char *path);
 psync_fsfolderid_t psync_fsfolderid_by_path(const char *path, uint32_t *pflags);
-psync_fsfolderid_t psync_fsfolderidperm_by_path(const char *path, uint32_t *pflags, uint32_t *pPermissions);
-uint32_t psync_fsfolderflags_by_id(psync_fsfolderid_t folderid, uint32_t *pperm);
+psync_fsfolderid_t psync_fsfolderidperm_by_path(const char *path,
+                                                uint32_t *pflags,
+                                                uint32_t *pPermissions);
+uint32_t psync_fsfolderflags_by_id(psync_fsfolderid_t folderid,
+                                   uint32_t *pperm);
 int psync_fsfolder_crypto_error();
-char *get_decname_for_folder(psync_fsfolderid_t folderid, const char *path, size_t len);
+char *get_decname_for_folder(psync_fsfolderid_t folderid, const char *path,
+                             size_t len);
 
-psync_fsfolderid_t psync_get_folderid(psync_fsfolderid_t parent_fid, const char* name);
+psync_fsfolderid_t psync_get_folderid(psync_fsfolderid_t parent_fid,
+                                      const char *name);
 
 #endif

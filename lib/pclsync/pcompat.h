@@ -1,4 +1,4 @@
-/* 
+/*
    Copyright (c) 2013 Anton Titov.
 
    Copyright (c) 2013 pCloud Ltd.  All rights reserved.
@@ -28,7 +28,6 @@
    DAMAGE.
 */
 
-
 #ifndef _PSYNC_COMPAT_H
 #define _PSYNC_COMPAT_H
 
@@ -36,30 +35,29 @@
 
 // figure out which OS...
 // XXX: goal is to remove
-// --- 
+// ---
 #if defined(__linux__)
 // linux os
 #ifndef P_OS_LINUX // HACK: need to rework includes
 #define P_OS_LINUX
 #endif
-#define P_OS_ID 7  // linux
+#define P_OS_ID 7 // linux
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
 #else
 // non-linux posix-compliant OS
-#define P_OS_ID 0  
+#define P_OS_ID 0
 #endif
-
 
 #define _FILE_OFFSET_BITS 64
 
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <errno.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <pthread.h>
-#include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 typedef long psync_int_t;
 typedef unsigned long psync_uint_t;
@@ -71,20 +69,19 @@ typedef unsigned long psync_uint_t;
 #define PRIu64 "I64u"
 #endif
 
-
-#define psync_32to64(hi, lo) ((((uint64_t)(hi))<<32)+(lo))
-#define psync_bool_to_zero(x) (((int)(!!(x)))-1)
+#define psync_32to64(hi, lo) ((((uint64_t)(hi)) << 32) + (lo))
+#define psync_bool_to_zero(x) (((int)(!!(x))) - 1)
 
 #define NTO_STR(s) TO_STR(s)
 #define TO_STR(s) #s
 
-#include <sys/socket.h>
-#include <sys/select.h>
-#include <sys/time.h>
 #include <arpa/inet.h>
-#include <netdb.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <netdb.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #define P_PRI_U64 PRIu64
@@ -100,14 +97,15 @@ typedef unsigned long psync_uint_t;
 
 #if defined(st_mtime)
 #if defined(st_mtimensec)
-#define psync_stat_mtime_native(s) ((s)->st_mtime*1000000ULL+(s)->st_mtimensec/1000)
+#define psync_stat_mtime_native(s)                                             \
+  ((s)->st_mtime * 1000000ULL + (s)->st_mtimensec / 1000)
 #else
-#define psync_stat_mtime_native(s)						\
-  ((s)->st_mtime*1000000ULL+							\
-   ((struct timespec *)(&(s)->st_mtime))->tv_nsec/1000)
+#define psync_stat_mtime_native(s)                                             \
+  ((s)->st_mtime * 1000000ULL +                                                \
+   ((struct timespec *)(&(s)->st_mtime))->tv_nsec / 1000)
 #endif
 
-#define psync_mtime_native_to_mtime(n) ((n)/1000000ULL)
+#define psync_mtime_native_to_mtime(n) ((n) / 1000000ULL)
 
 #define psync_stat_inode(s) ((s)->st_ino)
 #define psync_stat_device(s) ((s)->st_dev)
@@ -118,7 +116,7 @@ typedef unsigned long psync_uint_t;
 typedef struct stat psync_stat_t;
 
 #define psync_sock_err() errno
-#define psync_sock_set_err(e) errno=(e)
+#define psync_sock_set_err(e) errno = (e)
 
 #define psync_fs_err() errno
 
@@ -131,28 +129,28 @@ typedef int psync_fs_err_t;
 #define PSYNC_DIRECTORY_SEPARATORC '/'
 
 #define P_WOULDBLOCK EWOULDBLOCK
-#define P_AGAIN      EAGAIN
+#define P_AGAIN EAGAIN
 #define P_INPROGRESS EINPROGRESS
-#define P_TIMEDOUT   ETIMEDOUT
-#define P_INVAL      EINVAL
-#define P_CONNRESET  ECONNRESET
-#define P_INTR       EINTR
+#define P_TIMEDOUT ETIMEDOUT
+#define P_INVAL EINVAL
+#define P_CONNRESET ECONNRESET
+#define P_INTR EINTR
 
-#define P_NOENT      ENOENT
-#define P_EXIST      EEXIST
-#define P_NOSPC      ENOSPC
-#define P_DQUOT      EDQUOT
-#define P_NOTEMPTY   ENOTEMPTY
-#define P_NOTDIR     ENOTDIR
-#define P_BUSY       EBUSY
-#define P_ROFS       EROFS
+#define P_NOENT ENOENT
+#define P_EXIST EEXIST
+#define P_NOSPC ENOSPC
+#define P_DQUOT EDQUOT
+#define P_NOTEMPTY ENOTEMPTY
+#define P_NOTDIR ENOTDIR
+#define P_BUSY EBUSY
+#define P_ROFS EROFS
 
 #define P_O_RDONLY O_RDONLY
 #define P_O_WRONLY O_WRONLY
-#define P_O_RDWR   O_RDWR
-#define P_O_CREAT  O_CREAT
-#define P_O_TRUNC  O_TRUNC
-#define P_O_EXCL   O_EXCL
+#define P_O_RDWR O_RDWR
+#define P_O_CREAT O_CREAT
+#define P_O_TRUNC O_TRUNC
+#define P_O_EXCL O_EXCL
 
 #define P_SEEK_SET SEEK_SET
 #define P_SEEK_CUR SEEK_CUR
@@ -229,10 +227,11 @@ typedef struct {
 #define INVALID_HANDLE_VALUE -1
 #endif
 
-#define PSYNC_SOCKET_ERROR      -1
+#define PSYNC_SOCKET_ERROR -1
 #define PSYNC_SOCKET_WOULDBLOCK -2
 
-#if !defined(__socklen_t_defined) && !defined(HAVE_SOCKET_LEN_T) && !defined(socklen_t)
+#if !defined(__socklen_t_defined) && !defined(HAVE_SOCKET_LEN_T) &&            \
+    !defined(socklen_t)
 
 typedef unsigned int socklen_t;
 
@@ -266,10 +265,12 @@ void psync_nanotime(struct timespec *tm);
 uint64_t psync_millitime();
 void psync_yield_cpu();
 
-void psync_get_random_seed(unsigned char *seed, const void *addent, size_t aelen, int fast);
+void psync_get_random_seed(unsigned char *seed, const void *addent,
+                           size_t aelen, int fast);
 
 psync_socket_t psync_create_socket(int domain, int type, int protocol);
-psync_socket *psync_socket_connect(const char *host, int unsigned port, int ssl);
+psync_socket *psync_socket_connect(const char *host, int unsigned port,
+                                   int ssl);
 void psync_socket_close(psync_socket *sock);
 void psync_socket_close_bad(psync_socket *sock);
 void psync_socket_set_write_buffered(psync_socket *sock);
@@ -310,8 +311,10 @@ int psync_wait_socket_read_timeout(psync_socket_t sock);
 int psync_socket_is_broken(psync_socket_t sock);
 int psync_select_in(psync_socket_t *sockets, int cnt, int64_t timeoutmillisec);
 
-int psync_list_dir(const char *path, psync_list_dir_callback callback, void *ptr);
-int psync_list_dir_fast(const char *path, psync_list_dir_callback_fast callback, void *ptr);
+int psync_list_dir(const char *path, psync_list_dir_callback callback,
+                   void *ptr);
+int psync_list_dir_fast(const char *path, psync_list_dir_callback_fast callback,
+                        void *ptr);
 
 int64_t psync_get_free_space_by_path(const char *path);
 
@@ -330,13 +333,16 @@ int psync_folder_sync(const char *path);
 psync_file_t psync_file_dup(psync_file_t fd);
 int psync_file_set_creation(psync_file_t fd, time_t ctime);
 int psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime);
-int psync_set_crtime_mtime_by_fd(psync_file_t fd, const char *path, time_t crtime, time_t mtime);
+int psync_set_crtime_mtime_by_fd(psync_file_t fd, const char *path,
+                                 time_t crtime, time_t mtime);
 int psync_file_preread(psync_file_t fd, uint64_t offset, size_t count);
 int psync_file_readahead(psync_file_t fd, uint64_t offset, size_t count);
 ssize_t psync_file_read(psync_file_t fd, void *buf, size_t count);
-ssize_t psync_file_pread(psync_file_t fd, void *buf, size_t count, uint64_t offset);
+ssize_t psync_file_pread(psync_file_t fd, void *buf, size_t count,
+                         uint64_t offset);
 ssize_t psync_file_write(psync_file_t fd, const void *buf, size_t count);
-ssize_t psync_file_pwrite(psync_file_t fd, const void *buf, size_t count, uint64_t offset);
+ssize_t psync_file_pwrite(psync_file_t fd, const void *buf, size_t count,
+                          uint64_t offset);
 int64_t psync_file_seek(psync_file_t fd, uint64_t offset, int whence);
 int psync_file_truncate(psync_file_t fd);
 int64_t psync_file_size(psync_file_t fd);

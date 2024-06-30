@@ -1,4 +1,4 @@
-/* 
+/*
    Copyright (c) 2013-2015 pCloud Ltd.  All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -30,6 +30,6 @@
 #ifndef _PSYNC_TYPES_H
 #define _PSYNC_TYPES_H
 #include "papi.h"
-typedef void (*result_visitor)(int i, const binresult *result, void *param); 
+typedef void (*result_visitor)(int i, const binresult *result, void *param);
 
 #endif

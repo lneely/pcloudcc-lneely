@@ -1,8 +1,8 @@
-/* 
+/*
    Copyright (c) 2014 Anton Titov.
- 
+
    Copyright (c) 2014 pCloud Ltd.  All rights reserved.
- 
+
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
    are met: Redistributions of source code must retain the above
@@ -14,7 +14,7 @@
    names of its contributors may be used to endorse or promote
    products derived from this software without specific prior written
    permission.
- 
+
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -36,6 +36,8 @@
 
 void psync_p2p_init();
 void psync_p2p_change();
-int psync_p2p_check_download(psync_fileid_t fileid, const unsigned char *filehashhex, uint64_t fsize, const char *filename);
+int psync_p2p_check_download(psync_fileid_t fileid,
+                             const unsigned char *filehashhex, uint64_t fsize,
+                             const char *filename);
 
 #endif

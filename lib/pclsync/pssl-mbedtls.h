@@ -1,6 +1,6 @@
-/* 
+/*
    Copyright (c) 2015 Anton Titov.
- 
+
    Copyright (c) 2015 pCloud Ltd.  All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -33,11 +33,11 @@
 #define _PSYNC_MBEDTLS_H
 
 #include "plibs.h"
+#include <polarssl/aes.h>
+#include <polarssl/rsa.h>
 #include <polarssl/sha1.h>
 #include <polarssl/sha256.h>
 #include <polarssl/sha512.h>
-#include <polarssl/rsa.h>
-#include <polarssl/aes.h>
 
 #define PSYNC_INVALID_RSA NULL
 #define PSYNC_INVALID_SYM_KEY NULL
@@ -48,7 +48,8 @@
 #define psync_sha1_ctx sha1_context
 #define psync_sha1(data, datalen, checksum) sha1(data, datalen, checksum)
 #define psync_sha1_init(pctx) sha1_starts(pctx)
-#define psync_sha1_update(pctx, data, datalen) sha1_update(pctx, (const unsigned char *)data, datalen)
+#define psync_sha1_update(pctx, data, datalen)                                 \
+  sha1_update(pctx, (const unsigned char *)data, datalen)
 #define psync_sha1_final(checksum, pctx) sha1_finish(pctx, checksum)
 
 #define PSYNC_SHA256_BLOCK_LEN 64
@@ -57,7 +58,8 @@
 #define psync_sha256_ctx sha256_context
 #define psync_sha256(data, datalen, checksum) sha256(data, datalen, checksum, 0)
 #define psync_sha256_init(pctx) sha256_starts(pctx, 0)
-#define psync_sha256_update(pctx, data, datalen) sha256_update(pctx, (const unsigned char *)data, datalen)
+#define psync_sha256_update(pctx, data, datalen)                               \
+  sha256_update(pctx, (const unsigned char *)data, datalen)
 #define psync_sha256_final(checksum, pctx) sha256_finish(pctx, checksum)
 
 #define PSYNC_SHA512_BLOCK_LEN 128
@@ -66,7 +68,8 @@
 #define psync_sha512_ctx sha512_context
 #define psync_sha512(data, datalen, checksum) sha512(data, datalen, checksum, 0)
 #define psync_sha512_init(pctx) sha512_starts(pctx, 0)
-#define psync_sha512_update(pctx, data, datalen) sha512_update(pctx, (const unsigned char *)data, datalen)
+#define psync_sha512_update(pctx, data, datalen)                               \
+  sha512_update(pctx, (const unsigned char *)data, datalen)
 #define psync_sha512_final(checksum, pctx) sha512_finish(pctx, checksum)
 
 typedef rsa_context *psync_rsa_t;
@@ -81,11 +84,13 @@ typedef struct {
 typedef aes_context *psync_aes256_encoder;
 typedef aes_context *psync_aes256_decoder;
 
-typedef void (*psync_ssl_debug_callback_t)(void *ctx, int level, const char *message);
+typedef void (*psync_ssl_debug_callback_t)(void *ctx, int level,
+                                           const char *message);
 void psync_ssl_set_log_threshold(int threshold);
 void psync_ssl_set_debug_callback(psync_ssl_debug_callback_t cb, void *ctx);
 
-#if defined(__GNUC__) && (defined(__amd64__) || defined(__x86_64__) || defined(__i386__))
+#if defined(__GNUC__) &&                                                       \
+    (defined(__amd64__) || defined(__x86_64__) || defined(__i386__))
 #define PSYNC_AES_HW
 #define PSYNC_AES_HW_GCC
 #elif defined(_MSC_VER)
@@ -96,46 +101,70 @@ void psync_ssl_set_debug_callback(psync_ssl_debug_callback_t cb, void *ctx);
 #if defined(PSYNC_AES_HW)
 extern int psync_ssl_hw_aes;
 
-void psync_aes256_encode_block_hw(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst);
-void psync_aes256_decode_block_hw(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst);
-void psync_aes256_encode_2blocks_consec_hw(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst);
-void psync_aes256_decode_2blocks_consec_hw(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst);
-void psync_aes256_decode_4blocks_consec_xor_hw(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor);
-void psync_aes256_decode_4blocks_consec_xor_sw(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor);
+void psync_aes256_encode_block_hw(psync_aes256_encoder enc,
+                                  const unsigned char *src, unsigned char *dst);
+void psync_aes256_decode_block_hw(psync_aes256_decoder enc,
+                                  const unsigned char *src, unsigned char *dst);
+void psync_aes256_encode_2blocks_consec_hw(psync_aes256_encoder enc,
+                                           const unsigned char *src,
+                                           unsigned char *dst);
+void psync_aes256_decode_2blocks_consec_hw(psync_aes256_decoder enc,
+                                           const unsigned char *src,
+                                           unsigned char *dst);
+void psync_aes256_decode_4blocks_consec_xor_hw(psync_aes256_decoder enc,
+                                               const unsigned char *src,
+                                               unsigned char *dst,
+                                               unsigned char *bxor);
+void psync_aes256_decode_4blocks_consec_xor_sw(psync_aes256_decoder enc,
+                                               const unsigned char *src,
+                                               unsigned char *dst,
+                                               unsigned char *bxor);
 
-static inline void psync_aes256_encode_block(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst){
+static inline void psync_aes256_encode_block(psync_aes256_encoder enc,
+                                             const unsigned char *src,
+                                             unsigned char *dst) {
   if (likely(psync_ssl_hw_aes))
     psync_aes256_encode_block_hw(enc, src, dst);
   else
     aes_crypt_ecb(enc, AES_ENCRYPT, src, dst);
 }
 
-static inline void psync_aes256_decode_block(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst){
+static inline void psync_aes256_decode_block(psync_aes256_decoder enc,
+                                             const unsigned char *src,
+                                             unsigned char *dst) {
   if (likely(psync_ssl_hw_aes))
     psync_aes256_decode_block_hw(enc, src, dst);
   else
     aes_crypt_ecb(enc, AES_DECRYPT, src, dst);
 }
 
-static inline void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst){
+static inline void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc,
+                                                      const unsigned char *src,
+                                                      unsigned char *dst) {
   if (likely(psync_ssl_hw_aes))
     psync_aes256_encode_2blocks_consec_hw(enc, src, dst);
-  else{
+  else {
     aes_crypt_ecb(enc, AES_ENCRYPT, src, dst);
-    aes_crypt_ecb(enc, AES_ENCRYPT, src+PSYNC_AES256_BLOCK_SIZE, dst+PSYNC_AES256_BLOCK_SIZE);
+    aes_crypt_ecb(enc, AES_ENCRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                  dst + PSYNC_AES256_BLOCK_SIZE);
   }
 }
 
-static inline void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst){
+static inline void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc,
+                                                      const unsigned char *src,
+                                                      unsigned char *dst) {
   if (likely(psync_ssl_hw_aes))
     psync_aes256_decode_2blocks_consec_hw(enc, src, dst);
-  else{
+  else {
     aes_crypt_ecb(enc, AES_DECRYPT, src, dst);
-    aes_crypt_ecb(enc, AES_DECRYPT, src+PSYNC_AES256_BLOCK_SIZE, dst+PSYNC_AES256_BLOCK_SIZE);
+    aes_crypt_ecb(enc, AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                  dst + PSYNC_AES256_BLOCK_SIZE);
   }
 }
 
-static inline void psync_aes256_decode_4blocks_consec_xor(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor){
+static inline void psync_aes256_decode_4blocks_consec_xor(
+    psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst,
+    unsigned char *bxor) {
   if (psync_ssl_hw_aes)
     psync_aes256_decode_4blocks_consec_xor_hw(enc, src, dst, bxor);
   else
@@ -144,36 +173,49 @@ static inline void psync_aes256_decode_4blocks_consec_xor(psync_aes256_decoder e
 
 #else
 
-static inline void psync_aes256_encode_block(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst){
+static inline void psync_aes256_encode_block(psync_aes256_encoder enc,
+                                             const unsigned char *src,
+                                             unsigned char *dst) {
   aes_crypt_ecb(enc, AES_ENCRYPT, src, dst);
 }
 
-static inline void psync_aes256_decode_block(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst){
+static inline void psync_aes256_decode_block(psync_aes256_decoder enc,
+                                             const unsigned char *src,
+                                             unsigned char *dst) {
   aes_crypt_ecb(enc, AES_DECRYPT, src, dst);
 }
 
-static inline void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst){
+static inline void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc,
+                                                      const unsigned char *src,
+                                                      unsigned char *dst) {
   aes_crypt_ecb(enc, AES_ENCRYPT, src, dst);
-  aes_crypt_ecb(enc, AES_ENCRYPT, src+PSYNC_AES256_BLOCK_SIZE, dst+PSYNC_AES256_BLOCK_SIZE);
+  aes_crypt_ecb(enc, AES_ENCRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                dst + PSYNC_AES256_BLOCK_SIZE);
 }
 
-static inline void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst){
+static inline void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc,
+                                                      const unsigned char *src,
+                                                      unsigned char *dst) {
   aes_crypt_ecb(enc, AES_DECRYPT, src, dst);
-  aes_crypt_ecb(enc, AES_DECRYPT, src+PSYNC_AES256_BLOCK_SIZE, dst+PSYNC_AES256_BLOCK_SIZE);
+  aes_crypt_ecb(enc, AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                dst + PSYNC_AES256_BLOCK_SIZE);
 }
 
-static inline void psync_aes256_decode_4blocks_consec_xor(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor){
+static inline void psync_aes256_decode_4blocks_consec_xor(
+    psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst,
+    unsigned char *bxor) {
   unsigned long i;
   aes_crypt_ecb(enc, AES_DECRYPT, src, dst);
-  aes_crypt_ecb(enc, AES_DECRYPT, src+PSYNC_AES256_BLOCK_SIZE, dst+PSYNC_AES256_BLOCK_SIZE);
-  aes_crypt_ecb(enc, AES_DECRYPT, src+PSYNC_AES256_BLOCK_SIZE*2, dst+PSYNC_AES256_BLOCK_SIZE*2);
-  aes_crypt_ecb(enc, AES_DECRYPT, src+PSYNC_AES256_BLOCK_SIZE*3, dst+PSYNC_AES256_BLOCK_SIZE*3);
-  for (i=0; i<PSYNC_AES256_BLOCK_SIZE*4/sizeof(unsigned long); i++)
-    ((unsigned long *)dst)[i]^=((unsigned long *)bxor)[i];
+  aes_crypt_ecb(enc, AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                dst + PSYNC_AES256_BLOCK_SIZE);
+  aes_crypt_ecb(enc, AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE * 2,
+                dst + PSYNC_AES256_BLOCK_SIZE * 2);
+  aes_crypt_ecb(enc, AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE * 3,
+                dst + PSYNC_AES256_BLOCK_SIZE * 3);
+  for (i = 0; i < PSYNC_AES256_BLOCK_SIZE * 4 / sizeof(unsigned long); i++)
+    ((unsigned long *)dst)[i] ^= ((unsigned long *)bxor)[i];
 }
 
 #endif
-
-
 
 #endif

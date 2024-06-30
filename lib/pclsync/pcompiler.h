@@ -1,8 +1,8 @@
-/* 
+/*
    Copyright (c) 2013-2014 Anton Titov.
 
    Copyright (c) 2013-2014 pCloud Ltd.  All rights reserved.
- 
+
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
    are met: Redistributions of source code must retain the above
@@ -14,7 +14,7 @@
    names of its contributors may be used to endorse or promote
    products derived from this software without specific prior written
    permission.
- 
+
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -74,7 +74,7 @@
 #endif
 
 #if defined(_MSC_VER)
-#define PSYNC_THREAD   __declspec(thread)
+#define PSYNC_THREAD __declspec(thread)
 #define PSYNC_NOINLINE __declspec(noinline)
 #else
 #if __has_attribute(noinline)
@@ -92,48 +92,48 @@
 #endif
 
 #if __has_attribute(sentinel)
-#define PSYNC_SENTINEL __attribute__ ((sentinel))
+#define PSYNC_SENTINEL __attribute__((sentinel))
 #else
 #define PSYNC_SENTINEL
 #endif
 
 #if __has_attribute(pure)
-#define PSYNC_PURE __attribute__ ((pure))
+#define PSYNC_PURE __attribute__((pure))
 #else
 #define PSYNC_PURE
 #endif
 
 #if __has_attribute(const)
-#define PSYNC_CONST __attribute__ ((const))
+#define PSYNC_CONST __attribute__((const))
 #else
 #define PSYNC_CONST
 #endif
 
 #if __has_attribute(cold)
-#define PSYNC_COLD __attribute__ ((cold))
+#define PSYNC_COLD __attribute__((cold))
 #else
 #define PSYNC_COLD
-#endif 
+#endif
 
 #if __has_attribute(format)
-#define PSYNC_FORMAT(a, b, c) __attribute__ ((format (a, b, c)))
+#define PSYNC_FORMAT(a, b, c) __attribute__((format(a, b, c)))
 #else
 #define PSYNC_FORMAT(a, b, c)
 #endif
 
 #if __has_attribute(nonnull)
-#define PSYNC_NONNULL(...) __attribute__ ((nonnull (__VA_ARGS__)))
+#define PSYNC_NONNULL(...) __attribute__((nonnull(__VA_ARGS__)))
 #else
 #define PSYNC_NONNULL(...)
 #endif
 
 #if __has_attribute(packed)
-#define PSYNC_PACKED_STRUCT struct __attribute__ ((packed))
+#define PSYNC_PACKED_STRUCT struct __attribute__((packed))
 #elif defined(_MSC_VER)
 #define PSYNC_PACKED_STRUCT __declspec(align(1)) struct
 #else
 #define PSYNC_PACKED_STRUCT struct
-#endif 
+#endif
 
 #if _MSC_VER >= 1500 && _MSC_VER < 1600
 #define inline __inline
@@ -141,7 +141,7 @@
 #elif __GNUC__ >= 3
 #define inline __inline
 #define restrict __restrict
-#elif __STDC_VERSION__!=199901L
+#elif __STDC_VERSION__ != 199901L
 #define inline
 #define restrict
 #endif
@@ -151,7 +151,13 @@
 #elif defined(__GNUC__)
 #define psync_alignof __alignof__
 #else
-#define psync_alignof(t) offsetof(struct {char a; t b;}, b)
+#define psync_alignof(t)                                                       \
+  offsetof(                                                                    \
+      struct {                                                                 \
+        char a;                                                                \
+        t b;                                                                   \
+      },                                                                       \
+      b)
 #endif
 
 #endif

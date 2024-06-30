@@ -1,6 +1,6 @@
 /*
   Copyright (c) 2013-2015 pCloud Ltd.  All rights reserved.
- 
+
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions
   are met: Redistributions of source code must retain the above
@@ -11,7 +11,7 @@
   the distribution.  Neither the name of pCloud Ltd nor the names of
   its contributors may be used to endorse or promote products derived
   from this software without specific prior written permission.
- 
+
   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -30,11 +30,11 @@
 #define CONTROL_TOOLS_H
 
 namespace control_tools {
-  int start_crypto(const char * pass);
-  int stop_crypto();
-  int finalize();
-  int daemonize(bool do_commands);
-  void process_commands();
-}
+int start_crypto(const char *pass);
+int stop_crypto();
+int finalize();
+int daemonize(bool do_commands);
+void process_commands();
+} // namespace control_tools
 
-#endif //CONTROL_TOOLS_H
+#endif // CONTROL_TOOLS_H

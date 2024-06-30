@@ -1,8 +1,8 @@
-/* 
+/*
    Copyright (c) 2014 Anton Titov.
- 
+
    Copyright (c) 2014 pCloud Ltd.  All rights reserved.
- 
+
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
    are met: Redistributions of source code must retain the above
@@ -14,7 +14,7 @@
    names of its contributors may be used to endorse or promote
    products derived from this software without specific prior written
    permission.
- 
+
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -37,8 +37,10 @@
 
 #define PFS_XATTR_IGN
 
-int psync_fs_setxattr(const char *path, const char *name, const char *value, size_t size, int flags PFS_XATTR_IGN);
-int psync_fs_getxattr(const char *path, const char *name, char *value, size_t size PFS_XATTR_IGN);
+int psync_fs_setxattr(const char *path, const char *name, const char *value,
+                      size_t size, int flags PFS_XATTR_IGN);
+int psync_fs_getxattr(const char *path, const char *name, char *value,
+                      size_t size PFS_XATTR_IGN);
 int psync_fs_listxattr(const char *path, char *list, size_t size);
 int psync_fs_removexattr(const char *path, const char *name);
 

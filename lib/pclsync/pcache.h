@@ -31,6 +31,7 @@
 #ifndef _PSYNC_CACHE_H
 #define _PSYNC_CACHE_H
 
+#include <stdint.h>
 #include <time.h>
 
 typedef void (*psync_cache_free_callback)(void *);
@@ -38,8 +39,10 @@ typedef void (*psync_cache_free_callback)(void *);
 void psync_cache_init();
 void *psync_cache_get(const char *key);
 int psync_cache_has(const char *key);
-void psync_cache_add(const char *key, void *ptr, time_t freeafter, psync_cache_free_callback freefunc, uint32_t maxkeys);
-void psync_cache_add_free(char *key, void *ptr, time_t freeafter, psync_cache_free_callback freefunc, uint32_t maxkeys);
+void psync_cache_add(const char *key, void *ptr, time_t freeafter,
+                     psync_cache_free_callback freefunc, uint32_t maxkeys);
+void psync_cache_add_free(char *key, void *ptr, time_t freeafter,
+                          psync_cache_free_callback freefunc, uint32_t maxkeys);
 void psync_cache_del(const char *key);
 void psync_cache_clean_all();
 void psync_cache_clean_starting_with(const char *prefix);

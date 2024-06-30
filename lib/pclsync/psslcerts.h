@@ -1,6 +1,6 @@
-/* 
+/*
    Copyright (c) 2013-2014 Anton Titov.
- 
+
    Copyright (c) 2013-2014 pCloud Ltd.  All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -32,14 +32,13 @@
 #ifndef _PSYNC_SSLCERTS_H
 #define _PSYNC_SSLCERTS_H
 
-static const char *psync_ssl_trusted_pk_sha256[]={
-  "c4fe0872215f16af17c1f2da80ca23863105590a5e64c8ddc9693d21cb835a4e",
-  "cc5e7d264759ce57d8d2616532ddc7224d2ea721433bd3828e9f70fd89fcf81d"
-};
+static const char *psync_ssl_trusted_pk_sha256[] = {
+    "c4fe0872215f16af17c1f2da80ca23863105590a5e64c8ddc9693d21cb835a4e",
+    "cc5e7d264759ce57d8d2616532ddc7224d2ea721433bd3828e9f70fd89fcf81d"};
 
-static const char *psync_ssl_trusted_certs[]={
-// SwissSign_Silver_CA_-_G2.crt until Oct 25 08:32:46 2036 GMT
-"-----BEGIN CERTIFICATE-----\n\
+static const char *psync_ssl_trusted_certs[] = {
+    // SwissSign_Silver_CA_-_G2.crt until Oct 25 08:32:46 2036 GMT
+    "-----BEGIN CERTIFICATE-----\n\
 MIIFvTCCA6WgAwIBAgIITxvUL1S7L0swDQYJKoZIhvcNAQEFBQAwRzELMAkGA1UE\n\
 BhMCQ0gxFTATBgNVBAoTDFN3aXNzU2lnbiBBRzEhMB8GA1UEAxMYU3dpc3NTaWdu\n\
 IFNpbHZlciBDQSAtIEcyMB4XDTA2MTAyNTA4MzI0NloXDTM2MTAyNTA4MzI0Nlow\n\
@@ -73,8 +72,8 @@ hAhm0sQ2fac+EPyI4NSA5QC9qvNOBqN6avlicuMJT+ubDgEj8Z+7fNzcbBGXJbLy\n\
 tGMU0gYqZ4yD9c7qB9iaah7s5Aq7KkzrCWA5zspi2C5u\n\
 -----END CERTIFICATE-----\n\
 ",
-// SwissSign_Gold_CA_-_G2.crt until Oct 25 08:30:35 2036 GMT
-"-----BEGIN CERTIFICATE-----\n\
+    // SwissSign_Gold_CA_-_G2.crt until Oct 25 08:30:35 2036 GMT
+    "-----BEGIN CERTIFICATE-----\n\
 MIIFujCCA6KgAwIBAgIJALtAHEP1Xk+wMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV\n\
 BAYTAkNIMRUwEwYDVQQKEwxTd2lzc1NpZ24gQUcxHzAdBgNVBAMTFlN3aXNzU2ln\n\
 biBHb2xkIENBIC0gRzIwHhcNMDYxMDI1MDgzMDM1WhcNMzYxMDI1MDgzMDM1WjBF\n\
@@ -108,8 +107,8 @@ ZMEBnunKoGqYDs/YYPIvSbjkQuE4NRb0yG5P94FW6LqjviOvrv1vA+ACOzB2+htt\n\
 Qc8Bsem4yWb02ybzOqR08kkkW8mw0FfB+j564ZfJ\n\
 -----END CERTIFICATE-----\n\
 ",
-// SwissSign_Platinum_CA_-_G2.crt until Oct 25 08:36:00 2036 GMT
-"-----BEGIN CERTIFICATE-----\n\
+    // SwissSign_Platinum_CA_-_G2.crt until Oct 25 08:36:00 2036 GMT
+    "-----BEGIN CERTIFICATE-----\n\
 MIIFwTCCA6mgAwIBAgIITrIAZwwDXU8wDQYJKoZIhvcNAQEFBQAwSTELMAkGA1UE\n\
 BhMCQ0gxFTATBgNVBAoTDFN3aXNzU2lnbiBBRzEjMCEGA1UEAxMaU3dpc3NTaWdu\n\
 IFBsYXRpbnVtIENBIC0gRzIwHhcNMDYxMDI1MDgzNjAwWhcNMzYxMDI1MDgzNjAw\n\
@@ -143,8 +142,8 @@ kcsymxM9Pn2SUjWskpSi0xjCfMfqr3YFFt1nJ8J+HAciIfNAChs0B0QTwoRqjt8Z\n\
 Wr9/6x3iGjjRXK9HkmuAtTClyY3YqzGBH9/CZjfTk6mFhnll0g==\n\
 -----END CERTIFICATE-----\n\
 ",
-// GeoTrust Global CA
-"-----BEGIN CERTIFICATE-----\n\
+    // GeoTrust Global CA
+    "-----BEGIN CERTIFICATE-----\n\
 MIIDVDCCAjygAwIBAgIDAjRWMA0GCSqGSIb3DQEBBQUAMEIxCzAJBgNVBAYTAlVT\n\
 MRYwFAYDVQQKEw1HZW9UcnVzdCBJbmMuMRswGQYDVQQDExJHZW9UcnVzdCBHbG9i\n\
 YWwgQ0EwHhcNMDIwNTIxMDQwMDAwWhcNMjIwNTIxMDQwMDAwWjBCMQswCQYDVQQG\n\
@@ -165,8 +164,8 @@ hw4EbNX/3aBd7YdStysVAq45pmp06drE57xNNB6pXE0zX5IJL4hmXXeXxx12E6nV\n\
 5fEWCRE11azbJHFwLJhWC9kXtNHjUStedejV0NxPNO3CBWaAocvmMw==\n\
 -----END CERTIFICATE-----\n\
 ",
-// QuoVadis Root CA 2
-"-----BEGIN CERTIFICATE-----\n\
+    // QuoVadis Root CA 2
+    "-----BEGIN CERTIFICATE-----\n\
 MIIFtzCCA5+gAwIBAgICBQkwDQYJKoZIhvcNAQEFBQAwRTELMAkGA1UEBhMCQk0x\n\
 GTAXBgNVBAoTEFF1b1ZhZGlzIExpbWl0ZWQxGzAZBgNVBAMTElF1b1ZhZGlzIFJv\n\
 b3QgQ0EgMjAeFw0wNjExMjQxODI3MDBaFw0zMTExMjQxODIzMzNaMEUxCzAJBgNV\n\
@@ -200,8 +199,8 @@ ohEUGW6yhhtoPkg3Goi3XZZenMfvJ2II4pEZXNLxId26F0KCl3GBUzGpn/Z9Yr9y\n\
 8eOx79+Rj1QqCyXBJhnEUhAFZdWCEOrCMc0u\n\
 -----END CERTIFICATE-----\n\
 ",
-// QuoVadis Root CA 3
-"-----BEGIN CERTIFICATE-----\n\
+    // QuoVadis Root CA 3
+    "-----BEGIN CERTIFICATE-----\n\
 MIIGnTCCBIWgAwIBAgICBcYwDQYJKoZIhvcNAQEFBQAwRTELMAkGA1UEBhMCQk0x\n\
 GTAXBgNVBAoTEFF1b1ZhZGlzIExpbWl0ZWQxGzAZBgNVBAMTElF1b1ZhZGlzIFJv\n\
 b3QgQ0EgMzAeFw0wNjExMjQxOTExMjNaFw0zMTExMjQxOTA2NDRaMEUxCzAJBgNV\n\
@@ -240,8 +239,8 @@ mJlglFwjz1onl14LBQaTNx47aTbrqZ5hHY8y2o4M1nQ+ewkk2gF3R8Q7zTSMmfXK\n\
 4SVhM7JZG+Ju1zdXtg2pEto=\n\
 -----END CERTIFICATE-----\n\
 ",
-// QuoVadis Root Certification Authority
-"-----BEGIN CERTIFICATE-----\n\
+    // QuoVadis Root Certification Authority
+    "-----BEGIN CERTIFICATE-----\n\
 MIIF0DCCBLigAwIBAgIEOrZQizANBgkqhkiG9w0BAQUFADB/MQswCQYDVQQGEwJC\n\
 TTEZMBcGA1UEChMQUXVvVmFkaXMgTGltaXRlZDElMCMGA1UECxMcUm9vdCBDZXJ0\n\
 aWZpY2F0aW9uIEF1dGhvcml0eTEuMCwGA1UEAxMlUXVvVmFkaXMgUm9vdCBDZXJ0\n\
@@ -276,8 +275,8 @@ xFIY6iHOsfHmhIHluqmGKPJDWl0Snawe2ajlCmqnf6CHKc/yiU3U7MXi5nrQNiOK\n\
 SnQ2+Q==\n\
 -----END CERTIFICATE-----\n\
 ",
-// QuoVadis Root CA 1 G3
-"-----BEGIN CERTIFICATE-----\n\
+    // QuoVadis Root CA 1 G3
+    "-----BEGIN CERTIFICATE-----\n\
 MIIFYDCCA0igAwIBAgIUeFhfLq0sGUvjNwc1NBMotZbUZZMwDQYJKoZIhvcNAQEL\n\
 BQAwSDELMAkGA1UEBhMCQk0xGTAXBgNVBAoTEFF1b1ZhZGlzIExpbWl0ZWQxHjAc\n\
 BgNVBAMTFVF1b1ZhZGlzIFJvb3QgQ0EgMSBHMzAeFw0xMjAxMTIxNzI3NDRaFw00\n\
@@ -309,8 +308,8 @@ q1467HxpvMc7hU6eFbm0FU/DlXpY18ls6Wy58yljXrQs8C097Vpl4KlbQMJImYFt\n\
 nh8GKjwStIsPm6Ik8KaN1nrgS7ZklmOVhMJKzRwuJIczYOXD\n\
 -----END CERTIFICATE-----\n\
 ",
-// QuoVadis Root CA 2 G3
-"-----BEGIN CERTIFICATE-----\n\
+    // QuoVadis Root CA 2 G3
+    "-----BEGIN CERTIFICATE-----\n\
 MIIFYDCCA0igAwIBAgIURFc0JFuBiZs18s64KztbpybwdSgwDQYJKoZIhvcNAQEL\n\
 BQAwSDELMAkGA1UEBhMCQk0xGTAXBgNVBAoTEFF1b1ZhZGlzIExpbWl0ZWQxHjAc\n\
 BgNVBAMTFVF1b1ZhZGlzIFJvb3QgQ0EgMiBHMzAeFw0xMjAxMTIxODU5MzJaFw00\n\
@@ -342,8 +341,8 @@ HVOyToV7BjjHLPj4sHKNJeV3UvQDHEimUF+IIDBu8oJDqz2XhOdT+yHBTw8imoa4\n\
 WSr2Rz0ZiC3oheGe7IUIarFsNMkd7EgrO3jtZsSOeWmD3n+M\n\
 -----END CERTIFICATE-----\n\
 ",
-// QuoVadis Root CA 3 G3
-"-----BEGIN CERTIFICATE-----\n\
+    // QuoVadis Root CA 3 G3
+    "-----BEGIN CERTIFICATE-----\n\
 MIIFYDCCA0igAwIBAgIULvWbAiin23r/1aOp7r0DoM8Sah0wDQYJKoZIhvcNAQEL\n\
 BQAwSDELMAkGA1UEBhMCQk0xGTAXBgNVBAoTEFF1b1ZhZGlzIExpbWl0ZWQxHjAc\n\
 BgNVBAMTFVF1b1ZhZGlzIFJvb3QgQ0EgMyBHMzAeFw0xMjAxMTIyMDI2MzJaFw00\n\
@@ -374,6 +373,5 @@ DhcI00iX0HGS8A85PjRqHH3Y8iKuu2n0M7SmSFXRDw4m6Oy2Cy2nhTXN/VnIn9HN\n\
 PlopNLk9hM6xZdRZkZFWdSHBd575euFgndOtBBj0fOtek49TSiIp+EgrPk2GrFt/\n\
 ywaZWWDYWGWVjUTR939+J399roD1B0y2PpxxVJkES/1Y+Zj0\n\
 -----END CERTIFICATE-----\n\
-"
-};
+"};
 #endif

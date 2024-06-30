@@ -26,11 +26,11 @@
   DAMAGE.
 */
 
+#include "poverlay.h"
+#include "pcache.h"
 #include "pcompat.h"
 #include "plibs.h"
-#include "poverlay.h"
 #include "ppathstatus.h"
-#include "pcache.h"
 
 int overlays_running = 1;
 int callbacks_running = 1;
@@ -38,83 +38,77 @@ int callbacks_running = 1;
 #if defined(P_OS_LINUX)
 #include "poverlay_lin.c"
 #else
-void overlay_main_loop(VOID){}
-void instance_thread(LPVOID){}
-#endif 
+void overlay_main_loop(VOID) {}
+void instance_thread(LPVOID) {}
+#endif
 
-poverlay_callback * callbacks;
+poverlay_callback *callbacks;
 static int callbacks_size = 15;
 static const int calbacks_lower_band = 20;
 
-int psync_add_overlay_callback(int id, poverlay_callback callback)
-{
-  poverlay_callback * callbacks_old = callbacks;
+int psync_add_overlay_callback(int id, poverlay_callback callback) {
+  poverlay_callback *callbacks_old = callbacks;
   int callbacks_size_old = callbacks_size;
   if (id < calbacks_lower_band)
     return -1;
   if (id > (calbacks_lower_band + callbacks_size)) {
-     callbacks_size = id - calbacks_lower_band + 1;
-     init_overlay_callbacks();
-     memcpy(callbacks,callbacks_old, callbacks_size_old*sizeof(poverlay_callback));
-     psync_free(callbacks_old);
+    callbacks_size = id - calbacks_lower_band + 1;
+    init_overlay_callbacks();
+    memcpy(callbacks, callbacks_old,
+           callbacks_size_old * sizeof(poverlay_callback));
+    psync_free(callbacks_old);
   }
   callbacks[id - calbacks_lower_band] = callback;
   return 0;
 }
 
 void init_overlay_callbacks() {
-  callbacks = (poverlay_callback *) psync_malloc(sizeof(poverlay_callback)*callbacks_size);
-  memset(callbacks, 0, sizeof(poverlay_callback)*callbacks_size);
+  callbacks = (poverlay_callback *)psync_malloc(sizeof(poverlay_callback) *
+                                                callbacks_size);
+  memset(callbacks, 0, sizeof(poverlay_callback) * callbacks_size);
 }
 
-void psync_stop_overlays(){
-  overlays_running = 0;
-}
-void psync_start_overlays(){
-  overlays_running = 1;
-}
+void psync_stop_overlays() { overlays_running = 0; }
+void psync_start_overlays() { overlays_running = 1; }
 
-void psync_stop_overlay_callbacks(){
-  callbacks_running = 0;
-}
-void psync_start_overlay_callbacks(){
-  callbacks_running = 1;
-}
+void psync_stop_overlay_callbacks() { callbacks_running = 0; }
+void psync_start_overlay_callbacks() { callbacks_running = 1; }
 
-void get_answer_to_request(message *request, message *reply)
-{
-  psync_path_status_t stat=PSYNC_PATH_STATUS_NOT_OURS;
+void get_answer_to_request(message *request, message *reply) {
+  psync_path_status_t stat = PSYNC_PATH_STATUS_NOT_OURS;
   memcpy(reply->value, "Ok.", 4);
-  reply->length=sizeof(message)+4;
-  
-  if(request->type == 20 /* STARTCRYPTO, see control_tools.cpp */) {
-	// don't publish the crypto password to the logs in plain text... 
-	debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]", request->type, request->length, "REDACTED");
-  } else {
-	debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]", request->type, request->length, request->value);
-  }
-  
+  reply->length = sizeof(message) + 4;
 
-  if (request->type < 20 ) {
+  if (request->type == 20 /* STARTCRYPTO, see control_tools.cpp */) {
+    // don't publish the crypto password to the logs in plain text...
+    debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]",
+          request->type, request->length, "REDACTED");
+  } else {
+    debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]",
+          request->type, request->length, request->value);
+  }
+
+  if (request->type < 20) {
     if (overlays_running)
-      stat=psync_path_status_get(request->value);
+      stat = psync_path_status_get(request->value);
     switch (psync_path_status_get_status(stat)) {
-      case PSYNC_PATH_STATUS_IN_SYNC:
-        reply->type=10;
-        break;
-      case PSYNC_PATH_STATUS_IN_PROG:
-        reply->type=12;
-        break;
-      case PSYNC_PATH_STATUS_PAUSED:
-      case PSYNC_PATH_STATUS_REMOTE_FULL:
-      case PSYNC_PATH_STATUS_LOCAL_FULL:
-        reply->type=11;
-        break;
-      default:
-        reply->type=13;
-        memcpy(reply->value, "No.", 4);
+    case PSYNC_PATH_STATUS_IN_SYNC:
+      reply->type = 10;
+      break;
+    case PSYNC_PATH_STATUS_IN_PROG:
+      reply->type = 12;
+      break;
+    case PSYNC_PATH_STATUS_PAUSED:
+    case PSYNC_PATH_STATUS_REMOTE_FULL:
+    case PSYNC_PATH_STATUS_LOCAL_FULL:
+      reply->type = 11;
+      break;
+    default:
+      reply->type = 13;
+      memcpy(reply->value, "No.", 4);
     }
-  } else if ((callbacks_running)&&(request->type < (calbacks_lower_band + callbacks_size))) {
+  } else if ((callbacks_running) &&
+             (request->type < (calbacks_lower_band + callbacks_size))) {
     int ind = request->type - 20;
     int ret = 0;
     message *rep = NULL;
@@ -125,9 +119,8 @@ void get_answer_to_request(message *request, message *reply)
         if (rep) {
           psync_free(reply);
           reply = rep;
-        }
-        else
-        reply->type = 0;
+        } else
+          reply->type = 0;
       } else {
         reply->type = ret;
         memcpy(reply->value, "No.", 4);
@@ -135,15 +128,14 @@ void get_answer_to_request(message *request, message *reply)
     } else {
       reply->type = 13;
       memcpy(reply->value, "No callback with this id registered.", 37);
-      reply->length = sizeof(message)+37;
+      reply->length = sizeof(message) + 37;
     }
   } else {
     reply->type = 13;
     memcpy(reply->value, "Invalid type.", 14);
-    reply->length = sizeof(message)+14;
+    reply->length = sizeof(message) + 14;
   }
 }
 
-
-int psync_overlays_running(){return overlays_running;}
-int psync_ovr_callbacks_running(){return callbacks_running;}
+int psync_overlays_running() { return overlays_running; }
+int psync_ovr_callbacks_running() { return callbacks_running; }

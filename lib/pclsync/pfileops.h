@@ -1,4 +1,4 @@
-/* 
+/*
    Copyright (c) 2013-2014 Anton Titov.
 
    Copyright (c) 2013-2014 pCloud Ltd.  All rights reserved.
@@ -32,22 +32,29 @@
 #ifndef _PSYNC_FILEOPS_H
 #define _PSYNC_FILEOPS_H
 
-#include "pcompiler.h"
 #include "papi.h"
+#include "pcompiler.h"
 #include "psettings.h"
 #include "psynclib.h"
 
 #define PSYNC_INVALID_FOLDERID ((psync_folderid_t)-1)
 #define PSYNC_INVALID_PATH NULL
 
-static inline uint64_t psync_get_permissions(const binresult *meta){
-  const binresult *canmanage=psync_check_result(meta, "canmanage", PARAM_BOOL);
-  return
-    (psync_find_result(meta, "canread", PARAM_BOOL)->num?PSYNC_PERM_READ:0)+
-    (psync_find_result(meta, "canmodify", PARAM_BOOL)->num?PSYNC_PERM_MODIFY:0)+
-    (psync_find_result(meta, "candelete", PARAM_BOOL)->num?PSYNC_PERM_DELETE:0)+
-    (psync_find_result(meta, "cancreate", PARAM_BOOL)->num?PSYNC_PERM_CREATE:0)+
-    (canmanage && canmanage->num?PSYNC_PERM_MANAGE:0);
+static inline uint64_t psync_get_permissions(const binresult *meta) {
+  const binresult *canmanage =
+      psync_check_result(meta, "canmanage", PARAM_BOOL);
+  return (psync_find_result(meta, "canread", PARAM_BOOL)->num ? PSYNC_PERM_READ
+                                                              : 0) +
+         (psync_find_result(meta, "canmodify", PARAM_BOOL)->num
+              ? PSYNC_PERM_MODIFY
+              : 0) +
+         (psync_find_result(meta, "candelete", PARAM_BOOL)->num
+              ? PSYNC_PERM_DELETE
+              : 0) +
+         (psync_find_result(meta, "cancreate", PARAM_BOOL)->num
+              ? PSYNC_PERM_CREATE
+              : 0) +
+         (canmanage && canmanage->num ? PSYNC_PERM_MANAGE : 0);
 }
 
 void psync_ops_create_folder_in_db(const binresult *meta);

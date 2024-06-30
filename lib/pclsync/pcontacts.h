@@ -1,4 +1,4 @@
-/* 
+/*
    Copyright (c) 2013-2015 pCloud Ltd.  All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -30,8 +30,8 @@
 #ifndef _PSYNC_CONTACTS_H
 #define _PSYNC_CONTACTS_H
 
-#include "ptypes.h"
 #include "psynclib.h"
+#include "ptypes.h"
 
 pcontacts_list_t *do_psync_list_contacts();
 pcontacts_list_t *do_psync_list_myteams();

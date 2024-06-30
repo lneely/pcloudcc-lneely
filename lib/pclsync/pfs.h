@@ -1,6 +1,6 @@
-/* 
+/*
    Copyright (c) 2013-2014 Anton Titov.
- 
+
    Copyright (c) 2013-2014 pCloud Ltd.  All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -32,18 +32,18 @@
 #ifndef _PSYNC_FS_H
 #define _PSYNC_FS_H
 
-#include "psynclib.h"
-#include "ptree.h"
-#include "pintervaltree.h"
 #include "papi.h"
-#include "psettings.h"
+#include "pcompat.h"
+#include "pcrc32c.h"
+#include "pcrypto.h"
 #include "pfsfolder.h"
 #include "pfstasks.h"
-#include "pcompat.h"
-#include "pcrypto.h"
-#include "pcrc32c.h"
-#include "ptimer.h"
+#include "pintervaltree.h"
 #include "plibs.h"
+#include "psettings.h"
+#include "psynclib.h"
+#include "ptimer.h"
+#include "ptree.h"
 #include <pthread.h>
 
 #define psync_fs_need_per_folder_refresh() psync_fs_need_per_folder_refresh_f()
@@ -115,8 +115,8 @@ typedef struct {
   unsigned long lockline;
 #endif
   /*
-   * for non-encrypted files only offsetof(psync_openfile_t, encoder) bytes are allocated
-   * keep all fields for encryption after encoder
+   * for non-encrypted files only offsetof(psync_openfile_t, encoder) bytes are
+   * allocated keep all fields for encryption after encoder
    */
   psync_crypto_aes256_sector_encoder_decoder_t encoder;
   psync_tree *sectorsinlog;
@@ -124,7 +124,7 @@ typedef struct {
   psync_fast_hash256_ctx loghashctx;
   psync_enc_file_extender_t *extender;
   psync_file_t logfile;
-  uint32_t logoffset; 
+  uint32_t logoffset;
 } psync_openfile_t;
 
 typedef struct {
@@ -136,36 +136,45 @@ typedef struct {
   int dummy[0];
 } psync_fs_index_header;
 
-#if IS_DEBUG && defined(P_OS_LINUX) 
+#if IS_DEBUG && defined(P_OS_LINUX)
 #define psync_fs_lock_file(of) psync_fs_do_lock_file(of, __FILE__, __LINE__)
 
-static inline void psync_fs_do_lock_file(psync_openfile_t *of, const char *file, unsigned long line){
-  if (unlikely(pthread_mutex_trylock(&of->mutex))){
+static inline void psync_fs_do_lock_file(psync_openfile_t *of, const char *file,
+                                         unsigned long line) {
+  if (unlikely(pthread_mutex_trylock(&of->mutex))) {
     struct timespec tm;
     psync_nanotime(&tm);
-    tm.tv_sec+=60;
+    tm.tv_sec += 60;
     if (pthread_mutex_timedlock(&of->mutex, &tm)) {
-      debug(D_BUG, "could not lock mutex of file %s taken in %s:%lu by thread %s, aborting", of->currentname, of->lockfile, of->lockline, of->lockthread);
+      debug(D_BUG,
+            "could not lock mutex of file %s taken in %s:%lu by thread %s, "
+            "aborting",
+            of->currentname, of->lockfile, of->lockline, of->lockthread);
       abort();
     }
   }
-  of->lockfile=file;
-  of->lockthread=psync_thread_name;
-  of->lockline=line;
+  of->lockfile = file;
+  of->lockthread = psync_thread_name;
+  of->lockline = line;
 }
 #else
-static inline void psync_fs_lock_file(psync_openfile_t *of){
+static inline void psync_fs_lock_file(psync_openfile_t *of) {
   pthread_mutex_lock(&of->mutex);
 }
 #endif
 
 int psync_fs_crypto_err_to_errno(int cryptoerr);
-int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid, psync_fileid_t newfileid, uint64_t hash, uint64_t size, time_t ctime);
-//void psync_fs_uploading_openfile(uint64_t taskid);
-int psync_fs_rename_openfile_locked(psync_fsfileid_t fileid, psync_fsfolderid_t folderid, const char *name);
+int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
+                             psync_fileid_t newfileid, uint64_t hash,
+                             uint64_t size, time_t ctime);
+// void psync_fs_uploading_openfile(uint64_t taskid);
+int psync_fs_rename_openfile_locked(psync_fsfileid_t fileid,
+                                    psync_fsfolderid_t folderid,
+                                    const char *name);
 void psync_fs_mark_openfile_deleted(uint64_t taskid);
 int64_t psync_fs_get_file_writeid(uint64_t taskid);
-int64_t psync_fs_load_interval_tree(psync_file_t fd, uint64_t size, psync_interval_tree_t **tree);
+int64_t psync_fs_load_interval_tree(psync_file_t fd, uint64_t size,
+                                    psync_interval_tree_t **tree);
 int psync_fs_remount();
 void psync_fs_inc_of_refcnt_locked(psync_openfile_t *of);
 void psync_fs_inc_of_refcnt(psync_openfile_t *of);

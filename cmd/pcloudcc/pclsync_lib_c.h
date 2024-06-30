@@ -30,19 +30,19 @@
 extern "C" {
 #endif
 
-  void psync_fs_pause_until_login();
+void psync_fs_pause_until_login();
 
-  typedef void (*status_callback_t)(int status, const char *stat_string);
+typedef void (*status_callback_t)(int status, const char *stat_string);
 
-  int init();
-  int start_crypto(const char *pass);
-  int stop_crypto();
-  int finalize();
-  char *get_token();
-  void set_status_callback(status_callback_t);
-  int logout();
-  int unlinklib();
-  int login(const char *user, const char *pass, int save);
+int init();
+int start_crypto(const char *pass);
+int stop_crypto();
+int finalize();
+char *get_token();
+void set_status_callback(status_callback_t);
+int logout();
+int unlinklib();
+int login(const char *user, const char *pass, int save);
 
 #ifdef __cplusplus
 };

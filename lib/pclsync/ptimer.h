@@ -1,6 +1,6 @@
-/* 
+/*
    Copyright (c) 2013-2014 Anton Titov.
- 
+
    Copyright (c) 2013-2014 pCloud Ltd.  All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -34,8 +34,8 @@
 
 #include "pcompiler.h"
 #include "plist.h"
-#include <time.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define PSYNC_INVALID_TIMER NULL
 
@@ -59,13 +59,18 @@ typedef struct _psync_timer_t {
 void psync_timer_init();
 time_t psync_timer_time();
 void psync_timer_wake();
-psync_timer_t psync_timer_register(psync_timer_callback func, time_t numsec, void *param);
+psync_timer_t psync_timer_register(psync_timer_callback func, time_t numsec,
+                                   void *param);
 int psync_timer_stop(psync_timer_t timer);
 void psync_timer_exception_handler(psync_exception_callback func);
 void psync_timer_sleep_handler(psync_exception_callback func);
 void psync_timer_do_notify_exception();
 void psync_timer_wait_next_sec();
 
-#define psync_timer_notify_exception() do {debug(D_NOTICE, "sending exception");psync_timer_do_notify_exception();} while (0)
+#define psync_timer_notify_exception()                                         \
+  do {                                                                         \
+    debug(D_NOTICE, "sending exception");                                      \
+    psync_timer_do_notify_exception();                                         \
+  } while (0)
 
 #endif

@@ -1,6 +1,6 @@
-/* 
+/*
    Copyright (c) 2015 Anton Titov.
- 
+
    Copyright (c) 2015 pCloud Ltd.  All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -50,11 +50,13 @@ void psync_rwlock_init(psync_rwlock_t *rw);
 void psync_rwlock_destroy(psync_rwlock_t *rw);
 void psync_rwlock_rdlock(psync_rwlock_t *rw);
 int psync_rwlock_tryrdlock(psync_rwlock_t *rw);
-int psync_rwlock_timedrdlock(psync_rwlock_t *rw, const struct timespec *abstime);
+int psync_rwlock_timedrdlock(psync_rwlock_t *rw,
+                             const struct timespec *abstime);
 void psync_rwlock_rdlock_starvewr(psync_rwlock_t *rw);
 void psync_rwlock_wrlock(psync_rwlock_t *rw);
 int psync_rwlock_trywrlock(psync_rwlock_t *rw);
-int psync_rwlock_timedwrlock(psync_rwlock_t *rw, const struct timespec *abstime);
+int psync_rwlock_timedwrlock(psync_rwlock_t *rw,
+                             const struct timespec *abstime);
 void psync_rwlock_rslock(psync_rwlock_t *rw);
 int psync_rwlock_towrlock(psync_rwlock_t *rw);
 void psync_rwlock_unlock(psync_rwlock_t *rw);
@@ -62,6 +64,5 @@ unsigned psync_rwlock_num_waiters(psync_rwlock_t *rw);
 int psync_rwlock_holding_rdlock(psync_rwlock_t *rw);
 int psync_rwlock_holding_wrlock(psync_rwlock_t *rw);
 int psync_rwlock_holding_lock(psync_rwlock_t *rw);
-
 
 #endif

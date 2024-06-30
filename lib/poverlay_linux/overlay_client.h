@@ -34,18 +34,18 @@
 extern "C" {
 #endif
 
-typedef enum _pCloud_FileState
-{
+typedef enum _pCloud_FileState {
   FileStateInSync = 0,
   FileStateNoSync,
   FileStateInProgress,
   FileStateInvalid
-}pCloud_FileState;
+} pCloud_FileState;
 
-int QueryState(pCloud_FileState *state /*OUT*/, char* path /*IN*/);
+int QueryState(pCloud_FileState *state /*OUT*/, char *path /*IN*/);
 
-int SendCall( int id /*IN*/ ,const char * path /*IN*/ , int * ret /*OUT*/ , char ** out /*OUT*/ );
+int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
+             char **out /*OUT*/);
 #ifdef __cplusplus
 }
 #endif
-#endif //OVERLAY_CLIENT_H
+#endif // OVERLAY_CLIENT_H

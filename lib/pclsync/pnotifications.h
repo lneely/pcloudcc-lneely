@@ -1,6 +1,6 @@
-/* 
+/*
    Copyright (c) 2015 Anton Titov.
- 
+
    Copyright (c) 2015 pCloud Ltd.  All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -32,13 +32,14 @@
 #ifndef _PSYNC_NOTIFICATIONS_H
 #define _PSYNC_NOTIFICATIONS_H
 
-#include "psynclib.h"
 #include "papi.h"
+#include "psynclib.h"
 
 int psync_notifications_running();
 const char *psync_notifications_get_thumb_size();
 void psync_notifications_notify(binresult *res);
-void psync_notifications_set_callback(pnotification_callback_t notification_callback, const char *thumbsize);
+void psync_notifications_set_callback(
+    pnotification_callback_t notification_callback, const char *thumbsize);
 psync_notification_list_t *psync_notifications_get();
 void psync_notifications_clean();
 

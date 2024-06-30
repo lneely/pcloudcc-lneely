@@ -35,70 +35,70 @@
 struct pstatus_struct_;
 
 namespace console_client {
-  namespace clibrary {
+namespace clibrary {
 
-	class pclsync_lib {
-	public:
-	  ~pclsync_lib();
-	  pclsync_lib();
+class pclsync_lib {
+public:
+  ~pclsync_lib();
+  pclsync_lib();
 
-	  bool crypto_on_; 
-	  bool save_pass_; 
-	  bool setup_crypto_; 
-	  pstatus_struct_ *status_;
-	  bool newuser_;
-	  status_callback_t status_callback_;
-	  bool was_init_;
+  bool crypto_on_;
+  bool save_pass_;
+  bool setup_crypto_;
+  pstatus_struct_ *status_;
+  bool newuser_;
+  status_callback_t status_callback_;
+  bool was_init_;
 
-	  // Getters
-	  const std::string &get_username();
-	  const std::string &get_password();
-	  const std::string &get_crypto_pass();
-	  const std::string &get_mount();
+  // Getters
+  const std::string &get_username();
+  const std::string &get_password();
+  const std::string &get_crypto_pass();
+  const std::string &get_mount();
 
-	  // Setters
-	  void set_username(const std::string &arg);
-	  void set_password(const std::string &arg);
-	  void set_crypto_pass(const std::string &arg);
-	  void set_mount(const std::string &arg);
-	  void set_savepass(bool s);
-	  void setupsetup_crypto(bool p);
-	  void set_newuser(bool p);
-	  void set_daemon(bool p);
-	  void set_status_callback(status_callback_t p);
+  // Setters
+  void set_username(const std::string &arg);
+  void set_password(const std::string &arg);
+  void set_crypto_pass(const std::string &arg);
+  void set_mount(const std::string &arg);
+  void set_savepass(bool s);
+  void setupsetup_crypto(bool p);
+  void set_newuser(bool p);
+  void set_daemon(bool p);
+  void set_status_callback(status_callback_t p);
 
-	  // Singleton
-	  static pclsync_lib &get_lib();
-	  	  
-	  // Console
-	  void get_pass_from_console();
-	  void get_cryptopass_from_console();
+  // Singleton
+  static pclsync_lib &get_lib();
 
-	  // API calls
-	  int init();
-	  // std::string& username, std::string& password, std::string*
-	  // crypto_pass, int setup_crypto = 1, int usesrypto_userpass = 0);
-	  static int start_crypto(const char *pass, void *rep);
-	  static int stop_crypto(const char *path, void *rep);
-	  static int finalize(const char *path, void *rep);
-	  static int list_sync_folders(const char *path, void *rep);
+  // Console
+  void get_pass_from_console();
+  void get_cryptopass_from_console();
 
-	  char *get_token();
-	  int logout();
-	  int unlink();
-	  int login(const char *user, const char *pass, int save);
+  // API calls
+  int init();
+  // std::string& username, std::string& password, std::string*
+  // crypto_pass, int setup_crypto = 1, int usesrypto_userpass = 0);
+  static int start_crypto(const char *pass, void *rep);
+  static int stop_crypto(const char *path, void *rep);
+  static int finalize(const char *path, void *rep);
+  static int list_sync_folders(const char *path, void *rep);
 
-	private:
-	  std::string username_;
-	  std::string password_;
-	  std::string crypto_pass_;
-	  std::string mount_;
+  char *get_token();
+  int logout();
+  int unlink();
+  int login(const char *user, const char *pass, int save);
 
-	  bool to_set_mount_;
-	  bool daemon_;
+private:
+  std::string username_;
+  std::string password_;
+  std::string crypto_pass_;
+  std::string mount_;
 
-	  void do_get_pass_from_console(std::string &password);
-	};
-  }
-}
+  bool to_set_mount_;
+  bool daemon_;
+
+  void do_get_pass_from_console(std::string &password);
+};
+} // namespace clibrary
+} // namespace console_client
 #endif // PCLSYNC_LIB_H

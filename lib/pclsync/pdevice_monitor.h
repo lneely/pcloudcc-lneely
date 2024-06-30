@@ -1,8 +1,8 @@
-/* 
+/*
    Copyright (c) 2013-2014 Anton Titov.
 
    Copyright (c) 2013-2014 pCloud Ltd.  All rights reserved.
- 
+
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
    are met: Redistributions of source code must retain the above
@@ -14,7 +14,7 @@
    names of its contributors may be used to endorse or promote
    products derived from this software without specific prior written
    permission.
- 
+
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -33,35 +33,36 @@
 
 #ifndef _PDEVICE_MONITOR
 #define _PDEVICE_MONITOR
-#include <stdint.h>
 #include "psynclib.h"
+#include <stdint.h>
 
-//typedef struct _pdevice_info pdevice_info;
+// typedef struct _pdevice_info pdevice_info;
 
-//struct _pdevice_info {
-//  pdevice_types type;
-//  int isextended;
-//  char * filesystem_path;
-//};
+// struct _pdevice_info {
+//   pdevice_types type;
+//   int isextended;
+//   char * filesystem_path;
+// };
 
-//typedef struct _pdevice_extended_info pdevice_extended_info;
+// typedef struct _pdevice_extended_info pdevice_extended_info;
 
-//struct _pdevice_extended_info {
-//  pdevice_types type;
-//  int isextended;
-//  char *filesystem_path;
-//  char *vendor;
-//  char *product;
-//  char *device_id;
-//  pdevice_extended_info* next;
-//  pdevice_extended_info* prev;
-//};
+// struct _pdevice_extended_info {
+//   pdevice_types type;
+//   int isextended;
+//   char *filesystem_path;
+//   char *vendor;
+//   char *product;
+//   char *device_id;
+//   pdevice_extended_info* next;
+//   pdevice_extended_info* prev;
+// };
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-  void psync_devmon_init();
-//  void psync_devmon_notify_device_callbacks(pdevice_extended_info *param, device_event event);
+void psync_devmon_init();
+//  void psync_devmon_notify_device_callbacks(pdevice_extended_info *param,
+//  device_event event);
 #ifdef __cplusplus
 }
 #endif
