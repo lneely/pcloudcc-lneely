@@ -32,6 +32,7 @@
 #include "ptimer.h"
 #include "pcache.h"
 #include "pcompat.h"
+#include "pcompiler.h"
 #include "plibs.h"
 #include "psynclib.h"
 

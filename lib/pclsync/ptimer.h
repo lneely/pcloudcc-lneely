@@ -32,8 +32,8 @@
 #ifndef _PSYNC_TIMER_H
 #define _PSYNC_TIMER_H
 
-#include "pcompiler.h"
 #include "plist.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
 
