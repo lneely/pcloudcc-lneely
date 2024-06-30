@@ -29,10 +29,10 @@
    DAMAGE.
 */
 
-// #include "miniz.h"
+#include <zlib.h>
+
 #include "pcompression.h"
 #include "plibs.h"
-#include "zlib.h"
 
 #define BUFFER_SIZE (4 * 1024)
 
