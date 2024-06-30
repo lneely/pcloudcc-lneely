@@ -32,7 +32,6 @@
 #define _FILE_OFFSET_BITS 64
 
 #include "pfs.h"
-#include "pcache.h"
 #include "pcloudcrypto.h"
 #include "pcompat.h"
 #include "pfolder.h"
@@ -52,9 +51,11 @@
 #include <errno.h>
 #include <fuse.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #ifndef FUSE_STAT
 #define FUSE_STAT stat

@@ -43,5 +43,6 @@ typedef uint32_t psync_changetype_t;
  */
 
 typedef void (*paccount_cache_callback_t)(void *event);
+void do_register_account_events_callback(paccount_cache_callback_t callback);
 
 #endif //_PACCOUNTEVENTS_H

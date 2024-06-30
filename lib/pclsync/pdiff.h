@@ -32,7 +32,6 @@
 #ifndef _PSYNC_DIFF_H
 #define _PSYNC_DIFF_H
 
-#include "paccountevents.h"
 #include "papi.h"
 
 void psync_diff_init();
@@ -44,9 +43,6 @@ void psync_diff_update_file(const binresult *meta);
 void psync_diff_delete_file(const binresult *meta);
 void psync_diff_update_folder(const binresult *meta);
 void psync_diff_delete_folder(const binresult *meta);
-
-void do_register_account_events_callback(paccount_cache_callback_t callback);
-
 void psync_delete_cached_crypto_keys();
 
 #endif

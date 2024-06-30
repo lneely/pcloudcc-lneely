@@ -30,6 +30,7 @@
 */
 
 #include "pdiff.h"
+#include "paccountevents.h"
 #include "papi.h"
 #include "pbusinessaccount.h"
 #include "pcache.h"
