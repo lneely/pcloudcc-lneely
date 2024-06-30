@@ -29,8 +29,15 @@
    DAMAGE.
 */
 
-#include "pfscrypto.h"
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
+#include <pthread.h>
+
 #include "pcloudcrypto.h"
+#include "pfscrypto.h"
 #include "plibs.h"
 #include "ppagecache.h"
 #include <ctype.h>

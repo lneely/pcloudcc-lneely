@@ -29,10 +29,18 @@
    DAMAGE.
 */
 
-#include "pfolder.h"
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
+#include <pthread.h>
+#include <stddef.h>
+
 #include "papi.h"
 #include "pcloudcrypto.h"
 #include "pdiff.h"
+#include "pfolder.h"
 #include "pfsfolder.h"
 #include "plibs.h"
 #include "plist.h"

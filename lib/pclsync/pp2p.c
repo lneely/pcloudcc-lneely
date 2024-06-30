@@ -29,7 +29,13 @@
    DAMAGE.
 */
 
-#include "pp2p.h"
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
+#include <pthread.h>
+
 #include "papi.h"
 #include "pcompat.h"
 #include "pcrypto.h"
@@ -37,6 +43,7 @@
 #include "pfolder.h"
 #include "plibs.h"
 #include "pnetlibs.h"
+#include "pp2p.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "pstatus.h"

@@ -27,8 +27,15 @@
   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "pasyncnet.h"
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
+#include <pthread.h>
+
 #include "papi.h"
+#include "pasyncnet.h"
 #include "pcompat.h"
 #include "pcompression.h"
 #include "plibs.h"

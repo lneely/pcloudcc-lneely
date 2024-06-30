@@ -29,16 +29,19 @@
    DAMAGE.
 */
 
+/*
+  Dependencies:
+  - pcompat.h
+  - pcompiler.h
+  - <polarssl/aes.h>
+  - <polarssl/rsa.h>
+  - <polarssl/sha1.h>
+  - <polarssl/sha256.h>
+  - <polarssl/sha512.h>
+*/
+
 #ifndef _PSYNC_SSL_H
 #define _PSYNC_SSL_H
-
-#include "pcompat.h"
-#include "pcompiler.h"
-#include <polarssl/aes.h>
-#include <polarssl/rsa.h>
-#include <polarssl/sha1.h>
-#include <polarssl/sha256.h>
-#include <polarssl/sha512.h>
 
 #define PSYNC_AES256_BLOCK_SIZE 16
 #define PSYNC_AES256_KEY_SIZE 32

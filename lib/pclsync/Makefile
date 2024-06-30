@@ -9,7 +9,7 @@ CFLAGS=-Werror -O2 -g -fno-stack-protector -fomit-frame-pointer -mtune=core2 -I.
 LIB_A=psynclib.a
 UNAME_S := $(shell uname -s)
 UNAME_V := $(shell uname -v)
-CFLAGS += -DP_OS_LINUX -D_FILE_OFFSET_BITS=64
+CFLAGS += -DP_OS_LINUX -D_FILE_OFFSET_BITS=64 -DP_SSL_MBEDTLS -I../mbedtls/include
 LDFLAGS += -lssl -lcrypto -lfuse -lpthread -lsqlite3 -lzlib
 
 OBJ=pcompat.o psynclib.o plocks.o plibs.o pcallbacks.o pdiff.o pstatus.o papi.o ptimer.o\
@@ -21,10 +21,6 @@ OBJ=pcompat.o psynclib.o plocks.o plibs.o pcallbacks.o pdiff.o pstatus.o papi.o 
 
 OBJFS=pfs.o ppagecache.o pfsfolder.o pfstasks.o pfsupload.o pintervaltree.o pfsxattr.o\
 	pcloudcrypto.o pfscrypto.o pcrc32c.o pfsstatic.o plocks.o
-
-# committing to mbedtls
-OBJ += pssl-mbedtls.o
-CFLAGS += -DP_SSL_MBEDTLS -I../mbedtls/include
 
 OBJ1=overlay_client.o
 

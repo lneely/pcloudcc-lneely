@@ -29,11 +29,18 @@
    DAMAGE.
 */
 
-#include "pmemlock.h"
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
+#include <pthread.h>
+
 #include "pcloudcrypto.h"
 #include "pcompat.h"
 #include "pintervaltree.h"
 #include "plibs.h"
+#include "pmemlock.h"
 #include "ptree.h"
 #include <stdint.h>
 

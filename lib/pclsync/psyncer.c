@@ -29,7 +29,14 @@
    DAMAGE.
 */
 
-#include "psyncer.h"
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
+#include <pthread.h>
+#include <stddef.h>
+
 #include "pcallbacks.h"
 #include "pdownload.h"
 #include "pfolder.h"
@@ -38,6 +45,7 @@
 #include "plocalscan.h"
 #include "ppathstatus.h"
 #include "pstatus.h"
+#include "psyncer.h"
 #include "ptasks.h"
 #include "ptree.h"
 #include <string.h>

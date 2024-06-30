@@ -29,7 +29,15 @@
    DAMAGE.
 */
 
-#include "psynclib.h"
+#include <ctype.h>
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
+#include <pthread.h>
+#include <stddef.h>
+
 #include "papi.h"
 #include "pasyncnet.h"
 #include "pbusinessaccount.h"
@@ -62,6 +70,7 @@
 #include "pssl.h"
 #include "pstatus.h"
 #include "psyncer.h"
+#include "psynclib.h"
 #include "ptasks.h"
 #include "ptimer.h"
 #include "ptools.h"
@@ -2216,11 +2225,11 @@ int psync_crypto_reset() {
 
 psync_folderid_t psync_crypto_folderid() {
   int64_t id;
-  id =
-      psync_sql_cellint("SELECT id FROM folder WHERE parentfolderid=0 AND "
-                        "flags&" NTO_STR(PSYNC_FOLDER_FLAG_ENCRYPTED) "=" NTO_STR(
-                            PSYNC_FOLDER_FLAG_ENCRYPTED) " LIMIT 1",
-                        0);
+  id = psync_sql_cellint(
+      "SELECT id FROM folder WHERE parentfolderid=0 AND "
+      "flags&" NTO_STR(PSYNC_FOLDER_FLAG_ENCRYPTED) "=" NTO_STR(
+          PSYNC_FOLDER_FLAG_ENCRYPTED) " LIMIT 1",
+      0);
   if (id)
     return id;
   id = psync_sql_cellint(

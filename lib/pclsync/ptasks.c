@@ -29,12 +29,19 @@
    DAMAGE.
 */
 
-#include "ptasks.h"
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
+#include <pthread.h>
+
 #include "pcallbacks.h"
 #include "pdownload.h"
 #include "plibs.h"
 #include "ppathstatus.h"
 #include "pstatus.h"
+#include "ptasks.h"
 #include "pupload.h"
 
 static void create_task1(psync_uint_t type, psync_syncid_t syncid,

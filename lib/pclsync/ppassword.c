@@ -28,8 +28,15 @@
   DAMAGE.
 */
 
-#include "ppassword.h"
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
+#include <pthread.h>
+
 #include "plibs.h"
+#include "ppassword.h"
 #include "ppassworddict.h"
 #include "pssl.h"
 #include <ctype.h>

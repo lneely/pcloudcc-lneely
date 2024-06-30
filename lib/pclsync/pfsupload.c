@@ -29,12 +29,19 @@
    DAMAGE.
 */
 
-#include "pfsupload.h"
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
+#include <pthread.h>
+
 #include "pcache.h"
 #include "pdiff.h"
 #include "pfileops.h"
 #include "pfscrypto.h"
 #include "pfstasks.h"
+#include "pfsupload.h"
 #include "pfsxattr.h"
 #include "plibs.h"
 #include "plist.h"

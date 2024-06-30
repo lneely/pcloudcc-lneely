@@ -31,10 +31,17 @@
 #define FUSE_USE_VERSION 26
 #define _FILE_OFFSET_BITS 64
 
-#include "pfs.h"
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
+#include <pthread.h>
+
 #include "pcloudcrypto.h"
 #include "pcompat.h"
 #include "pfolder.h"
+#include "pfs.h"
 #include "pfscrypto.h"
 #include "pfsfolder.h"
 #include "pfsstatic.h"
