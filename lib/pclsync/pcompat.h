@@ -55,7 +55,6 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 

@@ -30,6 +30,7 @@
 */
 
 #include "pssl.h"
+#include "plibs.h"
 #include "pmemlock.h"
 #include "psynclib.h"
 #include <stddef.h>

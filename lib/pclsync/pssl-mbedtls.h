@@ -32,7 +32,6 @@
 #ifndef _PSYNC_MBEDTLS_H
 #define _PSYNC_MBEDTLS_H
 
-#include "plibs.h"
 #include <polarssl/aes.h>
 #include <polarssl/rsa.h>
 #include <polarssl/sha1.h>

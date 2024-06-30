@@ -32,23 +32,10 @@
 #ifndef _PSYNC_SETTINGS_H
 #define _PSYNC_SETTINGS_H
 
-#include "pcompat.h"
 #include "pcompiler.h"
 #include <stdint.h>
 
 #define PSYNC_LIB_VERSION "1.5.1"
-
-/*
-#define PSYNC_API_HOST     "api74.pcloud.com"
-#define PSYNC_API_PORT     8398
-#define PSYNC_API_PORT_SSL 8399
-*/
-
-// #define PSYNC_API_HOST     "ebinapi71.pcloud.com"
-// #define PSYNC_API_AHOST    "eapi71.pcloud.com"
-
-// #define PSYNC_API_HOST     "ebinapi69.pcloud.com"
-// #define PSYNC_API_AHOST    "eapi69.pcloud.com"
 
 #define PSYNC_API_HOST "bineapi.pcloud.com"
 #define PSYNC_API_PORT 80
