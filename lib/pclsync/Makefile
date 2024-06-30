@@ -4,19 +4,7 @@ RANLIB=ranlib
 #USESSL=openssl
 USESSL=mbed
 
-#CFLAGS=-Wall -Wpointer-arith -O2 -g -mtune=core2
-#CFLAGS=-Wunused-parameter -O2 -g -fno-stack-protector -fomit-frame-pointer -mtune=core2 -I../sqlite -fPIC
-
-# TODO: fix unused parameters
-CFLAGS=-O2 -g -fno-stack-protector -fomit-frame-pointer -mtune=core2 -I../sqlite -fPIC
-
-#CFLAGS=-Wall -Wpointer-arith -O2 -g -fsanitize=address -mtune=core2
-#CFLAGS=-Wall -Wpointer-arith -O2 -g -fsanitize=address -mtune=core2 -I../sqlite
-#CFLAGS=-Wall -Wpointer-arith -Os -g -mtune=core2 -I../sqlite -pg
-#CFLAGS=-Wall -Wpointer-arith -O2 -g -fno-stack-protector -fomit-frame-pointer -mtune=core2 -I../sqlite/ -fPIC
-#CFLAGS=-Wall -Wpointer-arith -O2 -g -mtune=core2 -I../sqlite -pg -m32 -D_FILE_OFFSET_BITS=64
-#CFLAGS=-O2 -g -pg
-#CFLAGS=-Wall -Wpointer-arith -O2 -g -mtune=core2 -I../../psync32/zlib -I../../psync32/sqlite -m32 -D_FILE_OFFSET_BITS=64
+CFLAGS=-Werror -O2 -g -fno-stack-protector -fomit-frame-pointer -mtune=core2 -I../sqlite -fPIC
 
 LIB_A=psynclib.a
 UNAME_S := $(shell uname -s)
