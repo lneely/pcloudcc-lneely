@@ -475,6 +475,7 @@ int psync_ssl_write(void *sslconn, const void *buf, int num) {
 }
 
 void psync_ssl_rand_strong(unsigned char *buf, int num) {
+  // FIXME: causing segfault
   if (unlikely(ctr_drbg_random_locked(&psync_mbed_rng, buf, num))) {
     debug(D_CRITICAL, "could not generate %d random bytes, exiting", num);
     abort();
