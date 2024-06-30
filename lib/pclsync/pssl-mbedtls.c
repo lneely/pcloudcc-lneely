@@ -36,7 +36,6 @@
 #include "pssl.h"
 #include "psslcerts.h"
 #include "psynclib.h"
-#include "ptimer.h"
 #include <ctype.h>
 #include <polarssl/ctr_drbg.h>
 #include <polarssl/debug.h>
@@ -44,6 +43,7 @@
 #include <polarssl/pkcs5.h>
 #include <polarssl/ssl.h>
 #include <pthread.h>
+#include <stddef.h>
 
 #if defined(PSYNC_AES_HW_MSC)
 #include <intrin.h>

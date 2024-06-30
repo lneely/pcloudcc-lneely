@@ -42,11 +42,8 @@
 #include "pssl-openssl.h"
 #elif defined(P_SSL_MBEDTLS)
 #include "pssl-mbedtls.h"
-#elif defined(P_SSL_SECURETRANSPORT)
-#include "pssl-securetransport.h"
 #else
 #error "Please specify SSL library to use"
-#include "pssl-openssl.h"
 #endif
 
 extern PSYNC_THREAD int psync_ssl_errno;

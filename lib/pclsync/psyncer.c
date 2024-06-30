@@ -37,7 +37,6 @@
 #include "plocalnotify.h"
 #include "plocalscan.h"
 #include "ppathstatus.h"
-#include "psettings.h"
 #include "pstatus.h"
 #include "ptasks.h"
 #include "ptree.h"
