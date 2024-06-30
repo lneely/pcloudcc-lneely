@@ -31,16 +31,15 @@
 
 #include "plibs.h"
 #include "psynclib.h"
-// #include "pdevice_monitor.h"
-#include "papi.h"
-#include "pbusinessaccount.h"
-#include "pdevicemap.h"
-#include "pnetlibs.h"
 
 #include "pdevice_monitor.h"
-// #include "pdevicemap.h"
 #include "plocalscan.h"
 #include "ptimer.h"
+#include <libudev.h>
+#include <locale.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #define DEV_MONITOR_ACTIVITY_TIMER_INT 20
 
@@ -62,106 +61,6 @@ void devmon_activity_timer_start() {
         devmon_activity_timer_action, DEV_MONITOR_ACTIVITY_TIMER_INT, NULL);
   pthread_mutex_unlock(&devmon_mutex);
 }
-
-// device_event_callback *device_callbacks;
-// int device_clbsize = 10;
-// int device_clbnum = 0;
-
-// void psync_add_device_monitor_callback(device_event_callback callback) {
-//   if (callback) {
-//     if (device_clbnum == 0)
-//       device_callbacks = (device_event_callback
-//       *)psync_malloc(sizeof(device_event_callback)*device_clbsize);
-//     else {
-//       while (device_clbnum > device_clbsize) {
-//         device_event_callback *callbacks_old = device_callbacks;
-//         device_callbacks = (device_event_callback
-//         *)psync_malloc(sizeof(device_event_callback)*device_clbsize*2);
-//         memccpy(device_callbacks, callbacks_old,
-//         0,sizeof(device_event_callback)*device_clbsize); device_clbsize =
-//         device_clbsize * 2; psync_free(callbacks_old);
-//       }
-//     }
-//     device_callbacks[device_clbnum] = callback;
-//     device_clbnum
-//     ++;
-//   }
-// }
-
-// static pdevice_info * new_dev_info( char *szPath, pdevice_types type,
-// device_event evt) {
-//   /*int pathsize = strlen(szPath);
-//   int infstrsize = sizeof(pdevice_info);
-//   int infsize = pathsize + infstrsize + 1;*/
-//  // pdevice_info *infop = (pdevice_info *)psync_malloc(infsize);
-//   pdevice_info *infop = (pdevice_info *)psync_malloc(sizeof(pdevice_info));
-//   //ZeroMemory(infop, infsize);
-//   //infop->filesystem_path = (char *)(infop) + infstrsize;
-//   infop->filesystem_path = strdup(szPath);
-//   //memcpy(infop->filesystem_path, szPath, pathsize);
-//   //infop->filesystem_path[pathsize] = '\0';
-//   infop->type = type;
-//   infop->isextended = 0;
-//   return infop;
-// }
-
-// static pdevice_extended_info * new_dev_ext_info(char *szPath, char * vendor,
-// char *product, char* deviceid, pdevice_types type, device_event evt) {
-//  /*uint32_t pathsize = strlen(szPath);
-//   uint32_t vndsize = strlen(vendor);
-//   uint32_t prdsize = strlen(product);
-//   uint32_t devsize = strlen(deviceid);
-//   uint32_t infstrsize = sizeof(pdevice_extended_info);
-//   uint32_t infsize = pathsize + infstrsize + pathsize + vndsize + prdsize +
-//   5; void * infovp = psync_malloc(infsize); pdevice_extended_info *infop =
-//   (pdevice_extended_info *)infovp; ZeroMemory(infop, infsize); char
-//   *storage_begin = (char *)(infovp)+infstrsize;
-//   put_into_storage(&infop->filesystem_path, &storage_begin, szPath,
-//   pathsize); put_into_storage(&infop->vendor, &storage_begin, vendor,
-//   vndsize); put_into_storage(&infop->product, &storage_begin, product,
-//   prdsize); put_into_storage(&infop->device_id, &storage_begin, deviceid,
-//   devsize); infop->type = type; infop->event = evt; infop->isextended = 1;
-//   infop->size = infsize;
-//   infop->me = infop;*/
-//   pdevice_extended_info *infop = (pdevice_extended_info
-//   *)psync_malloc(sizeof(pdevice_extended_info)); infop->filesystem_path =
-//   strdup(szPath); infop->vendor = strdup(vendor); infop->product =
-//   strdup(product); infop->device_id = strdup(deviceid); infop->type = type;
-//   infop->isextended = 1;
-//   return infop;
-// }
-
-// void psync_devmon_notify_device_callbacks(pdevice_extended_info * param,
-// device_event event) {
-//   if (event == Dev_Event_arrival)
-//     psync_run_thread1("Device notifications", do_notify_device_callbacks_in,
-//     (void*)param);
-//   else
-//     psync_run_thread1("Device notifications", do_notify_device_callbacks_out,
-//     (void*)param);
-// }
-
-// static void psync_devmon_arivalmonitor(device_event event, void *
-// device_info)
-//{
-//   pdevice_extended_info *pDevExtInfo = (pdevice_extended_info*)device_info;
-//   if (event == Dev_Event_arrival){
-//	debug(D_NOTICE, "Device arrived.");
-//	psync_do_restat_sync_folders();
-//   }
-//   else{
-//	debug(D_NOTICE, "Device removed.");
-//	psync_do_restat_sync_folders();
-//   }
-//   if (pDevExtInfo)
-//	print_device_info(pDevExtInfo);
-// }
-
-#include <libudev.h>
-#include <locale.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 
 void enumerate_devices(struct udev *udev, device_event event) {
   devmon_activity_timer_start();
