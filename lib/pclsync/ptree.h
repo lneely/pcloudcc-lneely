@@ -32,7 +32,6 @@
 #ifndef _PSYNC_TREE_H
 #define _PSYNC_TREE_H
 
-#include "pcompiler.h"
 #include <stddef.h>
 #include <stdlib.h>
 

@@ -32,6 +32,8 @@
 #include "pupload.h"
 #include "papi.h"
 #include "pcallbacks.h"
+#include "pcompat.h"
+#include "pcompiler.h"
 #include "pdiff.h"
 #include "pfileops.h"
 #include "pfolder.h"

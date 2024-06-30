@@ -31,13 +31,17 @@
    Library containing tool functions, not used in the main
    functionality. Keeping statistics, getting data for them etc.
 */
-#include "ptools.h"
+
+#include <stdio.h>
+
+#include "papi.h"
+
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "psettings.h"
+#include "ptools.h"
 #include "stdlib.h"
 #include "string.h"
-#include <stdio.h>
 
 #if defined(P_OS_LINUX)
 #include <net/if.h>
