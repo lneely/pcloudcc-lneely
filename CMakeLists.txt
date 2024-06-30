@@ -15,7 +15,7 @@ link_directories(${Boost_LIBRARY_DIR})
 #set (CMAKE_CXX_FLAGS "-Wl,-Bstatic")
 set (CMAKE_C_FLAGS "-fPIC")
 set (PCLSYNC_PATH ${CMAKE_SOURCE_DIR}/lib/pclsync)
-set (MBEDTLS_PATH ${CMAKE_SOURCE_DIR}/lib/mbedtls-1.3.10)
+set (MBEDTLS_PATH ${CMAKE_SOURCE_DIR}/lib/mbedtls-2.1.14)
 set (CMD_PATH ${CMAKE_SOURCE_DIR}/cmd/pcloudcc)
 
 #add_subdirectory(${MBEDTLS_PATH})
@@ -40,6 +40,8 @@ add_library(pcloudcc_lib SHARED ${CMD_PATH}/pclsync_lib_c.cpp ${CMD_PATH}/pclsyn
 target_link_libraries(pcloudcc_lib
 	${PCLSYNC_PATH}/psynclib.a
 	${MBEDTLS_PATH}/build/library/libmbedtls.a
+	${MBEDTLS_PATH}/build/library/libmbedx509.a	
+	${MBEDTLS_PATH}/build/library/libmbedcrypto.a	
 	fuse
 	pthread
 	sqlite3

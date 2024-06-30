@@ -30,13 +30,17 @@
 */
 
 #include <ctype.h>
-#include <polarssl/ctr_drbg.h>
-#include <polarssl/debug.h>
-#include <polarssl/entropy.h>
-#include <polarssl/pkcs5.h>
-#include <polarssl/ssl.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/debug.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/net.h>
+#include <mbedtls/pkcs5.h>
+#include <mbedtls/sha256.h>
+#include <mbedtls/ssl.h>
 #include <pthread.h>
 #include <stddef.h>
+
+#include "mbedtls/compat-1.3.h"
 
 #include "pcompat.h"
 #include "pcompiler.h"
@@ -132,6 +136,7 @@ typedef struct {
 
 typedef struct {
   ssl_context ssl;
+  mbedtls_ssl_config conf;
   psync_socket_t sock;
   int isbroken;
   char cachekey[];
@@ -209,9 +214,13 @@ int psync_ssl_init() {
   entropy_init(&psync_mbed_entropy);
   psync_get_random_seed(seed, seed, sizeof(seed), 0);
   entropy_update_manual(&psync_mbed_entropy, seed, sizeof(seed));
+  /*
   if (ctr_drbg_init(&psync_mbed_rng.rnd, entropy_func, &psync_mbed_entropy,
                     NULL, 0))
     return PRINT_RETURN(-1);
+  */
+  ctr_drbg_init(&psync_mbed_rng.rnd);
+
   x509_crt_init(&psync_mbed_trusted_certs_x509);
   for (i = 0; i < ARRAY_SIZE(psync_ssl_trusted_certs); i++)
     if (x509_crt_parse(&psync_mbed_trusted_certs_x509,
@@ -237,6 +246,12 @@ static ssl_connection_t *psync_ssl_alloc_conn(const char *hostname) {
   memcpy(conn->cachekey, "SSLS", 4);
   memcpy(conn->cachekey + 4, hostname, len);
   return conn;
+}
+
+static mbedtls_ssl_config *psync_ssl_alloc_config() {
+  mbedtls_ssl_config *cfg;
+  cfg = malloc(sizeof(mbedtls_ssl_config));
+  return cfg;
 }
 
 static void psync_set_ssl_error(ssl_connection_t *conn, int err) {
@@ -341,22 +356,23 @@ static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
 int psync_ssl_connect(psync_socket_t sock, void **sslconn,
                       const char *hostname) {
   ssl_connection_t *conn;
+  mbedtls_ssl_config *cfg;
   ssl_session *sess;
   int ret;
   conn = psync_ssl_alloc_conn(hostname);
-  if (unlikely(ssl_init(&conn->ssl)))
-    goto err0;
+  cfg = psync_ssl_alloc_config();
+  ssl_init(&conn->ssl);
   conn->sock = sock;
-  ssl_set_endpoint(&conn->ssl, SSL_IS_CLIENT);
-  ssl_set_dbg(&conn->ssl, debug_cb, debug_ctx);
-  ssl_set_authmode(&conn->ssl, SSL_VERIFY_REQUIRED);
-  ssl_set_min_version(&conn->ssl, SSL_MAJOR_VERSION_3, SSL_MINOR_VERSION_3);
-  ssl_set_ca_chain(&conn->ssl, &psync_mbed_trusted_certs_x509, NULL, hostname);
-  ssl_set_ciphersuites(&conn->ssl, psync_mbed_ciphersuite);
-  ssl_set_rng(&conn->ssl, ctr_drbg_random_locked, &psync_mbed_rng);
-  ssl_set_bio(&conn->ssl, psync_mbed_read, conn, psync_mbed_write, conn);
-  ssl_set_hostname(&conn->ssl, hostname); // we do not need SNI, but should not
-                                          // hurt in general to support
+  ssl_set_endpoint(&conn->conf, SSL_IS_CLIENT);
+  ssl_set_dbg(&conn->conf, debug_cb, debug_ctx);
+  ssl_set_authmode(&conn->conf, SSL_VERIFY_REQUIRED);
+  ssl_set_min_version(&conn->conf, SSL_MAJOR_VERSION_3, SSL_MINOR_VERSION_3);
+  ssl_set_ca_chain(&conn->conf, &psync_mbed_trusted_certs_x509, NULL);
+  ssl_set_ciphersuites(&conn->conf, psync_mbed_ciphersuite);
+  ssl_set_rng(&conn->conf, ctr_drbg_random_locked, &psync_mbed_rng);
+
+  // XXX: may not be needed
+  // ssl_set_bio(&conn->ssl, psync_mbed_read, conn, psync_mbed_write, conn);
   if ((sess = (ssl_session *)psync_cache_get(conn->cachekey))) {
     debug(D_NOTICE, "reusing cached session for %s", hostname);
     if (ssl_set_session(&conn->ssl, sess))
@@ -631,7 +647,7 @@ psync_ssl_gen_symmetric_key_from_pass(const char *password, size_t keylen,
   key->keylen = keylen;
   pkcs5_pbkdf2_hmac(&ctx, (const unsigned char *)password, strlen(password),
                     salt, saltlen, iterations, keylen, key->key);
-  md_free_ctx(&ctx);
+  md_free(&ctx);
   return key;
 }
 
@@ -654,7 +670,7 @@ char *psync_ssl_derive_password_from_passphrase(const char *username,
   pkcs5_pbkdf2_hmac(&ctx, (const unsigned char *)passphrase, strlen(passphrase),
                     usersha512, PSYNC_SHA512_DIGEST_LEN, 5000,
                     sizeof(passwordbin), passwordbin);
-  md_free_ctx(&ctx);
+  md_free(&ctx);
   usercopy = psync_base64_encode(passwordbin, sizeof(passwordbin), &userlen);
   return (char *)usercopy;
 }

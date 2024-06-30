@@ -91,8 +91,8 @@ typedef struct {
 typedef aes_context *psync_aes256_encoder;
 typedef aes_context *psync_aes256_decoder;
 
-typedef void (*psync_ssl_debug_callback_t)(void *ctx, int level,
-                                           const char *message);
+typedef void (*psync_ssl_debug_callback_t)(void *, int, const char *, int,
+                                           const char *);
 void psync_ssl_set_log_threshold(int threshold);
 void psync_ssl_set_debug_callback(psync_ssl_debug_callback_t cb, void *ctx);
 
