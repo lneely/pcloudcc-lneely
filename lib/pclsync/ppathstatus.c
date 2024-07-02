@@ -29,15 +29,12 @@
    DAMAGE.
 */
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
 #include <pthread.h>
-#include <string.h>
-
-#include "mbedtls/compat-1.3.h"
 
 #include "pcloudcrypto.h"
 #include "pfolder.h"
@@ -48,6 +45,8 @@
 #include "pstatus.h"
 #include "ptasks.h"
 #include "ptree.h"
+#include <ctype.h>
+#include <string.h>
 
 #define PATH_CACHE_SIZE 512
 #define PATH_HASH_SIZE 512

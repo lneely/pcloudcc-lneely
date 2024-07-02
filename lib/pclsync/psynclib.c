@@ -30,15 +30,13 @@
 */
 
 #include <ctype.h>
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
 #include <pthread.h>
 #include <stddef.h>
-
-#include "mbedtls/compat-1.3.h"
 
 #include "papi.h"
 #include "pasyncnet.h"
@@ -208,9 +206,7 @@ static void psync_stop_crypto_on_sleep() {
   }
 }
 
-// TODO: figure out what the new args are
-static void ssl_debug_cb(void *ctx, int level, const char *msg, int TODO1,
-                         const char *TODO2) {
+static void ssl_debug_cb(void *ctx, int level, const char *msg) {
   debug(D_NOTICE, "%s", msg);
 }
 

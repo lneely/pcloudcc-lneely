@@ -29,17 +29,12 @@
    DAMAGE.
 */
 
-#include <ctype.h>
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/sha256.h>
-#include <mbedtls/ssl.h>
+#include <polarssl/ctr_drbg.h>
+#include <polarssl/debug.h>
+#include <polarssl/entropy.h>
+#include <polarssl/pkcs5.h>
+#include <polarssl/ssl.h>
 #include <pthread.h>
-#include <string.h>
-
-#include "mbedtls/compat-1.3.h"
 
 #include "pcallbacks.h"
 #include "pfolder.h"
@@ -55,6 +50,8 @@
 #include "ptasks.h"
 #include "ptimer.h"
 #include "pupload.h"
+#include <ctype.h>
+#include <string.h>
 
 typedef struct {
   psync_list list;
