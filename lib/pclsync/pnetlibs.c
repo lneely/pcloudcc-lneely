@@ -64,7 +64,7 @@ struct _psync_file_lock_t {
 };
 
 typedef struct {
-  unsigned char sha1[PSYNC_SHA1_DIGEST_LEN];
+  unsigned char mbedtls_sha1[PSYNC_SHA1_DIGEST_LEN];
   uint32_t adler;
 } psync_block_checksum;
 
@@ -1733,7 +1733,7 @@ err0:
 static int psync_sha1_cmp(const void *p1, const void *p2){
   psync_block_checksum **b1=(psync_block_checksum **)p1;
   psync_block_checksum **b2=(psync_block_checksum **)p2;
-  return memcmp((*b1)->sha1, (*b2)->sha1, PSYNC_SHA1_DIGEST_LEN);
+  return memcmp((*b1)->mbedtls_sha1, (*b2)->mbedtls_sha1, PSYNC_SHA1_DIGEST_LEN);
 }
 
 static psync_block_checksum
@@ -1786,8 +1786,8 @@ psync_net_create_hash(const psync_file_checksums *checksums) {
     if (h->elements[o]) {
       col = 0;
       do {
-        if (!memcmp(checksums->blocks[i].sha1,
-                    checksums->blocks[h->elements[o] - 1].sha1,
+        if (!memcmp(checksums->blocks[i].mbedtls_sha1,
+                    checksums->blocks[h->elements[o] - 1].mbedtls_sha1,
                     PSYNC_SHA1_DIGEST_LEN)) {
           checksums->next[i] = h->elements[o];
           break;
@@ -1810,7 +1810,7 @@ psync_net_create_hash(const psync_file_checksums *checksums) {
 
 static void psync_net_hash_remove(psync_file_checksum_hash *restrict hash,
                                   psync_file_checksums *restrict checksums,
-                                  uint32_t adler, const unsigned char *sha1) {
+                                  uint32_t adler, const unsigned char *mbedtls_sha1) {
   uint32_t idx, zeroidx, o, bp;
   o = adler % hash->elementcnt;
   while (1) {
@@ -1818,7 +1818,7 @@ static void psync_net_hash_remove(psync_file_checksum_hash *restrict hash,
     if (unlikely_log(!idx))
       return;
     else if (checksums->blocks[idx - 1].adler == adler &&
-             !memcmp(checksums->blocks[idx - 1].sha1, sha1,
+             !memcmp(checksums->blocks[idx - 1].mbedtls_sha1, mbedtls_sha1,
                      PSYNC_SHA1_DIGEST_LEN))
       break;
     else if (++o >= hash->elementcnt)
@@ -1871,7 +1871,7 @@ psync_net_block_match_found(psync_file_checksum_hash *restrict hash,
       break;
   }
   psync_net_hash_remove(hash, checksums, checksums->blocks[idx].adler,
-                        checksums->blocks[idx].sha1);
+                        checksums->blocks[idx].mbedtls_sha1);
 }
 
 static int psync_net_hash_has_adler(const psync_file_checksum_hash *hash,
@@ -1893,7 +1893,7 @@ static int psync_net_hash_has_adler(const psync_file_checksum_hash *hash,
 static uint32_t
 psync_net_hash_has_adler_and_sha1(const psync_file_checksum_hash *hash,
                                   const psync_file_checksums *checksums,
-                                  uint32_t adler, const unsigned char *sha1) {
+                                  uint32_t adler, const unsigned char *mbedtls_sha1) {
   uint32_t idx, o;
   o = adler % hash->elementcnt;
   while (1) {
@@ -1901,7 +1901,7 @@ psync_net_hash_has_adler_and_sha1(const psync_file_checksum_hash *hash,
     if (!idx)
       return 0;
     else if (checksums->blocks[idx - 1].adler == adler &&
-             !memcmp(checksums->blocks[idx - 1].sha1, sha1,
+             !memcmp(checksums->blocks[idx - 1].mbedtls_sha1, mbedtls_sha1,
                      PSYNC_SHA1_DIGEST_LEN))
       return idx;
     else if (++o >= hash->elementcnt)

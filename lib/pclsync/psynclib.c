@@ -736,7 +736,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   uint64_t perms;
   psync_stat_t st;
   psync_syncid_t ret;
-  int unsigned md;
+  int unsigned mbedtls_md;
 
   debug(D_NOTICE, "Add sync by folder id localpath: [%s]", localpath);
 
@@ -747,10 +747,10 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
       unlikely_log(!psync_stat_isfolder(&st)))
     return_isyncid(PERROR_LOCAL_FOLDER_NOT_FOUND);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
-    md = 7;
+    mbedtls_md = 7;
   else
-    md = 5;
-  if (unlikely_log(!psync_stat_mode_ok(&st, md)))
+    mbedtls_md = 5;
+  if (unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md)))
     return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
   syncmp = psync_fs_getmountpoint();
   if (syncmp) {
@@ -823,7 +823,7 @@ int psync_add_sync_by_path_delayed(const char *localpath,
                                    psync_synctype_t synctype) {
   psync_sql_res *res;
   psync_stat_t st;
-  int unsigned md;
+  int unsigned mbedtls_md;
   if (unlikely_log(synctype < PSYNC_SYNCTYPE_MIN ||
                    synctype > PSYNC_SYNCTYPE_MAX))
     return_error(PERROR_INVALID_SYNCTYPE);
@@ -831,10 +831,10 @@ int psync_add_sync_by_path_delayed(const char *localpath,
       unlikely_log(!psync_stat_isfolder(&st)))
     return_error(PERROR_LOCAL_FOLDER_NOT_FOUND);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
-    md = 7;
+    mbedtls_md = 7;
   else
-    md = 5;
-  if (unlikely_log(!psync_stat_mode_ok(&st, md)))
+    mbedtls_md = 5;
+  if (unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md)))
     return_error(PERROR_LOCAL_FOLDER_ACC_DENIED);
   res = psync_sql_prep_statement("INSERT INTO syncfolderdelayed (localpath, "
                                  "remotepath, synctype) VALUES (?, ?, ?)");
@@ -855,7 +855,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   psync_folderid_t folderid;
   uint64_t perms;
   psync_stat_t st;
-  int unsigned md;
+  int unsigned mbedtls_md;
   psync_synctype_t oldsynctype;
   if (unlikely_log(synctype < PSYNC_SYNCTYPE_MIN ||
                    synctype > PSYNC_SYNCTYPE_MAX))
@@ -885,10 +885,10 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   }
   psync_sql_free_result(res);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
-    md = 7;
+    mbedtls_md = 7;
   else
-    md = 5;
-  if (unlikely_log(!psync_stat_mode_ok(&st, md))) {
+    mbedtls_md = 5;
+  if (unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md))) {
     psync_sql_rollback_transaction();
     return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
   }

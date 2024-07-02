@@ -422,7 +422,7 @@ void psync_syncer_check_delayed_syncs() {
   uint64_t id, synctype;
   int64_t syncid;
   psync_folderid_t folderid;
-  int unsigned md;
+  int unsigned mbedtls_md;
 re:
   res = psync_sql_query(
       "SELECT id, localpath, remotepath, synctype FROM syncfolderdelayed");
@@ -432,19 +432,19 @@ re:
     remotepath = (char *)psync_get_string(row[2]);
     synctype = psync_get_number(row[3]);
     if (synctype & PSYNC_DOWNLOAD_ONLY)
-      md = 7;
+      mbedtls_md = 7;
     else
-      md = 5;
+      mbedtls_md = 5;
     if (unlikely_log(psync_stat(localpath, &st)) ||
         unlikely_log(!psync_stat_isfolder(&st)) ||
-        unlikely_log(!psync_stat_mode_ok(&st, md))) {
+        unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md))) {
       debug(D_WARNING,
             "ignoring delayed sync id %" P_PRI_U64 " for local path %s", id,
             localpath);
       delete_delayed_sync(id);
       continue;
     }
-    md = 0;
+    mbedtls_md = 0;
     res2 = psync_sql_query("SELECT localpath FROM syncfolder");
     while ((srow = psync_sql_fetch_rowstr(res2)))
       if (psync_str_is_prefix(srow[0], localpath)) {
@@ -452,15 +452,15 @@ re:
             D_WARNING,
             "skipping localfolder %s, remote %s, because of same parent to %s",
             localpath, remotepath, srow[0]);
-        md = 1;
+        mbedtls_md = 1;
       } else if (!psync_filename_cmp(srow[0], localpath)) {
         debug(D_WARNING,
               "skipping localfolder %s, remote %s, because of same dir to %s",
               localpath, remotepath, srow[0]);
-        md = 1;
+        mbedtls_md = 1;
       }
     psync_sql_free_result(res2);
-    if (md) {
+    if (mbedtls_md) {
       delete_delayed_sync(id);
       continue;
     }
