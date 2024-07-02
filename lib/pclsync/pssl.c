@@ -360,6 +360,7 @@ static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
   return -1;
 }
 
+// FIXME
 int psync_ssl_connect(psync_socket_t sock, void **sslconn,
                       const char *hostname) {
   ssl_connection_t *conn;
@@ -372,6 +373,15 @@ int psync_ssl_connect(psync_socket_t sock, void **sslconn,
   mbedtls_net_init(&conn->srv);
   conn->sock = sock;
 
+  if ((ret = mbedtls_ssl_config_defaults(&conn->cfg, MBEDTLS_SSL_IS_CLIENT,
+                                         MBEDTLS_SSL_TRANSPORT_STREAM,
+                                         MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
+    debug(D_ERROR,
+          "failed to set ssl cfg defaults: ! mbedtls_ssl_config_defaults "
+          "returned %d\n\n",
+          ret);
+    goto err0;
+  }
   mbedtls_ssl_conf_endpoint(&conn->cfg, MBEDTLS_SSL_IS_CLIENT);
   mbedtls_ssl_conf_dbg(&conn->cfg, debug_cb, debug_ctx);
   mbedtls_ssl_conf_authmode(&conn->cfg, MBEDTLS_SSL_VERIFY_REQUIRED);
@@ -389,8 +399,9 @@ int psync_ssl_connect(psync_socket_t sock, void **sslconn,
 
   if ((sess = (mbedtls_ssl_session *)psync_cache_get(conn->cachekey))) {
     debug(D_NOTICE, "reusing cached session for %s", hostname);
-    if (mbedtls_ssl_set_session(&conn->ssl, sess))
+    if (mbedtls_ssl_set_session(&conn->ssl, sess)) {
       debug(D_WARNING, "ssl_set_session failed");
+    }
     mbedtls_ssl_session_free(sess);
     psync_free(sess);
   }
@@ -398,13 +409,16 @@ int psync_ssl_connect(psync_socket_t sock, void **sslconn,
   ret = mbedtls_ssl_handshake(&conn->ssl);
   if (ret == 0) {
     int result;
+
     if ((result = psync_ssl_check_peer_public_key(conn))) {
       goto err1;
     }
     *sslconn = conn;
+
     psync_ssl_save_session(conn);
     return PSYNC_SSL_SUCCESS;
   }
+
   psync_set_ssl_error(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
                  ret == MBEDTLS_ERR_SSL_WANT_WRITE)) {
@@ -421,13 +435,18 @@ err0:
 int psync_ssl_connect_finish(void *sslconn, const char *hostname) {
   ssl_connection_t *conn;
   int ret;
+
   conn = (ssl_connection_t *)sslconn;
   ret = mbedtls_ssl_handshake(&conn->ssl);
   if (ret == 0) {
-    if (psync_ssl_check_peer_public_key(conn))
+    int result;
+    if ((result = psync_ssl_check_peer_public_key(conn))) {
       goto fail;
+    }
     psync_ssl_save_session(conn);
     return PSYNC_SSL_SUCCESS;
+  } else {
+    debug(D_ERROR, "handshake failed, return code was %d", ret);
   }
   psync_set_ssl_error(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||

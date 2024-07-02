@@ -27,13 +27,15 @@
   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "papi.h"
 #include "plibs.h"
 #include "psettings.h"
 #include "psynclib.h"
 #include "ptimer.h"
-#include <stddef.h>
-#include <string.h>
 
 /*
   commented definitions are unused, but kept because they may be
@@ -105,8 +107,9 @@ psync_socket *psync_api_connect(const char *hostname, int usessl) {
   if (psync_timer_time() > notuntil || !userapi) {
     ret = psync_socket_connect(
         hostname, usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT, usessl);
-    if (ret)
+    if (ret) {
       return ret;
+    }
     if (!userapi || !strcmp(hostname, userapi))
       return NULL;
     ret = psync_socket_connect(
