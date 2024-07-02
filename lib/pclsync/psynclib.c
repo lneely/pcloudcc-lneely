@@ -210,7 +210,8 @@ static void psync_stop_crypto_on_sleep() {
 
 static void ssl_debug_cb(void *ctx, int level, const char *msg, int TODO1,
                          const char *TODO2) {
-  debug(D_NOTICE, "%s", msg);
+  debug(D_NOTICE, "%s (%s, %d)", msg, TODO2,
+        TODO1); // trying to figure out what these are...
 }
 
 void psync_set_ssl_debug_callback(psync_ssl_debug_callback_t cb) {

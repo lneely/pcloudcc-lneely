@@ -40,6 +40,7 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 #include <stddef.h>
+#include <stdio.h>
 
 #include "pcompat.h"
 #include "pcompiler.h"
@@ -134,6 +135,7 @@ typedef struct {
 } ctr_drbg_context_locked;
 
 typedef struct {
+  mbedtls_net_context srv;
   mbedtls_ssl_context ssl;
   mbedtls_ssl_config cfg;
   psync_socket_t sock;
@@ -212,22 +214,29 @@ int psync_ssl_init() {
 #endif
   if (pthread_mutex_init(&psync_mbed_rng.mutex, NULL))
     return PRINT_RETURN(-1);
+
   mbedtls_entropy_init(&psync_mbed_entropy);
   psync_get_random_seed(seed, seed, sizeof(seed), 0);
   mbedtls_entropy_update_manual(&psync_mbed_entropy, seed, sizeof(seed));
+
   mbedtls_ctr_drbg_init(&psync_mbed_rng.rnd);
   if ((result = mbedtls_ctr_drbg_seed(&psync_mbed_rng.rnd, mbedtls_entropy_func,
                                       &psync_mbed_entropy, NULL, 0))) {
     debug(D_ERROR, "mbedtls_ctr_drbg_seed failed with return code %d", result);
     return PRINT_RETURN(-1);
   }
+
   mbedtls_x509_crt_init(&psync_mbed_trusted_certs_x509);
-  for (i = 0; i < ARRAY_SIZE(psync_ssl_trusted_certs); i++)
-    if (mbedtls_x509_crt_parse(
-            &psync_mbed_trusted_certs_x509,
-            (const unsigned char *)psync_ssl_trusted_certs[i],
-            strlen(psync_ssl_trusted_certs[i])))
-      debug(D_ERROR, "failed to load certificate %lu", (unsigned long)i);
+  for (i = 0; i < ARRAY_SIZE(psync_ssl_trusted_certs); i++) {
+    result = mbedtls_x509_crt_parse(&psync_mbed_trusted_certs_x509,
+                                    (unsigned char *)psync_ssl_trusted_certs[i],
+                                    1 + strlen(psync_ssl_trusted_certs[i]));
+    if (result) {
+      debug(D_ERROR, "failed to load certificate %lu, got result %d",
+            (unsigned long)i, result);
+    }
+  }
+
   return 0;
 }
 
@@ -258,9 +267,9 @@ static void psync_set_ssl_error(ssl_connection_t *conn, int err) {
     psync_ssl_errno = PSYNC_SSL_ERR_UNKNOWN;
     conn->isbroken = 1;
     if (err == MBEDTLS_ERR_NET_RECV_FAILED)
-      debug(D_NOTICE, "got POLARSSL_ERR_NET_RECV_FAILED");
+      debug(D_NOTICE, "got MBEDTLS_ERR_NET_RECV_FAILED");
     else if (err == MBEDTLS_ERR_NET_SEND_FAILED)
-      debug(D_NOTICE, "got POLARSSL_ERR_NET_SEND_FAILED");
+      debug(D_NOTICE, "got MBEDTLS_ERR_NET_SEND_FAILED");
     else
       debug(D_NOTICE, "got error %d", err);
   }
@@ -321,6 +330,8 @@ static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
   unsigned char buff[1024], sigbin[32];
   char sighex[66];
   int i;
+
+  // TODO: returning null, why?
   cert = mbedtls_ssl_get_peer_cert(&conn->ssl);
   if (!cert) {
     debug(D_WARNING, "ssl_get_peer_cert returned NULL");
@@ -354,23 +365,27 @@ int psync_ssl_connect(psync_socket_t sock, void **sslconn,
   ssl_connection_t *conn;
   mbedtls_ssl_session *sess;
   int ret;
+
   conn = psync_ssl_alloc_conn(hostname);
   mbedtls_ssl_init(&conn->ssl);
   mbedtls_ssl_config_init(&conn->cfg);
+  mbedtls_net_init(&conn->srv);
   conn->sock = sock;
+
   mbedtls_ssl_conf_endpoint(&conn->cfg, MBEDTLS_SSL_IS_CLIENT);
   mbedtls_ssl_conf_dbg(&conn->cfg, debug_cb, debug_ctx);
   mbedtls_ssl_conf_authmode(&conn->cfg, MBEDTLS_SSL_VERIFY_REQUIRED);
   mbedtls_ssl_conf_min_version(&conn->cfg, MBEDTLS_SSL_MAJOR_VERSION_3,
                                MBEDTLS_SSL_MINOR_VERSION_3);
-  // TODO: hostname removed, does it need to go elsewhere?
-  // it seems so...
   mbedtls_ssl_conf_ca_chain(&conn->cfg, &psync_mbed_trusted_certs_x509, NULL);
   mbedtls_ssl_conf_ciphersuites(&conn->cfg, psync_mbed_ciphersuite);
   mbedtls_ssl_conf_rng(&conn->cfg, ctr_drbg_random_locked, &psync_mbed_rng);
-  mbedtls_ssl_set_bio(&conn->ssl, &conn->sock, psync_mbed_write,
-                      psync_mbed_read, NULL);
+
+  mbedtls_ssl_set_bio(&conn->ssl, &conn->srv, psync_mbed_write, psync_mbed_read,
+                      NULL);
   mbedtls_ssl_set_hostname(&conn->ssl, hostname);
+
+  mbedtls_ssl_setup(&conn->ssl, &conn->cfg); // attach config to ssl
 
   if ((sess = (mbedtls_ssl_session *)psync_cache_get(conn->cachekey))) {
     debug(D_NOTICE, "reusing cached session for %s", hostname);
@@ -379,10 +394,13 @@ int psync_ssl_connect(psync_socket_t sock, void **sslconn,
     mbedtls_ssl_session_free(sess);
     psync_free(sess);
   }
+
   ret = mbedtls_ssl_handshake(&conn->ssl);
   if (ret == 0) {
-    if (psync_ssl_check_peer_public_key(conn))
+    int result;
+    if ((result = psync_ssl_check_peer_public_key(conn))) {
       goto err1;
+    }
     *sslconn = conn;
     psync_ssl_save_session(conn);
     return PSYNC_SSL_SUCCESS;
