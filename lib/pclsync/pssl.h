@@ -33,11 +33,11 @@
   Dependencies:
   - pcompat.h
   - pcompiler.h
-  - <polarssl/aes.h>
-  - <polarssl/rsa.h>
-  - <polarssl/sha1.h>
-  - <polarssl/sha256.h>
-  - <polarssl/sha512.h>
+  - <mbedtls/aes.h>
+  - <mbedtls/rsa.h>
+  - <mbedtls/sha1.h>
+  - <mbedtls/sha256.h>
+  - <mbedtls/sha512.h>
 */
 
 #ifndef _PSYNC_SSL_H
