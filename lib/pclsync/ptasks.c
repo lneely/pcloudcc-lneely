@@ -36,8 +36,6 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 
-#include "mbedtls/compat-1.3.h"
-
 #include "pcallbacks.h"
 #include "pdownload.h"
 #include "plibs.h"

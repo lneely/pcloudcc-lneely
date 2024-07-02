@@ -37,8 +37,6 @@
 #include <pthread.h>
 #include <stddef.h>
 
-#include "mbedtls/compat-1.3.h"
-
 #include "pcallbacks.h"
 #include "pdownload.h"
 #include "pfolder.h"

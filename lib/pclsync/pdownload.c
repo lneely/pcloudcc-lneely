@@ -37,8 +37,6 @@
 #include <pthread.h>
 #include <stddef.h>
 
-#include "mbedtls/compat-1.3.h"
-
 #include "papi.h"
 #include "pasyncnet.h"
 #include "pcallbacks.h"

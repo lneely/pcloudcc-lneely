@@ -35,8 +35,6 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 
-#include "mbedtls/compat-1.3.h"
-
 #include "plibs.h"
 #include "ppassword.h"
 #include "ppassworddict.h"

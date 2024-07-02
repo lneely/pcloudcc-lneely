@@ -39,8 +39,6 @@
 #include <pthread.h>
 #include <stddef.h>
 
-#include "mbedtls/compat-1.3.h"
-
 #include "paccountevents.h"
 #include "papi.h"
 #include "pbusinessaccount.h"

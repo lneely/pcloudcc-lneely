@@ -37,8 +37,6 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 
-#include "mbedtls/compat-1.3.h"
-
 #include "pcallbacks.h"
 #include "pfolder.h"
 #include "plibs.h"

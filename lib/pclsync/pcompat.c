@@ -34,8 +34,6 @@
 #include <mbedtls/pkcs5.h>
 #include <mbedtls/ssl.h>
 
-#include "mbedtls/compat-1.3.h"
-
 #include "pcompat.h"
 #include "plibs.h"
 #include "psettings.h"

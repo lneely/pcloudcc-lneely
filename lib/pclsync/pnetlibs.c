@@ -37,8 +37,6 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 
-#include "mbedtls/compat-1.3.h"
-
 #include "papi.h"
 #include "pcache.h"
 #include "plibs.h"
@@ -1733,7 +1731,8 @@ err0:
 static int psync_sha1_cmp(const void *p1, const void *p2){
   psync_block_checksum **b1=(psync_block_checksum **)p1;
   psync_block_checksum **b2=(psync_block_checksum **)p2;
-  return memcmp((*b1)->mbedtls_sha1, (*b2)->mbedtls_sha1, PSYNC_SHA1_DIGEST_LEN);
+  return memcmp((*b1)->mbedtls_sha1, (*b2)->mbedtls_sha1,
+PSYNC_SHA1_DIGEST_LEN);
 }
 
 static psync_block_checksum
@@ -1810,7 +1809,8 @@ psync_net_create_hash(const psync_file_checksums *checksums) {
 
 static void psync_net_hash_remove(psync_file_checksum_hash *restrict hash,
                                   psync_file_checksums *restrict checksums,
-                                  uint32_t adler, const unsigned char *mbedtls_sha1) {
+                                  uint32_t adler,
+                                  const unsigned char *mbedtls_sha1) {
   uint32_t idx, zeroidx, o, bp;
   o = adler % hash->elementcnt;
   while (1) {
@@ -1890,10 +1890,9 @@ static int psync_net_hash_has_adler(const psync_file_checksum_hash *hash,
   }
 }
 
-static uint32_t
-psync_net_hash_has_adler_and_sha1(const psync_file_checksum_hash *hash,
-                                  const psync_file_checksums *checksums,
-                                  uint32_t adler, const unsigned char *mbedtls_sha1) {
+static uint32_t psync_net_hash_has_adler_and_sha1(
+    const psync_file_checksum_hash *hash, const psync_file_checksums *checksums,
+    uint32_t adler, const unsigned char *mbedtls_sha1) {
   uint32_t idx, o;
   o = adler % hash->elementcnt;
   while (1) {
