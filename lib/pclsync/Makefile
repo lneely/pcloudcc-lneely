@@ -4,7 +4,7 @@ RANLIB=ranlib
 #USESSL=openssl
 USESSL=mbed
 
-CFLAGS=-Werror -O2 -g -fno-stack-protector -fomit-frame-pointer -mtune=core2 -I../sqlite -fPIC
+CFLAGS=-Werror -O2 -g -fno-stack-protector -fomit-frame-pointer -I../sqlite -fPIC
 
 LIB_A=psynclib.a
 UNAME_S := $(shell uname -s)
