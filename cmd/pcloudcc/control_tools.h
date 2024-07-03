@@ -29,6 +29,7 @@
 #ifndef CONTROL_TOOLS_H
 #define CONTROL_TOOLS_H
 
+#define MAX_STRING_SIZE 1024
 namespace control_tools {
 
 int start_crypto(const char *pass);
