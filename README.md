@@ -17,6 +17,7 @@ This version of pcloudcc is independently maintained by me, whose only affiliati
 [Boost](http://www.boost.org/) Boost system and boost program options libraries used.  
 [Pthread](http://www.gnu.org/)   
 [Fuse](https://github.com/libfuse/libfuse) Filesystem in Userspace.
+libsqlite3. lightweight SQL database.
 
 
 ## Build steps
