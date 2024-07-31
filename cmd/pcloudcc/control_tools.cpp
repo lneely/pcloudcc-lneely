@@ -88,7 +88,7 @@ int stop_crypto() {
 
 int finalize() {
   int ret;
-  char *errm;
+  char *errm = (char *)calloc(MAX_STRING_SIZE , sizeof(char));
 
   if (SendCall(FINALIZE, "", &ret, &errm)) {
     std::cout << "Finalize failed. return is " << ret << " and message is "
