@@ -60,6 +60,42 @@
 #include <stddef.h>
 #include <string.h>
 
+// HACK: This function is duplicated from
+// mbedtls-2.1.14/library/pkparse.c, because it is needed to properly
+// parse the RSA keys returned by the pcloud server; see the fallback
+// code in psync_ssl_rsa_load_public.
+//
+// IMO this duplication beats the hell out of maintaining the full
+// mbedtls library in the pcloudcc source tree just to apply a tiny
+// patch.
+static int pk_get_rsapubkey(unsigned char **p, const unsigned char *end,
+                            mbedtls_rsa_context *rsa) {
+  int ret;
+  size_t len;
+
+  if ((ret = mbedtls_asn1_get_tag(
+           p, end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE)) !=
+      0)
+    return (MBEDTLS_ERR_PK_INVALID_PUBKEY + ret);
+
+  if (*p + len != end)
+    return (MBEDTLS_ERR_PK_INVALID_PUBKEY + MBEDTLS_ERR_ASN1_LENGTH_MISMATCH);
+
+  if ((ret = mbedtls_asn1_get_mpi(p, end, &rsa->N)) != 0 ||
+      (ret = mbedtls_asn1_get_mpi(p, end, &rsa->E)) != 0)
+    return (MBEDTLS_ERR_PK_INVALID_PUBKEY + ret);
+
+  if (*p != end)
+    return (MBEDTLS_ERR_PK_INVALID_PUBKEY + MBEDTLS_ERR_ASN1_LENGTH_MISMATCH);
+
+  if ((ret = mbedtls_rsa_check_pubkey(rsa)) != 0)
+    return (MBEDTLS_ERR_PK_INVALID_PUBKEY);
+
+  rsa->len = mbedtls_mpi_size(&rsa->N);
+
+  return (0);
+}
+
 static pthread_mutex_t rsa_decr_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void psync_ssl_free_psync_encrypted_data_t(psync_encrypted_data_t e) {
@@ -626,13 +662,32 @@ psync_rsa_publickey_t psync_ssl_rsa_load_public(const unsigned char *keydata,
         keydata[0], keydata[1], keydata[2], keydata[3]);
 
   mbedtls_pk_init(&ctx);
+
   if (unlikely(ret = mbedtls_pk_parse_public_key(&ctx, keydata, keylen))) {
-    debug(D_WARNING, "pk_parse_public_key failed with code %d (-0x%04x)", ret,
-          -ret);
-    char error_buf[100];
-    mbedtls_strerror(ret, error_buf, sizeof(error_buf));
-    debug(D_WARNING, "Error details: %s", error_buf);
-    return PSYNC_INVALID_RSA;
+    debug(D_WARNING,
+          "pk_parse_public_key failed with code %d (-0x%04x); resorting to "
+          "mbedtls 1.x RSA fallback",
+          ret, -ret);
+
+    // this code comes from the mbedtls-1.3.10.patch that was applied
+    // to the vanilla version.
+    //
+    // TODO: fixme
+
+    if (ret != 0) {
+      mbedtls_pk_setup(&ctx, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
+      unsigned char *p = (unsigned char *)keydata;
+      ret = pk_get_rsapubkey(&p, p + keylen, mbedtls_pk_rsa(ctx));
+      if (ret != 0)
+        mbedtls_pk_free(&ctx);
+    }
+
+    if (ret != 0) {
+      char error_buf[100];
+      mbedtls_strerror(ret, error_buf, sizeof(error_buf));
+      debug(D_WARNING, "Error details: %s", error_buf);
+      return PSYNC_INVALID_RSA;
+    }
   }
 
   if (mbedtls_pk_get_type(&ctx) != MBEDTLS_PK_RSA) {
