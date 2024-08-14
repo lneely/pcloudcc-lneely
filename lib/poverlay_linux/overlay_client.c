@@ -26,7 +26,9 @@
   DAMAGE.
 */
 
+#include <errno.h>
 #include <netinet/in.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,7 +64,9 @@ const char *clsoc = "/tmp/pcloud_unix_soc.sock";
 int QueryState(pCloud_FileState *state, char *path) {
   int rep = 0;
   char *errm;
-  if (!SendCall(4, path /*IN*/, &rep, &errm)) {
+  size_t errm_size;
+
+  if (!SendCall(4, path /*IN*/, &rep, &errm, &errm_size)) {
     debug(D_NOTICE, "QueryState responese rep[%d] path[%s]", rep, path);
     if (errm)
       debug(D_NOTICE, "The error is %s", errm);
@@ -81,73 +85,199 @@ int QueryState(pCloud_FileState *state, char *path) {
 }
 
 int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
-             char **out /*OUT*/) {
+             char **out /*OUT*/, size_t *out_size) {
   struct sockaddr_un addr;
 
-  int fd, rc;
-  int path_size = strlen(path);
-  int mess_size = sizeof(message) + path_size + 1;
-  int bytes_writen = 0;
-  char *curbuf = NULL;
-  char *buf = NULL;
-  uint32_t bufflen = 0;
-  char sendbuf[mess_size];
-  int bytes_read = 0;
+  int result, rc;
+  uint64_t sendbytes = 0;
+  int fd = -1;
+  int sendlen = strlen(path);
+  int sendsize = sizeof(message) + sendlen + 1;
+
+  char sendbuf[sendsize];
+
+  char *recvbuf = NULL;
+  size_t recvsize = 0;
+  size_t recvbytes = 0;
+  size_t recvchunk = 32; // read response in 32-byte chunks
+
   message *rep = NULL;
+  const char *error_msg;
+
+  // init output params
+  *out = NULL;
+  *out_size = 0;
+  *ret = 0;
+  result = 0;
 
   debug(D_NOTICE, "SendCall id[%d] path[%s]\n", id, path);
 
+  // prepare socket fd
   if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-    *out = strndup("Unable to create UNIX socket", 27);
+    error_msg = "Unable to create unix socket";
+    *out = strdup(error_msg);
+    if (*out == NULL) {
+      debug(D_ERROR,
+            "on socket(): failed to allocate memory for output message");
+      *ret = -255;
+      return -255;
+    }
+    *out_size = strlen(error_msg) + 1;
     *ret = -3;
     return -3;
   }
+
+  // connect to socket
   memset(&addr, 0, sizeof(addr));
   addr.sun_family = AF_UNIX;
   strncpy(addr.sun_path, clsoc, sizeof(addr.sun_path) - 1);
-
   if (connect(fd, (struct sockaddr *)&addr, SUN_LEN(&addr)) == -1) {
-    *out = strndup("Unable to connect to UNIX socket", 32);
+    error_msg = "Unable to connect to UNIX socket";
+    *out = strdup(error_msg);
+    if (*out == NULL) {
+      debug(D_ERROR,
+            "on connect(): failed to allocate memory for output message");
+      *ret = -254;
+      return -254;
+    }
+    *out_size = strlen(error_msg) + 1;
     *ret = -4;
     return -4;
   }
 
+  debug(D_NOTICE, "SendCall: Sending message type %d, path '%s'", id, path);
+
+  // prepare and send the message to the socket
   message *mes = (message *)sendbuf;
-  memset(mes, 0, mess_size);
+  memset(mes, 0, sendsize);
   mes->type = id;
-  strncpy(mes->value, path, path_size);
-  mes->length = mess_size;
-  curbuf = (char *)mes;
-  while ((rc = write(fd, curbuf, (mes->length - bytes_writen))) > 0) {
-    bytes_writen += rc;
-    curbuf = curbuf + rc;
+  strncpy(mes->value, path, sendlen);
+  mes->length = sendsize;
+
+  char *curbuf = (char *)mes;
+  while (sendbytes < mes->length) {
+    rc = write(fd, curbuf, (mes->length - sendbytes));
+    if (rc <= 0) {
+      if (errno == EINTR)
+        continue; // try again on interrupt
+
+      sprintf((char *)error_msg, "failed to write to socket. errno: %d", errno);
+      *out = strdup(error_msg);
+      if (*out == NULL) {
+        debug(D_ERROR, "failed to allocate memory for output message");
+        *ret = -253;
+        return -253;
+      }
+      *ret = -248;
+      return -248;
+    }
+    sendbytes += rc;
   }
-  debug(D_NOTICE, "QueryState bytes send[%d]\n", bytes_writen);
-  if (bytes_writen != mes->length) {
-    *out = strndup("Communication error", 19);
-    close(fd);
+  debug(D_NOTICE, "SendCall: Sent %lu bytes", sendbytes);
+
+  if (sendbytes != mes->length) {
+    sprintf((char *)error_msg,
+            "Communication error: sendbytes=%lu, mes->length=%lu", sendbytes,
+            mes->length);
+    *out = strdup(error_msg);
+    if (*out == NULL) {
+      debug(D_ERROR, "while checking bytes_written: failed to allocate memory "
+                     "for output message");
+      *ret = -253;
+      return -253;
+    }
+    *out_size = strlen(error_msg) + 1;
     *ret = -5;
     return -5;
   }
 
-  bufflen = read_x_bytes(fd, 4, buf);
+  // read the response from the socket
+  bool received_data = false;
+  for (;;) {
+    char *new_buf = realloc(recvbuf, recvsize + recvchunk);
+    if (!new_buf) {
+      debug(D_ERROR, "failed to allocate memory to response buffer");
+      *ret = -252;
+      result = -252;
+      goto cleanup;
+    }
+    recvbuf = new_buf;
 
-  if (bufflen <= 0) {
-    debug(D_NOTICE, "Message size could not be read![%d]\n", bufflen);
-    return -6;
+    rc = read(fd, recvbuf + recvsize, recvchunk);
+    if (rc < 0) {
+      debug(D_ERROR, "failed to read from socket into response buffer");
+      *ret = -251;
+      result = -251;
+      goto cleanup;
+    }
+    if (rc == 0) {
+      break; // end of response
+    }
+    received_data = true;
+    recvsize += rc;
+    recvbytes += rc;
+    if (recvbytes >= sizeof(message)) {
+      message *rep = (message *)recvbuf;
+      if (recvbytes >= rep->length) {
+        break; // entire message read
+      }
+    }
   }
-  buf = (char *)malloc(bufflen);
-  rep = (message *)buf;
-  rep->length = bufflen;
 
-  read_x_bytes(fd, bufflen - 4, buf + 4);
+  debug(D_NOTICE, "SendCall: Received %zu bytes", recvbytes);
 
+  if (!received_data) {
+    *ret = 0;
+    *out = strdup("");
+    if (*out == NULL) {
+      debug(D_ERROR, "failed to allocate memory for empty output message");
+      *ret = -248;
+      result = -248;
+      goto cleanup;
+    }
+    *out_size = 1;
+    result = 0;
+    goto cleanup;
+  }
+
+  if (recvbytes >= sizeof(message)) {
+    message *rep = (message *)recvbuf;
+    debug(D_NOTICE, "SendCall: Received message type: %d, length: %lu",
+          rep->type, rep->length);
+    if (recvbytes >= rep->length) {
+      debug(D_NOTICE, "SendCall: Entire message content: '%s'", rep->value);
+    }
+  }
+
+  if (recvbytes < sizeof(message)) {
+    debug(D_ERROR, "got incomplete message from socket");
+    *ret = -250;
+    result = -250;
+    goto cleanup;
+  }
+
+  rep = (message *)recvbuf;
   *ret = rep->type;
-  *out = strndup(rep->value, rep->length - sizeof(message));
 
-  close(fd);
+  size_t value_size = rep->length - sizeof(message);
+  *out = malloc(value_size + 1);
+  if (!*out) {
+    debug(D_ERROR, "failed to allocate memory to output buffer");
+    *ret = -249;
+    result = -249;
+    goto cleanup;
+  }
+  memcpy(*out, rep->value, value_size);
+  (*out)[value_size] = '\0';
+  *out_size = value_size + 1;
 
-  return 0;
+cleanup:
+  if (fd != -1)
+    close(fd);
+  if (recvbuf)
+    free(recvbuf);
+
+  return result;
 }
 
 #ifdef PCLOUD_TESTING
@@ -155,6 +285,7 @@ int main(int arc, char **argv) {
   int i, j = 0;
   pCloud_FileState state;
   char *errm;
+  size_t errm_size;
 
   for (i = 1; i < arc; ++i) {
     QueryState(&state, argv[i]);
@@ -168,14 +299,13 @@ int main(int arc, char **argv) {
       printf("File %s FileStateInvalid\n", argv[i]);
     else
       printf("Not valid state returned for file %s\n", argv[i]);
-    SendCall(20, argv[i], &j, &errm);
+    SendCall(20, argv[i], &j, &errm, &errm_size);
     printf("Call 20 returned %d msg %s \n", j, errm);
-    SendCall(21, argv[i], &j, &errm);
+    SendCall(21, argv[i], &j, &errm, &errm_size);
     printf("Call 21 returned %d msg %s \n", j, errm);
-    SendCall(22, argv[i], &j, &errm);
+    SendCall(22, argv[i], &j, &errm, &errm_size);
     printf("Call 22 returned %d msg %s \n", j, errm);
-
-    SendCall(23, argv[i], &j, &errm);
+    SendCall(23, argv[i], &j, &errm, &errm_size);
     printf("Call 22 returned %d msg %s \n", j, errm);
   }
   return 0;

@@ -59,45 +59,56 @@ enum command_ids_ {
 int start_crypto(const char *pass) {
   int ret;
   char *errm;
+  size_t errm_size;
 
-  if (SendCall(STARTCRYPTO, pass, &ret, &errm)) {
+  int result = SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size);
+  if (result != 0) {
     std::cout << "Start Crypto failed. return is " << ret << " and message is "
-              << errm << std::endl;
+              << (errm ? errm : "no message") << std::endl;
   } else {
     std::cout << "Crypto started. " << std::endl;
   }
 
-  free(errm);
+  if (errm)
+    free(errm);
   return ret;
 }
 
 int stop_crypto() {
   int ret;
   char *errm;
+  size_t errm_size;
 
-  if (SendCall(STOPCRYPTO, "", &ret, &errm)) {
+  int result = SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size);
+  if (result != 0) {
     std::cout << "Stop Crypto failed. return is " << ret << " and message is "
-              << errm << std::endl;
+              << (errm ? errm : "no message") << std::endl;
   } else {
     std::cout << "Crypto Stopped. " << std::endl;
   }
 
-  free(errm);
+  if (errm)
+    free(errm);
   return ret;
 }
 
 int finalize() {
   int ret;
   char *errm;
+  size_t errm_size;
 
-  if (SendCall(FINALIZE, "", &ret, &errm)) {
-    std::cout << "Finalize failed. return is " << ret << " and message is "
-              << errm << std::endl;
+  int result = SendCall(FINALIZE, "", &ret, &errm, &errm_size);
+  if (result != 0) {
+    std::cout << "Finalize failed. return code is " << result << ", ret is "
+              << ret << ", and message is " << (errm ? errm : "no message")
+              << std::endl;
   } else {
     std::cout << "Exiting ..." << std::endl;
   }
 
-  free(errm);
+  if (errm)
+    free(errm);
+
   return ret;
 }
 
