@@ -62,7 +62,11 @@ int start_crypto(const char *pass) {
   size_t errm_size;
 
   int result = SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size);
-  if (result != 0) {
+
+  // in this case, it is not enough to check for result; the server
+  // should return (ret==0) indicating that the crypto folder was unlocked
+  // successfully.
+  if (result != 0 || ret != 0) {
     std::cout << "Start Crypto failed. return is " << ret << " and message is "
               << (errm ? errm : "no message") << std::endl;
   } else {
