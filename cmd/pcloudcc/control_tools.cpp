@@ -61,14 +61,16 @@ int start_crypto(const char *pass) {
   char *errm;
   size_t errm_size;
 
-  if (SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size)) {
+  int result = SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size);
+  if (result != 0 || ret != 0) {
     std::cout << "Start Crypto failed. return is " << ret << " and message is "
               << errm << std::endl;
   } else {
     std::cout << "Crypto started. " << std::endl;
   }
 
-  free(errm);
+  if (errm)
+    free(errm);
   return ret;
 }
 
@@ -77,14 +79,16 @@ int stop_crypto() {
   char *errm;
   size_t errm_size;
 
-  if (SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size)) {
+  int result = SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size);
+  if (result != 0 || ret != 0) {
     std::cout << "Stop Crypto failed. return is " << ret << " and message is "
               << errm << std::endl;
   } else {
     std::cout << "Crypto Stopped. " << std::endl;
   }
 
-  free(errm);
+  if (errm)
+    free(errm);
   return ret;
 }
 
