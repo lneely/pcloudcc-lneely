@@ -59,8 +59,9 @@ enum command_ids_ {
 int start_crypto(const char *pass) {
   int ret;
   char *errm;
+  size_t errm_size;
 
-  if (SendCall(STARTCRYPTO, pass, &ret, &errm)) {
+  if (SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size)) {
     std::cout << "Start Crypto failed. return is " << ret << " and message is "
               << errm << std::endl;
   } else {
@@ -74,8 +75,9 @@ int start_crypto(const char *pass) {
 int stop_crypto() {
   int ret;
   char *errm;
+  size_t errm_size;
 
-  if (SendCall(STOPCRYPTO, "", &ret, &errm)) {
+  if (SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size)) {
     std::cout << "Stop Crypto failed. return is " << ret << " and message is "
               << errm << std::endl;
   } else {
@@ -89,8 +91,9 @@ int stop_crypto() {
 int finalize() {
   int ret;
   char *errm;
+  size_t errm_size;
 
-  if (SendCall(FINALIZE, "", &ret, &errm)) {
+  if (SendCall(FINALIZE, "", &ret, &errm, &errm_size)) {
     std::cout << "Finalize failed. return is " << ret << " and message is "
               << errm << std::endl;
   } else {

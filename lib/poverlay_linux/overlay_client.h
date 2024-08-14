@@ -26,6 +26,11 @@
   DAMAGE.
 */
 
+/*
+Dependencies:
+  - stddef.h
+ */
+
 #ifndef OVERLAY_CLIENT_H
 #define OVERLAY_CLIENT_H
 
@@ -44,7 +49,7 @@ typedef enum _pCloud_FileState {
 int QueryState(pCloud_FileState *state /*OUT*/, char *path /*IN*/);
 
 int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
-             char **out /*OUT*/);
+             char **out /*OUT*/, size_t *out_size);
 #ifdef __cplusplus
 }
 #endif
