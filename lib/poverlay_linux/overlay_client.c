@@ -134,8 +134,8 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
     if (*out == NULL) {
       debug(D_ERROR,
             "on connect(): failed to allocate memory for output message");
-      *ret = -255;
-      return -255;
+      *ret = -254;
+      return -254;
     }
     *out_size = strlen(error_msg) + 1;
     *ret = -4;
@@ -155,14 +155,13 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   }
   debug(D_NOTICE, "QueryState bytes send[%d]\n", sendbytes);
   if (sendbytes != mes->length) {
-    *out = strndup("Communication error", 19);
     error_msg = "Communication error";
     *out = strdup(error_msg);
     if (*out == NULL) {
       debug(D_ERROR, "while checking bytes_written: failed to allocate memory "
                      "for output message");
-      *ret = -255;
-      return -255;
+      *ret = -253;
+      return -253;
     }
     *out_size = strlen(error_msg) + 1;
     *ret = -5;
@@ -175,15 +174,15 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
     recvbuf = realloc(recvbuf, recvsize + recvchunk);
     if (!recvbuf) {
       debug(D_ERROR, "failed to allocate memory to response buffer");
-      *ret = -255;
-      return -255;
+      *ret = -252;
+      return -252;
     }
 
     rc = read(fd, recvbuf + recvsize, recvchunk);
     if (rc < 0) {
       debug(D_ERROR, "failed to read from socket into response buffer");
-      *ret = -255;
-      return -255;
+      *ret = -251;
+      return -251;
     }
     if (rc == 0) {
       break; // end of response
@@ -201,8 +200,8 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
 
   if (recvbytes < sizeof(message)) {
     debug(D_ERROR, "got incomplete message from socket");
-    *ret = -255;
-    return -255;
+    *ret = -250;
+    return -250;
   }
 
   rep = (message *)recvbuf;
@@ -212,8 +211,8 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   *out = malloc(value_size + 1);
   if (!*out) {
     debug(D_ERROR, "failed to allocate memory to output buffer");
-    *ret = -255;
-    return -255;
+    *ret = -249;
+    return -249;
   }
   memcpy(*out, rep->value, value_size);
   (*out)[value_size] = '\0';
