@@ -101,6 +101,12 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   message *rep = NULL;
   const char *error_msg;
 
+  // init output params
+  *out = NULL;
+  *out_size = 0;
+  *ret = 0;
+  result = 0;
+
   debug(D_NOTICE, "SendCall id[%d] path[%s]\n", id, path);
 
   // prepare socket fd
@@ -111,13 +117,11 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
       debug(D_ERROR,
             "on socket(): failed to allocate memory for output message");
       *ret = -255;
-      result = -255;
-      goto cleanup;
+      return -255;
     }
     *out_size = strlen(error_msg) + 1;
     *ret = -3;
-    result = -3;
-    goto cleanup;
+    return -3;
   }
 
   // connect to socket
@@ -131,13 +135,11 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
       debug(D_ERROR,
             "on connect(): failed to allocate memory for output message");
       *ret = -255;
-      result = -255;
-      goto cleanup;
+      return -255;
     }
     *out_size = strlen(error_msg) + 1;
     *ret = -4;
-    result = -4;
-    goto cleanup;
+    return -4;
   }
 
   // prepare and send the message to the socket
@@ -160,13 +162,11 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
       debug(D_ERROR, "while checking bytes_written: failed to allocate memory "
                      "for output message");
       *ret = -255;
-      result = -255;
-      goto cleanup;
+      return -255;
     }
     *out_size = strlen(error_msg) + 1;
     *ret = -5;
-    result = -5;
-    goto cleanup;
+    return -5;
   }
 
   // read the response from the socket
@@ -176,16 +176,14 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
     if (!recvbuf) {
       debug(D_ERROR, "failed to allocate memory to response buffer");
       *ret = -255;
-      result = -255;
-      goto cleanup;
+      return -255;
     }
 
     rc = read(fd, recvbuf + recvsize, recvchunk);
     if (rc < 0) {
       debug(D_ERROR, "failed to read from socket into response buffer");
       *ret = -255;
-      result = -255;
-      goto cleanup;
+      return -255;
     }
     if (rc == 0) {
       break; // end of response
@@ -204,8 +202,7 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   if (recvbytes < sizeof(message)) {
     debug(D_ERROR, "got incomplete message from socket");
     *ret = -255;
-    result = -255;
-    goto cleanup;
+    return -255;
   }
 
   rep = (message *)recvbuf;
@@ -216,14 +213,12 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   if (!*out) {
     debug(D_ERROR, "failed to allocate memory to output buffer");
     *ret = -255;
-    result = -255;
-    goto cleanup;
+    return -255;
   }
   memcpy(*out, rep->value, value_size);
   (*out)[value_size] = '\0';
   *out_size = value_size + 1;
 
-cleanup:
   if (fd != -1)
     close(fd);
   if (recvbuf)
