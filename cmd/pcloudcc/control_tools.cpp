@@ -62,7 +62,7 @@ int start_crypto(const char *pass) {
   size_t errm_size;
 
   int result = SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size);
-  if (result != 0 || ret != 0) {
+  if (result != 0) {
     std::cout << "Start Crypto failed. return is " << ret << " and message is "
               << (errm ? errm : "no message") << std::endl;
   } else {
@@ -80,7 +80,7 @@ int stop_crypto() {
   size_t errm_size;
 
   int result = SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size);
-  if (result != 0 || ret != 0) {
+  if (result != 0) {
     std::cout << "Stop Crypto failed. return is " << ret << " and message is "
               << (errm ? errm : "no message") << std::endl;
   } else {
@@ -98,7 +98,7 @@ int finalize() {
   size_t errm_size;
 
   int result = SendCall(FINALIZE, "", &ret, &errm, &errm_size);
-  if (result != 0 || ret != 0) {
+  if (result != 0) {
     std::cout << "Finalize failed. return code is " << result << ", ret is "
               << ret << ", and message is " << (errm ? errm : "no message")
               << std::endl;

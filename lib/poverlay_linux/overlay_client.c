@@ -145,6 +145,8 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
     return -4;
   }
 
+  debug(D_NOTICE, "SendCall: Sending message type %d, path '%s'", id, path);
+
   // prepare and send the message to the socket
   message *mes = (message *)sendbuf;
   memset(mes, 0, sendsize);
@@ -171,6 +173,7 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
     }
     sendbytes += rc;
   }
+  debug(D_NOTICE, "SendCall: Sent %lu bytes", sendbytes);
 
   if (sendbytes != mes->length) {
     sprintf((char *)error_msg,
@@ -221,6 +224,8 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
     }
   }
 
+  debug(D_NOTICE, "SendCall: Received %zu bytes", recvbytes);
+
   if (!received_data) {
     *ret = 0;
     *out = strdup("");
@@ -234,6 +239,16 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
     result = 0;
     goto cleanup;
   }
+
+  if (recvbytes >= sizeof(message)) {
+    message *rep = (message *)recvbuf;
+    debug(D_NOTICE, "SendCall: Received message type: %d, length: %lu",
+          rep->type, rep->length);
+    if (recvbytes >= rep->length) {
+      debug(D_NOTICE, "SendCall: Entire message content: '%s'", rep->value);
+    }
+  }
+
   if (recvbytes < sizeof(message)) {
     debug(D_ERROR, "got incomplete message from socket");
     *ret = -250;
