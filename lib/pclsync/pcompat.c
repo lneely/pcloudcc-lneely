@@ -28,11 +28,11 @@
    DAMAGE.
 */
 
-#include <polarssl/ctr_drbg.h>
-#include <polarssl/debug.h>
-#include <polarssl/entropy.h>
-#include <polarssl/pkcs5.h>
-#include <polarssl/ssl.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/debug.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/pkcs5.h>
+#include <mbedtls/ssl.h>
 
 #include "pcompat.h"
 #include "plibs.h"
@@ -1086,9 +1086,12 @@ psync_socket *psync_socket_connect(const char *host, int unsigned port,
   psync_socket_t sock;
   char sport[8];
   psync_slprintf(sport, sizeof(sport), "%d", port);
+
   sock = connect_socket(host, sport);
-  if (unlikely_log(sock == INVALID_SOCKET))
+  if (unlikely_log(sock == INVALID_SOCKET)) {
     return NULL;
+  }
+
   if (ssl) {
     ssl = psync_ssl_connect(sock, &sslc, host);
     while (ssl == PSYNC_SSL_NEED_FINISH) {
@@ -1102,8 +1105,9 @@ psync_socket *psync_socket_connect(const char *host, int unsigned port,
       psync_close_socket(sock);
       return NULL;
     }
-  } else
+  } else {
     sslc = NULL;
+  }
   ret = psync_new(psync_socket);
   ret->ssl = sslc;
   ret->buffer = NULL;

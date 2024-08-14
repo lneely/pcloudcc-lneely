@@ -337,8 +337,6 @@ int clib::pclsync_lib::init() {
     psync_set_string_setting("fsroot", get_mount().c_str());
   }
 
-  // _tunnel  = psync_ssl_tunnel_start("127.0.0.1", 9443, "62.210.116.50", 443);
-
   isfsautostart = psync_get_bool_setting("autostartfs");
   psync_start_sync(status_change, event_handler);
 

@@ -31,11 +31,11 @@
 #define FUSE_USE_VERSION 26
 #define _FILE_OFFSET_BITS 64
 
-#include <polarssl/ctr_drbg.h>
-#include <polarssl/debug.h>
-#include <polarssl/entropy.h>
-#include <polarssl/pkcs5.h>
-#include <polarssl/ssl.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/debug.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/pkcs5.h>
+#include <mbedtls/ssl.h>
 #include <pthread.h>
 
 #include "pcloudcrypto.h"

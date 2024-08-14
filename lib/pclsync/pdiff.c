@@ -30,11 +30,12 @@
 */
 
 #include <ctype.h>
-#include <polarssl/ctr_drbg.h>
-#include <polarssl/debug.h>
-#include <polarssl/entropy.h>
-#include <polarssl/pkcs5.h>
-#include <polarssl/ssl.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/debug.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/pkcs5.h>
+#include <mbedtls/sha1.h>
+#include <mbedtls/ssl.h>
 #include <pthread.h>
 #include <stddef.h>
 
@@ -348,6 +349,7 @@ static psync_socket *get_connected_socket() {
 
     psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
     saveauth = psync_setting_get_bool(_PS(saveauth));
+
     sock = psync_api_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
 
     if (unlikely_log(!sock)) {

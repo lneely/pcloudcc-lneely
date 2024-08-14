@@ -29,11 +29,11 @@
    DAMAGE.
 */
 
-#include <polarssl/ctr_drbg.h>
-#include <polarssl/debug.h>
-#include <polarssl/entropy.h>
-#include <polarssl/pkcs5.h>
-#include <polarssl/ssl.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/debug.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/pkcs5.h>
+#include <mbedtls/ssl.h>
 #include <pthread.h>
 #include <stddef.h>
 
@@ -545,125 +545,6 @@ char *psync_local_path_for_local_file(psync_fileid_t localfileid,
   psync_free_string_list(&folderlist);
   return ret;
 }
-
-/*static int psync_add_local_path_to_list(psync_list *lst, psync_folderid_t
-folderid, psync_syncid_t syncid){ string_list *e, *le; psync_sql_res *res;
-  psync_variant *row;
-  const char *str;
-  size_t len;
-  psync_syncid_t srootfolderid;
-  res=psync_sql_query("SELECT folderid, localpath FROM syncfolder WHERE id=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  row=psync_sql_fetch_row(res);
-  if (unlikely(!row)){
-    debug(D_ERROR, "could not find sync id %lu", (long unsigned)syncid);
-    return -1;
-  }
-  srootfolderid=psync_get_number(row[0]);
-  str=psync_get_lstring(row[1], &len);
-  le=(string_list *)psync_malloc(sizeof(string_list)+len+1);
-  le->str=(char *)(le+1);
-  le->len=len;
-  memcpy(le->str, str, len+1);
-  psync_sql_free_result(res);
-  while (1){
-    if (folderid==srootfolderid){
-      psync_list_add_head(lst, &le->list);
-      return 0;
-    }
-    res=psync_sql_query("SELECT parentfolderid, name FROM folder WHERE id=?");
-    psync_sql_bind_uint(res, 1, folderid);
-    row=psync_sql_fetch_row(res);
-    if (unlikely(!row))
-      break;
-    folderid=psync_get_number(row[0]);
-    str=psync_get_lstring(row[1], &len);
-    e=(string_list *)psync_malloc(sizeof(string_list)+len+1);
-    e->str=(char *)(e+1);
-    e->len=len;
-    memcpy(e->str, str, len+1);
-    psync_list_add_head(lst, &e->list);
-    psync_sql_free_result(res);
-  }
-  psync_sql_free_result(res);
-  psync_list_add_head(lst, &le->list);
-  debug(D_ERROR, "folder %lu not found in database", (unsigned long)folderid);
-  return -1;
-}
-
-char *psync_local_path_for_remote_folder(psync_folderid_t folderid,
-psync_syncid_t syncid, size_t *retlen){ psync_list folderlist; char *ret; int
-res; psync_list_init(&folderlist); psync_sql_lock();
-  res=psync_add_local_path_to_list(&folderlist, folderid, syncid);
-  psync_sql_unlock();
-  if (unlikely(res)){
-    psync_free_string_list(&folderlist);
-    return PSYNC_INVALID_PATH;
-  }
-  ret=psync_join_string_list(PSYNC_DIRECTORY_SEPARATOR, &folderlist, retlen);
-  psync_free_string_list(&folderlist);
-  return ret;
-}
-
-char *psync_local_path_for_remote_file(psync_fileid_t fileid, psync_syncid_t
-syncid, size_t *retlen){ psync_list folderlist; char *ret; psync_sql_res *res;
-  psync_variant *row;
-  string_list *e;
-  const char *str;
-  psync_folderid_t folderid;
-  size_t len;
-  psync_list_init(&folderlist);
-  psync_sql_lock();
-  res=psync_sql_query("SELECT parentfolderid, name FROM file WHERE id=?");
-  psync_sql_bind_uint(res, 1, fileid);
-  row=psync_sql_fetch_row(res);
-  if (unlikely(!row)){
-    psync_sql_free_result(res);
-    psync_sql_unlock();
-    return PSYNC_INVALID_PATH;
-  }
-  folderid=psync_get_number(row[0]);
-  str=psync_get_lstring(row[1], &len);
-  e=(string_list *)psync_malloc(sizeof(string_list)+len+1);
-  e->str=(char *)(e+1);
-  e->len=len;
-  memcpy(e->str, str, len+1);
-  psync_list_add_head(&folderlist, &e->list);
-  psync_sql_free_result(res);
-  if (unlikely(psync_add_local_path_to_list(&folderlist, folderid, syncid))){
-    psync_sql_unlock();
-    psync_free_string_list(&folderlist);
-    return PSYNC_INVALID_PATH;
-  }
-  psync_sql_unlock();
-  ret=psync_join_string_list(PSYNC_DIRECTORY_SEPARATOR, &folderlist, retlen);
-  psync_free_string_list(&folderlist);
-  return ret;
-}
-
-char *psync_local_path_for_remote_file_or_folder_by_name(psync_folderid_t
-parentfolderid, const char *filename, psync_syncid_t syncid, size_t *retlen){
-  psync_list folderlist;
-  char *ret;
-  string_list *e;
-  size_t len;
-  psync_list_init(&folderlist);
-  len=strlen(filename);
-  e=(string_list *)psync_malloc(sizeof(string_list)+len+1);
-  e->str=(char *)(e+1);
-  e->len=len;
-  memcpy(e->str, filename, len+1);
-  psync_list_add_head(&folderlist, &e->list);
-  psync_sql_lock();
-  if (unlikely(psync_add_local_path_to_list(&folderlist, parentfolderid,
-syncid))){ psync_sql_unlock(); psync_free_string_list(&folderlist); return
-PSYNC_INVALID_PATH;
-  }
-  psync_sql_unlock();
-  ret=psync_join_string_list(PSYNC_DIRECTORY_SEPARATOR, &folderlist, retlen);
-  psync_free_string_list(&folderlist);
-  return ret;
-}*/
 
 static folder_list *folder_list_init() {
   folder_list *list;

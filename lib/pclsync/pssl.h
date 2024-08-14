@@ -33,11 +33,11 @@
   Dependencies:
   - pcompat.h
   - pcompiler.h
-  - <polarssl/aes.h>
-  - <polarssl/rsa.h>
-  - <polarssl/sha1.h>
-  - <polarssl/sha256.h>
-  - <polarssl/sha512.h>
+  - <mbedtls/aes.h>
+  - <mbedtls/rsa.h>
+  - <mbedtls/mbedtls_sha1.h>
+  - <mbedtls/mbedtls_sha256.h>
+  - <mbedtls/mbedtls_sha512.h>
 */
 
 #ifndef _PSYNC_SSL_H
@@ -52,47 +52,51 @@
 #define PSYNC_SHA1_BLOCK_LEN 64
 #define PSYNC_SHA1_DIGEST_LEN 20
 #define PSYNC_SHA1_DIGEST_HEXLEN 40
-#define psync_sha1_ctx sha1_context
-#define psync_sha1(data, datalen, checksum) sha1(data, datalen, checksum)
-#define psync_sha1_init(pctx) sha1_starts(pctx)
+#define psync_sha1_ctx mbedtls_sha1_context
+#define psync_sha1(data, datalen, checksum)                                    \
+  mbedtls_sha1(data, datalen, checksum)
+#define psync_sha1_init(pctx) mbedtls_sha1_starts(pctx)
 #define psync_sha1_update(pctx, data, datalen)                                 \
-  sha1_update(pctx, (const unsigned char *)data, datalen)
-#define psync_sha1_final(checksum, pctx) sha1_finish(pctx, checksum)
+  mbedtls_sha1_update(pctx, (const unsigned char *)data, datalen)
+#define psync_sha1_final(checksum, pctx) mbedtls_sha1_finish(pctx, checksum)
 
 #define PSYNC_SHA256_BLOCK_LEN 64
 #define PSYNC_SHA256_DIGEST_LEN 32
 #define PSYNC_SHA256_DIGEST_HEXLEN 64
-#define psync_sha256_ctx sha256_context
-#define psync_sha256(data, datalen, checksum) sha256(data, datalen, checksum, 0)
-#define psync_sha256_init(pctx) sha256_starts(pctx, 0)
+#define psync_sha256_ctx mbedtls_sha256_context
+#define psync_sha256(data, datalen, checksum)                                  \
+  mbedtls_sha256(data, datalen, checksum, 0)
+#define psync_sha256_init(pctx) mbedtls_sha256_starts(pctx, 0)
 #define psync_sha256_update(pctx, data, datalen)                               \
-  sha256_update(pctx, (const unsigned char *)data, datalen)
-#define psync_sha256_final(checksum, pctx) sha256_finish(pctx, checksum)
+  mbedtls_sha256_update(pctx, (const unsigned char *)data, datalen)
+#define psync_sha256_final(checksum, pctx) mbedtls_sha256_finish(pctx, checksum)
 
 #define PSYNC_SHA512_BLOCK_LEN 128
 #define PSYNC_SHA512_DIGEST_LEN 64
 #define PSYNC_SHA512_DIGEST_HEXLEN 128
-#define psync_sha512_ctx sha512_context
-#define psync_sha512(data, datalen, checksum) sha512(data, datalen, checksum, 0)
-#define psync_sha512_init(pctx) sha512_starts(pctx, 0)
+#define psync_sha512_ctx mbedtls_sha512_context
+#define psync_sha512(data, datalen, checksum)                                  \
+  mbedtls_sha512(data, datalen, checksum, 0)
+#define psync_sha512_init(pctx) mbedtls_sha512_starts(pctx, 0)
 #define psync_sha512_update(pctx, data, datalen)                               \
-  sha512_update(pctx, (const unsigned char *)data, datalen)
-#define psync_sha512_final(checksum, pctx) sha512_finish(pctx, checksum)
+  mbedtls_sha512_update(pctx, (const unsigned char *)data, datalen)
+#define psync_sha512_final(checksum, pctx) mbedtls_sha512_finish(pctx, checksum)
 
-typedef rsa_context *psync_rsa_t;
-typedef rsa_context *psync_rsa_publickey_t;
-typedef rsa_context *psync_rsa_privatekey_t;
+typedef mbedtls_rsa_context *psync_rsa_t;
+typedef mbedtls_rsa_context *psync_rsa_publickey_t;
+typedef mbedtls_rsa_context *psync_rsa_privatekey_t;
 
 typedef struct {
   size_t keylen;
   unsigned char key[];
 } psync_symmetric_key_struct_t, *psync_symmetric_key_t;
 
-typedef aes_context *psync_aes256_encoder;
-typedef aes_context *psync_aes256_decoder;
+typedef mbedtls_aes_context *psync_aes256_encoder;
+typedef mbedtls_aes_context *psync_aes256_decoder;
 
-typedef void (*psync_ssl_debug_callback_t)(void *ctx, int level,
-                                           const char *message);
+// ctx, level, message, ???, ???
+typedef void (*psync_ssl_debug_callback_t)(void *, int, const char *, int,
+                                           const char *);
 void psync_ssl_set_log_threshold(int threshold);
 void psync_ssl_set_debug_callback(psync_ssl_debug_callback_t cb, void *ctx);
 
@@ -133,7 +137,7 @@ static inline void psync_aes256_encode_block(psync_aes256_encoder enc,
   if (likely(psync_ssl_hw_aes))
     psync_aes256_encode_block_hw(enc, src, dst);
   else
-    aes_crypt_ecb(enc, AES_ENCRYPT, src, dst);
+    mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
 }
 
 static inline void psync_aes256_decode_block(psync_aes256_decoder enc,
@@ -142,7 +146,7 @@ static inline void psync_aes256_decode_block(psync_aes256_decoder enc,
   if (likely(psync_ssl_hw_aes))
     psync_aes256_decode_block_hw(enc, src, dst);
   else
-    aes_crypt_ecb(enc, AES_DECRYPT, src, dst);
+    mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
 }
 
 static inline void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc,
@@ -151,9 +155,10 @@ static inline void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc,
   if (likely(psync_ssl_hw_aes))
     psync_aes256_encode_2blocks_consec_hw(enc, src, dst);
   else {
-    aes_crypt_ecb(enc, AES_ENCRYPT, src, dst);
-    aes_crypt_ecb(enc, AES_ENCRYPT, src + PSYNC_AES256_BLOCK_SIZE,
-                  dst + PSYNC_AES256_BLOCK_SIZE);
+    mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
+    mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT,
+                          src + PSYNC_AES256_BLOCK_SIZE,
+                          dst + PSYNC_AES256_BLOCK_SIZE);
   }
 }
 
@@ -163,9 +168,10 @@ static inline void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc,
   if (likely(psync_ssl_hw_aes))
     psync_aes256_decode_2blocks_consec_hw(enc, src, dst);
   else {
-    aes_crypt_ecb(enc, AES_DECRYPT, src, dst);
-    aes_crypt_ecb(enc, AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
-                  dst + PSYNC_AES256_BLOCK_SIZE);
+    mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
+    mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT,
+                          src + PSYNC_AES256_BLOCK_SIZE,
+                          dst + PSYNC_AES256_BLOCK_SIZE);
   }
 }
 
@@ -183,42 +189,44 @@ static inline void psync_aes256_decode_4blocks_consec_xor(
 static inline void psync_aes256_encode_block(psync_aes256_encoder enc,
                                              const unsigned char *src,
                                              unsigned char *dst) {
-  aes_crypt_ecb(enc, AES_ENCRYPT, src, dst);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
 }
 
 static inline void psync_aes256_decode_block(psync_aes256_decoder enc,
                                              const unsigned char *src,
                                              unsigned char *dst) {
-  aes_crypt_ecb(enc, AES_DECRYPT, src, dst);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
 }
 
 static inline void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc,
                                                       const unsigned char *src,
                                                       unsigned char *dst) {
-  aes_crypt_ecb(enc, AES_ENCRYPT, src, dst);
-  aes_crypt_ecb(enc, AES_ENCRYPT, src + PSYNC_AES256_BLOCK_SIZE,
-                dst + PSYNC_AES256_BLOCK_SIZE);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                        dst + PSYNC_AES256_BLOCK_SIZE);
 }
 
 static inline void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc,
                                                       const unsigned char *src,
                                                       unsigned char *dst) {
-  aes_crypt_ecb(enc, AES_DECRYPT, src, dst);
-  aes_crypt_ecb(enc, AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
-                dst + PSYNC_AES256_BLOCK_SIZE);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                        dst + PSYNC_AES256_BLOCK_SIZE);
 }
 
 static inline void psync_aes256_decode_4blocks_consec_xor(
     psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst,
     unsigned char *bxor) {
   unsigned long i;
-  aes_crypt_ecb(enc, AES_DECRYPT, src, dst);
-  aes_crypt_ecb(enc, AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
-                dst + PSYNC_AES256_BLOCK_SIZE);
-  aes_crypt_ecb(enc, AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE * 2,
-                dst + PSYNC_AES256_BLOCK_SIZE * 2);
-  aes_crypt_ecb(enc, AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE * 3,
-                dst + PSYNC_AES256_BLOCK_SIZE * 3);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                        dst + PSYNC_AES256_BLOCK_SIZE);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT,
+                        src + PSYNC_AES256_BLOCK_SIZE * 2,
+                        dst + PSYNC_AES256_BLOCK_SIZE * 2);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT,
+                        src + PSYNC_AES256_BLOCK_SIZE * 3,
+                        dst + PSYNC_AES256_BLOCK_SIZE * 3);
   for (i = 0; i < PSYNC_AES256_BLOCK_SIZE * 4 / sizeof(unsigned long); i++)
     ((unsigned long *)dst)[i] ^= ((unsigned long *)bxor)[i];
 }
