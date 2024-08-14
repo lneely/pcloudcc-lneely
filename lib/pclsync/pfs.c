@@ -3576,7 +3576,9 @@ static char is_fuse3_installed_on_system() {
   char output[1024];
   memset(output, 0, sizeof(output));
 
-  fgets(output, sizeof(output), pipe);
+  if (fgets(output, sizeof(output), pipe) != NULL) {
+    return 0;
+  }
 
   pclose(pipe);
   size_t outlen = strlen(output);
