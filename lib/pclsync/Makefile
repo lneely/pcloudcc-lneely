@@ -9,7 +9,7 @@ CFLAGS=-Werror -O2 -g -fno-stack-protector -fomit-frame-pointer -I../sqlite -fPI
 LIB_A=psynclib.a
 UNAME_S := $(shell uname -s)
 UNAME_V := $(shell uname -v)
-CFLAGS += -DP_OS_LINUX -D_FILE_OFFSET_BITS=64 -DP_SSL_MBEDTLS -I../mbedtls-1.3.10/include -I ../mbedtls-2.1.14/include
+CFLAGS += -DP_OS_LINUX -D_FILE_OFFSET_BITS=64 -DP_SSL_MBEDTLS -I ../mbedtls-2.1.14/include
 LDFLAGS += -lssl -lcrypto -lfuse -lpthread -lsqlite3 -lzlib
 
 OBJ=pcompat.o psynclib.o plocks.o plibs.o pcallbacks.o pdiff.o pstatus.o papi.o ptimer.o\

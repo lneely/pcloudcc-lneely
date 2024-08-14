@@ -33,6 +33,7 @@
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
+#include <mbedtls/error.h>
 #include <mbedtls/md.h>
 #include <mbedtls/net.h>
 #include <mbedtls/pkcs5.h>
@@ -620,16 +621,32 @@ psync_rsa_publickey_t psync_ssl_rsa_load_public(const unsigned char *keydata,
   mbedtls_pk_context ctx;
   mbedtls_rsa_context *rsa;
   int ret;
+
+  debug(D_NOTICE, "Public key data (first 16 bytes): %02x %02x %02x %02x ...",
+        keydata[0], keydata[1], keydata[2], keydata[3]);
+
   mbedtls_pk_init(&ctx);
   if (unlikely(ret = mbedtls_pk_parse_public_key(&ctx, keydata, keylen))) {
-    debug(D_WARNING, "pk_parse_public_key failed with code %d", ret);
+    debug(D_WARNING, "pk_parse_public_key failed with code %d (-0x%04x)", ret,
+          -ret);
+    char error_buf[100];
+    mbedtls_strerror(ret, error_buf, sizeof(error_buf));
+    debug(D_WARNING, "Error details: %s", error_buf);
     return PSYNC_INVALID_RSA;
   }
+
+  if (mbedtls_pk_get_type(&ctx) != MBEDTLS_PK_RSA) {
+    debug(D_WARNING, "Parsed key is not RSA");
+    mbedtls_pk_free(&ctx);
+    return PSYNC_INVALID_RSA;
+  }
+
   rsa = psync_new(mbedtls_rsa_context);
   mbedtls_rsa_init(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
   ret = mbedtls_rsa_copy(rsa, mbedtls_pk_rsa(ctx));
   mbedtls_pk_free(&ctx);
   if (unlikely(ret)) {
+    debug(D_WARNING, "rsa_copy failed with code %d", ret);
     mbedtls_rsa_free(rsa);
     psync_free(rsa);
     return PSYNC_INVALID_RSA;

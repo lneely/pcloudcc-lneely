@@ -38,15 +38,16 @@ add_library(pcloudcc_lib SHARED ${CMD_PATH}/pclsync_lib_c.cpp ${CMD_PATH}/pclsyn
 
 target_link_libraries(pcloudcc_lib
 	${PCLSYNC_PATH}/psynclib.a
-	${MBEDTLS2_PATH}/build/library/libmbedcrypto.a		
-	${MBEDTLS2_PATH}/build/library/libmbedx509.a				
-	${MBEDTLS2_PATH}/build/library/libmbedtls.a		
 	fuse
 	pthread
 	sqlite3
 	z
 	dl
-	udev)
+	udev
+	${MBEDTLS2_PATH}/build/library/libmbedtls.a
+	${MBEDTLS2_PATH}/build/library/libmbedx509.a
+	${MBEDTLS2_PATH}/build/library/libmbedcrypto.a
+)
 
 add_executable(pcloudcc ${CMD_PATH}/main.cpp)
 
