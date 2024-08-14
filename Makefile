@@ -1,9 +1,9 @@
 all:
 	make -C ./lib/pclsync fs
-	cmake -H./lib/mbedtls -B./lib/mbedtls/build
+	cmake -DCMAKE_BUILD_TYPE=Debug -H./lib/mbedtls -B./lib/mbedtls/build
 	make -C ./lib/mbedtls/build
 	mkdir -p ./cmd/pcloudcc/build
-	cmake -H. -B./cmd/pcloudcc/build
+	cmake -DCMAKE_BUILD_TYPE=Debug -H. -B./cmd/pcloudcc/build
 	make -C ./cmd/pcloudcc/build
 
 clean:
