@@ -14,7 +14,6 @@ clean:
 	rm -rf ./cmd/pcloudcc/build
 
 install:
-	install -d $(DESTDIR)/{bin,lib}
 	install -m 755 cmd/pcloudcc/build/pcloudcc $(DESTDIR)/bin/pcloudcc
 	install -m 755 cmd/pcloudcc/build/libpcloudcc_lib.so $(DESTDIR)/lib/libpcloudcc_lib.so
 
