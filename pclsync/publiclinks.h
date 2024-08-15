@@ -82,7 +82,7 @@ plink_contents_t *do_show_link(const char *code, char **err /*OUT*/);
 
 void cache_links_all();
 int cache_upload_links(char **err /*OUT*/);
-int cache_links(char **err /*OUT*/);
+int cache_links(char *err, size_t err_size /*OUT*/);
 
 int do_delete_all_folder_links(psync_folderid_t folderid, char **err);
 int do_delete_all_file_links(psync_fileid_t fileid, char **err);

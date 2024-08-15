@@ -553,7 +553,7 @@ int64_t do_psync_tree_public_link(const char *linkname, const char *root,
   return result;
 }
 
-int cache_links(char **err /*OUT*/) {
+int cache_links(char *err, size_t err_size /*OUT*/) {
   psync_socket *api;
   binresult *bres;
   uint64_t result;
@@ -566,7 +566,6 @@ int cache_links(char **err /*OUT*/) {
   q = psync_sql_prep_statement("DELETE FROM links WHERE isincomming = 0 ");
   psync_sql_run_free(q);
 
-  *err = 0;
   if (psync_my_auth[0]) {
     binparam params[] = {P_STR("auth", psync_my_auth),
                          P_STR("timeformat", "timestamp"),
@@ -574,7 +573,8 @@ int cache_links(char **err /*OUT*/) {
     api = psync_apipool_get();
     if (unlikely(!api)) {
       debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
-      *err = psync_strndup("Connection error.", 17);
+      //*err = psync_strndup("Connection error.", 17);
+      snprintf(err, err_size, "Connection error.");
       return -2;
     }
     bres = send_command(api, "listpublinks", params);
@@ -586,31 +586,39 @@ int cache_links(char **err /*OUT*/) {
     api = psync_apipool_get();
     if (unlikely(!api)) {
       debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
-      *err = psync_strndup("Connection error.", 17);
+      //*err = psync_strndup("Connection error.", 17);
+      snprintf(err, err_size, "Connection error.");
       return -2;
     }
     bres = send_command(api, "listpublinks", params);
-  } else
+  } else {
     return -1;
+  }
+
   if (likely(bres))
     psync_apipool_release(api);
   else {
     psync_apipool_release_bad(api);
     debug(D_WARNING, "Send command returned in valid result.\n");
-    *err = psync_strndup("Connection error.", 17);
+    //*err = psync_strndup("Connection error.", 17);
+    snprintf(err, err_size, "Connection error.");
+    psync_free(bres);
     return 0;
   }
   result = psync_find_result(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
     errorret = psync_find_result(bres, "error", PARAM_STR)->str;
-    *err = psync_strndup(errorret, strlen(errorret));
+    //*err = psync_strndup(errorret, strlen(errorret));
+    snprintf(err, err_size, "%s", errorret);
     debug(D_WARNING, "command listpublinks returned error code %u",
           (unsigned)result);
     psync_process_api_error(result);
+    psync_free(bres);
     if (psync_handle_api_result(result) == PSYNC_NET_TEMPFAIL)
       return -result;
     else {
-      *err = psync_strndup("Connection error.", 17);
+      //*err = psync_strndup("Connection error.", 17);
+      snprintf(err, err_size, "Connection error.");
       return 0;
     }
   }
@@ -700,6 +708,8 @@ int cache_links(char **err /*OUT*/) {
 
     psync_sql_run_free(q);
   }
+
+  psync_free(bres);
   return linkscnt;
 }
 
@@ -1299,7 +1309,7 @@ void cache_links_all() {
 
   ret = cache_upload_links(&err);
   if (ret >= 0)
-    ret += cache_links(&err);
+    ret += cache_links(err, 256);
 
   if (ret < 0) {
     if (err) {
@@ -1308,6 +1318,8 @@ void cache_links_all() {
       psync_free(err);
     }
   }
+  if (err)
+    psync_free(err);
 }
 
 int do_delete_all_links(int64_t folderid, int64_t fileid, char **err) {

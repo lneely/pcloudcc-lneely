@@ -270,8 +270,9 @@ int check_user_relocated(uint64_t luserid, psync_socket *sock) {
     id = userids->array[i];
     userid = psync_find_result(id, "userid", PARAM_NUM)->num;
     lid = psync_find_result(id, "locationid", PARAM_NUM)->num;
-    if (luserid == userid && lid == clid)
+    if (luserid == userid && lid == clid) {
       return 1;
+    }
   }
   return 0;
 }
@@ -774,6 +775,7 @@ static psync_socket *get_connected_socket() {
       psync_sql_sync();
     }
 
+    psync_free(chrUserid);
     psync_free(auth);
     psync_free(user);
     psync_free(pass);
@@ -2531,8 +2533,7 @@ static void process_modifyaccountinfo(const binresult *entry) {
       psync_find_result(res, "cryptosetup", PARAM_BOOL)->num);
 }
 
-#define FN(n)                                                                  \
-  { process_##n, #n, sizeof(#n) - 1, 0 }
+#define FN(n) {process_##n, #n, sizeof(#n) - 1, 0}
 
 static struct {
   void (*process)(const binresult *);
@@ -3132,7 +3133,7 @@ restart:
           psync_notifications_notify(res);
         } else if (entries->length == 8 && !strcmp(entries->str, "publinks")) {
           ids.publinkid = psync_find_result(res, "publinkid", PARAM_NUM)->num;
-          ret = cache_links(&err);
+          ret = cache_links(err, 256);
           if (ret < 0)
             debug(D_ERROR, "Cacheing links faild with err %s", err);
           else
@@ -3167,6 +3168,7 @@ restart:
         debug(D_NOTICE, "got no from, did we send a nop recently?");
       }
     }
+    psync_free(res);
   }
   psync_socket_close(sock);
   psync_pipe_close(exceptionsock);
