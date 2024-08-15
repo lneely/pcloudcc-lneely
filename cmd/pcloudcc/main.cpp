@@ -38,7 +38,9 @@
 namespace po = boost::program_options;
 namespace ct = control_tools;
 namespace cc = console_client;
-static std::string version = "2.0.1";
+
+// TODO: a proper version string might be useful for debugging
+static std::string version = "git";
 
 int main(int argc, char **argv) {
   std::cout << "pCloud console client v." << version << std::endl;

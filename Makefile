@@ -11,4 +11,10 @@ clean:
 	rm -rf lib/mbedtls-2.1.14/build
 	rm -rf ./cmd/pcloudcc/build
 
+install:
+	install -m 755 cmd/pcloudcc/build/pcloudcc /usr/bin/pcloudcc
+	install -m 755 cmd/pcloudcc/build/libpcloudcc_lib.so /usr/lib/libpcloudcc_lib.so
 
+uninstall:
+	rm /usr/bin/pcloudcc
+	rm /usr/lib/pcloudcc_lib.so
