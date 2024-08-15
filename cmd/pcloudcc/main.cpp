@@ -40,10 +40,10 @@ namespace ct = control_tools;
 namespace cc = console_client;
 
 // TODO: a proper version string might be useful for debugging
-static std::string version = "git";
+static std::string version = "git-lneely";
 
 int main(int argc, char **argv) {
-  std::cout << "pCloud console client v." << version << std::endl;
+  std::cout << "pCloud console client (" << version << ")" << std::endl;
   std::string username;
   std::string password;
   bool daemon = false;

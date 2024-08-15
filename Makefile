@@ -16,5 +16,5 @@ install:
 	install -m 755 cmd/pcloudcc/build/libpcloudcc_lib.so /usr/lib/libpcloudcc_lib.so
 
 uninstall:
-	rm /usr/bin/pcloudcc
-	rm /usr/lib/pcloudcc_lib.so
+	rm -f /usr/bin/pcloudcc
+	rm -f /usr/lib/libpcloudcc_lib.so
