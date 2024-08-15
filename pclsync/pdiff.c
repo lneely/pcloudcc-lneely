@@ -3133,7 +3133,7 @@ restart:
           psync_notifications_notify(res);
         } else if (entries->length == 8 && !strcmp(entries->str, "publinks")) {
           ids.publinkid = psync_find_result(res, "publinkid", PARAM_NUM)->num;
-          ret = cache_links(&err);
+          ret = cache_links(err, 256);
           if (ret < 0)
             debug(D_ERROR, "Cacheing links faild with err %s", err);
           else
