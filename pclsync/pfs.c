@@ -3482,6 +3482,7 @@ static void psync_fs_do_stop(void) {
 #if IS_DEBUG
     psync_fs_dump_internals();
 #endif
+    psync_free(mp);
   }
   pthread_mutex_unlock(&start_mutex);
 }
