@@ -1,22 +1,19 @@
-CFLAGS=-Wall -O2 -g -fsanitize=address -fPIC -I./pclsync -I./poverlay_linux
-LDFLAGS=-l:./libpcloudcc_lib.so -lboost_program_options
-LIBSRC=control_tools.cpp pclsync_lib_c.cpp pclsync_lib.cpp
+CFLAGS=-fPIC -Wall -O2 -g -fsanitize=address -I./pclsync -I./poverlay_linux -I/usr/include -I/usr/include/mbedtls2
+LDFLAGS=-lboost_program_options -lssl -lcrypto -lfuse -lpthread -ludev -lsqlite3 -lz -l:libmbedtls.so.14 -l:libmbedx509.so.1 -l:libmbedcrypto.so.7 
+CMDSRC=control_tools.cpp pclsync_lib_c.cpp pclsync_lib.cpp main.cpp
 DESTDIR=/usr/local
+LIBSRC=$(wildcard pclsync/*.c poverlay_linux/*.c)
+LIBOBJ = $(LIBOBJ:%.c=%.o)
 
-all: 
-	make -C ./pclsync fs
-	make -C ./poverlay_linux all
-	make libpcloudcc_lib.so pcloudcc
+all: libpcloudcc_lib.so pcloudcc
 
-libpcloudcc_lib.so: 
-	g++ -shared $(CFLAGS) $(LIBSRC) -o libpcloudcc_lib.so
+libpcloudcc_lib.so: $(LIBSRC)
+	gcc -o $@ -shared $(CFLAGS) $(LDFLAGS) $(LIBSRC)
 
-pcloudcc:
-	g++ $(CFLAGS) $(LDFLAGS) main.cpp -o pcloudcc
+pcloudcc: $(CMDSRC)
+	g++ -o $@ $(CFLAGS) $(LDFLAGS) -L. -lpcloudcc_lib $(CMDSRC)
 
 clean:
-	make -C ./pclsync clean
-	make -C ./poverlay_linux clean
 	rm -f *.o a.out libpcloudcc_lib.so pcloudcc
 
 install:

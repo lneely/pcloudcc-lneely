@@ -264,35 +264,3 @@ cleanup:
 
   return result;
 }
-
-#ifdef PCLOUD_TESTING
-int main(int arc, char **argv) {
-  int i, j = 0;
-  pCloud_FileState state;
-  char *errm;
-  size_t errm_size;
-
-  for (i = 1; i < arc; ++i) {
-    QueryState(&state, argv[i]);
-    if (state == FileStateInSync)
-      printf("File %s FileStateInSync\n", argv[i]);
-    else if (state == FileStateNoSync)
-      printf("File %s FileStateNoSync\n", argv[i]);
-    else if (state == FileStateInProgress)
-      printf("File %s FileStateInProgress\n", argv[i]);
-    else if (state == FileStateInvalid)
-      printf("File %s FileStateInvalid\n", argv[i]);
-    else
-      printf("Not valid state returned for file %s\n", argv[i]);
-    SendCall(20, argv[i], &j, &errm, &errm_size);
-    printf("Call 20 returned %d msg %s \n", j, errm);
-    SendCall(21, argv[i], &j, &errm, &errm_size);
-    printf("Call 21 returned %d msg %s \n", j, errm);
-    SendCall(22, argv[i], &j, &errm, &errm_size);
-    printf("Call 22 returned %d msg %s \n", j, errm);
-    SendCall(23, argv[i], &j, &errm, &errm_size);
-    printf("Call 22 returned %d msg %s \n", j, errm);
-  }
-  return 0;
-}
-#endif

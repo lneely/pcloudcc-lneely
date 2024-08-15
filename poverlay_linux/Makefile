@@ -1,7 +1,7 @@
 CC=cc
 USESSL=mbed
 
-CFLAGS=-Wall -Wpointer-arith -O2 -g -fsanitize=address 
+CFLAGS=-Wall -Wpointer-arith -O2 -g -fsanitize=address -fPIC
 #CFLAGS=-Wall -Wpointer-arith -O2 -g -fno-stack-protector -fomit-frame-pointer -DPCLOUD_TESTING
 
 UNAME_S := $(shell uname -s)
