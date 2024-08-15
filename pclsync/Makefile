@@ -4,7 +4,7 @@ RANLIB=ranlib
 #USESSL=openssl
 USESSL=mbed
 
-CFLAGS=-Werror -O2 -g -fno-stack-protector -fomit-frame-pointer -fPIC
+CFLAGS=-Wall -O2 -g -fno-stack-protector -fomit-frame-pointer -fPIC
 
 LIB_A=psynclib.a
 UNAME_S := $(shell uname -s)
