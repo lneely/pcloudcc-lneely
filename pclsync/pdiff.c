@@ -3168,6 +3168,7 @@ restart:
         debug(D_NOTICE, "got no from, did we send a nop recently?");
       }
     }
+    psync_free(res);
   }
   psync_socket_close(sock);
   psync_pipe_close(exceptionsock);
