@@ -1,21 +1,24 @@
-DESTDIR=/usr
+CFLAGS=-fPIC -Wall -O2 -g -fsanitize=address -I./pclsync -I./poverlay_linux -I/usr/include -I/usr/include/mbedtls2
+LDFLAGS=-lboost_program_options -lssl -lcrypto -lfuse -lpthread -ludev -lsqlite3 -lz -l:libmbedtls.so.14 -l:libmbedx509.so.1 -l:libmbedcrypto.so.7 
+CMDSRC=control_tools.cpp pclsync_lib_c.cpp pclsync_lib.cpp main.cpp
+DESTDIR=/usr/local
+LIBSRC=$(wildcard pclsync/*.c poverlay_linux/*.c)
+LIBOBJ = $(LIBOBJ:%.c=%.o)
 
-all:
-	make -C ./lib/pclsync fs
-	cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_PROGRAMS=OFF -DENABLE_TESTING=OFF -H./lib/mbedtls-2.1.14 -B./lib/mbedtls-2.1.14/build
-	make -C ./lib/mbedtls-2.1.14/build
-	mkdir -p ./cmd/pcloudcc/build
-	cmake -DCMAKE_BUILD_TYPE=Debug -H. -B./cmd/pcloudcc/build
-	make -C ./cmd/pcloudcc/build
+all: libpcloudcc_lib.so pcloudcc
+
+libpcloudcc_lib.so: $(LIBSRC)
+	gcc -o $@ -shared $(CFLAGS) $(LDFLAGS) $(LIBSRC)
+
+pcloudcc: $(CMDSRC)
+	g++ -o $@ $(CFLAGS) $(LDFLAGS) -L. -lpcloudcc_lib $(CMDSRC)
 
 clean:
-	make -C lib/pclsync clean
-	rm -rf lib/mbedtls-2.1.14/build
-	rm -rf ./cmd/pcloudcc/build
+	rm -f *.o a.out libpcloudcc_lib.so pcloudcc
 
 install:
-	install -m 755 cmd/pcloudcc/build/pcloudcc $(DESTDIR)/bin/pcloudcc
-	install -m 755 cmd/pcloudcc/build/libpcloudcc_lib.so $(DESTDIR)/lib/libpcloudcc_lib.so
+	install -m 755 pcloudcc $(DESTDIR)/bin/pcloudcc
+	install -m 755 libpcloudcc_lib.so $(DESTDIR)/lib/libpcloudcc_lib.so
 
 uninstall:
 	rm -f $(DESTDIR)/bin/pcloudcc

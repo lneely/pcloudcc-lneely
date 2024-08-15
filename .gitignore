@@ -19,3 +19,4 @@ compile_commands.json
 /cmd/pcloudcc/build/
 /.cache/
 /lib/poverlay_linux/overlay_client
+pcloudcc
