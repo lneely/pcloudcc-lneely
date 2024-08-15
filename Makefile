@@ -1,5 +1,5 @@
 CFLAGS=-Wall -O2 -g -fsanitize=address -fPIC -I./pclsync -I./poverlay_linux
-LDFLAGS=-l:libpcloudcc_lib.so -lboost_program_options
+LDFLAGS=-l:./libpcloudcc_lib.so -lboost_program_options
 LIBSRC=control_tools.cpp pclsync_lib_c.cpp pclsync_lib.cpp
 DESTDIR=/usr/local
 
