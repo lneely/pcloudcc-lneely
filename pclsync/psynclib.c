@@ -30,6 +30,7 @@
 */
 
 #include <ctype.h>
+#include <execinfo.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
@@ -79,6 +80,8 @@
 #include <ctype.h>
 #include <stddef.h>
 #include <string.h>
+
+#define BUGHUNT 0
 
 // Variable containing UNIX time of the last backup file deleted event
 time_t lastBupDelEventTime = 0;
@@ -135,13 +138,25 @@ PSYNC_NOINLINE void *psync_emergency_malloc(size_t size) {
 }
 
 void *psync_malloc(size_t size) {
-  void *ret;
-  ret = psync_real_malloc(size);
-  if (likely(ret))
+  void *ptr;
+#if 1 == BUGHUNT
+  void *callstack[128];
+  int frames = backtrace(callstack, 128);
+  char **strs = backtrace_symbols(callstack, frames);
+#endif
+  ptr = psync_real_malloc(size);
+#if 1 == BUGHUNT
+  printf("Allocated %zu bytes at %p\n", size, ptr);
+  for (int i = 0; i < frames; i++) {
+    printf("%s\n", strs[i]);
+  }
+  free(strs);
+#endif
+  if (likely(ptr))
 #if IS_DEBUG
-    return memset(ret, 0xfa, size);
+    return memset(ptr, 0xfa, size);
 #else
-    return ret;
+    return ptr;
 #endif
   else
     return psync_emergency_malloc(size);
