@@ -212,7 +212,7 @@ static void status_change(pstatus_t *status) {
   static int cryptocheck = 0;
 
   char *err;
-  err = (char *)malloc(1024);
+  err = (char *)psync_malloc(1024);
 
   std::cout << "Down: " << status->downloadstr << "| Up: " << status->uploadstr
             << ", status is " << status2string(status->status) << std::endl;
@@ -265,6 +265,9 @@ static void status_change(pstatus_t *status) {
     clib::pclsync_lib::get_lib().status_callback_(
         (int)status->status, status2string(status->status));
   }
+
+  if (err)
+    psync_free(err);
 }
 
 int clib::pclsync_lib::start_crypto(const char *pass, void *rep) {

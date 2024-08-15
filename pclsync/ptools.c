@@ -419,7 +419,7 @@ void send_psyncs_event(const char *binapi, const char *auth) {
   int intRes;
   int syncCnt = 0;
 
-  errMsg = (char *)malloc(1024 * sizeof(char));
+  errMsg = (char *)psync_malloc(1024 * sizeof(char));
   errMsg[0] = 0;
 
   time(&rawtime);
@@ -433,11 +433,11 @@ void send_psyncs_event(const char *binapi, const char *auth) {
 
     if (syncCnt < 1) {
       debug(D_NOTICE, "No syncs, skip the event.");
-
+      psync_free(errMsg);
       return;
     }
 
-    eventParams params = {1, // Number of parameters we are passing below.
+    eventParams params = {1, // Number of parameters passed below
                           {P_NUM(PSYNC_SYNCS_COUNT, syncCnt)}};
 
     intRes = create_backend_event(binapi,
@@ -448,13 +448,14 @@ void send_psyncs_event(const char *binapi, const char *auth) {
 
     debug(D_NOTICE, "Syncs Count Event Result:[%d], Message: [%s] .", intRes,
           errMsg);
-    psync_free(errMsg);
 
     sql = psync_sql_prep_statement(
         "REPLACE INTO setting (id, value) VALUES ('syncEventSentFlag', ?)");
     psync_sql_bind_uint(sql, 1, 1);
     psync_sql_run_free(sql);
   }
+
+  psync_free(errMsg);
 }
 
 int set_be_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
