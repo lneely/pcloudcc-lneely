@@ -11,14 +11,13 @@ This version of pcloudcc is independently maintained by me, whose only affiliati
 - Ivan Stoev
 - pCloud
 
-## Dependencies
-- [CMake](https://cmake.org/) build system.  
-- [Zlib](http://zlib.net/)  A Massively Spiffy Yet Delicately Unobtrusive Compression Library.  
-- [Boost](http://www.boost.org/) Boost system and boost program options libraries used.  
-- [Pthread](http://www.gnu.org/)   
-- [Fuse](https://github.com/libfuse/libfuse) Filesystem in Userspace.
-- libsqlite3. lightweight SQL database.
-
+## Dependencies  
+- zlib
+- boost (system, program-options)
+- pthread
+- libfuse (2.x)
+- libsqlite (3.x)
+- libmbedtls (2.x)
 
 ## Build steps
 
