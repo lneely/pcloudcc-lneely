@@ -60,7 +60,7 @@ starts.
 
 Use the command prompt to interact with a running daemon.
 
-> pcloudcc -u example@myemail.com -k
+> pcloudcc -k
 
 Command Reference:
 
