@@ -29,7 +29,9 @@ clean:
 
 install:
 	install -m 755 pcloudcc $(DESTDIR)/bin/pcloudcc
+ifeq ($(STATIC), 0)
 	install -m 755 libpcloudcc_lib.so $(DESTDIR)/lib/libpcloudcc_lib.so
+endif
 
 uninstall:
 	rm -f $(DESTDIR)/bin/pcloudcc
