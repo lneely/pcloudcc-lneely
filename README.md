@@ -15,10 +15,9 @@ This version of pcloudcc is independently maintained by me, whose only affiliati
 - zlib
 - boost (system, program-options)
 - pthread
-- openssl
-- libfuse (2.x)
-- libsqlite (3.x)
-- libmbedtls (2.x)
+- libfuse (-lfuse)
+- libsqlite (-lsqlite3)
+- libmbedtls (-l:libmbedtls.so.14, -l:libmbedx509.so.1, -l:libmbedcrypto.so.7)
 
 ## Build steps
 
