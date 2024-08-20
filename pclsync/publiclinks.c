@@ -268,7 +268,6 @@ int64_t do_psync_folder_public_link(const char *path, char **link /*OUT*/,
   }
   rescode = psync_find_result(bres, "link", PARAM_STR)->str;
   *link = psync_strndup(rescode, strlen(rescode));
-  result = 0;
   result = psync_find_result(bres, "linkid", PARAM_NUM)->num;
 
   psync_free(bres);
@@ -537,7 +536,6 @@ int64_t do_psync_tree_public_link(const char *linkname, const char *root,
   rescode = psync_find_result(bres, "link", PARAM_STR)->str;
   *link = psync_strndup(rescode, strlen(rescode));
 
-  result = 0;
   result = psync_find_result(bres, "linkid", PARAM_NUM)->num;
 
   if (ids)
@@ -1001,7 +999,6 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
   rescode = psync_find_result(bres, "link", PARAM_STR)->str;
   *link = psync_strndup(rescode, strlen(rescode));
 
-  result = 0;
   result = psync_find_result(bres, "uploadlinkid", PARAM_NUM)->num;
 
   psync_free(bres);

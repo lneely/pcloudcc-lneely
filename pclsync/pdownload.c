@@ -766,7 +766,7 @@ static int task_download_file(download_task_t *dt) {
           break;
       if (unlikely_log(!http))
         goto err2;
-      rd = 0;
+
       while (!dt->dwllist.stop) {
         rd = psync_http_readall(http, buff, PSYNC_COPY_BUFFER_SIZE);
         if (rd == 0)

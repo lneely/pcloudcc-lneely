@@ -373,6 +373,7 @@ typedef struct pstatus_struct_ {
 #define PSYNC_CRYPTO_INTERNAL_ERROR -8
 #define PSYNC_CRYPTO_BAD_PASSPHRASE -9
 #define PSYNC_CRYPTO_BAD_KEY -10
+#define PSYNC_CRYPTO_NULL_PTR -11
 
 #define PSYNC_CRYPTO_STATUS_NEW 1
 #define PSYNC_CRYPTO_STATUS_TRIAL 2
@@ -380,7 +381,7 @@ typedef struct pstatus_struct_ {
 #define PSYNC_CRYPTO_STATUS_ACTIVE 4
 #define PSYNC_CRYPTO_STATUS_SETUP 5
 
-#define PSYNC_CRYPTO_INVALID_FOLDERID ((psync_folderid_t)-1)
+#define PSYNC_CRYPTO_INVALID_FOLDERID ((psync_folderid_t) - 1)
 
 #define PSYNC_CRYPTO_FLAG_TEMP_PASS 1
 

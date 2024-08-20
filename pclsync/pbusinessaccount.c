@@ -425,8 +425,8 @@ void get_ba_team_name(uint64_t teamid, char **name /*OUT*/,
     debug(D_WARNING, "Account_teams returned empty result!\n");
     return;
   } else {
-    const char *teamret = "";
-    teamret = psync_find_result(teams->array[0], "name", PARAM_STR)->str;
+    const char *teamret =
+        psync_find_result(teams->array[0], "name", PARAM_STR)->str;
     *length = strlen(teamret);
     *name = psync_strndup(teamret, *length);
   }
@@ -738,7 +738,6 @@ static psync_folderid_t create_index_folder(const char *path) {
   psync_folderid_t folderid;
 
   while (ind < 100) {
-    folderid = PSYNC_INVALID_FOLDERID;
     bufflen = strlen(path) + 1 /*zero char*/ + 3 /*parenthesis*/ +
               3 /*up to 3 digit index*/;
     buff = (char *)psync_malloc(bufflen);

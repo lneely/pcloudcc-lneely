@@ -208,8 +208,9 @@ void get_answer_to_request(message *request, message *reply) {
         if (rep) {
           psync_free(reply);
           reply = rep;
-        } else
+        } else {
           reply->type = 0;
+        }
       } else {
         reply->type = ret;
         memcpy(reply->value, "No.", 4);

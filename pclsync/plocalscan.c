@@ -753,7 +753,6 @@ static void scan_create_folder(sync_folderlist *fl) {
   psync_sql_run_free(res);
   /* it is OK to use affected rows after run_free as we are in transaction */
   if (!psync_sql_affected_rows()) {
-    localfolderid = 0;
     res = psync_sql_query("SELECT id FROM localfolder WHERE syncid=? AND "
                           "localparentfolderid=? AND name=?");
     psync_sql_bind_uint(res, 1, fl->syncid);

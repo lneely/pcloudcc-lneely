@@ -1402,10 +1402,9 @@ static void process_createfile(const binresult *entry) {
       psync_sql_bind_uint(res2, 2, row[1]);
       psync_sql_bind_uint(res2, 3, hash);
       psync_sql_bind_uint(res2, 4, fileid);
-      if ((row2 = psync_sql_fetch_rowstr(res2)))
-        hasit = 1;
-      else
-        hasit = 0;
+      row2 = psync_sql_fetch_rowstr(res2);
+      hasit = row2 != NULL;
+
       psync_sql_free_result(res2);
       if (!hasit) {
         debug(D_NOTICE, "downloading file %s with hash %ld to local folder %lu",

@@ -296,10 +296,6 @@ int clib::pclsync_lib::list_sync_folders(const char *path, void *rep) {
 }
 
 int clib::pclsync_lib::init() {
-  // std::string& username, std::string& password,
-  // std::string* crypto_pass, int setup_crypto, int usesrypto_userpass)
-  // std::string software_string = exec("lsb_release -ds");
-
   std::string software_string;
   char *username_old;
 

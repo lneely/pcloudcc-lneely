@@ -1592,7 +1592,7 @@ static int psync_net_get_checksums(psync_socket *api, psync_fileid_t fileid,
   psync_file_checksums *cs;
   psync_block_checksum_header hdr;
   uint64_t result;
-  uint32_t i;
+  uint64_t i;
   char cookie[128];
   *checksums = NULL; /* gcc is not smart enough to notice that initialization is
                         not needed */
@@ -1632,7 +1632,7 @@ static int psync_net_get_checksums(psync_socket *api, psync_fileid_t fileid,
     return PSYNC_NET_TEMPFAIL;
   if (unlikely_log(psync_http_readall(http, &hdr, sizeof(hdr)) != sizeof(hdr)))
     goto err0;
-  i = (hdr.filesize + hdr.blocksize - 1) / hdr.blocksize;
+  i = (hdr.filesize + (uint64_t)hdr.blocksize - 1) / (uint64_t)hdr.blocksize;
   if ((sizeof(psync_block_checksum) + sizeof(uint32_t)) * i >=
       PSYNC_MAX_CHECKSUMS_SIZE) {
     debug(
@@ -2232,6 +2232,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
           if (rd <= 0)
             break;
           else {
+            assert(checksums->blocksize != 0);
             bufferlen = (rd + checksums->blocksize - 1) / checksums->blocksize *
                         checksums->blocksize;
             memset(buff + rd, 0, bufferlen - rd);

@@ -853,7 +853,6 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
   }
   if (asize) {
     psync_upload_sub_bytes_uploaded(asize);
-    asize = 0;
   }
   return large_upload_save(api, uploadid, folderid, name, taskid, writeid, 1, 0,
                            key, filename);
@@ -1950,7 +1949,6 @@ static void psync_fsupload_run_tasks(psync_list *tasks) {
   if (!api)
     goto err;
   rtask = psync_list_element(tasks->next, fsupload_task_t, list);
-  ret = 0;
   np = 0;
   psync_list_for_each_element(task, tasks, fsupload_task_t, list) {
     task->needprocessing = 0;

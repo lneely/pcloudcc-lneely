@@ -1256,16 +1256,17 @@ psync_cloud_crypto_get_folder_decoder(psync_fsfolderid_t folderid) {
       return dec;
   }
   pthread_rwlock_rdlock(&crypto_lock);
-  if (!crypto_started_l)
+  if (!crypto_started_l) {
     dec = (psync_crypto_aes256_text_decoder_t)err_to_ptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
-  if (folderid > 0)
+  } else if (folderid > 0) {
     dec = psync_crypto_get_folder_decoder_locked(folderid);
-  else if (folderid < 0)
+  } else if (folderid < 0) {
     dec = psync_crypto_get_temp_folder_decoder_locked(folderid);
-  else
+  } else {
     dec = (psync_crypto_aes256_text_decoder_t)err_to_ptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_FOLDER_NOT_ENCRYPTED));
+  }
   pthread_rwlock_unlock(&crypto_lock);
   return dec;
 }
@@ -1318,26 +1319,31 @@ psync_crypto_aes256_text_encoder_t
 psync_cloud_crypto_get_folder_encoder(psync_fsfolderid_t folderid) {
   char buff[16];
   psync_crypto_aes256_text_encoder_t enc;
-  if (!crypto_started_un)
+  if (!crypto_started_un) {
     return (psync_crypto_aes256_text_encoder_t)err_to_ptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
+  }
+
   if (folderid >= 0) {
     psync_get_string_id(buff, "FLDE", folderid);
-    enc = (psync_crypto_aes256_text_encoder_t)psync_cache_get(buff);
-    if (enc)
+    if ((enc = (psync_crypto_aes256_text_encoder_t)psync_cache_get(buff)) !=
+        NULL) {
       return enc;
+    }
   }
+
   pthread_rwlock_rdlock(&crypto_lock);
-  if (!crypto_started_l)
+  if (!crypto_started_l) {
     enc = (psync_crypto_aes256_text_encoder_t)err_to_ptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
-  if (folderid > 0)
+  } else if (folderid > 0) {
     enc = psync_crypto_get_folder_encoder_locked(folderid);
-  else if (folderid < 0)
+  } else if (folderid < 0) {
     enc = psync_crypto_get_temp_folder_encoder_locked(folderid);
-  else
+  } else {
     enc = (psync_crypto_aes256_text_encoder_t)err_to_ptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_FOLDER_NOT_ENCRYPTED));
+  }
   pthread_rwlock_unlock(&crypto_lock);
   return enc;
 }
@@ -1490,16 +1496,17 @@ psync_cloud_crypto_get_file_encoder(psync_fsfileid_t fileid, uint64_t hash,
       return enc;
   }
   pthread_rwlock_rdlock(&crypto_lock);
-  if (!crypto_started_l)
+  if (!crypto_started_l) {
     enc = (psync_crypto_aes256_sector_encoder_decoder_t)err_to_ptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
-  if (fileid > 0)
+  } else if (fileid > 0) {
     enc = psync_crypto_get_file_encoder_locked(fileid, hash, nonetwork);
-  else if (fileid < 0)
+  } else if (fileid < 0) {
     enc = psync_crypto_get_temp_file_encoder_locked(fileid, nonetwork);
-  else
+  } else {
     enc = (psync_crypto_aes256_sector_encoder_decoder_t)err_to_ptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_FOLDER_NOT_ENCRYPTED));
+  }
   pthread_rwlock_unlock(&crypto_lock);
   return enc;
 }
@@ -1531,7 +1538,8 @@ psync_cloud_crypto_get_file_encoder_from_binresult(psync_fileid_t fileid,
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   else {
     // save_file_key_to_db runs thread to save to db, that's why we insert
-    // decrypted key to cache, so psync_crypto_get_file_encoder_locked finds it
+    // decrypted key to cache, so psync_crypto_get_file_encoder_locked finds
+    // it
     symkey = psync_ssl_rsa_decrypt_symm_key_lock(&crypto_privkey, &esym);
 
     psync_crypto_release_file_symkey_locked(fileid, hash, symkey);
@@ -1824,7 +1832,6 @@ int psync_pcloud_crypto_reencode_key(
   }
 
   newpriv = NULL;
-  newprivlen = 0;
 
   switch (*((uint32_t *)rsapriv)) {
   case PSYNC_CRYPTO_TYPE_RSA4096_64BYTESALT_20000IT: {

@@ -44,8 +44,8 @@ static std::string version = "git-lneely";
 
 int main(int argc, char **argv) {
   std::cout << "pCloud console client (" << version << ")" << std::endl;
-  std::string username;
-  std::string password;
+  std::string username = "";
+  std::string password = "";
   bool daemon = false;
   bool commands = false;
   bool commands_only = false;
@@ -76,7 +76,13 @@ int main(int argc, char **argv) {
         "Register a new pCloud user account.")(
         "savepassword,s", po::bool_switch(&save_pass),
         "Save user password in the database.");
-    po::store(po::parse_command_line(argc, argv, desc), vm);
+
+    po::command_line_parser parser{argc, argv};
+    po::positional_options_description p;
+    parser.options(desc).positional(p).allow_unregistered();
+    po::parsed_options parsed_options = parser.run();
+    po::store(parsed_options, vm);
+
     po::notify(vm);
 
     if (vm.count("help")) {
