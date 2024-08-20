@@ -1,5 +1,5 @@
-CC			:= clang
-CXX			:= clang++
+CC			:= gcc
+CXX			:= g++
 AR			:= ar
 COMMONFLAGS	= -fsanitize=address
 CFLAGS		= -fPIC -g $(COMMONFLAGS) -I./pclsync -I/usr/include -I/usr/include/mbedtls2
