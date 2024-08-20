@@ -2,9 +2,10 @@
 
 set -x
 
-cid=$(buildah from "${1:-ubuntu}")
-buildah run "$cid" -- apt update
-buildah run "$cid" -- apt install build-essential git libfuse-dev libudev-dev libsqlite3-dev libmbedtls-dev zlib1g-dev libboost-system-dev libboost-program-options-dev fuse
-buildah commit "$cid" "$USER"
-
+echo "building ubuntu container..."
+ctrid=$(buildah from ubuntu:latest)
+buildah run "$ctrid" -- apt update -y
+buildah run "$ctrid" -- apt install -y build-essential git libfuse-dev libudev-dev libsqlite3-dev libmbedtls-dev zlib1g-dev libboost-system-dev libboost-program-options-dev fuse 
+export ctrid=$(buildah commit "$ctrid" "$USER/ubuntu-build")
+echo "done! the container name is: $USER/ubuntu-build"
 set +x
