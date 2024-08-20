@@ -18,9 +18,10 @@ I use Artix and maintain an [AUR](https://aur.archlinux.org/packages/pcloudcc-ln
 - pCloud
 
 ## Dependencies  
-- zlib
-- boost (system, program-options)
-- pthread
+- zlib (-lz)
+- boost (-lboost_system, -lboost_program_options)
+- pthread (lpthread)
+- udev (-ludev)
 - libfuse (-lfuse)
 - libsqlite (-lsqlite3)
 - libmbedtls (-l:libmbedtls.so.14, -l:libmbedx509.so.1, -l:libmbedcrypto.so.7)
