@@ -33,21 +33,10 @@
 
 #include "pcompiler.h"
 
-// figure out which OS...
-// XXX: goal is to remove
-// ---
-#if defined(__linux__)
-// linux os
-#ifndef P_OS_LINUX // HACK: need to rework includes
 #define P_OS_LINUX
-#endif
 #define P_OS_ID 7 // linux
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
-#endif
-#else
-// non-linux posix-compliant OS
-#define P_OS_ID 0
 #endif
 
 #define _FILE_OFFSET_BITS 64
