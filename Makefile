@@ -4,7 +4,7 @@ CMDSRC=control_tools.cpp pclsync_lib_c.cpp pclsync_lib.cpp main.cpp
 DESTDIR=/usr/local
 LIBSRC=$(wildcard pclsync/*.c)
 LIBOBJ = $(notdir $(LIBSRC:%.c=%.o))
-STATIC=0
+STATIC=1
 
 all: $(LIBSRC) $(CMDSRC)
 ifeq ($(STATIC),1)
