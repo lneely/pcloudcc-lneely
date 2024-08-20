@@ -1,14 +1,14 @@
 CC			:= clang
 CXX			:= clang++
 AR			:= ar
-COMMONFLAGS	:= -fsanitize=address
-CFLAGS		:= -fPIC -g $(COMMONFLAGS) -I./pclsync -I/usr/include -I/usr/include/mbedtls2 -O0
+COMMONFLAGS	= -fsanitize=address
+CFLAGS		= -fPIC -g $(COMMONFLAGS) -I./pclsync -I/usr/include -I/usr/include/mbedtls2
 ifneq (,$(filter clang%,$(CC)))
     CFLAGS += -Wthread-safety
 endif
-CXXFLAGS	:= $(CFLAGS)
-LIBLDFLAGS	:= $(COMMONFLAGS) -lpthread -ludev -lsqlite3 -lz -l:libmbedtls.so.14 -l:libmbedx509.so.1 -l:libmbedcrypto.so.7
-EXECLDFLAGS	:= $(COMMONFLAGS) -lboost_program_options -lfuse
+CXXFLAGS	= $(CFLAGS)
+LIBLDFLAGS	= $(COMMONFLAGS) -lpthread -ludev -lsqlite3 -lz -l:libmbedtls.so.14 -l:libmbedx509.so.1 -l:libmbedcrypto.so.7
+EXECLDFLAGS	= $(COMMONFLAGS) -lboost_program_options -lfuse
 
 SCAN		:= 0
 SRCDIR 		:= .
@@ -21,9 +21,24 @@ CPPOBJ		:= $(notdir $(CPPSRC:%.cpp=%.o))
 
 DESTDIR		:= /usr/local
 STATIC		:= 1
+BUILD		:= release
 
 EXECOUT		:= pcloudcc
 LIBOUT		:= libpcloudcc_lib.so
+
+# Build type specific flags
+ifeq ($(BUILD), debug)
+    CFLAGS += -O0 -DDEBUG
+    CXXFLAGS += -O0 -DDEBUG
+else ifeq ($(BUILD), release)
+    CFLAGS += -O2 -DNDEBUG
+    CXXFLAGS += -O2 -DNDEBUG
+    COMMONFLAGS := $(filter-out -fsanitize=address,$(COMMONFLAGS))
+    LIBLDFLAGS := $(filter-out -fsanitize=address,$(LIBLDFLAGS))
+    EXECLDFLAGS := $(filter-out -fsanitize=address,$(EXECLDFLAGS))
+else
+    $(error Invalid BUILD. Use 'debug' or 'release')
+endif
 
 ifeq ($(SCAN), 1)
 	CC := scan-build -o scanresults $(CC)
@@ -38,7 +53,7 @@ else
 	EXECLDFLAGS += $(LIBLDFLAGS)
 endif
 
-.PHONY: all clean
+.PHONY: all clean install uninstall
 
 all: $(TARGETS)
 
