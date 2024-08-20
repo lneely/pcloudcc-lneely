@@ -37,6 +37,7 @@
 #include <mbedtls/pkcs5.h>
 #include <mbedtls/ssl.h>
 #include <pthread.h>
+#include <stdatomic.h>
 
 #include "pcloudcrypto.h"
 #include "pcompat.h"
@@ -3456,15 +3457,37 @@ static void psync_fs_dump_internals() {
 #endif
 
 static void psync_fs_do_stop(void) {
-  struct timespec ts;
   debug(D_NOTICE, "stopping");
   pthread_mutex_lock(&start_mutex);
   if (started == 1) {
 
 #if defined(P_OS_LINUX)
     char *mp;
+    struct stat st_before, st_after;
+    struct timespec ts = {0, 100000000};
+
     mp = psync_fuse_get_mountpoint();
-    fuse_unmount(mp, psync_fuse_channel);
+    if (mp) {
+      if (stat(mp, &st_before) == 0) {
+        fuse_unmount(mp, psync_fuse_channel);
+        psync_nanotime(&ts);
+
+        // Check if the mountpoint is still accessible
+        if (stat(mp, &st_after) == 0) {
+          if (st_before.st_dev == st_after.st_dev) {
+            debug(D_WARNING, "FUSE filesystem may not have unmounted properly");
+          }
+        } else if (errno != ENOENT) {
+          debug(D_WARNING, "Unexpected error after unmount: %s",
+                strerror(errno));
+        }
+      } else {
+        debug(D_WARNING, "Mountpoint not accessible before unmount: %s",
+              strerror(errno));
+      }
+    } else {
+      debug(D_ERROR, "Failed to get mountpoint");
+    }
 #endif
 
     debug(D_NOTICE, "running fuse_exit");
@@ -3475,10 +3498,17 @@ static void psync_fs_do_stop(void) {
     debug(D_NOTICE, "cache flushed, waiting for fuse to exit");
     psync_nanotime(&ts);
     ts.tv_sec += 2;
-    if (pthread_cond_timedwait(&start_cond, &start_mutex, &ts))
-      debug(D_NOTICE, "timeouted waiting for fuse to exit");
-    else
+
+    int wait_result = pthread_cond_timedwait(&start_cond, &start_mutex, &ts);
+    if (wait_result == ETIMEDOUT) {
+      debug(D_WARNING, "timed out waiting for fuse to exit");
+    } else if (wait_result != 0) {
+      debug(D_ERROR, "error waiting for fuse to exit: %s",
+            strerror(wait_result));
+    } else {
       debug(D_NOTICE, "waited for fuse to exit");
+    }
+
 #if IS_DEBUG
     psync_fs_dump_internals();
 #endif
