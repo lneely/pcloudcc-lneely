@@ -2,7 +2,7 @@ CC			:= gcc
 CXX			:= g++
 AR			:= ar
 COMMONFLAGS	= -fsanitize=address
-CFLAGS		= -fPIC -g $(COMMONFLAGS) -I./pclsync -I/usr/include -I/usr/include/mbedtls2
+CFLAGS		= -fPIC $(COMMONFLAGS) -I./pclsync -I/usr/include -I/usr/include/mbedtls2
 ifneq (,$(filter clang%,$(CC)))
     CFLAGS += -Wthread-safety
 endif
@@ -28,8 +28,8 @@ LIBOUT		:= libpcloudcc_lib.so
 
 # Build type specific flags
 ifeq ($(BUILD), debug)
-    CFLAGS += -O0 -DDEBUG
-    CXXFLAGS += -O0 -DDEBUG
+    CFLAGS += -g -O0 -DDEBUG -Wall
+    CXXFLAGS += -g -O0 -DDEBUG -Wall
 else ifeq ($(BUILD), release)
     CFLAGS += -O2 -DNDEBUG
     CXXFLAGS += -O2 -DNDEBUG
