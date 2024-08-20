@@ -6,6 +6,12 @@ This is a simple **linux** console client for pCloud cloud storage, derived from
 
 This version of pcloudcc is independently maintained by me, whose only affiliation with pCloud is as a user of their services. As of June 2024, the console-client repo (https://github.com/pcloudcom/console-client) seems to have been inactive for several years. This was an attractive alternative for myself and other like-minded weirdos who don't enjoy unneeded GUIs, and it is a shame to see it abandoned.
 
+## Supported Distributions & Packages
+
+pcloudcc-lneely seeks to support as many Linux distributions as possible and has been tested on recent versions of Fedora, Debian, Ubuntu, Arch, and Artix. 
+
+I use Artix and maintain an [AUR](https://aur.archlinux.org/packages/pcloudcc-lneely) package. I do not plan on providing or maintaining any other packages, but encourage anyone interested in doing so for their own distributions.
+
 ## Due Credit
 - Anton Titov
 - Ivan Stoev
