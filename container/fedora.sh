@@ -2,8 +2,6 @@
 
 set -x
 
-#cid=$(podman run -dit -v /home/lkn/src:/src ubuntu)
-
 cid=$(buildah from "${1:-fedora}")
 buildah run "$cid" -- dnf update -y
 buildah run "$cid" --  dnf group install -y "C Development Tools and Libraries"
