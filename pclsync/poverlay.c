@@ -128,6 +128,8 @@ void instance_thread(void *lpvParam) {
     close(*cl);
   }
   // debug(D_NOTICE, "InstanceThread exitting.\n");
+
+  psync_free(reply);
   return;
 };
 
