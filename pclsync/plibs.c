@@ -2294,6 +2294,14 @@ void psync_pqsort(void *base, size_t cnt, size_t sort_first, size_t size,
   psq_stack_t *top;
   unsigned char *lo, *hi, *mid, *l, *r, *sf;
   size_t tresh, n, u32size;
+
+  lo = NULL;
+  hi = NULL;
+  mid = NULL;
+  l = NULL;
+  r = NULL;
+  sf = NULL;
+
   tresh = QSORT_TRESH * size;
   sf = (unsigned char *)base + sort_first * size;
   if (size % sizeof(uint32_t) == 0 && (uintptr_t)base % sizeof(uint32_t) == 0)

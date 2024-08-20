@@ -88,12 +88,12 @@ static int pk_get_rsapubkey(unsigned char **p, const unsigned char *end,
   if (*p != end)
     return (MBEDTLS_ERR_PK_INVALID_PUBKEY + MBEDTLS_ERR_ASN1_LENGTH_MISMATCH);
 
-  if ((ret = mbedtls_rsa_check_pubkey(rsa)) != 0)
+  ret = mbedtls_rsa_check_pubkey(rsa);
+  if (ret != 0)
     return (MBEDTLS_ERR_PK_INVALID_PUBKEY);
 
   rsa->len = mbedtls_mpi_size(&rsa->N);
-
-  return (0);
+  return 0;
 }
 
 static pthread_mutex_t rsa_decr_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -445,9 +445,7 @@ int psync_ssl_connect(psync_socket_t sock, void **sslconn,
 
   ret = mbedtls_ssl_handshake(&conn->ssl);
   if (ret == 0) {
-    int result;
-
-    if ((result = psync_ssl_check_peer_public_key(conn))) {
+    if ((psync_ssl_check_peer_public_key(conn))) {
       goto err1;
     }
     *sslconn = conn;
@@ -476,8 +474,7 @@ int psync_ssl_connect_finish(void *sslconn, const char *hostname) {
   conn = (ssl_connection_t *)sslconn;
   ret = mbedtls_ssl_handshake(&conn->ssl);
   if (ret == 0) {
-    int result;
-    if ((result = psync_ssl_check_peer_public_key(conn))) {
+    if ((psync_ssl_check_peer_public_key(conn))) {
       goto fail;
     }
     psync_ssl_save_session(conn);

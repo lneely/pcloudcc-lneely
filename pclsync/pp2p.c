@@ -651,7 +651,7 @@ static int psync_p2p_get_download_token(psync_fileid_t fileid,
 static int psync_p2p_download(psync_socket_t sock, psync_fileid_t fileid,
                               const unsigned char *filehashhex, uint64_t fsize,
                               const char *filename) {
-  uint32_t keylen, enctype;
+  uint32_t keylen = 0, enctype = 0;
   psync_symmetric_key_t key;
   psync_encrypted_symmetric_key_t ekey;
   psync_crypto_aes256_ctr_encoder_decoder_t decoder;

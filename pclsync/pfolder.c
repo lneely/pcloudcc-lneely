@@ -623,7 +623,7 @@ pfolder_list_t *psync_list_remote_folder(psync_folderid_t folderid,
       parentencrypted =
           (psync_get_number(row[0]) & PSYNC_FOLDER_FLAG_ENCRYPTED) ? 1 : 0;
     } else {
-      debug(D_ERROR, "Can't find folder with id %Ilu", folderid);
+      debug(D_ERROR, "Can't find folder with id %lu", folderid);
       psync_sql_free_result(res);
       return NULL;
     }
