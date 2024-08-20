@@ -1,4 +1,7 @@
-CFLAGS=-fPIC -Wall -O0 -g -fsanitize=address -I./pclsync -I/usr/include -I/usr/include/mbedtls2
+CC=/usr/bin/clang
+CXX=/usr/bin/clang++
+CFLAGS=-fPIC -g -fsanitize=thread -I./pclsync -I/usr/include -I/usr/include/mbedtls2
+CFLAGS += -O0 -Wthread-safety
 LDFLAGS=-lboost_program_options -lfuse -lpthread -ludev -lsqlite3 -lz -l:libmbedtls.so.14 -l:libmbedx509.so.1 -l:libmbedcrypto.so.7
 CMDSRC=control_tools.cpp pclsync_lib_c.cpp pclsync_lib.cpp main.cpp
 DESTDIR=/usr/local
@@ -8,21 +11,21 @@ STATIC=1
 
 all: $(LIBSRC) $(CMDSRC)
 ifeq ($(STATIC),1)
-	make pcloudcc_static
+	scan-build --use-cc=$(CC) --use-c++=$(CXX) make pcloudcc_static
 else
-	make libpcloudcc_lib.so pcloudcc
+	scan-build --use-cc=$(CC) --use-c++=$(CXX) make libpcloudcc_lib.so pcloudcc
 endif
 
 pcloudcc_static:
-	gcc -c $(CFLAGS) $(LDFLAGS) $(LIBSRC)
-	g++ -o pcloudcc $(CFLAGS) $(LDFLAGS) $(LIBOBJ) $(CMDSRC)
+	$(CC) -c $(CFLAGS) $(LIBSRC)
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(LIBOBJ) $(CMDSRC) -o pcloudcc
 
 
 libpcloudcc_lib.so: $(LIBSRC)
-	gcc -o $@ -shared $(CFLAGS) $(LDFLAGS) $(LIBSRC)
+	$(CC) -o $@ -shared $(CFLAGS) $(LDFLAGS) $(LIBSRC)
 
 pcloudcc: $(CMDSRC)
-	g++ -o $@ $(CFLAGS) $(LDFLAGS) -L. -lpcloudcc_lib $(CMDSRC)
+	$(CXX) -o $@ $(CFLAGS) $(LDFLAGS) -L. -lpcloudcc_lib $(CMDSRC)
 
 clean:
 	rm -f *.o a.out libpcloudcc_lib.so pcloudcc
