@@ -1,4 +1,4 @@
-CFLAGS=-fPIC -Wall -O0 -g -fsanitize=thread -I./pclsync -I/usr/include -I/usr/include/mbedtls2
+CFLAGS=-fPIC -Wall -O0 -g -fsanitize=address -I./pclsync -I/usr/include -I/usr/include/mbedtls2
 LDFLAGS=-lboost_program_options -lfuse -lpthread -ludev -lsqlite3 -lz -l:libmbedtls.so.14 -l:libmbedx509.so.1 -l:libmbedcrypto.so.7
 CMDSRC=control_tools.cpp pclsync_lib_c.cpp pclsync_lib.cpp main.cpp
 DESTDIR=/usr/local
