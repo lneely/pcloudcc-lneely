@@ -165,7 +165,6 @@ int create_backend_event(const char *binapi, const char *category,
     }
 
     paramsLocal[mpCnt + pCnt] = (binparam)P_STR(EPARAM_KEY, keyParams);
-    free(keyParams);
   }
 
   for (i = 0; i < tpCnt; i++) {
@@ -185,6 +184,7 @@ int create_backend_event(const char *binapi, const char *category,
   res = do_send_command(sock, EVENT_WS, strlen(EVENT_WS), paramsLocal, tpCnt,
                         -1, 1);
 
+  free(keyParams);
   free(paramsLocal);
 
   if (unlikely_log(!res)) {
