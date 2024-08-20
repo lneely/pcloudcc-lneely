@@ -10,6 +10,7 @@ CXXFLAGS	:= $(CFLAGS)
 LIBLDFLAGS	:= $(COMMONFLAGS) -lpthread -ludev -lsqlite3 -lz -l:libmbedtls.so.14 -l:libmbedx509.so.1 -l:libmbedcrypto.so.7
 EXECLDFLAGS	:= $(COMMONFLAGS) -lboost_program_options -lfuse
 
+SCAN		:= 0
 SRCDIR 		:= .
 LIBDIR		:= pclsync
 
@@ -23,6 +24,11 @@ STATIC		:= 1
 
 EXECOUT		:= pcloudcc
 LIBOUT		:= libpcloudcc_lib.so
+
+ifeq ($(SCAN), 1)
+	CC := scan-build -o scanresults $(CC)
+	CXX := scan-build -o scanresults $(CXX)
+endif
 
 TARGETS := $(EXECOUT)
 ifeq ($(STATIC), 0)
@@ -51,32 +57,12 @@ $(COBJ): %.o: $(LIBDIR)/%.c
 $(LIBOUT): $(COBJ)
 	$(CC) -shared -fPIC -o $@ $^ $(LIBLDFLAGS)
 
-# ifeq ($(STATIC),1)
-# 	scan-build --use-cc=$(CC) --use-c++=$(CXX) make pcloudcc_static
-# else
-# 	scan-build --use-cc=$(CC) --use-c++=$(CXX) make libpcloudcc_lib.so pcloudcc
-# endif
+install:
+	install -m 755 pcloudcc $(DESTDIR)/bin/pcloudcc
+ifeq ($(STATIC), 0)
+	install -m 755 libpcloudcc_lib.so $(DESTDIR)/lib/libpcloudcc_lib.so
+endif
 
-# pcloudcc_static:
-# 	$(CC) -c $(CFLAGS) $(LIBSRC)
-# 	$(CXX) $(CFLAGS) $(LDFLAGS) $(LIBOBJ) $(CMDSRC) -o pcloudcc
-
-
-# libpcloudcc_lib.so: $(LIBSRC)
-# 	$(CC) -o $@ -shared $(CFLAGS) $(LDFLAGS) $(LIBSRC)
-
-# pcloudcc: $(CMDSRC)
-# 	$(CXX) -o $@ $(CFLAGS) $(LDFLAGS) -L. -lpcloudcc_lib $(CMDSRC)
-
-# clean:
-# 	rm -f *.o a.out libpcloudcc_lib.so pcloudcc
-
-# install:
-# 	install -m 755 pcloudcc $(DESTDIR)/bin/pcloudcc
-# ifeq ($(STATIC), 0)
-# 	install -m 755 libpcloudcc_lib.so $(DESTDIR)/lib/libpcloudcc_lib.so
-# endif
-
-# uninstall:
-# 	rm -f $(DESTDIR)/bin/pcloudcc
-# 	rm -f $(DESTDIR)/lib/libpcloudcc_lib.so
+uninstall:
+	rm -f $(DESTDIR)/bin/pcloudcc
+	rm -f $(DESTDIR)/lib/libpcloudcc_lib.so
