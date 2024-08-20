@@ -25,9 +25,23 @@ I use Artix and maintain an [AUR](https://aur.archlinux.org/packages/pcloudcc-ln
 - libsqlite (-lsqlite3)
 - libmbedtls (-l:libmbedtls.so.14, -l:libmbedx509.so.1, -l:libmbedcrypto.so.7)
 
-## Build steps
+## Building
 
-> make
+```
+make
+```
+
+It's really that easy. Use `make install` to install, and `make uninstall` to uninstall. Specify `DESTDIR` if desired (see **Make Options**). 
+
+## Make Options
+
+```
+make BUILD=debug            # include debug symbols, ASan instrumentation. (default: release)
+make STATIC=0               # dynamically link libpcloudcc_lib.so. (default: 1)
+make SCAN=1                 # run code analysis; recommend CC=clang and CXX=clang++. (default: 0)
+make CC=clang CXX=clang++   # use clang instead of gcc (default: gcc,g++)
+make DESTDIR=/prefix        # installation prefix (default: /usr/local/bin)
+```
 
 ## Usage
 
