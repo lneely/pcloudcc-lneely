@@ -1001,7 +1001,6 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
   rescode = psync_find_result(bres, "link", PARAM_STR)->str;
   *link = psync_strndup(rescode, strlen(rescode));
 
-  result = 0;
   result = psync_find_result(bres, "uploadlinkid", PARAM_NUM)->num;
 
   psync_free(bres);
