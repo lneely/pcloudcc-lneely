@@ -76,7 +76,8 @@ int list_sync_folders() {
       if (folders->foldercnt > 0) {
         for (size_t i = 0; i < folders->foldercnt; i++) {
           std::cout << "Folder ID: " << folders->folders[i].folderid
-                    << ", Name: " << folders->folders[i].localpath << std::endl;
+                    << "Local Name: " << folders->folders[i].localname
+                    << std::endl;
         }
       } else {
         std::cout << "No sync folders found." << std::endl;
