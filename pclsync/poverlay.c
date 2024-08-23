@@ -84,6 +84,7 @@ void overlay_main_loop() {
   return;
 }
 
+/*
 void instance_thread(void *lpvParam) {
   int *cl, rc;
   char chbuf[POVERLAY_BUFSIZE];
@@ -132,6 +133,92 @@ void instance_thread(void *lpvParam) {
   psync_free(reply);
   return;
 };
+*/
+
+void instance_thread(void *lpvParam) {
+  int *cl, rc;
+  char chbuf[POVERLAY_BUFSIZE];
+  message *request = NULL;
+  char *curbuf = &chbuf[0];
+  int bytes_read = 0;
+  message *reply = (message *)psync_malloc(POVERLAY_BUFSIZE);
+  void *reply_data = NULL;
+  size_t reply_data_length = 0;
+
+  memset(reply, 0, POVERLAY_BUFSIZE);
+  memset(chbuf, 0, POVERLAY_BUFSIZE);
+
+  cl = (int *)lpvParam;
+
+  while ((rc = read(*cl, curbuf, (POVERLAY_BUFSIZE - bytes_read))) > 0) {
+    bytes_read += rc;
+    curbuf = curbuf + rc;
+    if (bytes_read > 12) {
+      request = (message *)chbuf;
+      if (request->length == bytes_read)
+        break;
+    }
+  }
+
+  if (rc == -1) {
+    debug(D_ERROR, "Unix socket read error");
+    goto cleanup;
+  } else if (rc == 0 && bytes_read == 0) {
+    debug(D_NOTICE, "Connection closed by client before sending data");
+    goto cleanup;
+  }
+
+  request = (message *)chbuf;
+  if (request) {
+    get_answer_to_request(request, reply, &reply_data, &reply_data_length);
+
+    // Send the reply structure
+    size_t bytes_written = 0;
+    while (bytes_written < reply->length) {
+      rc = write(*cl, (char *)reply + bytes_written,
+                 reply->length - bytes_written);
+      if (rc <= 0) {
+        debug(D_ERROR, "Unix socket write error (reply structure)");
+        goto cleanup;
+      }
+      bytes_written += rc;
+    }
+
+    // Send the additional reply data if present
+    if (reply_data && reply_data_length > 0) {
+      bytes_written = 0;
+
+      while (bytes_written < reply_data_length) {
+        rc = write(*cl, reply_data + bytes_written,
+                   reply_data_length - bytes_written);
+        if (rc <= 0) {
+          debug(D_ERROR, "Unix socket write error (reply data)");
+          goto cleanup;
+        }
+        bytes_written += rc;
+      }
+    }
+
+    debug(D_NOTICE,
+          "Successfully sent full reply: %zu bytes structure, %zu bytes "
+          "additional data",
+          reply->length, reply_data_length);
+  } else {
+    debug(D_ERROR, "No valid request received");
+  }
+
+cleanup:
+  if (cl) {
+    close(*cl);
+  }
+  if (reply) {
+    psync_free(reply);
+  }
+  if (reply_data) {
+    psync_free(reply_data);
+  }
+  debug(D_NOTICE, "InstanceThread exiting.");
+}
 
 poverlay_callback *callbacks;
 static int callbacks_size = 15;
@@ -165,13 +252,15 @@ void psync_start_overlays() { overlays_running = 1; }
 void psync_stop_overlay_callbacks() { callbacks_running = 0; }
 void psync_start_overlay_callbacks() { callbacks_running = 1; }
 
-void get_answer_to_request(message *request, message *reply) {
+void get_answer_to_request(message *request, message *reply, void **reply_data,
+                           size_t *reply_data_length) {
   psync_path_status_t stat = PSYNC_PATH_STATUS_NOT_OURS;
   memcpy(reply->value, "Ok.", 4);
   reply->length = sizeof(message) + 4;
+  *reply_data = NULL;
+  *reply_data_length = 0;
 
   if (request->type == 20 /* STARTCRYPTO, see control_tools.cpp */) {
-    // don't publish the crypto password to the logs in plain text...
     debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]",
           request->type, request->length, "REDACTED");
   } else {
@@ -202,32 +291,117 @@ void get_answer_to_request(message *request, message *reply) {
              (request->type < (calbacks_lower_band + callbacks_size))) {
     int ind = request->type - 20;
     int ret = 0;
-    message *rep = NULL;
+    void *rep = NULL;
 
     if (callbacks[ind]) {
-      ret = callbacks[ind](request->value, rep);
+      ret = callbacks[ind](request->value, &rep);
       if (ret == 0) {
+        reply->type = 0;
+        reply->length = sizeof(message) + strlen(reply->value) + 1;
         if (rep) {
-          psync_free(reply);
-          reply = rep;
+          *reply_data = rep;
+          switch (request->type) {
+          case 23:
+            debug(D_NOTICE, "got reply data for LISTSYNC message");
+            psync_folder_list_t *folders = (psync_folder_list_t *)rep;
+            *reply_data_length = sizeof(psync_folder_list_t) +
+                                 folders->foldercnt * sizeof(psync_folder_t);
+            debug(D_NOTICE, "reply data length is %zu", *reply_data_length);
+            break;
+          }
+          debug(D_NOTICE, "Reply data received, length: %zu",
+                *reply_data_length);
         } else {
-          reply->type = 0;
+          debug(D_NOTICE, "Callback succeeded but no reply data received");
         }
       } else {
         reply->type = ret;
         memcpy(reply->value, "No.", 4);
+        debug(D_NOTICE, "Callback failed with return code: %d", ret);
       }
     } else {
       reply->type = 13;
       memcpy(reply->value, "No callback with this id registered.", 37);
       reply->length = sizeof(message) + 37;
+      debug(D_NOTICE, "No callback registered for type: %u", request->type);
     }
   } else {
     reply->type = 13;
     memcpy(reply->value, "Invalid type.", 14);
     reply->length = sizeof(message) + 14;
+    debug(D_NOTICE, "Invalid request type: %u", request->type);
+  }
+
+  if (*reply_data == NULL) {
+    debug(D_NOTICE, "No reply data received");
   }
 }
+
+/* void get_answer_to_request(message *request, message *reply) { */
+/*   psync_path_status_t stat = PSYNC_PATH_STATUS_NOT_OURS; */
+/*   memcpy(reply->value, "Ok.", 4); */
+/*   reply->length = sizeof(message) + 4; */
+/*   reply->reply_data = NULL; */
+
+/*   if (request->type == 20 /\* STARTCRYPTO, see control_tools.cpp *\/) { */
+/*     // don't publish the crypto password to the logs in plain text... */
+/*     debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]", */
+/*           request->type, request->length, "REDACTED"); */
+/*   } else { */
+/*     debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]", */
+/*           request->type, request->length, request->value); */
+/*   } */
+
+/*   if (request->type < 20) { */
+/*     if (overlays_running) */
+/*       stat = psync_path_status_get(request->value); */
+/*     switch (psync_path_status_get_status(stat)) { */
+/*     case PSYNC_PATH_STATUS_IN_SYNC: */
+/*       reply->type = 10; */
+/*       break; */
+/*     case PSYNC_PATH_STATUS_IN_PROG: */
+/*       reply->type = 12; */
+/*       break; */
+/*     case PSYNC_PATH_STATUS_PAUSED: */
+/*     case PSYNC_PATH_STATUS_REMOTE_FULL: */
+/*     case PSYNC_PATH_STATUS_LOCAL_FULL: */
+/*       reply->type = 11; */
+/*       break; */
+/*     default: */
+/*       reply->type = 13; */
+/*       memcpy(reply->value, "No.", 4); */
+/*     } */
+/*   } else if ((callbacks_running) && */
+/*              (request->type < (calbacks_lower_band + callbacks_size))) { */
+/*     int ind = request->type - 20; */
+/*     int ret = 0; */
+/*     void *rep = NULL; */
+
+/*     if (callbacks[ind]) { */
+/*       ret = callbacks[ind](request->value, &rep); */
+/*       if (ret == 0) { */
+/*         if (rep) { */
+/*           reply->type = 0; */
+/*           reply->reply_data = rep; */
+/*           reply->length = sizeof(message) + strlen(reply->value) + 1; */
+/*         } else { */
+/*           reply->type = 0; */
+/*         } */
+/*       } else { */
+/*         reply->type = ret; */
+/*         memcpy(reply->value, "No.", 4); */
+/*       } */
+/*     } else { */
+/*       reply->type = 13; */
+/*       memcpy(reply->value, "No callback with this id registered.", 37); */
+/*       reply->length = sizeof(message) + 37; */
+/*     } */
+/*   } else { */
+/*     reply->type = 13; */
+/*     memcpy(reply->value, "Invalid type.", 14); */
+/*     reply->length = sizeof(message) + 14; */
+/*   } */
+/* } */
 
 int psync_overlays_running() { return overlays_running; }
 int psync_ovr_callbacks_running() { return callbacks_running; }

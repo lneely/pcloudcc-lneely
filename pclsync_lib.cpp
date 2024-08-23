@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 #include "pclsync_lib_c.h"
+#include "poverlay.h"
 #include "psynclib.h"
 
 #include "pclsync_lib.h"
@@ -288,10 +289,25 @@ int clib::pclsync_lib::finalize(const char *path, void *rep) {
   exit(0);
 }
 
+// int clib::pclsync_lib::list_sync_folders(const char *path, void *rep) {
+//   psync_folder_list_t *folders = psync_get_sync_list();
+
+//   printf("folder count: %lu\n", folders->foldercnt);
+
+//   rep = psync_malloc(sizeof(*folders));
+//   memcpy(rep, folders, sizeof(*folders));
+//   return 0;
+// }
+
 int clib::pclsync_lib::list_sync_folders(const char *path, void *rep) {
   psync_folder_list_t *folders = psync_get_sync_list();
-  rep = psync_malloc(sizeof(*folders));
-  memcpy(rep, folders, sizeof(*folders));
+  *(void **)rep = psync_malloc(sizeof(*folders));
+  if (*(void **)rep == NULL) {
+    psync_free(folders);
+    return -1;
+  }
+  memcpy(*(void **)rep, folders, sizeof(*folders));
+  psync_free(folders);
   return 0;
 }
 

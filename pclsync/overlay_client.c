@@ -53,7 +53,7 @@ int QueryState(pCloud_FileState *state, char *path) {
   char *errm;
   size_t errm_size;
 
-  if (!SendCall(4, path /*IN*/, &rep, &errm, &errm_size)) {
+  if (!SendCall(4, path /*IN*/, &rep, &errm, &errm_size, NULL)) {
     debug(D_NOTICE, "QueryState responese rep[%d] path[%s]", rep, path);
     if (errm)
       debug(D_NOTICE, "The error is %s", errm);
@@ -72,7 +72,7 @@ int QueryState(pCloud_FileState *state, char *path) {
 }
 
 int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
-             char **out /*OUT*/, size_t *out_size) {
+             char **out /*OUT*/, size_t *out_size, void **reply_data) {
   struct sockaddr_un addr;
 
   int result, rc;
@@ -97,7 +97,6 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   *ret = 0;
   result = 0;
 
-  debug(D_NOTICE, "SendCall id[%d] path[%s]\n", id, path);
 
   // prepare socket fd
   if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -132,7 +131,6 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
     return -4;
   }
 
-  debug(D_NOTICE, "SendCall: Sending message type %d, path '%s'", id, path);
 
   // prepare and send the message to the socket
   message *mes = (message *)sendbuf;
@@ -160,7 +158,6 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
     }
     sendbytes += rc;
   }
-  debug(D_NOTICE, "SendCall: Sent %lu bytes", sendbytes);
 
   if (sendbytes != mes->length) {
     error_msg = "Communication error";
@@ -195,6 +192,7 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
       result = -251;
       goto cleanup;
     }
+
     if (rc == 0) {
       break; // end of response
     }
@@ -208,8 +206,6 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
       }
     }
   }
-
-  debug(D_NOTICE, "SendCall: Received %zu bytes", recvbytes);
 
   if (!received_data) {
     *ret = 0;
@@ -227,11 +223,6 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
 
   if (recvbytes >= sizeof(message)) {
     message *rep = (message *)recvbuf;
-    debug(D_NOTICE, "SendCall: Received message type: %d, length: %lu",
-          rep->type, rep->length);
-    if (recvbytes >= rep->length) {
-      debug(D_NOTICE, "SendCall: Entire message content: '%s'", rep->value);
-    }
   }
 
   if (recvbytes < sizeof(message)) {
@@ -255,6 +246,22 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   memcpy(*out, rep->value, value_size);
   (*out)[value_size] = '\0';
   *out_size = value_size + 1;
+
+  if (reply_data != NULL) {
+    if (recvbytes > rep->length) {
+      size_t reply_data_size = recvbytes - rep->length;
+      *reply_data = malloc(reply_data_size);
+      if (*reply_data == NULL) {
+        debug(D_ERROR, "Failed to allocate memory for reply_data");
+        *ret = -248;
+        result = -248;
+        goto cleanup;
+      }
+      memcpy(*reply_data, recvbuf + rep->length, reply_data_size);
+    } else {
+      *reply_data = NULL;
+    }
+  } 
 
 cleanup:
   if (fd != -1)

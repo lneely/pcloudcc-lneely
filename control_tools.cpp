@@ -40,6 +40,7 @@
 #include "pclsync_lib_c.h"
 
 #include "pclsync_lib.h"
+#include "psynclib.h"
 
 namespace cc = console_client;
 
@@ -56,12 +57,45 @@ enum command_ids_ {
   STOPSYNC
 };
 
+int list_sync_folders() {
+  int ret;
+  char *errm;
+  size_t errm_size;
+  void *reply_data = NULL;
+
+  int result = SendCall(LISTSYNC, "", &ret, &errm, &errm_size, &reply_data);
+  if (result != 0) {
+    std::cout << "error listing sync folders, ret is " << ret << " and errm is "
+              << errm << std::endl;
+  } else {
+    if (reply_data) {
+      // Process reply_data here
+      psync_folder_list_t *folders =
+          static_cast<psync_folder_list_t *>(reply_data);
+
+      if (folders->foldercnt > 0) {
+        for (size_t i = 0; i < folders->foldercnt; i++) {
+          std::cout << "Folder ID: " << folders->folders[i].folderid
+                    << ", Name: " << folders->folders[i].localpath << std::endl;
+        }
+      } else {
+        std::cout << "No sync folders found." << std::endl;
+      }
+      // Don't forget to free reply_data when you're done with it
+      psync_free(reply_data);
+    } else {
+      std::cout << "No reply data received." << std::endl;
+    }
+  }
+  return ret;
+}
+
 int start_crypto(const char *pass) {
   int ret;
   char *errm;
   size_t errm_size;
 
-  int result = SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size);
+  int result = SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size, NULL);
 
   // in this case, it is not enough to check for result; the server
   // should return (ret==0) indicating that the crypto folder was unlocked
@@ -83,7 +117,7 @@ int stop_crypto() {
   char *errm;
   size_t errm_size;
 
-  int result = SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size);
+  int result = SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size, NULL);
   if (result != 0) {
     std::cout << "Stop Crypto failed. return is " << ret << " and message is "
               << (errm ? errm : "no message") << std::endl;
@@ -101,7 +135,7 @@ int finalize() {
   char *errm;
   size_t errm_size;
 
-  int result = SendCall(FINALIZE, "", &ret, &errm, &errm_size);
+  int result = SendCall(FINALIZE, "", &ret, &errm, &errm_size, NULL);
   if (result != 0) {
     std::cout << "Finalize failed. return code is " << result << ", ret is "
               << ret << ", and message is " << (errm ? errm : "no message")
@@ -121,6 +155,7 @@ void process_commands() {
             << "startcrypto <crypto pass>, "
             << "stopcrypto, "
             << "finalize, "
+            << "sfls, "
             << "q, quit" << std::endl;
   std::cout << "> ";
 
@@ -135,6 +170,8 @@ void process_commands() {
       start_crypto(line.c_str() + 12);
     } else if (!line.compare("q") || !line.compare("quit")) {
       break;
+    } else if (!line.compare("sfls")) {
+      list_sync_folders();
     }
     std::cout << "> ";
   }

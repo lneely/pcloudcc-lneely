@@ -50,6 +50,9 @@ int start_crypto(const char *pass) {
 }
 int stop_crypto() { return cc::pclsync_lib::stop_crypto(NULL, NULL); }
 int finalize() { return cc::pclsync_lib::finalize(NULL, NULL); }
+int list_sync_folders() {
+  return cc::pclsync_lib::list_sync_folders(NULL, NULL);
+}
 void set_status_callback(status_callback_t c) {
   cc::pclsync_lib::get_lib().set_status_callback(c);
 }
