@@ -878,7 +878,10 @@ psync_folder_list_t *psync_list_get_list(char *syncTypes) {
     l = folders[i].locallen;
     memcpy(str, folders[i].localpath, l);
     psync_free(folders[i].localpath);
-    ret->folders[i].localpath = str;
+    strncpy(ret->folders[i].localpath, str,
+            sizeof(ret->folders[i].localpath) - 1);
+    ret->folders[i].localpath[sizeof(ret->folders[i].localpath) - 1] = '\0';
+
     l--;
 
     while (l && str[l] != PSYNC_DIRECTORY_SEPARATORC && str[l] != '/')
@@ -887,13 +890,17 @@ psync_folder_list_t *psync_list_get_list(char *syncTypes) {
     if ((str[l] == PSYNC_DIRECTORY_SEPARATORC || str[l] == '/') && str[l + 1])
       l++;
 
-    ret->folders[i].localname = str + l;
+    strncpy(ret->folders[i].localname, str,
+            sizeof(ret->folders[i].localname) - 1);
+    ret->folders[i].localname[sizeof(ret->folders[i].localname) - 1] = '\0';
     str += folders[i].locallen;
 
     l = folders[i].remotelen;
     memcpy(str, folders[i].remotepath, l);
     psync_free(folders[i].remotepath);
-    ret->folders[i].remotepath = str;
+    strncpy(ret->folders[i].remotepath, str,
+            sizeof(ret->folders[i].remotepath) - 1);
+    ret->folders[i].remotepath[sizeof(ret->folders[i].remotepath) - 1] = '\0';
 
     if (l)
       l--;
@@ -904,7 +911,9 @@ psync_folder_list_t *psync_list_get_list(char *syncTypes) {
     if (str[l] == '/')
       l++;
 
-    ret->folders[i].remotename = str + l;
+    strncpy(ret->folders[i].remotename, str + l,
+            sizeof(ret->folders[i].remotename) - 1);
+    ret->folders[i].remotename[sizeof(ret->folders[i].remotename) - 1] = '\0';
     str += folders[i].remotelen;
     ret->folders[i].folderid = folders[i].folderid;
     ret->folders[i].syncid = folders[i].syncid;

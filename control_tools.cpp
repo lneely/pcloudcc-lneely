@@ -25,6 +25,8 @@
   USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
   DAMAGE.
 */
+#include <cstring>
+#include <iomanip>
 #include <iostream>
 #include <string>
 
@@ -60,35 +62,65 @@ enum command_ids_ {
 int list_sync_folders() {
   int ret;
   char *errm;
-  size_t errm_size;
-  void *reply_data = NULL;
+  size_t errmsz;
+  void *rep;
+  size_t repsz;
+  int result;
+  psync_folder_list_t *flist;
+  psync_folder_t *folder;
+  int return_value;
 
-  int result = SendCall(LISTSYNC, "", &ret, &errm, &errm_size, &reply_data);
+  errm = NULL;
+  errmsz = 0;
+  rep = NULL;
+  repsz = 0;
+  return_value = 0;
+
+  result = SendCall(LISTSYNC, "", &ret, &errm, &errmsz, &rep, &repsz);
+
   if (result != 0) {
-    std::cout << "error listing sync folders, ret is " << ret << " and errm is "
-              << errm << std::endl;
-  } else {
-    if (reply_data) {
-      // Process reply_data here
-      psync_folder_list_t *folders =
-          static_cast<psync_folder_list_t *>(reply_data);
+    std::cout << "SendCall failed with result " << result << std::endl;
+    return_value = result;
+  } else if (rep && repsz > 0) {
+    flist = static_cast<psync_folder_list_t *>(rep);
 
-      if (folders->foldercnt > 0) {
-        for (size_t i = 0; i < folders->foldercnt; i++) {
-          std::cout << "Folder ID: " << folders->folders[i].folderid
-                    << "Local Name: " << folders->folders[i].localname
-                    << std::endl;
-        }
-      } else {
-        std::cout << "No sync folders found." << std::endl;
-      }
-      // Don't forget to free reply_data when you're done with it
-      psync_free(reply_data);
+    if (repsz < sizeof(psync_folder_list_t)) {
+      std::cout << "Error: Insufficient data for folder list structure"
+                << std::endl;
+      return_value = -1;
     } else {
-      std::cout << "No reply data received." << std::endl;
+
+      const int id_width = 12;
+      const int path_width = 30;
+      const int type_width = 10;
+
+      std::cout << std::left << std::setw(id_width) << "Folder ID"
+                << std::setw(path_width) << "Local Path"
+                << std::setw(path_width) << "Remote Path"
+                << std::setw(type_width) << "SyncType" << std::endl;
+      std::cout << std::string(id_width, '-')
+                << std::string(path_width - 1, '-')
+                << std::string(path_width - 1, '-')
+                << std::string(type_width - 1, '-') << std::endl;
+
+      for (uint32_t i = 0; i < flist->foldercnt; i++) {
+        folder = &flist->folders[i];
+        std::cout << std::left << std::setw(id_width) << folder->folderid
+                  << std::setw(path_width) << folder->localpath
+                  << std::setw(path_width) << folder->remotepath
+                  << std::setw(type_width) << "TBD" // Placeholder for SyncType
+                  << std::endl;
+      }
+      return_value = ret;
     }
+  } else {
+    std::cout << "No synchronized folders found." << std::endl;
+    return_value = ret;
   }
-  return ret;
+
+  free(errm);
+  free(rep);
+  return return_value;
 }
 
 int start_crypto(const char *pass) {
@@ -96,7 +128,7 @@ int start_crypto(const char *pass) {
   char *errm;
   size_t errm_size;
 
-  int result = SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size, NULL);
+  int result = SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size, NULL, NULL);
 
   // in this case, it is not enough to check for result; the server
   // should return (ret==0) indicating that the crypto folder was unlocked
@@ -118,7 +150,7 @@ int stop_crypto() {
   char *errm;
   size_t errm_size;
 
-  int result = SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size, NULL);
+  int result = SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size, NULL, NULL);
   if (result != 0) {
     std::cout << "Stop Crypto failed. return is " << ret << " and message is "
               << (errm ? errm : "no message") << std::endl;
@@ -136,7 +168,7 @@ int finalize() {
   char *errm;
   size_t errm_size;
 
-  int result = SendCall(FINALIZE, "", &ret, &errm, &errm_size, NULL);
+  int result = SendCall(FINALIZE, "", &ret, &errm, &errm_size, NULL, NULL);
   if (result != 0) {
     std::cout << "Finalize failed. return code is " << result << ", ret is "
               << ret << ", and message is " << (errm ? errm : "no message")

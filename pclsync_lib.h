@@ -81,10 +81,10 @@ public:
   int init();
   // std::string& username, std::string& password, std::string*
   // crypto_pass, int setup_crypto = 1, int usesrypto_userpass = 0);
-  static int start_crypto(const char *pass, void *rep);
-  static int stop_crypto(const char *path, void *rep);
-  static int finalize(const char *path, void *rep);
-  static int list_sync_folders(const char *path, void *rep);
+  static int start_crypto(const char *pass, void **rep);
+  static int stop_crypto(const char *path, void **rep);
+  static int finalize(const char *path, void **rep);
+  static int list_sync_folders(const char *path, void **rep);
 
   char *get_token();
   int logout();

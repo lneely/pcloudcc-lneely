@@ -53,7 +53,7 @@ int QueryState(pCloud_FileState *state, char *path) {
   char *errm;
   size_t errm_size;
 
-  if (!SendCall(4, path /*IN*/, &rep, &errm, &errm_size, NULL)) {
+  if (!SendCall(4, path /*IN*/, &rep, &errm, &errm_size, NULL, NULL)) {
     debug(D_NOTICE, "QueryState responese rep[%d] path[%s]", rep, path);
     if (errm)
       debug(D_NOTICE, "The error is %s", errm);
@@ -72,9 +72,9 @@ int QueryState(pCloud_FileState *state, char *path) {
 }
 
 int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
-             char **out /*OUT*/, size_t *out_size, void **reply_data) {
+             char **out /*OUT*/, size_t *out_size, void **reply_data,
+             size_t *reply_size) {
   struct sockaddr_un addr;
-
   int result, rc;
   uint64_t sendbytes = 0;
   int fd = -1;
@@ -96,7 +96,6 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   *out_size = 0;
   *ret = 0;
   result = 0;
-
 
   // prepare socket fd
   if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -130,7 +129,6 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
     *ret = -4;
     return -4;
   }
-
 
   // prepare and send the message to the socket
   message *mes = (message *)sendbuf;
@@ -187,6 +185,9 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
 
     rc = read(fd, recvbuf + recvsize, recvchunk);
     if (rc < 0) {
+      if (errno == EINTR) {
+        continue; // try again on interrupt
+      }
       debug(D_ERROR, "failed to read from socket into response buffer");
       *ret = -251;
       result = -251;
@@ -199,12 +200,6 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
     received_data = true;
     recvsize += rc;
     recvbytes += rc;
-    if (recvbytes >= sizeof(message)) {
-      message *rep = (message *)recvbuf;
-      if (recvbytes >= rep->length) {
-        break; // entire message read
-      }
-    }
   }
 
   if (!received_data) {
@@ -247,7 +242,7 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   (*out)[value_size] = '\0';
   *out_size = value_size + 1;
 
-  if (reply_data != NULL) {
+  if (reply_data != NULL && reply_size != NULL) {
     if (recvbytes > rep->length) {
       size_t reply_data_size = recvbytes - rep->length;
       *reply_data = malloc(reply_data_size);
@@ -258,10 +253,12 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
         goto cleanup;
       }
       memcpy(*reply_data, recvbuf + rep->length, reply_data_size);
+      *reply_size = reply_data_size; // Set the reply_size
     } else {
       *reply_data = NULL;
+      *reply_size = 0; // Set reply_size to 0 if no extra data
     }
-  } 
+  }
 
 cleanup:
   if (fd != -1)

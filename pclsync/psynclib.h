@@ -402,10 +402,10 @@ typedef struct pstatus_struct_ {
 
 // Lib error codes end
 typedef struct {
-  const char *localname;
-  const char *localpath;
-  const char *remotename;
-  const char *remotepath;
+  char localname[4096];
+  char localpath[4096];
+  char remotename[4096];
+  char remotepath[4096];
   psync_folderid_t folderid;
   psync_syncid_t syncid;
   psync_synctype_t synctype;
@@ -1793,8 +1793,7 @@ void psync_get_folder_ownerid(psync_folderid_t folderid,
 
 /* Callback to be registered to be called from file manager extension.
  */
-
-typedef int (*poverlay_callback)(const char *path, void *rep);
+typedef int (*poverlay_callback)(const char *path, void **rep);
 
 /* Registers file manager extension callback that will be called when packet
  * with id equals to the give one had arrived from extension. The id must be

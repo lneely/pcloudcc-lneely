@@ -303,9 +303,43 @@ void get_answer_to_request(message *request, message *reply, void **reply_data,
           switch (request->type) {
           case 23:
             debug(D_NOTICE, "got reply data for LISTSYNC message");
+
             psync_folder_list_t *folders = (psync_folder_list_t *)rep;
-            *reply_data_length = sizeof(psync_folder_list_t) +
-                                 folders->foldercnt * sizeof(psync_folder_t);
+            size_t total_size = sizeof(psync_folder_list_t) +
+                                folders->foldercnt * sizeof(psync_folder_t);
+
+            debug(D_NOTICE, "Calculating reply_data_length for %zu folders",
+                  folders->foldercnt);
+            debug(D_NOTICE, "Base size: %zu", total_size);
+
+            // Add the length of all strings, carefully handling NULL pointers
+            for (size_t i = 0; i < folders->foldercnt; i++) {
+              debug(D_NOTICE, "Processing folder %zu", i);
+              if (folders->folders[i].localname) {
+                total_size += strlen(folders->folders[i].localname) + 1;
+                debug(D_NOTICE, "  localname: %s",
+                      folders->folders[i].localname);
+              }
+              if (folders->folders[i].localpath) {
+                total_size += strlen(folders->folders[i].localpath) + 1;
+                debug(D_NOTICE, "  localpath: %s",
+                      folders->folders[i].localpath);
+              }
+              if (folders->folders[i].remotename) {
+                total_size += strlen(folders->folders[i].remotename) + 1;
+                debug(D_NOTICE, "  remotename: %s",
+                      folders->folders[i].remotename);
+              }
+              if (folders->folders[i].remotepath) {
+                total_size += strlen(folders->folders[i].remotepath) + 1;
+                debug(D_NOTICE, "  remotepath: %s",
+                      folders->folders[i].remotepath);
+              }
+            }
+
+            *reply_data_length = total_size;
+            debug(D_NOTICE, "Final reply_data_length: %zu", *reply_data_length);
+
             debug(D_NOTICE, "reply data length is %zu", *reply_data_length);
             break;
           }

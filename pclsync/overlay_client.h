@@ -49,7 +49,8 @@ typedef enum _pCloud_FileState {
 int QueryState(pCloud_FileState *state /*OUT*/, char *path /*IN*/);
 
 int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
-             char **out /*OUT*/, size_t *out_size, void **reply_data);
+             char **out /*OUT*/, size_t *out_size, void **reply_data,
+             size_t *reply_size);
 #ifdef __cplusplus
 }
 #endif

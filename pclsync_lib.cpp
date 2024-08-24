@@ -271,20 +271,20 @@ static void status_change(pstatus_t *status) {
     psync_free(err);
 }
 
-int clib::pclsync_lib::start_crypto(const char *pass, void *rep) {
+int clib::pclsync_lib::start_crypto(const char *pass, void **rep) {
   std::cout << "calling startcrypto pass: " << pass << std::endl;
   get_lib().crypto_pass_ = pass;
   return lib_setup_cripto();
 }
 
-int clib::pclsync_lib::stop_crypto(const char *path, void *rep) {
+int clib::pclsync_lib::stop_crypto(const char *path, void **rep) {
   int res = -1;
   psync_crypto_stop();
   get_lib().crypto_on_ = false;
   return res;
 }
 
-int clib::pclsync_lib::finalize(const char *path, void *rep) {
+int clib::pclsync_lib::finalize(const char *path, void **rep) {
   psync_destroy();
   exit(0);
 }
@@ -299,14 +299,31 @@ int clib::pclsync_lib::finalize(const char *path, void *rep) {
 //   return 0;
 // }
 
-int clib::pclsync_lib::list_sync_folders(const char *path, void *rep) {
+// int clib::pclsync_lib::list_sync_folders(const char *path, void *rep) {
+//   psync_folder_list_t *folders = psync_get_sync_list();
+//   *(void **)rep = psync_malloc(sizeof(*folders));
+//   if (*(void **)rep == NULL) {
+//     psync_free(folders);
+//     return -1;
+//   }
+//   memcpy(*(void **)rep, folders, sizeof(*folders));
+//   psync_free(folders);
+//   return 0;
+// }
+
+int clib::pclsync_lib::list_sync_folders(const char *path, void **rep) {
   psync_folder_list_t *folders = psync_get_sync_list();
-  *(void **)rep = psync_malloc(sizeof(*folders));
-  if (*(void **)rep == NULL) {
+  if (!folders) {
+    return -1;
+  }
+  size_t alloc_size =
+      sizeof(*folders) + folders->foldercnt * sizeof(psync_folder_t);
+  *rep = psync_malloc(alloc_size);
+  if (*rep == NULL) {
     psync_free(folders);
     return -1;
   }
-  memcpy(*(void **)rep, folders, sizeof(*folders));
+  memcpy(*rep, folders, alloc_size);
   psync_free(folders);
   return 0;
 }
