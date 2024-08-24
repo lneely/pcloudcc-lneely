@@ -85,6 +85,8 @@ public:
   static int stop_crypto(const char *path, void **rep);
   static int finalize(const char *path, void **rep);
   static int list_sync_folders(const char *path, void **rep);
+  static int add_sync_folder(const char *path, void **rep);
+  static int remove_sync_folder(const char *path, void **rep);
 
   char *get_token();
   int logout();

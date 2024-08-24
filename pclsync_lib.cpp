@@ -223,9 +223,6 @@ static void status_change(pstatus_t *status) {
       clib::pclsync_lib::get_lib().get_pass_from_console();
     }
 
-    // std::cout << "Username: " <<
-    // clib::pclsync_lib::get_lib().get_username().c_str() << "| Password: " <<
-    // clib::pclsync_lib::get_lib().get_password().c_str() << std::endl;
     psync_set_user_pass(clib::pclsync_lib::get_lib().get_username().c_str(),
                         clib::pclsync_lib::get_lib().get_password().c_str(),
                         (int)clib::pclsync_lib::get_lib().save_pass_);
@@ -289,27 +286,44 @@ int clib::pclsync_lib::finalize(const char *path, void **rep) {
   exit(0);
 }
 
-// int clib::pclsync_lib::list_sync_folders(const char *path, void *rep) {
-//   psync_folder_list_t *folders = psync_get_sync_list();
+int clib::pclsync_lib::add_sync_folder(const char *path, void **rep) {
+  std::cout << "add_sync_folder called with path " << (path ? path : "nullptr");
+  int result = -1;
+  const char delimiter = '|'; // ASCII unit separator
+  std::string combined;
+  size_t delimiter_pos;
+  std::string localpath;
+  std::string remotepath;
+  psync_syncid_t syncid;
 
-//   printf("folder count: %lu\n", folders->foldercnt);
+  std::cout << "in add_sync_folder" << std::endl;
 
-//   rep = psync_malloc(sizeof(*folders));
-//   memcpy(rep, folders, sizeof(*folders));
-//   return 0;
-// }
+  if (path != nullptr) {
+    combined = path;
+    delimiter_pos = combined.find(delimiter);
+    if (delimiter_pos != std::string::npos) {
+      localpath = combined.substr(0, delimiter_pos);
+      remotepath = combined.substr(delimiter_pos + 1);
+      std::cout << "path = " << path << std::endl;
+      std::cout << "localpath = " << localpath << std::endl;
+      std::cout << "remotepath = " << remotepath << std::endl;
+      syncid = psync_add_sync_by_path(localpath.c_str(), remotepath.c_str(),
+                                      PSYNC_FULL);
 
-// int clib::pclsync_lib::list_sync_folders(const char *path, void *rep) {
-//   psync_folder_list_t *folders = psync_get_sync_list();
-//   *(void **)rep = psync_malloc(sizeof(*folders));
-//   if (*(void **)rep == NULL) {
-//     psync_free(folders);
-//     return -1;
-//   }
-//   memcpy(*(void **)rep, folders, sizeof(*folders));
-//   psync_free(folders);
-//   return 0;
-// }
+      if (syncid != PSYNC_INVALID_SYNCID) {
+        *reinterpret_cast<psync_syncid_t *>(*rep) = syncid;
+        result = 0;
+      }
+    }
+  }
+
+  return result;
+}
+
+int clib::pclsync_lib::remove_sync_folder(const char *path, void **rep) {
+  // TODO
+  return 0;
+}
 
 int clib::pclsync_lib::list_sync_folders(const char *path, void **rep) {
   psync_folder_list_t *folders = psync_get_sync_list();
@@ -367,6 +381,8 @@ int clib::pclsync_lib::init() {
   psync_add_overlay_callback(21, &clib::pclsync_lib::stop_crypto);
   psync_add_overlay_callback(22, &clib::pclsync_lib::finalize);
   psync_add_overlay_callback(23, &clib::pclsync_lib::list_sync_folders);
+  psync_add_overlay_callback(24, &clib::pclsync_lib::add_sync_folder);
+  psync_add_overlay_callback(25, &clib::pclsync_lib::remove_sync_folder);
 
   return 0;
 }

@@ -97,6 +97,8 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   *ret = 0;
   result = 0;
 
+  printf("Sendcall about to send path: %s\n", path);
+
   // prepare socket fd
   if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
     error_msg = "Unable to create unix socket";

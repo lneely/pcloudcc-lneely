@@ -51,7 +51,8 @@ extern int callbacks_running;
 
 void overlay_main_loop(VOID);
 void instance_thread(LPVOID);
-void get_answer_to_request(message *requesr /*IN*/, message *replay /*OUT*/, void **reply_data, size_t *reply_data_length);
+void get_answer_to_request(message *requesr /*IN*/, message *replay /*OUT*/,
+                           void **reply_data, size_t *reply_data_length);
 void psync_stop_overlays();
 void psync_start_overlays();
 void psync_stop_overlay_callbacks();

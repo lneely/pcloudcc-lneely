@@ -84,57 +84,6 @@ void overlay_main_loop() {
   return;
 }
 
-/*
-void instance_thread(void *lpvParam) {
-  int *cl, rc;
-  char chbuf[POVERLAY_BUFSIZE];
-  message *request = NULL;
-  char *curbuf = &chbuf[0];
-  int bytes_read = 0;
-  message *reply = (message *)psync_malloc(POVERLAY_BUFSIZE);
-
-  memset(reply, 0, POVERLAY_BUFSIZE);
-  memset(chbuf, 0, POVERLAY_BUFSIZE);
-
-  cl = (int *)lpvParam;
-
-  while ((rc = read(*cl, curbuf, (POVERLAY_BUFSIZE - bytes_read))) > 0) {
-    bytes_read += rc;
-    // debug(D_ERROR, "Read %u bytes: %u %s", bytes_read, rc, curbuf );
-    curbuf = curbuf + rc;
-    if (bytes_read > 12) {
-      request = (message *)chbuf;
-      if (request->length == bytes_read)
-        break;
-    }
-  }
-  if (rc == -1) {
-    // debug(D_ERROR,"Unix socket read");
-    close(*cl);
-    return;
-  } else if (rc == 0) {
-    // debug(D_NOTICE,"Message received");
-    close(*cl);
-  }
-  request = (message *)chbuf;
-  if (request) {
-    get_answer_to_request(request, reply);
-    if (reply) {
-      rc = write(*cl, reply, reply->length);
-      if (rc != reply->length)
-        debug(D_ERROR, "Unix socket reply not sent.");
-    }
-  }
-  if (cl) {
-    close(*cl);
-  }
-  // debug(D_NOTICE, "InstanceThread exitting.\n");
-
-  psync_free(reply);
-  return;
-};
-*/
-
 void instance_thread(void *lpvParam) {
   int *cl, rc;
   char chbuf[POVERLAY_BUFSIZE];
@@ -168,6 +117,9 @@ void instance_thread(void *lpvParam) {
     goto cleanup;
   }
 
+  // XXX: the chbuf is getting truncated here. chbuf + 16 offset
+  // contains the full request message, but request->value is
+  // truncated. why??
   request = (message *)chbuf;
   if (request) {
     get_answer_to_request(request, reply, &reply_data, &reply_data_length);

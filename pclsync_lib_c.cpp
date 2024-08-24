@@ -26,11 +26,13 @@
   DAMAGE.
 */
 
+#include <iostream>
 #include <string>
 
 #include "pclsync_lib_c.h"
 
 #include "pclsync_lib.h"
+#include "psynclib.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,13 +47,27 @@ int init() {
     return 0;
 }
 
+// TODO: delete?
 int start_crypto(const char *pass) {
   return cc::pclsync_lib::start_crypto(pass, NULL);
 }
+// TODO: delete?
 int stop_crypto() { return cc::pclsync_lib::stop_crypto(NULL, NULL); }
+// TODO: delete?
 int finalize() { return cc::pclsync_lib::finalize(NULL, NULL); }
+
+// TODO: delete?
 int list_sync_folders() {
-  return cc::pclsync_lib::list_sync_folders(NULL, NULL);
+  psync_folder_list_t *flist = NULL;
+  return cc::pclsync_lib::list_sync_folders(NULL, (void **)flist);
+}
+
+// TODO: delete?
+int add_sync_folder(std::string localpath, std::string remotepath) {
+  std::string combinedPaths;
+  const char delimiter = '|';
+  combinedPaths = localpath + delimiter + remotepath;
+  return cc::pclsync_lib::add_sync_folder(combinedPaths.c_str(), NULL);
 }
 void set_status_callback(status_callback_t c) {
   cc::pclsync_lib::get_lib().set_status_callback(c);
