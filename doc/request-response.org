@@ -14,7 +14,7 @@ corresponding response message from the server.
 The client and server send and receive messages over a Unix socket
 that gets created when the server is started.
 
-#+begin_src plantuml :file img/request-response-00.png
+#+begin_src plantuml :file img/request-response-00.png :export results
   participant user
   participant control_tools <<client>>
   participant overlay_client <<client>>
@@ -35,6 +35,5 @@ that gets created when the server is started.
   control_tools -> user : print results
 #+end_src
 
-#+RESULTS:
 [[file:img/request-response-00.png]]
 
