@@ -89,15 +89,15 @@ void psync_overlay_main_loop() {
       continue;
     }
     psync_run_thread1("Pipe request handle routine",
-                      psync_overlay_server_thread, // thread proc
-                      (LPVOID)&cl                  // thread parameter
+                      psync_overlay_handle_request, // thread proc
+                      (LPVOID)&cl                   // thread parameter
     );
   }
 
   return;
 }
 
-void psync_overlay_server_thread(void *lpvParam) {
+void psync_overlay_handle_request(void *lpvParam) {
   int *sockfd;                  // pcloud socket file descriptor
   int rc;                       // bytes read / written per iteration
   int readbytes;                // total bytes read from request

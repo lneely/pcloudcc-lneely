@@ -47,7 +47,7 @@ extern int overlays_running;
 extern int callbacks_running;
 
 void psync_overlay_main_loop(VOID);
-void psync_overlay_server_thread(LPVOID);
+void psync_overlay_handle_request(LPVOID);
 void psync_overlay_get_response(request_message *rq /*IN*/,
                                 response_message *rs /*OUT*/);
 void psync_overlay_stop_overlays();
