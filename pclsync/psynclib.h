@@ -1791,9 +1791,21 @@ void psync_get_current_userid(psync_userid_t * /*OUT*/ ret);
 void psync_get_folder_ownerid(psync_folderid_t folderid,
                               psync_userid_t * /*OUT*/ ret);
 
-/* Callback to be registered to be called from file manager extension.
- */
-typedef int (*poverlay_callback)(const char *path, void **payload);
+// Defines the function signature of an overlay server-side
+// callback. poverlay_callback implementations must satisfy the
+// following:
+//
+// - Accepts request data as a string.
+//
+// - Returns 0 on success, and non-zero on failure
+//
+// - If the function invoked by the callback function returns data
+//   that can be used by the client (e.g., list_sync_folders), then
+//   allocate the void** pointer and write the data there. If the
+//   void** pointer is null, then do not write any data back out for
+//   the client.
+//
+typedef int (*poverlay_callback)(const char *, void **);
 
 /* Registers file manager extension callback that will be called when packet
  * with id equals to the give one had arrived from extension. The id must be

@@ -221,107 +221,123 @@ void psync_overlay_init_callbacks() {
   memset(callbacks, 0, sizeof(poverlay_callback) * callbacks_size);
 }
 
-void psync_overlay_stop_overlays() { overlays_running = 0; }
-void psync_overlay_start_overlays() { overlays_running = 1; }
+static void psync_overlay_get_status_response(request_message *request,
+                                              response_message *response,
+                                              size_t available_space) {
+  psync_path_status_t stat;
 
-void psync_overlay_stop_overlay_callbacks() { callbacks_running = 0; }
-void psync_overlay_start_overlay_callbacks() { callbacks_running = 1; }
+  stat = PSYNC_PATH_STATUS_NOT_OURS;
+
+  if (overlays_running) {
+    stat = psync_path_status_get(request->value);
+  }
+  switch (psync_path_status_get_status(stat)) {
+  case PSYNC_PATH_STATUS_IN_SYNC:
+    response->msg->type = 10;
+    break;
+  case PSYNC_PATH_STATUS_IN_PROG:
+    response->msg->type = 12;
+    break;
+  case PSYNC_PATH_STATUS_PAUSED:
+  case PSYNC_PATH_STATUS_REMOTE_FULL:
+  case PSYNC_PATH_STATUS_LOCAL_FULL:
+    response->msg->type = 11;
+    break;
+  default:
+    response->msg->type = 13;
+    snprintf(response->msg->value, available_space, "No.");
+  }
+}
+
+static void
+psync_overlay_get_overlay_response_payload(request_message *request,
+                                           response_message *response) {
+  if (!response->payload) {
+    response->payloadsz = 0;
+    debug(D_NOTICE, "Callback succeeded with no reply data");
+    return;
+  }
+
+  if (request->type == 23) {
+    // LISTSYNC
+    psync_folder_list_t *folders = (psync_folder_list_t *)response->payload;
+    response->payloadsz = sizeof(psync_folder_list_t) +
+                          folders->foldercnt * sizeof(psync_folder_t);
+  } else if (request->type == 24) {
+    // ADDSYNC
+    response->payloadsz = sizeof(psync_syncid_t);
+  } else {
+    // default: response has no payload
+    response->payloadsz = 0;
+  }
+  debug(D_NOTICE, "Callback succeeded with reply data, length: %zu",
+        response->payloadsz);
+}
+
+static void psync_overlay_get_overlay_response(request_message *request,
+                                               response_message *response,
+                                               size_t available_space) {
+  int cbidx; // callback index (based on message type)
+  int ret;   //
+
+  cbidx = request->type - 20;
+  ret = 0;
+
+  if (!callbacks_running || (request->type >= ((uint32_t)calbacks_lower_band +
+                                               (uint32_t)callbacks_size))) {
+    response->msg->type = 13;
+    snprintf(response->msg->value, available_space, "Invalid type.");
+    debug(D_NOTICE, "Invalid request type: %u", request->type);
+    return;
+  }
+
+  if (!callbacks[cbidx]) {
+    response->msg->type = 13;
+    snprintf(response->msg->value, available_space,
+             "No callback with this id registered.");
+    debug(D_NOTICE, "No callback registered for type: %u", request->type);
+    return;
+  }
+
+  ret = callbacks[cbidx](request->value, &response->payload);
+  if (ret == 0) {
+    response->msg->type = ret; // TODO: verify this is correct
+    psync_overlay_get_overlay_response_payload(request, response);
+  } else {
+    response->msg->type = ret; // TODO: verify this is correct
+    snprintf(response->msg->value, available_space, "No.");
+    response->payloadsz = 0;
+    debug(D_NOTICE, "Callback failed with return code: %d", ret);
+  }
+}
 
 void psync_overlay_get_response(request_message *request,
                                 response_message *response) {
-  psync_path_status_t stat;
-  int ind, ret;
-  psync_folder_list_t *folders;
   const char *debug_string;
-  size_t available_space;
+  size_t value_space_available; // space available to store the value after
+                                // accounting for the fixed parts of the message
+                                // struct
 
   // Declarations
-  stat = PSYNC_PATH_STATUS_NOT_OURS;
-  ind = 0;
-  ret = 0;
-  folders = NULL;
   debug_string = NULL;
 
   // Initializations
   response->msg = (message *)psync_malloc(POVERLAY_BUFSIZE);
-  if (!response->msg) {
-    debug(D_ERROR, "Failed to allocate memory for response message");
-    return;
-  }
-  memset(response->msg, 0,
-         POVERLAY_BUFSIZE); // Initialize the entire buffer to zero
-  response->msg->length = sizeof(message);
+  memset(response->msg, 0, POVERLAY_BUFSIZE);
+  response->msg->length = 0;
   response->payload = NULL;
   response->payloadsz = 0;
-  available_space = POVERLAY_BUFSIZE - sizeof(message);
+  value_space_available = POVERLAY_BUFSIZE - sizeof(message);
 
-  // don't write the crypto password to the debug logs...
   debug_string = (request->type == 20) ? "REDACTED" : request->value;
-
   debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]",
         request->type, request->length, debug_string);
 
   if (request->type < 20) {
-    if (overlays_running) {
-      stat = psync_path_status_get(request->value);
-    }
-    switch (psync_path_status_get_status(stat)) {
-    case PSYNC_PATH_STATUS_IN_SYNC:
-      response->msg->type = 10;
-      break;
-    case PSYNC_PATH_STATUS_IN_PROG:
-      response->msg->type = 12;
-      break;
-    case PSYNC_PATH_STATUS_PAUSED:
-    case PSYNC_PATH_STATUS_REMOTE_FULL:
-    case PSYNC_PATH_STATUS_LOCAL_FULL:
-      response->msg->type = 11;
-      break;
-    default:
-      response->msg->type = 13;
-      snprintf(response->msg->value, available_space, "No.");
-    }
-  } else if (callbacks_running &&
-             (request->type <
-              ((uint32_t)calbacks_lower_band + (uint32_t)callbacks_size))) {
-    ind = request->type - 20;
-
-    if (callbacks[ind]) {
-      ret = callbacks[ind](request->value, &response->payload);
-      if (ret == 0) {
-        response->msg->type = 0;
-        if (response->payload) {
-          if (request->type == 23) { // LISTSYNC
-            folders = (psync_folder_list_t *)response->payload;
-            response->payloadsz = sizeof(psync_folder_list_t) +
-                                  folders->foldercnt * sizeof(psync_folder_t);
-          } else if (request->type == 24) { // ADDSYNC
-            response->payloadsz = sizeof(psync_syncid_t);
-          } else {
-            response->payloadsz = 0;
-          }
-          debug(D_NOTICE, "Callback succeeded with reply data, length: %zu",
-                response->payloadsz);
-        } else {
-          response->payloadsz = 0;
-          debug(D_NOTICE, "Callback succeeded with no reply data");
-        }
-      } else {
-        response->msg->type = ret;
-        snprintf(response->msg->value, available_space, "No.");
-        response->payloadsz = 0;
-        debug(D_NOTICE, "Callback failed with return code: %d", ret);
-      }
-    } else {
-      response->msg->type = 13;
-      snprintf(response->msg->value, available_space,
-               "No callback with this id registered.");
-      debug(D_NOTICE, "No callback registered for type: %u", request->type);
-    }
+    psync_overlay_get_status_response(request, response, value_space_available);
   } else {
-    response->msg->type = 13;
-    snprintf(response->msg->value, available_space, "Invalid type.");
-    debug(D_NOTICE, "Invalid request type: %u", request->type);
+    psync_overlay_get_overlay_response(request, response,
+                                       value_space_available);
   }
 
   if (response->payload == NULL) {
@@ -329,23 +345,23 @@ void psync_overlay_get_response(request_message *request,
     debug(D_NOTICE, "No reply data received");
   }
 
-  // Set default reply value if not set elsewhere
   if (response->msg->type != 13 && response->msg->value[0] == '\0') {
-    snprintf(response->msg->value, available_space, "Ok.");
+    snprintf(response->msg->value, value_space_available, "Ok.");
   }
 
-  // Calculate final message length (safely)
-  size_t value_length = strnlen(response->msg->value, available_space);
-  response->msg->length =
-      sizeof(message) + value_length + 1; // +1 for null terminator
+  size_t value_length = strnlen(response->msg->value, value_space_available);
+  response->msg->length = sizeof(message) + value_length + 1;
 
-  // Ensure we don't exceed the allocated buffer
   if (response->msg->length > POVERLAY_BUFSIZE) {
     response->msg->length = POVERLAY_BUFSIZE;
-    response->msg->value[available_space - 1] = '\0'; // Ensure null termination
+    response->msg->value[value_space_available - 1] = '\0';
     debug(D_WARNING, "Response message truncated to fit buffer");
   }
 }
 
+void psync_overlay_stop_overlays() { overlays_running = 0; }
+void psync_overlay_start_overlays() { overlays_running = 1; }
+void psync_overlay_stop_overlay_callbacks() { callbacks_running = 0; }
+void psync_overlay_start_overlay_callbacks() { callbacks_running = 1; }
 int psync_overlay_overlays_running() { return overlays_running; }
 int psync_overlay_callbacks_running() { return callbacks_running; }
