@@ -104,7 +104,7 @@ void instance_thread(void *lpvParam) {
     curbuf = curbuf + rc;
     if (bytes_read > 12) {
       request = (message *)chbuf;
-      if (request->length == bytes_read)
+      if (request->length == (uint64_t)bytes_read)
         break;
     }
   }
@@ -204,25 +204,41 @@ void psync_start_overlays() { overlays_running = 1; }
 void psync_stop_overlay_callbacks() { callbacks_running = 0; }
 void psync_start_overlay_callbacks() { callbacks_running = 1; }
 
-void get_answer_to_request(message *request, message *reply, void **reply_data,
-                           size_t *reply_data_length) {
-  psync_path_status_t stat = PSYNC_PATH_STATUS_NOT_OURS;
-  memcpy(reply->value, "Ok.", 4);
-  reply->length = sizeof(message) + 4;
-  *reply_data = NULL;
-  *reply_data_length = 0;
+void get_answer_to_request(message *request, message *reply, void **payload,
+                           size_t *payloadsz) {
+  psync_path_status_t stat;
+  int ind, ret;
+  void *callback_payload;
+  psync_folder_list_t *folders;
+  const char *debug_string;
 
-  if (request->type == 20 /* STARTCRYPTO, see control_tools.cpp */) {
-    debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]",
-          request->type, request->length, "REDACTED");
+  // Declarations
+  stat = PSYNC_PATH_STATUS_NOT_OURS;
+  ind = 0;
+  ret = 0;
+  callback_payload = NULL;
+  folders = NULL;
+  debug_string = NULL;
+
+  // Initializations
+  reply->length = sizeof(message) + 4;
+  *payload = NULL;
+  *payloadsz = 0;
+
+  // Main logic
+  if (request->type == 20) {
+    debug_string = "REDACTED";
   } else {
-    debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]",
-          request->type, request->length, request->value);
+    debug_string = request->value;
   }
 
+  debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]",
+        request->type, request->length, debug_string);
+
   if (request->type < 20) {
-    if (overlays_running)
+    if (overlays_running) {
       stat = psync_path_status_get(request->value);
+    }
     switch (psync_path_status_get_status(stat)) {
     case PSYNC_PATH_STATUS_IN_SYNC:
       reply->type = 10;
@@ -242,29 +258,25 @@ void get_answer_to_request(message *request, message *reply, void **reply_data,
   } else if ((callbacks_running) &&
              (request->type <
               ((uint32_t)calbacks_lower_band + (uint32_t)callbacks_size))) {
-    int ind = request->type - 20;
-    int ret = 0;
-    void *payload = NULL;
+    ind = request->type - 20;
 
     if (callbacks[ind]) {
-      ret = callbacks[ind](request->value, &payload);
+      ret = callbacks[ind](request->value, &callback_payload);
       if (ret == 0) {
         reply->type = 0;
         reply->length = sizeof(message) + strlen(reply->value) + 1;
 
-        // if the callback returns a payload, handle it.
-        if (payload) {
-          *reply_data = payload;
+        if (callback_payload) {
+          *payload = callback_payload;
           if (request->type == 23) { // LISTSYNC
-            psync_folder_list_t *folders = (psync_folder_list_t *)payload;
-            *reply_data_length = sizeof(psync_folder_list_t) +
-                                 folders->foldercnt * sizeof(psync_folder_t);
+            folders = (psync_folder_list_t *)callback_payload;
+            *payloadsz = sizeof(psync_folder_list_t) +
+                         folders->foldercnt * sizeof(psync_folder_t);
           } else if (request->type == 24) { // ADDSYNC
-            *reply_data_length = sizeof(psync_syncid_t);
+            *payloadsz = sizeof(psync_syncid_t);
           }
-
           debug(D_NOTICE, "Callback succeeded with reply data, length: %zu",
-                *reply_data_length);
+                *payloadsz);
         } else {
           debug(D_NOTICE, "Callback succeeded with no reply data");
         }
@@ -286,9 +298,16 @@ void get_answer_to_request(message *request, message *reply, void **reply_data,
     debug(D_NOTICE, "Invalid request type: %u", request->type);
   }
 
-  if (*reply_data == NULL) {
+  if (*payload == NULL) {
     debug(D_NOTICE, "No reply data received");
   }
+
+  // Set default reply value if not set elsewhere
+  if (reply->type != 13) {
+    memcpy(reply->value, "Ok.", 4);
+  }
+
+  return;
 }
 
 int psync_overlays_running() { return overlays_running; }
