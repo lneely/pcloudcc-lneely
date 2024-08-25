@@ -270,6 +270,13 @@ psync_overlay_get_overlay_response_payload(request_message *request,
     // default: response has no payload
     response->payloadsz = 0;
   }
+
+  if (response->payload == NULL) {
+    response->payloadsz = 0;
+    debug(D_NOTICE, "No reply data received");
+    return;
+  }
+
   debug(D_NOTICE, "Callback succeeded with reply data, length: %zu",
         response->payloadsz);
 }
@@ -278,10 +285,10 @@ static void psync_overlay_get_overlay_response(request_message *request,
                                                response_message *response,
                                                size_t available_space) {
   int cbidx; // callback index (based on message type)
-  int ret;   //
+  int cbret; // callback return value
 
   cbidx = request->type - 20;
-  ret = 0;
+  cbret = 0;
 
   if (!callbacks_running || (request->type >= ((uint32_t)calbacks_lower_band +
                                                (uint32_t)callbacks_size))) {
@@ -299,62 +306,55 @@ static void psync_overlay_get_overlay_response(request_message *request,
     return;
   }
 
-  ret = callbacks[cbidx](request->value, &response->payload);
-  if (ret == 0) {
-    response->msg->type = ret; // TODO: verify this is correct
+  cbret = callbacks[cbidx](request->value, &response->payload);
+  if (cbret == 0) {
+    response->msg->type = 0;
     psync_overlay_get_overlay_response_payload(request, response);
   } else {
-    response->msg->type = ret; // TODO: verify this is correct
+    response->msg->type = 13;
     snprintf(response->msg->value, available_space, "No.");
     response->payloadsz = 0;
-    debug(D_NOTICE, "Callback failed with return code: %d", ret);
+    debug(D_NOTICE, "Callback failed with return code: %d", cbret);
   }
 }
 
 void psync_overlay_get_response(request_message *request,
                                 response_message *response) {
-  const char *debug_string;
-  size_t value_space_available; // space available to store the value after
-                                // accounting for the fixed parts of the message
-                                // struct
 
-  // Declarations
-  debug_string = NULL;
+  const char *dbgmsg; // debug messages
+  size_t value_avail; // space available to store value (flexible array)
 
-  // Initializations
+  dbgmsg = NULL;
   response->msg = (message *)psync_malloc(POVERLAY_BUFSIZE);
   memset(response->msg, 0, POVERLAY_BUFSIZE);
   response->msg->length = 0;
   response->payload = NULL;
   response->payloadsz = 0;
-  value_space_available = POVERLAY_BUFSIZE - sizeof(message);
+  value_avail = POVERLAY_BUFSIZE - sizeof(message);
 
-  debug_string = (request->type == 20) ? "REDACTED" : request->value;
+  // never print the crypto password to the logs in plain text
+  dbgmsg = (request->type == 20) ? "REDACTED" : request->value;
   debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]",
-        request->type, request->length, debug_string);
+        request->type, request->length, dbgmsg);
 
   if (request->type < 20) {
-    psync_overlay_get_status_response(request, response, value_space_available);
+    psync_overlay_get_status_response(request, response, value_avail);
   } else {
-    psync_overlay_get_overlay_response(request, response,
-                                       value_space_available);
+    psync_overlay_get_overlay_response(request, response, value_avail);
   }
 
-  if (response->payload == NULL) {
-    response->payloadsz = 0;
-    debug(D_NOTICE, "No reply data received");
-  }
-
+  // a message with a type != 13 and a null string value after
+  // processing is considered successful. set value to "Ok."
   if (response->msg->type != 13 && response->msg->value[0] == '\0') {
-    snprintf(response->msg->value, value_space_available, "Ok.");
+    snprintf(response->msg->value, value_avail, "Ok.");
   }
 
-  size_t value_length = strnlen(response->msg->value, value_space_available);
+  // truncate messages that exceed the buffer boundaries
+  size_t value_length = strnlen(response->msg->value, value_avail);
   response->msg->length = sizeof(message) + value_length + 1;
-
   if (response->msg->length > POVERLAY_BUFSIZE) {
     response->msg->length = POVERLAY_BUFSIZE;
-    response->msg->value[value_space_available - 1] = '\0';
+    response->msg->value[value_avail - 1] = '\0';
     debug(D_WARNING, "Response message truncated to fit buffer");
   }
 }
