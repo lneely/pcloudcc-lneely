@@ -269,12 +269,11 @@ int add_sync_folder(std::string localpath, std::string remotepath) {
                 << std::endl;
       rval = -1;
     } else {
-      std::cout << "syncid received from add_sync_folder: " << syncid
-                << std::endl;
       rval = ret;
     }
   } else {
-    std::cout << "Did not get a syncid from add_sync_folder." << std::endl;
+    std::cout << "Error: Did not get a syncid from add_sync_folder."
+              << std::endl;
     rval = ret;
   }
 
