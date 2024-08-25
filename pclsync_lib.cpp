@@ -37,6 +37,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "poverlay_protocol.h"
+
 #include "poverlay.h"
 #include "psynclib.h"
 
@@ -389,12 +391,12 @@ int clib::pclsync_lib::init() {
     psync_free(username_old);
   }
 
-  psync_add_overlay_callback(20, &clib::pclsync_lib::start_crypto);
-  psync_add_overlay_callback(21, &clib::pclsync_lib::stop_crypto);
-  psync_add_overlay_callback(22, &clib::pclsync_lib::finalize);
-  psync_add_overlay_callback(23, &clib::pclsync_lib::list_sync_folders);
-  psync_add_overlay_callback(24, &clib::pclsync_lib::add_sync_folder);
-  psync_add_overlay_callback(25, &clib::pclsync_lib::remove_sync_folder);
+  psync_overlay_register_callback(20, &clib::pclsync_lib::start_crypto);
+  psync_overlay_register_callback(21, &clib::pclsync_lib::stop_crypto);
+  psync_overlay_register_callback(22, &clib::pclsync_lib::finalize);
+  psync_overlay_register_callback(23, &clib::pclsync_lib::list_sync_folders);
+  psync_overlay_register_callback(24, &clib::pclsync_lib::add_sync_folder);
+  psync_overlay_register_callback(25, &clib::pclsync_lib::remove_sync_folder);
 
   return 0;
 }

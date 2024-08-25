@@ -61,6 +61,9 @@
 #include "pmemlock.h"
 #include "pnetlibs.h"
 #include "pnotifications.h"
+
+#include "poverlay_protocol.h"
+
 #include "poverlay.h"
 #include "pp2p.h"
 #include "ppagecache.h"
@@ -297,8 +300,8 @@ int psync_init() {
     pthread_mutex_unlock(&psync_libstate_mutex);
   }
 
-  psync_run_thread("Overlay main thread", overlay_main_loop);
-  init_overlay_callbacks();
+  psync_run_thread("Overlay main thread", psync_overlay_main_loop);
+  psync_overlay_init_callbacks();
   if (PSYNC_SSL_DEBUG_LEVEL)
     psync_set_ssl_debug_callback(ssl_debug_cb);
 

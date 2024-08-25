@@ -26,6 +26,28 @@
   DAMAGE.
 */
 
+/*
+  overlay_client is responsible for invoking the pCloud API and
+  directing the result back to the calling function. It defines the
+  core logic of the request-response flow:
+
+  - SendCall (this function) writes the request to the socket.
+
+  - instance_thread reads the request from the socket and calls
+  get_response (see poverlay.c).
+
+  - get_response invokes the appropriate callback function and
+  generates a response_message. The callback functions are
+  registered in pclsync_lib.cpp using psync_add_overlay_callback
+  (see poverlay.c).
+
+  - instance_thread writes the resulting response_message to the
+  socket (see poverlay.c).
+
+  - SendCall reads the response from the socket. It writes the
+  response output data back to its caller (see control_tools.cpp).
+*/
+
 #include <errno.h>
 #include <netinet/in.h>
 #include <stdbool.h>
@@ -38,15 +60,17 @@
 
 #include "debug.h"
 #include "overlay_client.h"
+#include "poverlay_protocol.h"
+
 #define POVERLAY_BUFSIZE 512
 
-typedef struct _message {
-  uint32_t type;
-  uint64_t length;
-  char value[];
-} message;
-
-const char *clsoc = "/tmp/pcloud_unix_soc.sock";
+// for easier error tracing...
+#define POVERLAY_SOCKET_CREATE_FAILED -100
+#define POVERLAY_SOCKET_CONNECT_FAILED -101
+#define POVERLAY_WRITE_SOCK_ERR -102
+#define POVERLAY_WRITE_COMM_ERR -103
+#define POVERLAY_READ_SOCK_ERR -104
+#define POVERLAY_READ_INCOMPLETE -105
 
 int QueryState(pCloud_FileState *state, char *path) {
   int rep = 0;
@@ -71,198 +95,196 @@ int QueryState(pCloud_FileState *state, char *path) {
   return 0;
 }
 
-int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
-             char **out /*OUT*/, size_t *out_size, void **reply_data,
-             size_t *reply_size) {
+// socket_connect creates and connects to a unix socket at the
+// specified sockpath. it may write an error message and error message
+// size to out and out_size, and a "ret" value to ret (i think this is
+// redundant maybe...)
+int socket_connect(const char *sockpath, char **out, size_t *out_size,
+                   int *ret) {
+  int fd;
   struct sockaddr_un addr;
-  int result, rc;
-  uint64_t sendbytes = 0;
-  int fd = -1;
-  int sendlen = strlen(path);
-  int sendsize = sizeof(message) + sendlen + 1;
-
-  char sendbuf[sendsize];
-
-  char *recvbuf = NULL;
-  size_t recvsize = 0;
-  size_t recvbytes = 0;
-  size_t recvchunk = 32; // read response in 32-byte chunks
-
-  message *rep = NULL;
   const char *error_msg;
 
-  // init output params
-  *out = NULL;
-  *out_size = 0;
-  *ret = 0;
-  result = 0;
-
-  printf("Sendcall about to send path: %s\n", path);
-
-  // prepare socket fd
   if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
     error_msg = "Unable to create unix socket";
     *out = strdup(error_msg);
-    if (*out == NULL) {
-      debug(D_ERROR,
-            "on socket(): failed to allocate memory for output message");
-      *ret = -255;
-      return -255;
-    }
     *out_size = strlen(error_msg) + 1;
-    *ret = -3;
-    return -3;
+    *ret = POVERLAY_SOCKET_CREATE_FAILED;
+    return POVERLAY_SOCKET_CREATE_FAILED;
   }
 
-  // connect to socket
   memset(&addr, 0, sizeof(addr));
   addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, clsoc, sizeof(addr.sun_path) - 1);
+  strncpy(addr.sun_path, sockpath, sizeof(addr.sun_path) - 1);
   if (connect(fd, (struct sockaddr *)&addr, SUN_LEN(&addr)) == -1) {
     error_msg = "Unable to connect to UNIX socket";
     *out = strdup(error_msg);
-    if (*out == NULL) {
-      debug(D_ERROR,
-            "on connect(): failed to allocate memory for output message");
-      *ret = -254;
-      return -254;
-    }
     *out_size = strlen(error_msg) + 1;
-    *ret = -4;
-    return -4;
+    *ret = POVERLAY_SOCKET_CONNECT_FAILED;
+    return POVERLAY_SOCKET_CONNECT_FAILED;
   }
+  return fd;
+}
 
-  // prepare and send the message to the socket
-  message *mes = (message *)sendbuf;
-  memset(mes, 0, sendsize);
-  mes->type = id;
-  strncpy(mes->value, path, sendlen + 1);
-  mes->length = sendsize;
+// write_request writes a request_message to given socket file
+// descriptor of a given type and value. it may write out an error
+// message and error message size to out and out_size, and a "ret"
+// value to ret (i think this is redundant, maybe...)
+int write_request(int fd, int msgtype, const char *value, char **out,
+                  size_t *out_size, int *ret) {
+  uint64_t bytes_written;
+  int rc;
+  int len;
+  int size;
+  char *buf;
+  const char *err;
+  request_message *request;
+  char *curbuf;
 
-  char *curbuf = (char *)mes;
-  while (sendbytes < mes->length) {
-    rc = write(fd, curbuf, (mes->length - sendbytes));
+  *ret = 0; // Initialize ret to 0
+
+  len = strlen(value);
+  size = sizeof(request_message) + len + 1;
+  buf = (char *)malloc(size);
+  request = (request_message *)buf;
+  memset(request, 0, size);
+  request->type = msgtype;
+  strncpy(request->value, value, len + 1);
+  request->length = size;
+  bytes_written = 0;
+  curbuf = (char *)request;
+
+  while (bytes_written < request->length && *ret == 0) {
+    rc = write(fd, curbuf, (request->length - bytes_written));
     if (rc <= 0) {
-      if (errno == EINTR)
-        continue; // try again on interrupt
-
-      error_msg = "failed to write to socket.";
-      *out = strdup(error_msg);
-      if (*out == NULL) {
-        debug(D_ERROR, "failed to allocate memory for output message");
-        *ret = -253;
-        return -253;
+      if (errno != EINTR) {
+        err = "failed to write to socket.";
+        *out = strdup(err);
+        *ret = POVERLAY_WRITE_SOCK_ERR;
       }
-      *ret = -248;
-      return -248;
+    } else {
+      bytes_written += rc;
+      curbuf += rc;
     }
-    sendbytes += rc;
   }
 
-  if (sendbytes != mes->length) {
-    error_msg = "Communication error";
-    *out = strdup(error_msg);
-    if (*out == NULL) {
-      debug(D_ERROR, "while checking bytes_written: failed to allocate memory "
-                     "for output message");
-      *ret = -253;
-      return -253;
-    }
-    *out_size = strlen(error_msg) + 1;
-    *ret = -5;
-    return -5;
+  if (*ret == 0 && bytes_written != request->length) {
+    err = "Communication error";
+    *out = strdup(err);
+    *out_size = strlen(err) + 1;
+    *ret = POVERLAY_WRITE_COMM_ERR;
   }
 
-  // read the response from the socket
-  bool received_data = false;
-  for (;;) {
-    char *new_buf = realloc(recvbuf, recvsize + recvchunk);
-    if (!new_buf) {
-      debug(D_ERROR, "failed to allocate memory to response buffer");
-      *ret = -252;
-      result = -252;
-      goto cleanup;
-    }
-    recvbuf = new_buf;
+  free(buf);
+  return *ret;
+}
 
-    rc = read(fd, recvbuf + recvsize, recvchunk);
+// read_response reads a response message from a given socket. it may
+// write an error message OR an API response value to out (and its
+// size to out_size), a "ret" value to ret (redundant?), and the
+// callback's return data to payload and payloadsz.
+int read_response(int fd, char **out, size_t *out_size, int *ret,
+                  void **payload, size_t *payloadsz) {
+  char *buf;
+  size_t size;
+  size_t bytes_read;
+  size_t chunk_size;
+  response_message response;
+  int rc;
+  bool received_data;
+  size_t value_size;
+
+  buf = NULL;
+  size = 0;
+  bytes_read = 0;
+  chunk_size = 32; // read response in 32-byte chunks
+  *ret = 0;
+  received_data = false;
+  memset(&response, 0, sizeof(response_message));
+
+  while (1) {
+    buf = realloc(buf, size + chunk_size);
+    rc = read(fd, buf + size, chunk_size);
     if (rc < 0) {
       if (errno == EINTR) {
         continue; // try again on interrupt
       }
       debug(D_ERROR, "failed to read from socket into response buffer");
-      *ret = -251;
-      result = -251;
-      goto cleanup;
+      *ret = POVERLAY_READ_SOCK_ERR;
+      break;
     }
 
     if (rc == 0) {
       break; // end of response
     }
     received_data = true;
-    recvsize += rc;
-    recvbytes += rc;
+    size += rc;
+    bytes_read += rc;
   }
 
-  if (!received_data) {
-    *ret = 0;
-    *out = strdup("");
-    if (*out == NULL) {
-      debug(D_ERROR, "failed to allocate memory for empty output message");
-      *ret = -248;
-      result = -248;
-      goto cleanup;
-    }
-    *out_size = 1;
-    result = 0;
-    goto cleanup;
-  }
+  if (*ret == 0) {
+    if (!received_data) {
+      *out = strdup("");
+      *out_size = 1;
+    } else if (bytes_read >= sizeof(message)) {
+      response.msg = (message *)buf;
+      *ret = response.msg->type;
 
-  if (recvbytes >= sizeof(message)) {
-    rep = (message *)recvbuf;
-    *ret = rep->type;
-  } else {
-    debug(D_ERROR, "got incomplete message from socket");
-    *ret = -250;
-    result = -250;
-    goto cleanup;
-  }
+      value_size = response.msg->length - sizeof(message);
+      *out = malloc(value_size + 1);
+      memcpy(*out, response.msg->value, value_size);
+      (*out)[value_size] = '\0';
+      *out_size = value_size + 1;
 
-  size_t value_size = rep->length - sizeof(message);
-  *out = malloc(value_size + 1);
-  if (!*out) {
-    debug(D_ERROR, "failed to allocate memory to output buffer");
-    *ret = -249;
-    result = -249;
-    goto cleanup;
-  }
-  memcpy(*out, rep->value, value_size);
-  (*out)[value_size] = '\0';
-  *out_size = value_size + 1;
-
-  if (reply_data != NULL && reply_size != NULL) {
-    if (recvbytes > rep->length) {
-      size_t reply_data_size = recvbytes - rep->length;
-      *reply_data = malloc(reply_data_size);
-      if (*reply_data == NULL) {
-        debug(D_ERROR, "Failed to allocate memory for reply_data");
-        *ret = -248;
-        result = -248;
-        goto cleanup;
+      if (payload != NULL && payloadsz != NULL) {
+        if (bytes_read > response.msg->length) {
+          response.payloadsz = bytes_read - response.msg->length;
+          response.payload = malloc(response.payloadsz);
+          memcpy(response.payload, buf + response.msg->length,
+                 response.payloadsz);
+          *payload = response.payload;
+          *payloadsz = response.payloadsz;
+        } else {
+          *payload = NULL;
+          *payloadsz = 0;
+        }
       }
-      memcpy(*reply_data, recvbuf + rep->length, reply_data_size);
-      *reply_size = reply_data_size; // Set the reply_size
     } else {
-      *reply_data = NULL;
-      *reply_size = 0; // Set reply_size to 0 if no extra data
+      debug(D_ERROR, "got incomplete message from socket");
+      *ret = POVERLAY_READ_INCOMPLETE;
     }
   }
 
-cleanup:
-  if (fd != -1)
-    close(fd);
-  if (recvbuf)
-    free(recvbuf);
+  free(buf);
+  return *ret;
+}
 
+int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
+             char **out /*OUT*/, size_t *out_size, void **reply_data,
+             size_t *reply_size) {
+  int result;
+  int sockfd;
+
+  sockfd = -1;
+  result = 0;
+  *out = NULL;
+  *out_size = 0;
+  *ret = 0;
+
+  printf("SendCall invoked with path argument: %s\n", (path ? path : "(none)"));
+
+  // side effects: modify out, out_size, ret
+  sockfd = socket_connect("/tmp/pcloud_unix_soc.sock", out, out_size, ret);
+  if (sockfd >= 0) {
+    // side effects: modify out, out_size, ret
+    if ((result = write_request(sockfd, id, path, out, out_size, ret)) == 0) {
+      // side effects: modify out, out_size, ret, reply_data, reply_size
+      result =
+          read_response(sockfd, out, out_size, ret, reply_data, reply_size);
+    }
+    close(sockfd);
+  } else {
+    result = -1;
+  }
   return result;
 }

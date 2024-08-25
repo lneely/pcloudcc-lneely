@@ -1805,11 +1805,11 @@ typedef int (*poverlay_callback)(const char *path, void **payload);
  * synchronize.
  */
 
-int psync_add_overlay_callback(int id, poverlay_callback callback);
-void psync_stop_overlays();
-void psync_start_overlays();
-void psync_stop_overlay_callbacks();
-void psync_start_overlay_callbacks();
+int psync_overlay_register_callback(int id, poverlay_callback callback);
+void psync_overlay_stop_overlays();
+void psync_overlay_start_overlays();
+void psync_overlay_stop_overlay_callbacks();
+void psync_overlay_start_overlay_callbacks();
 
 int psync_setlanguage(const char *language, char **err);
 
