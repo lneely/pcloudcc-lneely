@@ -363,9 +363,9 @@ static void psync_overlay_get_overlay_response(request_message *request,
     response->msg->type = 0;
     psync_overlay_get_overlay_response_payload(request, response);
   } else {
-    response->msg->type = 13;
-    snprintf(response->msg->value, available_space, "No.");
-    response->payloadsz = 0;
+    response->msg->type = cbret;
+    snprintf(response->msg->value, available_space,
+             "Callback returned error code.");
     debug(D_NOTICE, "Callback failed with return code: %d", cbret);
   }
 }
@@ -399,6 +399,11 @@ void psync_overlay_get_response(request_message *request,
   // processing is considered successful. set value to "Ok."
   if (response->msg->type != 13 && response->msg->value[0] == '\0') {
     snprintf(response->msg->value, value_avail, "Ok.");
+  } else {
+    debug(D_WARNING,
+          "not updating value to Ok: response->msg->type=%d, "
+          "response->msg->value=%s",
+          response->msg->type, response->msg->value);
   }
 
   // truncate messages that exceed the buffer boundaries

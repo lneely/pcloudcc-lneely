@@ -233,37 +233,51 @@ int add_sync_folder(std::string localpath, std::string remotepath) {
   size_t errmsz;
   void *rep;
   size_t repsz;
-  std::string combinedPaths;
-  const char delimiter = '|';
+  int result;
+  int rval;
   psync_syncid_t *syncid;
 
   errm = NULL;
   errmsz = 0;
   rep = NULL;
   repsz = 0;
+  rval = 0;
 
-  combinedPaths = localpath + delimiter + remotepath;
-  std::cout << "combinedPaths = " << combinedPaths << std::endl;
-  int result = SendCall(ADDSYNC, combinedPaths.c_str(), &ret, &errm, &errmsz,
-                        &rep, &repsz);
+  std::string combinedPaths = localpath + '|' + remotepath;
+  result = SendCall(ADDSYNC, combinedPaths.c_str(), &ret, &errm, &errmsz, &rep,
+                    &repsz);
 
   if (result != 0) {
-    std::cout << "Add Sync Folder failed. return is " << ret
-              << " and message is " << (errm ? errm : "no message")
-              << std::endl;
-  } else {
+    if (result == -1) {
+      std::cout << "Add Sync Folders failed: remote folder " << remotepath
+                << " not found." << std::endl;
+    } else {
+      std::cout << "Add Sync Folders failed with unknown error. return is "
+                << ret << " and message is " << (errm ? errm : "no message")
+                << std::endl;
+    }
+    rval = result;
+  } else if (rep && repsz > 0) {
     syncid = static_cast<psync_syncid_t *>(rep);
-    std::cout << "Now syncing " << localpath << " to " << remotepath
-              << " on pCloud. Folder ID is " << syncid << std::endl;
+
+    if (repsz < sizeof(psync_syncid_t)) {
+      std::cout << "Error: Insufficient data for folder list structure"
+                << std::endl;
+      rval = -1;
+    } else {
+      std::cout << "syncid received from add_sync_folder: " << syncid
+                << std::endl;
+      rval = ret;
+    }
+  } else {
+    std::cout << "Did not get a syncid from add_sync_folder." << std::endl;
+    rval = ret;
   }
 
-  if (errm)
-    free(errm);
-
-  return 0;
+  free(errm);
+  free(rep);
+  return rval;
 }
-psync_syncid_t *syncid;
-size_t *syncid_size;
 
 int finalize() {
   int ret;

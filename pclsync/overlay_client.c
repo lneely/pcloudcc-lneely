@@ -396,5 +396,5 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   } else {
     result = -1;
   }
-  return result;
+  return *ret; // always 0 on success
 }

@@ -284,10 +284,9 @@ int clib::pclsync_lib::stop_crypto(const char *path, void **payload) {
   (void)payload;
   (void)path;
 
-  int res = -1;
   psync_crypto_stop();
   get_lib().crypto_on_ = false;
-  return res;
+  return 0;
 }
 
 int clib::pclsync_lib::finalize(const char *path, void **payload) {
@@ -299,36 +298,66 @@ int clib::pclsync_lib::finalize(const char *path, void **payload) {
 }
 
 int clib::pclsync_lib::add_sync_folder(const char *path, void **payload) {
-  std::cout << "add_sync_folder called with path " << (path ? path : "nullptr");
+  std::cout << "add_sync_folder called with path " << (path ? path : "nullptr")
+            << std::endl;
   int result = -1;
-  const char delimiter = '|'; // ASCII unit separator
-  std::string combined;
-  size_t delimiter_pos;
-  std::string localpath;
-  std::string remotepath;
-  psync_syncid_t syncid;
 
-  std::cout << "in add_sync_folder" << std::endl;
-
-  if (path != nullptr) {
-    combined = path;
-    delimiter_pos = combined.find(delimiter);
-    if (delimiter_pos != std::string::npos) {
-      localpath = combined.substr(0, delimiter_pos);
-      remotepath = combined.substr(delimiter_pos + 1);
-      std::cout << "path = " << path << std::endl;
-      std::cout << "localpath = " << localpath << std::endl;
-      std::cout << "remotepath = " << remotepath << std::endl;
-      syncid = psync_add_sync_by_path(localpath.c_str(), remotepath.c_str(),
-                                      PSYNC_FULL);
-
-      if (syncid != PSYNC_INVALID_SYNCID) {
-        *reinterpret_cast<psync_syncid_t *>(*payload) = syncid;
-        result = 0;
-      }
-    }
+  // Check if payload pointer is null
+  if (payload == nullptr) {
+    std::cerr << "Error: payload pointer is null" << std::endl;
+    return result;
   }
 
+  if (path == nullptr) {
+    std::cerr << "Error: path is nullptr" << std::endl;
+    return result;
+  }
+
+  // Split the path into localpath and remotepath
+  const char delimiter = '|';
+  std::string combined(path);
+  size_t delimiter_pos = combined.find(delimiter);
+  if (delimiter_pos == std::string::npos) {
+    std::cerr << "Error: Invalid path format. Expected 'localpath|remotepath'"
+              << std::endl;
+    return result;
+  }
+
+  std::string localpath = combined.substr(0, delimiter_pos);
+  std::string remotepath = combined.substr(delimiter_pos + 1);
+
+  std::cout << "localpath = " << localpath << std::endl;
+  std::cout << "remotepath = " << remotepath << std::endl;
+
+  psync_syncid_t syncid =
+      psync_add_sync_by_path(localpath.c_str(), remotepath.c_str(), PSYNC_FULL);
+
+  // Allocate memory for uint64_t to store both status and syncid
+  uint64_t *payload_ptr =
+      static_cast<uint64_t *>(psync_malloc(sizeof(uint64_t)));
+  if (payload_ptr == nullptr) {
+    std::cerr << "Error: Failed to allocate memory for payload" << std::endl;
+    return result;
+  }
+
+  if (syncid == PSYNC_INVALID_SYNCID) {
+    std::cout << "psync_add_sync_by_path returned PSYNC_INVALID_SYNCID"
+              << std::endl;
+    *payload_ptr = (static_cast<uint64_t>(1) << 32) |
+                   static_cast<uint32_t>(PSYNC_INVALID_SYNCID);
+  } else {
+    std::cout << "Sync folder added successfully. Syncid: " << syncid
+              << std::endl;
+    *payload_ptr = static_cast<uint64_t>(syncid);
+  }
+
+  // Set the payload pointer
+  *payload = payload_ptr;
+
+  std::cout << "Payload value: 0x" << std::hex << *payload_ptr << std::dec
+            << std::endl;
+
+  result = 0;
   return result;
 }
 

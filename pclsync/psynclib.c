@@ -738,6 +738,7 @@ psync_syncid_t psync_add_sync_by_path(const char *localpath,
                                       const char *remotepath,
                                       psync_synctype_t synctype) {
   psync_folderid_t folderid = psync_get_folderid_by_path(remotepath);
+  printf("remotepath folder id is %lu\n", folderid);
   if (likely_log(folderid != PSYNC_INVALID_FOLDERID))
     return psync_add_sync_by_folderid(localpath, folderid, synctype);
   else
