@@ -239,7 +239,6 @@ int add_sync_folder(std::string localpath, std::string remotepath) {
   size_t repsz;
   int result;
   int rval;
-  psync_syncid_t *syncid;
 
   errm = NULL;
   errmsz = 0;
@@ -262,8 +261,6 @@ int add_sync_folder(std::string localpath, std::string remotepath) {
     }
     rval = result;
   } else if (rep && repsz > 0) {
-    syncid = static_cast<psync_syncid_t *>(rep);
-
     if (repsz < sizeof(psync_syncid_t)) {
       std::cout << "Error: Insufficient data for folder list structure"
                 << std::endl;
