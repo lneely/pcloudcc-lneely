@@ -1,7 +1,5 @@
 #+title: pCloudCC Request-Response Flow
 
-* Concept
-
 Fundamentally, pcloudcc is built upon a client-server
 architecture. When the user runs `pcloudcc -u <username>`, this starts
 the server. The server listens for request messages and sends back
