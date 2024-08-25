@@ -42,17 +42,21 @@
 typedef struct _message {
   uint32_t type;
   uint64_t length;
-  void* reply_data;
   char value[];
 } message;
+
+typedef struct {
+  message *msg;
+  void *payload;
+  size_t payloadsz;
+} response;
 
 extern int overlays_running;
 extern int callbacks_running;
 
 void overlay_main_loop(VOID);
 void instance_thread(LPVOID);
-void get_answer_to_request(message *requesr /*IN*/, message *replay /*OUT*/,
-                           void **reply_data, size_t *reply_data_length);
+void get_answer_to_request(message *rq /*IN*/, response *rs /*OUT*/);
 void psync_stop_overlays();
 void psync_start_overlays();
 void psync_stop_overlay_callbacks();

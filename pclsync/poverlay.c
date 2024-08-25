@@ -90,9 +90,7 @@ void instance_thread(void *lpvParam) {
   message *request = NULL;
   char *curbuf = &chbuf[0];
   int bytes_read = 0;
-  message *reply = (message *)psync_malloc(POVERLAY_BUFSIZE);
-  void *reply_data = NULL;
-  size_t reply_data_length = 0;
+  response *reply = (response *)psync_malloc(POVERLAY_BUFSIZE);
 
   memset(reply, 0, POVERLAY_BUFSIZE);
   memset(chbuf, 0, POVERLAY_BUFSIZE);
@@ -123,13 +121,13 @@ void instance_thread(void *lpvParam) {
   // just syncadd.
   request = (message *)chbuf;
   if (request) {
-    get_answer_to_request(request, reply, &reply_data, &reply_data_length);
+    get_answer_to_request(request, reply);
 
     // Send the reply structure
     size_t bytes_written = 0;
-    while (bytes_written < reply->length) {
+    while (bytes_written < reply->msg->length) {
       rc = write(*cl, (char *)reply + bytes_written,
-                 reply->length - bytes_written);
+                 reply->msg->length - bytes_written);
       if (rc <= 0) {
         debug(D_ERROR, "Unix socket write error (reply structure)");
         goto cleanup;
@@ -138,12 +136,12 @@ void instance_thread(void *lpvParam) {
     }
 
     // Send the additional reply data if present
-    if (reply_data && reply_data_length > 0) {
+    if (reply->payload && reply->payloadsz > 0) {
       bytes_written = 0;
 
-      while (bytes_written < reply_data_length) {
-        rc = write(*cl, reply_data + bytes_written,
-                   reply_data_length - bytes_written);
+      while (bytes_written < reply->payloadsz) {
+        rc = write(*cl, reply->payload + bytes_written,
+                   reply->payloadsz - bytes_written);
         if (rc <= 0) {
           debug(D_ERROR, "Unix socket write error (reply data)");
           goto cleanup;
@@ -155,7 +153,7 @@ void instance_thread(void *lpvParam) {
     debug(D_NOTICE,
           "Successfully sent full reply: %zu bytes structure, %zu bytes "
           "additional data",
-          reply->length, reply_data_length);
+          reply->msg->length, reply->payloadsz);
   } else {
     debug(D_ERROR, "No valid request received");
   }
@@ -165,11 +163,15 @@ cleanup:
     close(*cl);
   }
   if (reply) {
+    if (reply->msg) {
+      psync_free(reply->msg);
+    }
+    if (reply->payload) {
+      psync_free(reply->payload);
+    }
     psync_free(reply);
   }
-  if (reply_data) {
-    psync_free(reply_data);
-  }
+
   debug(D_NOTICE, "InstanceThread exiting.");
 }
 
@@ -205,11 +207,9 @@ void psync_start_overlays() { overlays_running = 1; }
 void psync_stop_overlay_callbacks() { callbacks_running = 0; }
 void psync_start_overlay_callbacks() { callbacks_running = 1; }
 
-void get_answer_to_request(message *request, message *reply, void **payload,
-                           size_t *payloadsz) {
+void get_answer_to_request(message *request, response *reply) {
   psync_path_status_t stat;
   int ind, ret;
-  void *callback_payload;
   psync_folder_list_t *folders;
   const char *debug_string;
 
@@ -217,14 +217,14 @@ void get_answer_to_request(message *request, message *reply, void **payload,
   stat = PSYNC_PATH_STATUS_NOT_OURS;
   ind = 0;
   ret = 0;
-  callback_payload = NULL;
   folders = NULL;
   debug_string = NULL;
 
   // Initializations
-  reply->length = sizeof(message) + 4;
-  *payload = NULL;
-  *payloadsz = 0;
+  reply->msg = (message *)psync_malloc(POVERLAY_BUFSIZE);
+  reply->msg->length = sizeof(message) + 4;
+  reply->payload = NULL;
+  reply->payloadsz = 0;
 
   // Main logic
   if (request->type == 20) {
@@ -242,19 +242,19 @@ void get_answer_to_request(message *request, message *reply, void **payload,
     }
     switch (psync_path_status_get_status(stat)) {
     case PSYNC_PATH_STATUS_IN_SYNC:
-      reply->type = 10;
+      reply->msg->type = 10;
       break;
     case PSYNC_PATH_STATUS_IN_PROG:
-      reply->type = 12;
+      reply->msg->type = 12;
       break;
     case PSYNC_PATH_STATUS_PAUSED:
     case PSYNC_PATH_STATUS_REMOTE_FULL:
     case PSYNC_PATH_STATUS_LOCAL_FULL:
-      reply->type = 11;
+      reply->msg->type = 11;
       break;
     default:
-      reply->type = 13;
-      memcpy(reply->value, "No.", 4);
+      reply->msg->type = 13;
+      memcpy(reply->msg->value, "No.", 4);
     }
   } else if ((callbacks_running) &&
              (request->type <
@@ -262,50 +262,49 @@ void get_answer_to_request(message *request, message *reply, void **payload,
     ind = request->type - 20;
 
     if (callbacks[ind]) {
-      ret = callbacks[ind](request->value, &callback_payload);
+      ret = callbacks[ind](request->value, &reply->payload);
       if (ret == 0) {
-        reply->type = 0;
-        reply->length = sizeof(message) + strlen(reply->value) + 1;
+        reply->msg->type = 0;
+        reply->msg->length = sizeof(message) + strlen(reply->msg->value) + 1;
 
-        if (callback_payload) {
-          *payload = callback_payload;
+        if (reply->payload) {
           if (request->type == 23) { // LISTSYNC
-            folders = (psync_folder_list_t *)callback_payload;
-            *payloadsz = sizeof(psync_folder_list_t) +
-                         folders->foldercnt * sizeof(psync_folder_t);
+            folders = (psync_folder_list_t *)reply->payload;
+            reply->payloadsz = sizeof(psync_folder_list_t) +
+                               folders->foldercnt * sizeof(psync_folder_t);
           } else if (request->type == 24) { // ADDSYNC
-            *payloadsz = sizeof(psync_syncid_t);
+            reply->payloadsz = sizeof(psync_syncid_t);
           }
           debug(D_NOTICE, "Callback succeeded with reply data, length: %zu",
-                *payloadsz);
+                reply->payloadsz);
         } else {
           debug(D_NOTICE, "Callback succeeded with no reply data");
         }
       } else {
-        reply->type = ret;
-        memcpy(reply->value, "No.", 4);
+        reply->msg->type = ret;
+        memcpy(reply->msg->value, "No.", 4);
         debug(D_NOTICE, "Callback failed with return code: %d", ret);
       }
     } else {
-      reply->type = 13;
-      memcpy(reply->value, "No callback with this id registered.", 37);
-      reply->length = sizeof(message) + 37;
+      reply->msg->type = 13;
+      memcpy(reply->msg->value, "No callback with this id registered.", 37);
+      reply->msg->length = sizeof(message) + 37;
       debug(D_NOTICE, "No callback registered for type: %u", request->type);
     }
   } else {
-    reply->type = 13;
-    memcpy(reply->value, "Invalid type.", 14);
-    reply->length = sizeof(message) + 14;
+    reply->msg->type = 13;
+    memcpy(reply->msg->value, "Invalid type.", 14);
+    reply->msg->length = sizeof(message) + 14;
     debug(D_NOTICE, "Invalid request type: %u", request->type);
   }
 
-  if (*payload == NULL) {
+  if (reply->payload == NULL) {
     debug(D_NOTICE, "No reply data received");
   }
 
   // Set default reply value if not set elsewhere
-  if (reply->type != 13) {
-    memcpy(reply->value, "Ok.", 4);
+  if (reply->msg->type != 13) {
+    memcpy(reply->msg->value, "Ok.", 4);
   }
 
   return;
