@@ -116,36 +116,61 @@ void clib::pclsync_lib::do_get_pass_from_console(std::string &password) {
 void event_handler(psync_eventtype_t event, psync_eventdata_t eventdata) {
   if (event < PEVENT_FIRST_USER_EVENT) {
     if (event & PEVENT_TYPE_FOLDER) {
-      std::cout << "folder event=" << event
-                << ", syncid=" << eventdata.folder->syncid
-                << ", folderid=" << eventdata.folder->folderid
-                << ", name=" << eventdata.folder->name
-                << ", local=" << eventdata.folder->localpath
-                << ", remote=" << eventdata.folder->remotepath << std::endl;
+      if (eventdata.folder) {
+        std::cout << "folder event=" << event
+                  << ", syncid=" << eventdata.folder->syncid
+                  << ", folderid=" << eventdata.folder->folderid << ", name="
+                  << (eventdata.folder->name ? eventdata.folder->name : "")
+                  << ", local="
+                  << (eventdata.folder->localpath ? eventdata.folder->localpath
+                                                  : "")
+                  << ", remote="
+                  << (eventdata.folder->remotepath
+                          ? eventdata.folder->remotepath
+                          : "")
+                  << std::endl;
+      } else {
+        std::cout << "folder event=" << event << " (no folder data)"
+                  << std::endl;
+      }
     } else {
-      std::cout << "file event=" << event
-                << ", syncid=" << eventdata.folder->syncid
-                << ", file=" << eventdata.file->fileid
-                << ", name=" << eventdata.file->name
-                << ", local=" << eventdata.file->localpath
-                << ", remote=" << eventdata.file->remotepath << std::endl;
+      if (eventdata.file) {
+        std::cout
+            << "file event=" << event << ", syncid=" << eventdata.file->syncid
+            << ", file=" << eventdata.file->fileid
+            << ", name=" << (eventdata.file->name ? eventdata.file->name : "")
+            << ", local="
+            << (eventdata.file->localpath ? eventdata.file->localpath : "")
+            << ", remote="
+            << (eventdata.file->remotepath ? eventdata.file->remotepath : "")
+            << std::endl;
+      } else {
+        std::cout << "file event=" << event << " (no file data)" << std::endl;
+      }
     }
   } else if (event >= PEVENT_FIRST_SHARE_EVENT) {
-    std::cout << "share event=" << event
-              << ", folderid=" << eventdata.share->folderid
-              << ", sharename=" << eventdata.share->sharename
-              << ", email=" << eventdata.share->toemail
-              << ", message=" << eventdata.share->message
-              << ", userid=" << eventdata.share->userid
-              << ", shareid=" << eventdata.share->shareid
-              << ", sharerequestid=" << eventdata.share->sharerequestid
-              << ", created=" << eventdata.share->created
-              << ", canread=" << eventdata.share->canread
-              << ", cancreate=" << eventdata.share->cancreate
-              << ", canmodify=" << eventdata.share->canmodify
-              << ", candelete=" << eventdata.share->candelete << std::endl;
+    if (eventdata.share) {
+      std::cout << "share event=" << event
+                << ", folderid=" << eventdata.share->folderid << ", sharename="
+                << (eventdata.share->sharename ? eventdata.share->sharename
+                                               : "")
+                << ", email="
+                << (eventdata.share->toemail ? eventdata.share->toemail : "")
+                << ", message="
+                << (eventdata.share->message ? eventdata.share->message : "")
+                << ", userid=" << eventdata.share->userid
+                << ", shareid=" << eventdata.share->shareid
+                << ", sharerequestid=" << eventdata.share->sharerequestid
+                << ", created=" << eventdata.share->created
+                << ", canread=" << eventdata.share->canread
+                << ", cancreate=" << eventdata.share->cancreate
+                << ", canmodify=" << eventdata.share->canmodify
+                << ", candelete=" << eventdata.share->candelete << std::endl;
+    } else {
+      std::cout << "share event=" << event << " (no share data)" << std::endl;
+    }
   } else {
-    std::cout << "event" << event << std::endl;
+    std::cout << "event " << event << std::endl;
   }
 }
 
@@ -362,8 +387,13 @@ int clib::pclsync_lib::add_sync_folder(const char *path, void **payload) {
 }
 
 int clib::pclsync_lib::remove_sync_folder(const char *path, void **payload) {
-  // TODO
-  return 0;
+  (void)payload;
+  psync_folderid_t folderid;
+  std::cout << "remove_sync_folder called with path=" << path << std::endl;
+  folderid = static_cast<psync_folderid_t>(std::stoull(path, nullptr, 10));
+  std::cout << "remove_sync_folder: syncid=" << folderid << std::endl;
+
+  return psync_delete_sync_by_folderid(folderid);
 }
 
 int clib::pclsync_lib::list_sync_folders(const char *path, void **payload) {

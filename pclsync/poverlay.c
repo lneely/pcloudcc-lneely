@@ -96,15 +96,6 @@ size_t serialize_response_message(const response_message *resp,
   return total_size;
 }
 
-// Helper function to free a deserialized response_message
-void free_response_message(response_message *resp) {
-  if (resp) {
-    free(resp->msg);
-    free(resp->payload);
-    free(resp);
-  }
-}
-
 void psync_overlay_main_loop() {
   struct sockaddr_un addr;
   int fd, cl;

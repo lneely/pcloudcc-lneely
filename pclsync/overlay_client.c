@@ -169,6 +169,14 @@ response_message *deserialize_response_message(const char *buffer,
   return resp;
 }
 
+void free_response_message(response_message *resp) {
+  if (resp) {
+    free(resp->msg);
+    free(resp->payload);
+    free(resp);
+  }
+}
+
 int QueryState(pCloud_FileState *state, char *path) {
   int rep = 0;
   char *errm;
@@ -366,6 +374,7 @@ int read_response(int fd, char **out, size_t *out_size, int *ret,
     }
   }
 
+  free_response_message(resp);
   return 0;
 }
 

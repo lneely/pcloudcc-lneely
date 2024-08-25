@@ -204,25 +204,29 @@ int stop_crypto() {
   return ret;
 }
 
-int remove_sync_folder(std::string folderid) {
+int remove_sync_folder(const char *folderid) {
   int ret;
   char *errm;
-  size_t errm_size;
+  size_t errmsz;
+  int result;
+  int rval;
 
-  int result =
-      SendCall(STOPSYNC, folderid.c_str(), &ret, &errm, &errm_size, NULL, NULL);
+  errm = NULL;
+  errmsz = 0;
+  rval = 0;
+
+  result = SendCall(STOPSYNC, folderid, &ret, &errm, &errmsz, NULL, NULL);
   if (result != 0) {
-    std::cout << "Remove Sync Folder failed. return is " << ret
-              << " and message is " << (errm ? errm : "no message")
+    std::cout << "Remove Sync Folder failed with unknown error. return is "
+              << ret << " and message is " << (errm ? errm : "no message")
               << std::endl;
+    rval = result;
   } else {
-    std::cout << "Stopped syncing folder with id " << folderid << std::endl;
+    std::cout << "Successfully removed sync folder with folderid " << folderid
+              << std::endl;
   }
-
-  if (errm)
-    free(errm);
-
-  return 0;
+  free(errm);
+  return rval;
 }
 
 // TODO: should add support for specifying sync type. Need a better
