@@ -194,34 +194,6 @@ void psync_overlay_handle_request(void *lpvParam) {
   if (request) {
     psync_overlay_get_response(request, response);
 
-    /*
-    size_t bytes_written = 0;
-    while (bytes_written < response->msg->length) {
-      rc = write(*sockfd, (char *)response + bytes_written,
-                 response->msg->length - bytes_written);
-      if (rc <= 0) {
-        debug(D_ERROR, "Unix socket write error (reply structure)");
-        goto cleanup;
-      }
-      bytes_written += rc;
-    }
-
-    // Send the payload if it exists
-    if (response->payload && response->payloadsz > 0) {
-      bytes_written = 0;
-
-      while (bytes_written < response->payloadsz) {
-        rc = write(*sockfd, response->payload + bytes_written,
-                   response->payloadsz - bytes_written);
-        if (rc <= 0) {
-          debug(D_ERROR, "Unix socket write error (reply data)");
-          goto cleanup;
-        }
-        bytes_written += rc;
-      }
-    }
-    */
-
     char *rsbufp;
     size_t bytes_written = 0;
     size_t responsesz = serialize_response_message(response, &rsbufp);
