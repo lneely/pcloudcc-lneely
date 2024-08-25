@@ -34,7 +34,6 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include "pclsync_lib_c.h"
 #include "poverlay.h"
 #include "psynclib.h"
 
@@ -268,25 +267,33 @@ static void status_change(pstatus_t *status) {
     psync_free(err);
 }
 
-int clib::pclsync_lib::start_crypto(const char *pass, void **rep) {
+int clib::pclsync_lib::start_crypto(const char *pass, void **payload) {
+  (void)payload;
+
   std::cout << "calling startcrypto pass: " << pass << std::endl;
   get_lib().crypto_pass_ = pass;
   return lib_setup_cripto();
 }
 
-int clib::pclsync_lib::stop_crypto(const char *path, void **rep) {
+int clib::pclsync_lib::stop_crypto(const char *path, void **payload) {
+  (void)payload;
+  (void)path;
+
   int res = -1;
   psync_crypto_stop();
   get_lib().crypto_on_ = false;
   return res;
 }
 
-int clib::pclsync_lib::finalize(const char *path, void **rep) {
+int clib::pclsync_lib::finalize(const char *path, void **payload) {
+  (void)payload;
+  (void)path;
+
   psync_destroy();
   exit(0);
 }
 
-int clib::pclsync_lib::add_sync_folder(const char *path, void **rep) {
+int clib::pclsync_lib::add_sync_folder(const char *path, void **payload) {
   std::cout << "add_sync_folder called with path " << (path ? path : "nullptr");
   int result = -1;
   const char delimiter = '|'; // ASCII unit separator
@@ -311,7 +318,7 @@ int clib::pclsync_lib::add_sync_folder(const char *path, void **rep) {
                                       PSYNC_FULL);
 
       if (syncid != PSYNC_INVALID_SYNCID) {
-        *reinterpret_cast<psync_syncid_t *>(*rep) = syncid;
+        *reinterpret_cast<psync_syncid_t *>(*payload) = syncid;
         result = 0;
       }
     }
@@ -320,24 +327,26 @@ int clib::pclsync_lib::add_sync_folder(const char *path, void **rep) {
   return result;
 }
 
-int clib::pclsync_lib::remove_sync_folder(const char *path, void **rep) {
+int clib::pclsync_lib::remove_sync_folder(const char *path, void **payload) {
   // TODO
   return 0;
 }
 
-int clib::pclsync_lib::list_sync_folders(const char *path, void **rep) {
+int clib::pclsync_lib::list_sync_folders(const char *path, void **payload) {
+  (void)path;
+
   psync_folder_list_t *folders = psync_get_sync_list();
   if (!folders) {
     return -1;
   }
   size_t alloc_size =
       sizeof(*folders) + folders->foldercnt * sizeof(psync_folder_t);
-  *rep = psync_malloc(alloc_size);
-  if (*rep == NULL) {
+  *payload = psync_malloc(alloc_size);
+  if (*payload == NULL) {
     psync_free(folders);
     return -1;
   }
-  memcpy(*rep, folders, alloc_size);
+  memcpy(*payload, folders, alloc_size);
   psync_free(folders);
   return 0;
 }

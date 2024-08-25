@@ -219,18 +219,14 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   }
 
   if (recvbytes >= sizeof(message)) {
-    message *rep = (message *)recvbuf;
-  }
-
-  if (recvbytes < sizeof(message)) {
+    rep = (message *)recvbuf;
+    *ret = rep->type;
+  } else {
     debug(D_ERROR, "got incomplete message from socket");
     *ret = -250;
     result = -250;
     goto cleanup;
   }
-
-  rep = (message *)recvbuf;
-  *ret = rep->type;
 
   size_t value_size = rep->length - sizeof(message);
   *out = malloc(value_size + 1);

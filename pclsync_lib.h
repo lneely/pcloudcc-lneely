@@ -36,6 +36,7 @@
 #define PCLSYNC_LIB_H
 
 struct pstatus_struct_;
+typedef void (*status_callback_t)(int status, const char *stat_string);
 
 namespace console_client {
 namespace clibrary {

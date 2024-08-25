@@ -1793,7 +1793,7 @@ void psync_get_folder_ownerid(psync_folderid_t folderid,
 
 /* Callback to be registered to be called from file manager extension.
  */
-typedef int (*poverlay_callback)(const char *path, void **rep);
+typedef int (*poverlay_callback)(const char *path, void **payload);
 
 /* Registers file manager extension callback that will be called when packet
  * with id equals to the give one had arrived from extension. The id must be

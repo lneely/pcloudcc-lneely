@@ -27,10 +27,10 @@
 */
 
 #include "poverlay.h"
-#include "pcache.h"
 #include "pcompat.h"
-#include "plibs.h"
 #include "ppathstatus.h"
+
+#include "plibs.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -240,65 +240,33 @@ void get_answer_to_request(message *request, message *reply, void **reply_data,
       memcpy(reply->value, "No.", 4);
     }
   } else if ((callbacks_running) &&
-             (request->type < (calbacks_lower_band + callbacks_size))) {
+             (request->type <
+              ((uint32_t)calbacks_lower_band + (uint32_t)callbacks_size))) {
     int ind = request->type - 20;
     int ret = 0;
-    void *rep = NULL;
+    void *payload = NULL;
 
     if (callbacks[ind]) {
-      ret = callbacks[ind](request->value, &rep);
+      ret = callbacks[ind](request->value, &payload);
       if (ret == 0) {
         reply->type = 0;
         reply->length = sizeof(message) + strlen(reply->value) + 1;
-        if (rep) {
-          *reply_data = rep;
-          switch (request->type) {
-          case 23:
-            debug(D_NOTICE, "got reply data for LISTSYNC message");
 
-            psync_folder_list_t *folders = (psync_folder_list_t *)rep;
-            size_t total_size = sizeof(psync_folder_list_t) +
-                                folders->foldercnt * sizeof(psync_folder_t);
-
-            debug(D_NOTICE, "Calculating reply_data_length for %zu folders",
-                  folders->foldercnt);
-            debug(D_NOTICE, "Base size: %zu", total_size);
-
-            // Add the length of all strings, carefully handling NULL pointers
-            for (size_t i = 0; i < folders->foldercnt; i++) {
-              debug(D_NOTICE, "Processing folder %zu", i);
-              if (folders->folders[i].localname) {
-                total_size += strlen(folders->folders[i].localname) + 1;
-                debug(D_NOTICE, "  localname: %s",
-                      folders->folders[i].localname);
-              }
-              if (folders->folders[i].localpath) {
-                total_size += strlen(folders->folders[i].localpath) + 1;
-                debug(D_NOTICE, "  localpath: %s",
-                      folders->folders[i].localpath);
-              }
-              if (folders->folders[i].remotename) {
-                total_size += strlen(folders->folders[i].remotename) + 1;
-                debug(D_NOTICE, "  remotename: %s",
-                      folders->folders[i].remotename);
-              }
-              if (folders->folders[i].remotepath) {
-                total_size += strlen(folders->folders[i].remotepath) + 1;
-                debug(D_NOTICE, "  remotepath: %s",
-                      folders->folders[i].remotepath);
-              }
-            }
-
-            *reply_data_length = total_size;
-            debug(D_NOTICE, "Final reply_data_length: %zu", *reply_data_length);
-
-            debug(D_NOTICE, "reply data length is %zu", *reply_data_length);
-            break;
+        // if the callback returns a payload, handle it.
+        if (payload) {
+          *reply_data = payload;
+          if (request->type == 23) { // LISTSYNC
+            psync_folder_list_t *folders = (psync_folder_list_t *)payload;
+            *reply_data_length = sizeof(psync_folder_list_t) +
+                                 folders->foldercnt * sizeof(psync_folder_t);
+          } else if (request->type == 24) { // ADDSYNC
+            *reply_data_length = sizeof(psync_syncid_t);
           }
-          debug(D_NOTICE, "Reply data received, length: %zu",
+
+          debug(D_NOTICE, "Callback succeeded with reply data, length: %zu",
                 *reply_data_length);
         } else {
-          debug(D_NOTICE, "Callback succeeded but no reply data received");
+          debug(D_NOTICE, "Callback succeeded with no reply data");
         }
       } else {
         reply->type = ret;

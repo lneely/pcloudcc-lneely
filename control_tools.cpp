@@ -39,7 +39,6 @@
 
 #include "control_tools.h"
 #include "overlay_client.h"
-#include "pclsync_lib_c.h"
 
 #include "pclsync_lib.h"
 #include "psynclib.h"

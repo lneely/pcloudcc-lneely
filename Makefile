@@ -28,8 +28,8 @@ LIBOUT		:= libpcloudcc_lib.so
 
 # Build type specific flags
 ifeq ($(BUILD), debug)
-    CFLAGS += -g -O0 -DDEBUG -Wall
-    CXXFLAGS += -g -O0 -DDEBUG -Wall
+    CFLAGS += -g -O0 -DDEBUG -Wall -Wextra
+    CXXFLAGS += -g -O0 -DDEBUG -Wall -Wextra
 else ifeq ($(BUILD), release)
     CFLAGS += -O2 -DNDEBUG
     CXXFLAGS += -O2 -DNDEBUG
