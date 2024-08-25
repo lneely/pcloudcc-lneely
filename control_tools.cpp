@@ -284,14 +284,8 @@ int finalize() {
   char *errm;
   size_t errm_size;
 
-  int result = SendCall(FINALIZE, "", &ret, &errm, &errm_size, NULL, NULL);
-  if (result != 0) {
-    std::cout << "Finalize failed. return code is " << result << ", ret is "
-              << ret << ", and message is " << (errm ? errm : "no message")
-              << std::endl;
-  } else {
-    std::cout << "Exiting ..." << std::endl;
-  }
+  SendCall(FINALIZE, "", &ret, &errm, &errm_size, NULL, NULL);
+  std::cout << "Exiting ..." << std::endl;
 
   if (errm)
     free(errm);
