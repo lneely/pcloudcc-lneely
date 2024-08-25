@@ -3075,48 +3075,11 @@ void psync_async_ui_callback(void *ptr) {
   }
 }
 
-/* int psync_delete_sync_by_folderid(psync_folderid_t fId) { */
-/*   psync_sql_res *sqlRes; */
-/*   psync_uint_row row; */
-
-/*   psync_syncid_t *syncId; */
-/*   psync_syncid_t *syncIdT; */
-/*   printf("in psynclib: psync_delete_sync_by_folderid: folderid=%lu\n", fId);
- */
-/*   sqlRes = */
-/*       psync_sql_query_rdlock("SELECT id FROM syncfolder WHERE folderid = ?");
- */
-/*   psync_sql_bind_uint(sqlRes, 1, fId); */
-/*   row = psync_sql_fetch_rowint(sqlRes); */
-/*   if (unlikely(!row)) { */
-/*     debug(D_ERROR, "Sync to delete not found!"); */
-/*     psync_sql_free_result(sqlRes); */
-
-/*     return -1; */
-/*   } */
-
-/*   syncId = (psync_syncid_t *)row[0]; */
-
-/*   psync_sql_free_result(sqlRes); */
-
-/*   syncIdT = psync_new(psync_syncid_t); */
-/*   syncIdT = syncId; */
-/*   printf("syncId=%lu, syncIdT=%lu\n", (unsigned long)syncId, */
-/*          (unsigned long)syncIdT); */
-
-/*   psync_run_thread1("psync_async_sync_delete", psync_async_delete_sync, */
-/*                     syncIdT); */
-
-/*   psync_free(syncIdT); */
-/*   return 0; */
-/* } */
-
 int psync_delete_sync_by_folderid(psync_folderid_t fId) {
   psync_sql_res *sqlRes;
   psync_uint_row row;
   psync_syncid_t syncId;
 
-  printf("in psynclib: psync_delete_sync_by_folderid: folderid=%lu\n", fId);
   sqlRes =
       psync_sql_query_rdlock("SELECT id FROM syncfolder WHERE folderid = ?");
   psync_sql_bind_uint(sqlRes, 1, fId);
@@ -3129,8 +3092,6 @@ int psync_delete_sync_by_folderid(psync_folderid_t fId) {
 
   syncId = (psync_syncid_t)row[0];
   psync_sql_free_result(sqlRes);
-
-  printf("syncId=%lu\n", (unsigned long)syncId);
 
   psync_run_thread1("psync_async_sync_delete", psync_async_delete_sync,
                     (void *)(uintptr_t)syncId);

@@ -76,7 +76,7 @@
 response_message *deserialize_response_message(const char *buffer,
                                                size_t buffer_size) {
   if (buffer_size < 2 * sizeof(size_t) + sizeof(uint32_t) + sizeof(uint64_t)) {
-    fprintf(stderr, "Buffer size too small: %zu\n", buffer_size);
+    debug(D_ERROR, "Buffer size too small: %zu", buffer_size);
     return NULL;
   }
 
@@ -85,7 +85,7 @@ response_message *deserialize_response_message(const char *buffer,
   // Allocate response_message
   response_message *resp = (response_message *)malloc(sizeof(response_message));
   if (resp == NULL) {
-    fprintf(stderr, "Failed to allocate response_message\n");
+    debug(D_ERROR, "Failed to allocate response_message");
     return NULL;
   }
 
@@ -93,10 +93,10 @@ response_message *deserialize_response_message(const char *buffer,
   size_t msg_size = be64toh(*(size_t *)ptr);
   ptr += sizeof(size_t);
 
-  fprintf(stderr, "Message size: %zu\n", msg_size);
+  debug(D_ERROR, "Message size: %zu", msg_size);
 
   if (msg_size < sizeof(uint32_t) + sizeof(uint64_t)) {
-    fprintf(stderr, "Invalid message size: %zu\n", msg_size);
+    debug(D_ERROR, "Invalid message size: %zu", msg_size);
     free(resp);
     return NULL;
   }
@@ -106,7 +106,7 @@ response_message *deserialize_response_message(const char *buffer,
       sizeof(message) + msg_size - sizeof(uint32_t) - sizeof(uint64_t);
   resp->msg = (message *)malloc(alloc_size);
   if (resp->msg == NULL) {
-    fprintf(stderr, "Failed to allocate message\n");
+    debug(D_ERROR, "Failed to allocate message");
     free(resp);
     return NULL;
   }
@@ -117,15 +117,15 @@ response_message *deserialize_response_message(const char *buffer,
   resp->msg->length = be64toh(*(uint64_t *)ptr);
   ptr += sizeof(uint64_t);
 
-  fprintf(stderr, "Message type: %u, length: %lu\n", resp->msg->type,
-          resp->msg->length);
+  debug(D_ERROR, "Message type: %u, length: %lu", resp->msg->type,
+        resp->msg->length);
 
   // Calculate the size of the value array
   size_t value_size = msg_size - sizeof(uint32_t) - sizeof(uint64_t);
 
   if (value_size > 0) {
     if (ptr + value_size > buffer + buffer_size) {
-      fprintf(stderr, "Buffer overflow detected\n");
+      debug(D_ERROR, "Buffer overflow detected");
       free(resp->msg);
       free(resp);
       return NULL;
@@ -136,7 +136,7 @@ response_message *deserialize_response_message(const char *buffer,
 
   // Deserialize payload size
   if (ptr + sizeof(size_t) > buffer + buffer_size) {
-    fprintf(stderr, "Buffer overflow detected when reading payload size\n");
+    debug(D_ERROR, "Buffer overflow detected when reading payload size");
     free(resp->msg);
     free(resp);
     return NULL;
@@ -144,19 +144,19 @@ response_message *deserialize_response_message(const char *buffer,
   resp->payloadsz = be64toh(*(size_t *)ptr);
   ptr += sizeof(size_t);
 
-  fprintf(stderr, "Payload size: %zu\n", resp->payloadsz);
+  debug(D_ERROR, "Payload size: %zu", resp->payloadsz);
 
   // Deserialize payload
   if (resp->payloadsz > 0) {
     if (ptr + resp->payloadsz > buffer + buffer_size) {
-      fprintf(stderr, "Buffer overflow detected when reading payload\n");
+      debug(D_ERROR, "Buffer overflow detected when reading payload");
       free(resp->msg);
       free(resp);
       return NULL;
     }
     resp->payload = malloc(resp->payloadsz);
     if (resp->payload == NULL) {
-      fprintf(stderr, "Failed to allocate payload\n");
+      debug(D_ERROR, "Failed to allocate payload");
       free(resp->msg);
       free(resp);
       return NULL;
@@ -302,9 +302,6 @@ int read_response(int fd, char **out, size_t *out_size, int *ret,
     return -1;
   }
 
-  printf("bytes_read=%lu\n", bytes_read);
-  printf("sizeof(response_message)=%lu\n", sizeof(response_message));
-
   if (bytes_read < sizeof(response_message)) {
     const char *error_msg = "Incomplete response";
     *out = strdup(error_msg);
@@ -389,8 +386,6 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   *out = NULL;
   *out_size = 0;
   *ret = 0;
-
-  printf("SendCall invoked with path argument: %s\n", (path ? path : "(none)"));
 
   // side effects: modify out, out_size, ret
   sockfd = socket_connect(POVERLAY_SOCK_PATH, out, out_size, ret);

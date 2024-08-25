@@ -389,10 +389,7 @@ int clib::pclsync_lib::add_sync_folder(const char *path, void **payload) {
 int clib::pclsync_lib::remove_sync_folder(const char *path, void **payload) {
   (void)payload;
   psync_folderid_t folderid;
-  std::cout << "remove_sync_folder called with path=" << path << std::endl;
   folderid = static_cast<psync_folderid_t>(std::stoull(path, nullptr, 10));
-  std::cout << "remove_sync_folder: syncid=" << folderid << std::endl;
-
   return psync_delete_sync_by_folderid(folderid);
 }
 

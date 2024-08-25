@@ -104,8 +104,6 @@ psync_folderid_t psync_get_folderid_by_path(const char *path) {
     } else
       psync_sql_reset(res);
 
-    printf("parentfolderid to be bound to cfolderid=%lu\n", cfolderid);
-    printf("name to be bound to path=%s\n", path);
     psync_sql_bind_uint(res, 1, cfolderid);
     psync_sql_bind_lstring(res, 2, path, len);
     row = psync_sql_fetch_rowint(res);
