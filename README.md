@@ -85,13 +85,16 @@ Use the command prompt to interact with a running daemon.
 
 Command Reference:
 
-> startcrypto <crypto pass> - use your password to unlock the crypto folder
-
-> stopcrypto – lock the crypto folder
-
-> finalize – stops the running daemon.
-
-> quit, q  - exits the command prompt, daemon continues running in background
+```
+help(?): Show this help message
+startcrypto <crypto pass>: Unlock crypto folder
+stopcrypto: Lock crypto folder
+finalize: Kill daemon and quit
+syncls: List sync folders
+syncadd <localpath> <remotepath>: Add sync folder (full sync)
+syncrm <folderid>: Remove sync folder
+quit(q): Exit this program
+```
 
 ## Warning
 
