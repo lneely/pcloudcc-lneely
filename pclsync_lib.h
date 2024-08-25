@@ -36,6 +36,7 @@
 #define PCLSYNC_LIB_H
 
 struct pstatus_struct_;
+typedef void (*status_callback_t)(int status, const char *stat_string);
 
 namespace console_client {
 namespace clibrary {
@@ -81,10 +82,12 @@ public:
   int init();
   // std::string& username, std::string& password, std::string*
   // crypto_pass, int setup_crypto = 1, int usesrypto_userpass = 0);
-  static int start_crypto(const char *pass, void *rep);
-  static int stop_crypto(const char *path, void *rep);
-  static int finalize(const char *path, void *rep);
-  static int list_sync_folders(const char *path, void *rep);
+  static int start_crypto(const char *pass, void **rep);
+  static int stop_crypto(const char *path, void **rep);
+  static int finalize(const char *path, void **rep);
+  static int list_sync_folders(const char *path, void **rep);
+  static int add_sync_folder(const char *path, void **rep);
+  static int remove_sync_folder(const char *path, void **rep);
 
   char *get_token();
   int logout();

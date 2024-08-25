@@ -31,7 +31,6 @@
 #include <boost/program_options.hpp>
 
 #include "control_tools.h"
-#include "pclsync_lib_c.h"
 
 #include "pclsync_lib.h"
 

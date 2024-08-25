@@ -26,6 +26,10 @@
   DAMAGE.
 */
 
+// dependencies:
+// - poverlay_protocol.h
+// - psynclib.h
+
 #ifndef POVERLAY_H
 #define POVERLAY_H
 
@@ -39,26 +43,21 @@
 
 #include "psynclib.h"
 
-typedef struct _message {
-  uint32_t type;
-  uint64_t length;
-  char value[];
-} message;
-
 extern int overlays_running;
 extern int callbacks_running;
 
-void overlay_main_loop(VOID);
-void instance_thread(LPVOID);
-void get_answer_to_request(message *requesr /*IN*/, message *replay /*OUT*/);
-void psync_stop_overlays();
-void psync_start_overlays();
-void psync_stop_overlay_callbacks();
-void psync_start_overlay_callbacks();
-int psync_overlays_running();
-int psync_ovr_callbacks_running();
+void psync_overlay_main_loop(VOID);
+void psync_overlay_handle_request(LPVOID);
+void psync_overlay_get_response(request_message *rq /*IN*/,
+                                response_message *rs /*OUT*/);
+void psync_overlay_stop_overlays();
+void psync_overlay_start_overlays();
+void psync_overlay_stop_overlay_callbacks();
+void psync_overlay_start_overlay_callbacks();
+int psync_overlay_overlays_running();
+int psync_overlay_callbacks_running();
 
-void init_overlay_callbacks();
-int psync_add_overlay_callback(int id, poverlay_callback callback);
+void psync_overlay_init_callbacks();
+int psync_overlay_register_callback(int id, poverlay_callback callback);
 
 #endif // POVERLAY_H

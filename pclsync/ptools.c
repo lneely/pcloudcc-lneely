@@ -286,7 +286,7 @@ int backend_call(const char *binapi, const char *wsPath,
     j++;
   }
 
-  for (i = 0; i <= totalParCnt; i++) {
+  for (i = 0; i < totalParCnt; i++) {
     if (localParams[i].paramtype == 0) {
       continue;
     }

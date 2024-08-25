@@ -381,6 +381,9 @@ typedef struct pstatus_struct_ {
 #define PSYNC_CRYPTO_STATUS_ACTIVE 4
 #define PSYNC_CRYPTO_STATUS_SETUP 5
 
+// limitation: path length of 255, plus null terminator.
+#define PSYNC_MAX_PATH_LENGTH 256
+
 #define PSYNC_CRYPTO_INVALID_FOLDERID ((psync_folderid_t) - 1)
 
 #define PSYNC_CRYPTO_FLAG_TEMP_PASS 1
@@ -402,10 +405,10 @@ typedef struct pstatus_struct_ {
 
 // Lib error codes end
 typedef struct {
-  const char *localname;
-  const char *localpath;
-  const char *remotename;
-  const char *remotepath;
+  char localname[PSYNC_MAX_PATH_LENGTH];
+  char localpath[PSYNC_MAX_PATH_LENGTH];
+  char remotename[PSYNC_MAX_PATH_LENGTH];
+  char remotepath[PSYNC_MAX_PATH_LENGTH];
   psync_folderid_t folderid;
   psync_syncid_t syncid;
   psync_synctype_t synctype;
@@ -1791,10 +1794,21 @@ void psync_get_current_userid(psync_userid_t * /*OUT*/ ret);
 void psync_get_folder_ownerid(psync_folderid_t folderid,
                               psync_userid_t * /*OUT*/ ret);
 
-/* Callback to be registered to be called from file manager extension.
- */
-
-typedef int (*poverlay_callback)(const char *path, void *rep);
+// Defines the function signature of an overlay server-side
+// callback. poverlay_callback implementations must satisfy the
+// following:
+//
+// - Accepts request data as a string.
+//
+// - Returns 0 on success, and non-zero on failure
+//
+// - If the function invoked by the callback function returns data
+//   that can be used by the client (e.g., list_sync_folders), then
+//   allocate the void** pointer and write the data there. If the
+//   void** pointer is null, then do not write any data back out for
+//   the client.
+//
+typedef int (*poverlay_callback)(const char *, void **);
 
 /* Registers file manager extension callback that will be called when packet
  * with id equals to the give one had arrived from extension. The id must be
@@ -1806,11 +1820,11 @@ typedef int (*poverlay_callback)(const char *path, void *rep);
  * synchronize.
  */
 
-int psync_add_overlay_callback(int id, poverlay_callback callback);
-void psync_stop_overlays();
-void psync_start_overlays();
-void psync_stop_overlay_callbacks();
-void psync_start_overlay_callbacks();
+int psync_overlay_register_callback(int id, poverlay_callback callback);
+void psync_overlay_stop_overlays();
+void psync_overlay_start_overlays();
+void psync_overlay_stop_overlay_callbacks();
+void psync_overlay_start_overlay_callbacks();
 
 int psync_setlanguage(const char *language, char **err);
 

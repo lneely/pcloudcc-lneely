@@ -30,11 +30,16 @@
 #include <iostream>
 #include <string>
 
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
-#include "pclsync_lib_c.h"
+#include "poverlay_protocol.h"
+
+#include "poverlay.h"
 #include "psynclib.h"
 
 #include "pclsync_lib.h"
@@ -111,36 +116,61 @@ void clib::pclsync_lib::do_get_pass_from_console(std::string &password) {
 void event_handler(psync_eventtype_t event, psync_eventdata_t eventdata) {
   if (event < PEVENT_FIRST_USER_EVENT) {
     if (event & PEVENT_TYPE_FOLDER) {
-      std::cout << "folder event=" << event
-                << ", syncid=" << eventdata.folder->syncid
-                << ", folderid=" << eventdata.folder->folderid
-                << ", name=" << eventdata.folder->name
-                << ", local=" << eventdata.folder->localpath
-                << ", remote=" << eventdata.folder->remotepath << std::endl;
+      if (eventdata.folder) {
+        std::cout << "folder event=" << event
+                  << ", syncid=" << eventdata.folder->syncid
+                  << ", folderid=" << eventdata.folder->folderid << ", name="
+                  << (eventdata.folder->name ? eventdata.folder->name : "")
+                  << ", local="
+                  << (eventdata.folder->localpath ? eventdata.folder->localpath
+                                                  : "")
+                  << ", remote="
+                  << (eventdata.folder->remotepath
+                          ? eventdata.folder->remotepath
+                          : "")
+                  << std::endl;
+      } else {
+        std::cout << "folder event=" << event << " (no folder data)"
+                  << std::endl;
+      }
     } else {
-      std::cout << "file event=" << event
-                << ", syncid=" << eventdata.folder->syncid
-                << ", file=" << eventdata.file->fileid
-                << ", name=" << eventdata.file->name
-                << ", local=" << eventdata.file->localpath
-                << ", remote=" << eventdata.file->remotepath << std::endl;
+      if (eventdata.file) {
+        std::cout
+            << "file event=" << event << ", syncid=" << eventdata.file->syncid
+            << ", file=" << eventdata.file->fileid
+            << ", name=" << (eventdata.file->name ? eventdata.file->name : "")
+            << ", local="
+            << (eventdata.file->localpath ? eventdata.file->localpath : "")
+            << ", remote="
+            << (eventdata.file->remotepath ? eventdata.file->remotepath : "")
+            << std::endl;
+      } else {
+        std::cout << "file event=" << event << " (no file data)" << std::endl;
+      }
     }
   } else if (event >= PEVENT_FIRST_SHARE_EVENT) {
-    std::cout << "share event=" << event
-              << ", folderid=" << eventdata.share->folderid
-              << ", sharename=" << eventdata.share->sharename
-              << ", email=" << eventdata.share->toemail
-              << ", message=" << eventdata.share->message
-              << ", userid=" << eventdata.share->userid
-              << ", shareid=" << eventdata.share->shareid
-              << ", sharerequestid=" << eventdata.share->sharerequestid
-              << ", created=" << eventdata.share->created
-              << ", canread=" << eventdata.share->canread
-              << ", cancreate=" << eventdata.share->cancreate
-              << ", canmodify=" << eventdata.share->canmodify
-              << ", candelete=" << eventdata.share->candelete << std::endl;
+    if (eventdata.share) {
+      std::cout << "share event=" << event
+                << ", folderid=" << eventdata.share->folderid << ", sharename="
+                << (eventdata.share->sharename ? eventdata.share->sharename
+                                               : "")
+                << ", email="
+                << (eventdata.share->toemail ? eventdata.share->toemail : "")
+                << ", message="
+                << (eventdata.share->message ? eventdata.share->message : "")
+                << ", userid=" << eventdata.share->userid
+                << ", shareid=" << eventdata.share->shareid
+                << ", sharerequestid=" << eventdata.share->sharerequestid
+                << ", created=" << eventdata.share->created
+                << ", canread=" << eventdata.share->canread
+                << ", cancreate=" << eventdata.share->cancreate
+                << ", canmodify=" << eventdata.share->canmodify
+                << ", candelete=" << eventdata.share->candelete << std::endl;
+    } else {
+      std::cout << "share event=" << event << " (no share data)" << std::endl;
+    }
   } else {
-    std::cout << "event" << event << std::endl;
+    std::cout << "event " << event << std::endl;
   }
 }
 
@@ -222,9 +252,6 @@ static void status_change(pstatus_t *status) {
       clib::pclsync_lib::get_lib().get_pass_from_console();
     }
 
-    // std::cout << "Username: " <<
-    // clib::pclsync_lib::get_lib().get_username().c_str() << "| Password: " <<
-    // clib::pclsync_lib::get_lib().get_password().c_str() << std::endl;
     psync_set_user_pass(clib::pclsync_lib::get_lib().get_username().c_str(),
                         clib::pclsync_lib::get_lib().get_password().c_str(),
                         (int)clib::pclsync_lib::get_lib().save_pass_);
@@ -270,28 +297,99 @@ static void status_change(pstatus_t *status) {
     psync_free(err);
 }
 
-int clib::pclsync_lib::start_crypto(const char *pass, void *rep) {
+int clib::pclsync_lib::start_crypto(const char *pass, void **payload) {
+  (void)payload;
+
   std::cout << "calling startcrypto pass: " << pass << std::endl;
   get_lib().crypto_pass_ = pass;
   return lib_setup_cripto();
 }
 
-int clib::pclsync_lib::stop_crypto(const char *path, void *rep) {
-  int res = -1;
+int clib::pclsync_lib::stop_crypto(const char *path, void **payload) {
+  (void)payload;
+  (void)path;
+
   psync_crypto_stop();
   get_lib().crypto_on_ = false;
-  return res;
+  return 0;
 }
 
-int clib::pclsync_lib::finalize(const char *path, void *rep) {
+int clib::pclsync_lib::finalize(const char *path, void **payload) {
+  (void)payload;
+  (void)path;
+
   psync_destroy();
   exit(0);
 }
 
-int clib::pclsync_lib::list_sync_folders(const char *path, void *rep) {
+int clib::pclsync_lib::add_sync_folder(const char *path, void **payload) {
+  if (payload == nullptr) {
+    std::cerr << "Error: payload pointer is null" << std::endl;
+    return -255;
+  }
+
+  if (path == nullptr) {
+    std::cerr << "Error: path is nullptr" << std::endl;
+    return -255;
+  }
+  const char delimiter = '|';
+  std::string combined(path);
+  size_t delimiter_pos = combined.find(delimiter);
+  if (delimiter_pos == std::string::npos) {
+    std::cerr << "Error: Invalid path format. Expected 'localpath|remotepath'"
+              << std::endl;
+    return -255;
+  }
+
+  std::string localpath = combined.substr(0, delimiter_pos);
+  std::string remotepath = combined.substr(delimiter_pos + 1);
+
+  psync_syncid_t syncid =
+      psync_add_sync_by_path(localpath.c_str(), remotepath.c_str(), PSYNC_FULL);
+
+  uint64_t *payload_ptr =
+      static_cast<uint64_t *>(psync_malloc(sizeof(uint64_t)));
+  if (payload_ptr == nullptr) {
+    std::cerr << "Error: Failed to allocate memory for payload" << std::endl;
+    return -255;
+  }
+
+  if (syncid == PSYNC_INVALID_SYNCID) {
+    std::cerr << "psync_add_sync_by_path returned PSYNC_INVALID_SYNCID"
+              << std::endl;
+    *payload_ptr = (static_cast<uint64_t>(1) << 32) |
+                   static_cast<uint32_t>(PSYNC_INVALID_SYNCID);
+    return -1;
+  } else {
+    *payload_ptr = static_cast<uint64_t>(syncid);
+  }
+  *payload = payload_ptr;
+  return 0;
+}
+
+int clib::pclsync_lib::remove_sync_folder(const char *path, void **payload) {
+  (void)payload;
+  psync_folderid_t folderid;
+  folderid = static_cast<psync_folderid_t>(std::stoull(path, nullptr, 10));
+  return psync_delete_sync_by_folderid(folderid);
+}
+
+int clib::pclsync_lib::list_sync_folders(const char *path, void **payload) {
+  (void)path;
+
   psync_folder_list_t *folders = psync_get_sync_list();
-  rep = psync_malloc(sizeof(*folders));
-  memcpy(rep, folders, sizeof(*folders));
+  if (!folders) {
+    return -1;
+  }
+  size_t alloc_size =
+      sizeof(*folders) + folders->foldercnt * sizeof(psync_folder_t);
+  *payload = psync_malloc(alloc_size);
+  if (*payload == NULL) {
+    psync_free(folders);
+    return -1;
+  }
+  memcpy(*payload, folders, alloc_size);
+  psync_free(folders);
   return 0;
 }
 
@@ -330,10 +428,12 @@ int clib::pclsync_lib::init() {
     psync_free(username_old);
   }
 
-  psync_add_overlay_callback(20, &clib::pclsync_lib::start_crypto);
-  psync_add_overlay_callback(21, &clib::pclsync_lib::stop_crypto);
-  psync_add_overlay_callback(22, &clib::pclsync_lib::finalize);
-  psync_add_overlay_callback(23, &clib::pclsync_lib::list_sync_folders);
+  psync_overlay_register_callback(20, &clib::pclsync_lib::start_crypto);
+  psync_overlay_register_callback(21, &clib::pclsync_lib::stop_crypto);
+  psync_overlay_register_callback(22, &clib::pclsync_lib::finalize);
+  psync_overlay_register_callback(23, &clib::pclsync_lib::list_sync_folders);
+  psync_overlay_register_callback(24, &clib::pclsync_lib::add_sync_folder);
+  psync_overlay_register_callback(25, &clib::pclsync_lib::remove_sync_folder);
 
   return 0;
 }

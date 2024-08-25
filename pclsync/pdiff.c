@@ -2978,7 +2978,7 @@ void psync_diff_wake() {
 
 static void psync_diff_thread() {
   psync_socket *sock;
-  binresult *res;
+  binresult *res = NULL;
   const binresult *entries;
   uint64_t newdiffid, result;
   psync_socket_t exceptionsock, socks[2];
@@ -2986,8 +2986,11 @@ static void psync_diff_thread() {
   int sel, ret = 0;
   char ex;
   char *err = NULL;
+  int should_free_res = 0;
+
   psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   psync_send_status_update();
+
 restart:
   psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   sock = get_connected_socket();
@@ -3005,8 +3008,9 @@ restart:
                              P_NUM("limit", PSYNC_DIFF_LIMIT),
                              P_NUM("diffid", ids.diffid)};
     if (!psync_do_run)
-      break;
+      goto cleanup;
     res = send_command(sock, "diff", diffparams);
+    should_free_res = 1;
     if (!res) {
       psync_socket_close(sock);
       goto restart;
@@ -3015,7 +3019,6 @@ restart:
     if (unlikely(result)) {
       debug(D_ERROR, "diff returned error %u: %s", (unsigned int)result,
             psync_find_result(res, "error", PARAM_STR)->str);
-      psync_free(res);
       psync_socket_close(sock);
       psync_milisleep(PSYNC_SLEEP_BEFORE_RECONNECT);
       goto restart;
@@ -3026,13 +3029,17 @@ restart:
       debug(D_NOTICE, "processing diff with %u entries",
             (unsigned)entries->length);
       ids.diffid = process_entries(entries, newdiffid);
-      // psync_diff_refresh_fs(entries); -- don't do this for initial loading
       debug(D_NOTICE, "got diff with %u entries, new diffid %lu",
             (unsigned)entries->length, (unsigned long)ids.diffid);
     }
     result = entries->length;
-    psync_free(res);
+    if (should_free_res) {
+      psync_free(res);
+      should_free_res = 0;
+      res = NULL;
+    }
   } while (result);
+
   psync_fs_refresh_folder(0);
   debug(D_NOTICE, "initial sync finished");
   if (psync_diff_check_quota(sock)) {
@@ -3049,7 +3056,7 @@ restart:
   if (unlikely(exceptionsock == INVALID_SOCKET)) {
     debug(D_ERROR, "could not create pipe");
     psync_socket_close(sock);
-    return;
+    goto cleanup;
   }
   socks[0] = exceptionsock;
   socks[1] = sock->sock;
@@ -3059,6 +3066,7 @@ restart:
   send_diff_command(sock, ids);
   psync_milisleep(50);
   last_event = 0;
+
   while (psync_do_run) {
     if (unlinked) {
       unlinked = 0;
@@ -3085,6 +3093,7 @@ restart:
     } else if (sel == 1) {
       sock->pending = 1;
       res = get_result(sock);
+      should_free_res = 1;
       if (unlikely_log(!res)) {
         psync_timer_notify_exception();
         handle_exception(&sock, &ids, 'r');
@@ -3098,13 +3107,11 @@ restart:
         if (result == 6003 || result == 6002) { // timeout or cancel
           debug(D_NOTICE, "got \"%s\" from the socket",
                 psync_find_result(res, "error", PARAM_STR)->str);
-          psync_free(res);
           send_diff_command(sock, ids);
           continue;
         }
         debug(D_ERROR, "diff returned error %u: %s", (unsigned int)result,
               psync_find_result(res, "error", PARAM_STR)->str);
-        psync_free(res);
         handle_exception(&sock, &ids, 'r');
         socks[1] = sock->sock;
         continue;
@@ -3123,18 +3130,17 @@ restart:
               initialdownload = 0;
           } else
             debug(D_NOTICE, "diff with 0 entries, did we send a nop recently?");
-          psync_free(res);
         } else if (entries->length == 13 &&
                    !strcmp(entries->str, "notifications")) {
           ids.notificationid =
               psync_find_result(res, "notificationid", PARAM_NUM)->num;
-          // do not free res
           psync_notifications_notify(res);
+          should_free_res = 0; // Don't free res in this case
         } else if (entries->length == 8 && !strcmp(entries->str, "publinks")) {
           ids.publinkid = psync_find_result(res, "publinkid", PARAM_NUM)->num;
           ret = cache_links(err, 256);
           if (ret < 0)
-            debug(D_ERROR, "Cacheing links faild with err %s", err);
+            debug(D_ERROR, "Cacheing links failed with err %s", err);
           else
             psync_notify_cache_change(PACCOUNT_CHANGE_LINKS);
         } else if (entries->length == 11 &&
@@ -3146,7 +3152,6 @@ restart:
             debug(D_ERROR, "Cacheing upload links failed with err %s", err);
           else
             psync_notify_cache_change(PACCOUNT_CHANGE_LINKS);
-
         } else if (entries->length == 5 && !strcmp(entries->str, "teams")) {
           cache_account_teams();
           cache_ba_my_teams();
@@ -3159,14 +3164,22 @@ restart:
           psync_notify_cache_change(PACCOUNT_CHANGE_CONTACTS);
         } else {
           debug(D_NOTICE, "got no from, did we send a nop recently?");
-          psync_free(res);
         }
         send_diff_command(sock, ids);
       } else {
-        psync_free(res);
         debug(D_NOTICE, "got no from, did we send a nop recently?");
       }
     }
+
+    if (should_free_res) {
+      psync_free(res);
+      should_free_res = 0;
+      res = NULL;
+    }
+  }
+
+cleanup:
+  if (should_free_res && res) {
     psync_free(res);
   }
   psync_socket_close(sock);
