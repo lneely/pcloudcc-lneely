@@ -1,0 +1,37 @@
+#+title: pCloudCC Request-Response Flow
+
+~pcloudcc~ is built upon a client-server
+architecture. When the user runs ~pcloudcc -u <username>~, this starts
+the server. The server listens for request messages and sends back
+response messages.
+
+When the user runs ~pcloudcc -k~, this starts the client's command
+line interface. The client sends request messages to and expects a
+corresponding response message from the server.
+
+The client and server send and receive messages over a Unix socket
+that gets created when the server is started.
+
+#+begin_src plantuml :file img/request-response-00.png :export results
+  participant user
+  participant control_tools <<client>>
+  participant overlay_client <<client>>
+  participant socket <<net>>
+  participant poverlay <<server>>
+
+  user -> control_tools: input command
+  control_tools -> control_tools : parse command
+  control_tools -> overlay_client : SendCall(msgType, reqData, ...)
+  overlay_client -> socket : write_request
+  socket -> poverlay : request
+  poverlay -> poverlay : poverlay_handle_request
+  poverlay -> poverlay : poverlay_get_response
+  poverlay -> poverlay : serialize_response_message
+  poverlay -> socket : response (serialized)
+  socket -> overlay_client : read_response
+  overlay_client -> control_tools : (msg, msgsz, payload, payloadsz)
+  control_tools -> user : print results
+#+end_src
+
+[[file:img/request-response-00.png]]
+
