@@ -119,7 +119,8 @@ void instance_thread(void *lpvParam) {
 
   // XXX: the chbuf is getting truncated here. chbuf + 16 offset
   // contains the full request message, but request->value is
-  // truncated. why??
+  // truncated. why?? Note that this impacts all API functions, not
+  // just syncadd.
   request = (message *)chbuf;
   if (request) {
     get_answer_to_request(request, reply, &reply_data, &reply_data_length);
