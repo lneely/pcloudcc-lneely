@@ -16,7 +16,7 @@ typedef message request_message;
 // represents a response message; this includes the API response
 // message and any payload data returned by the callback function.
 typedef struct {
-  message *msg;     // API response message
   void *payload;    // data returned by the callback function
   size_t payloadsz; // size of payload
+  message *msg;     // API response message
 } response_message;

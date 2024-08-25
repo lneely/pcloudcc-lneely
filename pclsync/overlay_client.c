@@ -62,7 +62,7 @@
 #include "overlay_client.h"
 #include "poverlay_protocol.h"
 
-#define POVERLAY_BUFSIZE 512
+#define POVERLAY_BUFSIZE 16 * 1024
 
 // for easier error tracing...
 #define POVERLAY_SOCKET_CREATE_FAILED -100
@@ -71,6 +71,103 @@
 #define POVERLAY_WRITE_COMM_ERR -103
 #define POVERLAY_READ_SOCK_ERR -104
 #define POVERLAY_READ_INCOMPLETE -105
+#define POVERLAY_READ_INVALID_RESPONSE -106
+
+response_message *deserialize_response_message(const char *buffer,
+                                               size_t buffer_size) {
+  if (buffer_size < 2 * sizeof(size_t) + sizeof(uint32_t) + sizeof(uint64_t)) {
+    fprintf(stderr, "Buffer size too small: %zu\n", buffer_size);
+    return NULL;
+  }
+
+  const char *ptr = buffer;
+
+  // Allocate response_message
+  response_message *resp = (response_message *)malloc(sizeof(response_message));
+  if (resp == NULL) {
+    fprintf(stderr, "Failed to allocate response_message\n");
+    return NULL;
+  }
+
+  // Get message size
+  size_t msg_size = be64toh(*(size_t *)ptr);
+  ptr += sizeof(size_t);
+
+  fprintf(stderr, "Message size: %zu\n", msg_size);
+
+  if (msg_size < sizeof(uint32_t) + sizeof(uint64_t)) {
+    fprintf(stderr, "Invalid message size: %zu\n", msg_size);
+    free(resp);
+    return NULL;
+  }
+
+  // Allocate message with extra space for the flexible array member
+  size_t alloc_size =
+      sizeof(message) + msg_size - sizeof(uint32_t) - sizeof(uint64_t);
+  resp->msg = (message *)malloc(alloc_size);
+  if (resp->msg == NULL) {
+    fprintf(stderr, "Failed to allocate message\n");
+    free(resp);
+    return NULL;
+  }
+
+  resp->msg->type = ntohl(*(uint32_t *)ptr);
+  ptr += sizeof(uint32_t);
+
+  resp->msg->length = be64toh(*(uint64_t *)ptr);
+  ptr += sizeof(uint64_t);
+
+  fprintf(stderr, "Message type: %u, length: %lu\n", resp->msg->type,
+          resp->msg->length);
+
+  // Calculate the size of the value array
+  size_t value_size = msg_size - sizeof(uint32_t) - sizeof(uint64_t);
+
+  if (value_size > 0) {
+    if (ptr + value_size > buffer + buffer_size) {
+      fprintf(stderr, "Buffer overflow detected\n");
+      free(resp->msg);
+      free(resp);
+      return NULL;
+    }
+    memcpy(resp->msg->value, ptr, value_size);
+    ptr += value_size;
+  }
+
+  // Deserialize payload size
+  if (ptr + sizeof(size_t) > buffer + buffer_size) {
+    fprintf(stderr, "Buffer overflow detected when reading payload size\n");
+    free(resp->msg);
+    free(resp);
+    return NULL;
+  }
+  resp->payloadsz = be64toh(*(size_t *)ptr);
+  ptr += sizeof(size_t);
+
+  fprintf(stderr, "Payload size: %zu\n", resp->payloadsz);
+
+  // Deserialize payload
+  if (resp->payloadsz > 0) {
+    if (ptr + resp->payloadsz > buffer + buffer_size) {
+      fprintf(stderr, "Buffer overflow detected when reading payload\n");
+      free(resp->msg);
+      free(resp);
+      return NULL;
+    }
+    resp->payload = malloc(resp->payloadsz);
+    if (resp->payload == NULL) {
+      fprintf(stderr, "Failed to allocate payload\n");
+      free(resp->msg);
+      free(resp);
+      return NULL;
+    }
+    memcpy(resp->payload, ptr, resp->payloadsz);
+  } else {
+    resp->payload = NULL;
+  }
+
+  return resp;
+}
 
 int QueryState(pCloud_FileState *state, char *path) {
   int rep = 0;
@@ -185,78 +282,91 @@ int write_request(int fd, int msgtype, const char *value, char **out,
 // callback's return data to payload and payloadsz.
 int read_response(int fd, char **out, size_t *out_size, int *ret,
                   void **payload, size_t *payloadsz) {
-  char *buf;
-  size_t size;
-  size_t bytes_read;
-  size_t chunk_size;
-  response_message response;
-  int rc;
-  bool received_data;
-  size_t value_size;
+  char buffer[POVERLAY_BUFSIZE];
+  ssize_t bytes_read = read(fd, buffer, POVERLAY_BUFSIZE);
 
-  buf = NULL;
-  size = 0;
-  bytes_read = 0;
-  chunk_size = 32; // read response in 32-byte chunks
-  *ret = 0;
-  received_data = false;
-  memset(&response, 0, sizeof(response_message));
-
-  while (1) {
-    buf = realloc(buf, size + chunk_size);
-    rc = read(fd, buf + size, chunk_size);
-    if (rc < 0) {
-      if (errno == EINTR) {
-        continue; // try again on interrupt
-      }
-      debug(D_ERROR, "failed to read from socket into response buffer");
-      *ret = POVERLAY_READ_SOCK_ERR;
-      break;
-    }
-
-    if (rc == 0) {
-      break; // end of response
-    }
-    received_data = true;
-    size += rc;
-    bytes_read += rc;
+  if (bytes_read <= 0) {
+    const char *error_msg =
+        (bytes_read == 0) ? "Connection closed" : strerror(errno);
+    *out = strdup(error_msg);
+    *out_size = strlen(error_msg) + 1;
+    *ret = -1;
+    return -1;
   }
 
-  if (*ret == 0) {
-    if (!received_data) {
-      *out = strdup("");
-      *out_size = 1;
-    } else if (bytes_read >= sizeof(message)) {
-      response.msg = (message *)buf;
-      *ret = response.msg->type;
+  printf("bytes_read=%lu\n", bytes_read);
+  printf("sizeof(response_message)=%lu\n", sizeof(response_message));
 
-      value_size = response.msg->length - sizeof(message);
-      *out = malloc(value_size + 1);
-      memcpy(*out, response.msg->value, value_size);
-      (*out)[value_size] = '\0';
-      *out_size = value_size + 1;
+  if (bytes_read < sizeof(response_message)) {
+    const char *error_msg = "Incomplete response";
+    *out = strdup(error_msg);
+    *out_size = strlen(error_msg) + 1;
+    *ret = -1;
+    return -1;
+  }
 
-      if (payload != NULL && payloadsz != NULL) {
-        if (bytes_read > response.msg->length) {
-          response.payloadsz = bytes_read - response.msg->length;
-          response.payload = malloc(response.payloadsz);
-          memcpy(response.payload, buf + response.msg->length,
-                 response.payloadsz);
-          *payload = response.payload;
-          *payloadsz = response.payloadsz;
-        } else {
-          *payload = NULL;
-          *payloadsz = 0;
-        }
+  // response_message *resp = (response_message *)buffer;
+  response_message *resp = deserialize_response_message(buffer, bytes_read);
+
+  // Validate the response_message structure
+  if (resp->msg == NULL ||
+      (size_t)bytes_read < sizeof(response_message) + sizeof(message) ||
+      (size_t)bytes_read < sizeof(response_message) + resp->msg->length) {
+    const char *error_msg = "Invalid response structure";
+    *out = strdup(error_msg);
+    *out_size = strlen(error_msg) + 1;
+    *ret = -1;
+    return -1;
+  }
+
+  message *msg = resp->msg;
+  size_t value_size = msg->length - sizeof(message);
+
+  // Validate message length
+  if (msg->length < sizeof(message) ||
+      (size_t)bytes_read < sizeof(response_message) + msg->length) {
+    const char *error_msg = "Invalid message length";
+    *out = strdup(error_msg);
+    *out_size = strlen(error_msg) + 1;
+    *ret = -1;
+    return -1;
+  }
+
+  *out = malloc(value_size + 1);
+  if (*out == NULL) {
+    const char *error_msg = "Memory allocation failed";
+    *out = strdup(error_msg);
+    *out_size = strlen(error_msg) + 1;
+    *ret = -1;
+    return -1;
+  }
+
+  memcpy(*out, msg->value, value_size);
+  (*out)[value_size] = '\0';
+  *out_size = value_size + 1;
+
+  *ret = msg->type;
+
+  if (payload != NULL && payloadsz != NULL) {
+    if (resp->payload != NULL && resp->payloadsz > 0) {
+      *payload = malloc(resp->payloadsz);
+      if (*payload == NULL) {
+        const char *error_msg = "Memory allocation failed for payload";
+        free(*out);
+        *out = strdup(error_msg);
+        *out_size = strlen(error_msg) + 1;
+        *ret = -1;
+        return -1;
       }
+      memcpy(*payload, resp->payload, resp->payloadsz);
+      *payloadsz = resp->payloadsz;
     } else {
-      debug(D_ERROR, "got incomplete message from socket");
-      *ret = POVERLAY_READ_INCOMPLETE;
+      *payload = NULL;
+      *payloadsz = 0;
     }
   }
 
-  free(buf);
-  return *ret;
+  return 0;
 }
 
 int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,

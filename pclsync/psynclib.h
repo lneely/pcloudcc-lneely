@@ -381,6 +381,9 @@ typedef struct pstatus_struct_ {
 #define PSYNC_CRYPTO_STATUS_ACTIVE 4
 #define PSYNC_CRYPTO_STATUS_SETUP 5
 
+// limitation: path length of 255, plus null terminator.
+#define PSYNC_MAX_PATH_LENGTH 256
+
 #define PSYNC_CRYPTO_INVALID_FOLDERID ((psync_folderid_t) - 1)
 
 #define PSYNC_CRYPTO_FLAG_TEMP_PASS 1
@@ -402,10 +405,10 @@ typedef struct pstatus_struct_ {
 
 // Lib error codes end
 typedef struct {
-  char localname[4096];
-  char localpath[4096];
-  char remotename[4096];
-  char remotepath[4096];
+  char localname[PSYNC_MAX_PATH_LENGTH];
+  char localpath[PSYNC_MAX_PATH_LENGTH];
+  char remotename[PSYNC_MAX_PATH_LENGTH];
+  char remotepath[PSYNC_MAX_PATH_LENGTH];
   psync_folderid_t folderid;
   psync_syncid_t syncid;
   psync_synctype_t synctype;

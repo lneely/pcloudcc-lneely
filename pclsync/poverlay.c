@@ -55,6 +55,56 @@
 int overlays_running = 1;
 int callbacks_running = 1;
 
+// Serialization function
+size_t serialize_response_message(const response_message *resp,
+                                  char **out_buffer) {
+  // Calculate total size needed
+  size_t msg_size = sizeof(uint32_t) + sizeof(uint64_t) + resp->msg->length;
+  size_t total_size =
+      sizeof(size_t) + msg_size + sizeof(size_t) + resp->payloadsz;
+
+  // Allocate buffer
+  *out_buffer = (char *)malloc(total_size);
+  if (*out_buffer == NULL)
+    return 0;
+
+  char *ptr = *out_buffer;
+
+  // Serialize msg size
+  *(size_t *)ptr = htobe64(msg_size);
+  ptr += sizeof(size_t);
+
+  // Serialize msg
+  *(uint32_t *)ptr = htonl(resp->msg->type);
+  ptr += sizeof(uint32_t);
+
+  *(uint64_t *)ptr = htobe64(resp->msg->length);
+  ptr += sizeof(uint64_t);
+
+  memcpy(ptr, resp->msg->value, resp->msg->length);
+  ptr += resp->msg->length;
+
+  // Serialize payload size
+  *(size_t *)ptr = htobe64(resp->payloadsz);
+  ptr += sizeof(size_t);
+
+  // Serialize payload
+  if (resp->payloadsz > 0 && resp->payload != NULL) {
+    memcpy(ptr, resp->payload, resp->payloadsz);
+  }
+
+  return total_size;
+}
+
+// Helper function to free a deserialized response_message
+void free_response_message(response_message *resp) {
+  if (resp) {
+    free(resp->msg);
+    free(resp->payload);
+    free(resp);
+  }
+}
+
 void psync_overlay_main_loop() {
   struct sockaddr_un addr;
   int fd, cl;
@@ -118,7 +168,7 @@ void psync_overlay_handle_request(void *lpvParam) {
     readbytes += rc;
     rqbufp = rqbufp + rc;
     if (readbytes > 12) {
-      request = (message *)rqbuf;
+      request = (request_message *)rqbuf;
       if (request->length == (uint64_t)readbytes)
         break;
     }
@@ -140,10 +190,11 @@ void psync_overlay_handle_request(void *lpvParam) {
 
   // get the response for the request, and write the response to the
   // sockfd.
-  request = (message *)rqbuf;
+  request = (request_message *)rqbuf;
   if (request) {
     psync_overlay_get_response(request, response);
 
+    /*
     size_t bytes_written = 0;
     while (bytes_written < response->msg->length) {
       rc = write(*sockfd, (char *)response + bytes_written,
@@ -155,7 +206,7 @@ void psync_overlay_handle_request(void *lpvParam) {
       bytes_written += rc;
     }
 
-    // Send the additional reply data if present
+    // Send the payload if it exists
     if (response->payload && response->payloadsz > 0) {
       bytes_written = 0;
 
@@ -169,6 +220,35 @@ void psync_overlay_handle_request(void *lpvParam) {
         bytes_written += rc;
       }
     }
+    */
+
+    char *rsbufp;
+    size_t bytes_written = 0;
+    size_t responsesz = serialize_response_message(response, &rsbufp);
+    if (responsesz <= 0) {
+      debug(D_ERROR, "failed to serialize response message");
+      return;
+    }
+
+    while (bytes_written < responsesz) {
+      ssize_t written =
+          write(*sockfd, rsbufp + bytes_written, responsesz - bytes_written);
+      if (written == -1) {
+        if (errno == EINTR) {
+          // Interrupted by signal, try again
+          continue;
+        }
+        debug(D_ERROR, "failed to write to socket: %s", strerror(errno));
+        break;
+      }
+      bytes_written += written;
+    }
+    free(rsbufp);
+    if (bytes_written < responsesz) {
+      debug(D_ERROR, "failed to write entire message to socket");
+      return;
+    }
+
     debug(D_NOTICE,
           "Successfully sent full reply: %zu bytes structure, %zu bytes "
           "additional data",
