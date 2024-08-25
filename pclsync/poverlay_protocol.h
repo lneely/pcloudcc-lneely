@@ -1,5 +1,9 @@
 // defines the messaging protocol for pclsync
 
+#ifndef POVERLAY_SOCK_PATH
+#define POVERLAY_SOCK_PATH "/tmp/pcloud_unix_soc.sock"
+#endif
+
 typedef struct _message {
   uint32_t type;
   uint64_t length;

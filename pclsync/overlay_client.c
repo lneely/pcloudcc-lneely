@@ -274,7 +274,7 @@ int SendCall(int id /*IN*/, const char *path /*IN*/, int *ret /*OUT*/,
   printf("SendCall invoked with path argument: %s\n", (path ? path : "(none)"));
 
   // side effects: modify out, out_size, ret
-  sockfd = socket_connect("/tmp/pcloud_unix_soc.sock", out, out_size, ret);
+  sockfd = socket_connect(POVERLAY_SOCK_PATH, out, out_size, ret);
   if (sockfd >= 0) {
     // side effects: modify out, out_size, ret
     if ((result = write_request(sockfd, id, path, out, out_size, ret)) == 0) {

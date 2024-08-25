@@ -55,25 +55,23 @@
 int overlays_running = 1;
 int callbacks_running = 1;
 
-char *mysoc = "/tmp/pcloud_unix_soc.sock";
-
 void psync_overlay_main_loop() {
   struct sockaddr_un addr;
   int fd, cl;
 
   if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-    // debug(D_NOTICE, "Unix socket error failed to open %s", mysoc);
+    debug(D_ERROR, "Unix socket error failed to open %s", POVERLAY_SOCK_PATH);
     return;
   }
 
   memset(&addr, 0, sizeof(addr));
   addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, mysoc, sizeof(addr.sun_path) - 1);
+  strncpy(addr.sun_path, POVERLAY_SOCK_PATH, sizeof(addr.sun_path) - 1);
 
-  unlink(mysoc);
+  unlink(POVERLAY_SOCK_PATH);
 
   if (bind(fd, (struct sockaddr *)&addr,
-           strlen(mysoc) + sizeof(addr.sun_family)) == -1) {
+           strlen(POVERLAY_SOCK_PATH) + sizeof(addr.sun_family)) == -1) {
     debug(D_ERROR, "Unix socket bind error");
     return;
   }
@@ -88,6 +86,8 @@ void psync_overlay_main_loop() {
       debug(D_ERROR, "Unix socket accept error");
       continue;
     }
+
+    // handle the request in a new thread
     psync_run_thread1("Pipe request handle routine",
                       psync_overlay_handle_request, // thread proc
                       (LPVOID)&cl                   // thread parameter
