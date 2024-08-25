@@ -323,16 +323,14 @@ int clib::pclsync_lib::finalize(const char *path, void **payload) {
 }
 
 int clib::pclsync_lib::add_sync_folder(const char *path, void **payload) {
-  int result = -1;
-
   if (payload == nullptr) {
     std::cerr << "Error: payload pointer is null" << std::endl;
-    return result;
+    return -255;
   }
 
   if (path == nullptr) {
     std::cerr << "Error: path is nullptr" << std::endl;
-    return result;
+    return -255;
   }
   const char delimiter = '|';
   std::string combined(path);
@@ -340,7 +338,7 @@ int clib::pclsync_lib::add_sync_folder(const char *path, void **payload) {
   if (delimiter_pos == std::string::npos) {
     std::cerr << "Error: Invalid path format. Expected 'localpath|remotepath'"
               << std::endl;
-    return result;
+    return -255;
   }
 
   std::string localpath = combined.substr(0, delimiter_pos);
@@ -353,7 +351,7 @@ int clib::pclsync_lib::add_sync_folder(const char *path, void **payload) {
       static_cast<uint64_t *>(psync_malloc(sizeof(uint64_t)));
   if (payload_ptr == nullptr) {
     std::cerr << "Error: Failed to allocate memory for payload" << std::endl;
-    return result;
+    return -255;
   }
 
   if (syncid == PSYNC_INVALID_SYNCID) {
@@ -361,12 +359,12 @@ int clib::pclsync_lib::add_sync_folder(const char *path, void **payload) {
               << std::endl;
     *payload_ptr = (static_cast<uint64_t>(1) << 32) |
                    static_cast<uint32_t>(PSYNC_INVALID_SYNCID);
+    return -1;
   } else {
     *payload_ptr = static_cast<uint64_t>(syncid);
   }
   *payload = payload_ptr;
-  result = 0;
-  return result;
+  return 0;
 }
 
 int clib::pclsync_lib::remove_sync_folder(const char *path, void **payload) {

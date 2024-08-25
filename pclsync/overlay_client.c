@@ -312,6 +312,13 @@ int read_response(int fd, char **out, size_t *out_size, int *ret,
 
   // response_message *resp = (response_message *)buffer;
   response_message *resp = deserialize_response_message(buffer, bytes_read);
+  if (resp == NULL) {
+    const char *error_msg = "Failed to deserialize response";
+    *out = strdup(error_msg);
+    *out_size = strlen(error_msg) + 1;
+    *ret = -1;
+    return -1;
+  }
 
   // Validate the response_message structure
   if (resp->msg == NULL ||
@@ -343,6 +350,7 @@ int read_response(int fd, char **out, size_t *out_size, int *ret,
     *out = strdup(error_msg);
     *out_size = strlen(error_msg) + 1;
     *ret = -1;
+    free_response_message(resp);
     return -1;
   }
 
@@ -361,6 +369,7 @@ int read_response(int fd, char **out, size_t *out_size, int *ret,
         *out = strdup(error_msg);
         *out_size = strlen(error_msg) + 1;
         *ret = -1;
+        free_response_message(resp);
         return -1;
       }
       memcpy(*payload, resp->payload, resp->payloadsz);
