@@ -255,7 +255,7 @@ void psync_overlay_get_response(request_message *request,
   response->payloadsz = 0;
   available_space = POVERLAY_BUFSIZE - sizeof(message);
 
-  // Main logic
+  // don't write the crypto password to the debug logs...
   debug_string = (request->type == 20) ? "REDACTED" : request->value;
 
   debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]",
