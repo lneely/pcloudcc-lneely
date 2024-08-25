@@ -26,16 +26,18 @@
   DAMAGE.
 */
 
-#include "poverlay.h"
-#include "pcompat.h"
-#include "ppathstatus.h"
-
-#include "plibs.h"
-
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <time.h>
+
+#include "pcompat.h"
+#include "poverlay.h"
+#include "ppathstatus.h"
+
+#include "plibs.h"
 
 #define POVERLAY_BUFSIZE 512
 
@@ -85,49 +87,56 @@ void overlay_main_loop() {
 }
 
 void instance_thread(void *lpvParam) {
-  int *cl, rc;
-  char chbuf[POVERLAY_BUFSIZE];
-  message *request = NULL;
-  char *curbuf = &chbuf[0];
-  int bytes_read = 0;
-  response *reply = (response *)psync_malloc(POVERLAY_BUFSIZE);
+  int *sockfd;                  // pcloud socket file descriptor
+  int rc;                       // bytes read / written per iteration
+  int readbytes;                // total bytes read from request
+  char rqbuf[POVERLAY_BUFSIZE]; // request buffer, contains the request message
+  char *rqbufp;                 // request buffer ptr, for convenient iteration
+  request_message *request;     // request message
+  response_message *response;   // response message and payload
 
-  memset(reply, 0, POVERLAY_BUFSIZE);
-  memset(chbuf, 0, POVERLAY_BUFSIZE);
+  request = NULL;
+  response = NULL;
+  readbytes = 0;
+  rqbufp = &rqbuf[0];
+  sockfd = (int *)lpvParam;
 
-  cl = (int *)lpvParam;
-
-  while ((rc = read(*cl, curbuf, (POVERLAY_BUFSIZE - bytes_read))) > 0) {
-    bytes_read += rc;
-    curbuf = curbuf + rc;
-    if (bytes_read > 12) {
-      request = (message *)chbuf;
-      if (request->length == (uint64_t)bytes_read)
+  // read the request from the socket into the request buffer
+  memset(rqbuf, 0, POVERLAY_BUFSIZE);
+  while ((rc = read(*sockfd, rqbufp, (POVERLAY_BUFSIZE - readbytes))) > 0) {
+    readbytes += rc;
+    rqbufp = rqbufp + rc;
+    if (readbytes > 12) {
+      request = (message *)rqbuf;
+      if (request->length == (uint64_t)readbytes)
         break;
     }
   }
-
   if (rc == -1) {
     debug(D_ERROR, "Unix socket read error");
     goto cleanup;
-  } else if (rc == 0 && bytes_read == 0) {
+  } else if (rc == 0 && readbytes == 0) {
     debug(D_NOTICE, "Connection closed by client before sending data");
     goto cleanup;
   }
 
-  // XXX: the chbuf is getting truncated here. chbuf + 16 offset
-  // contains the full request message, but request->value is
-  // truncated. why?? Note that this impacts all API functions, not
-  // just syncadd.
-  request = (message *)chbuf;
-  if (request) {
-    get_answer_to_request(request, reply);
+  // allocate and initialize response message
+  response = (response_message *)psync_malloc(sizeof(response_message));
+  memset(response, 0, sizeof(response_message));
+  response->msg = NULL;
+  response->payload = NULL;
+  response->payloadsz = 0;
 
-    // Send the reply structure
+  // get the response for the request, and write the response to the
+  // sockfd.
+  request = (message *)rqbuf;
+  if (request) {
+    get_response(request, response);
+
     size_t bytes_written = 0;
-    while (bytes_written < reply->msg->length) {
-      rc = write(*cl, (char *)reply + bytes_written,
-                 reply->msg->length - bytes_written);
+    while (bytes_written < response->msg->length) {
+      rc = write(*sockfd, (char *)response + bytes_written,
+                 response->msg->length - bytes_written);
       if (rc <= 0) {
         debug(D_ERROR, "Unix socket write error (reply structure)");
         goto cleanup;
@@ -136,12 +145,12 @@ void instance_thread(void *lpvParam) {
     }
 
     // Send the additional reply data if present
-    if (reply->payload && reply->payloadsz > 0) {
+    if (response->payload && response->payloadsz > 0) {
       bytes_written = 0;
 
-      while (bytes_written < reply->payloadsz) {
-        rc = write(*cl, reply->payload + bytes_written,
-                   reply->payloadsz - bytes_written);
+      while (bytes_written < response->payloadsz) {
+        rc = write(*sockfd, response->payload + bytes_written,
+                   response->payloadsz - bytes_written);
         if (rc <= 0) {
           debug(D_ERROR, "Unix socket write error (reply data)");
           goto cleanup;
@@ -149,27 +158,26 @@ void instance_thread(void *lpvParam) {
         bytes_written += rc;
       }
     }
-
     debug(D_NOTICE,
           "Successfully sent full reply: %zu bytes structure, %zu bytes "
           "additional data",
-          reply->msg->length, reply->payloadsz);
+          response->msg->length, response->payloadsz);
   } else {
     debug(D_ERROR, "No valid request received");
   }
 
 cleanup:
-  if (cl) {
-    close(*cl);
+  if (sockfd) {
+    close(*sockfd);
   }
-  if (reply) {
-    if (reply->msg) {
-      psync_free(reply->msg);
+  if (response) {
+    if (response->msg) {
+      psync_free(response->msg);
     }
-    if (reply->payload) {
-      psync_free(reply->payload);
+    if (response->payload) {
+      psync_free(response->payload);
     }
-    psync_free(reply);
+    psync_free(response);
   }
 
   debug(D_NOTICE, "InstanceThread exiting.");
@@ -207,11 +215,12 @@ void psync_start_overlays() { overlays_running = 1; }
 void psync_stop_overlay_callbacks() { callbacks_running = 0; }
 void psync_start_overlay_callbacks() { callbacks_running = 1; }
 
-void get_answer_to_request(message *request, response *reply) {
+void get_response(request_message *request, response_message *response) {
   psync_path_status_t stat;
   int ind, ret;
   psync_folder_list_t *folders;
   const char *debug_string;
+  size_t available_space;
 
   // Declarations
   stat = PSYNC_PATH_STATUS_NOT_OURS;
@@ -221,17 +230,20 @@ void get_answer_to_request(message *request, response *reply) {
   debug_string = NULL;
 
   // Initializations
-  reply->msg = (message *)psync_malloc(POVERLAY_BUFSIZE);
-  reply->msg->length = sizeof(message) + 4;
-  reply->payload = NULL;
-  reply->payloadsz = 0;
+  response->msg = (message *)psync_malloc(POVERLAY_BUFSIZE);
+  if (!response->msg) {
+    debug(D_ERROR, "Failed to allocate memory for response message");
+    return;
+  }
+  memset(response->msg, 0,
+         POVERLAY_BUFSIZE); // Initialize the entire buffer to zero
+  response->msg->length = sizeof(message);
+  response->payload = NULL;
+  response->payloadsz = 0;
+  available_space = POVERLAY_BUFSIZE - sizeof(message);
 
   // Main logic
-  if (request->type == 20) {
-    debug_string = "REDACTED";
-  } else {
-    debug_string = request->value;
-  }
+  debug_string = (request->type == 20) ? "REDACTED" : request->value;
 
   debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]",
         request->type, request->length, debug_string);
@@ -242,72 +254,84 @@ void get_answer_to_request(message *request, response *reply) {
     }
     switch (psync_path_status_get_status(stat)) {
     case PSYNC_PATH_STATUS_IN_SYNC:
-      reply->msg->type = 10;
+      response->msg->type = 10;
       break;
     case PSYNC_PATH_STATUS_IN_PROG:
-      reply->msg->type = 12;
+      response->msg->type = 12;
       break;
     case PSYNC_PATH_STATUS_PAUSED:
     case PSYNC_PATH_STATUS_REMOTE_FULL:
     case PSYNC_PATH_STATUS_LOCAL_FULL:
-      reply->msg->type = 11;
+      response->msg->type = 11;
       break;
     default:
-      reply->msg->type = 13;
-      memcpy(reply->msg->value, "No.", 4);
+      response->msg->type = 13;
+      snprintf(response->msg->value, available_space, "No.");
     }
-  } else if ((callbacks_running) &&
+  } else if (callbacks_running &&
              (request->type <
               ((uint32_t)calbacks_lower_band + (uint32_t)callbacks_size))) {
     ind = request->type - 20;
 
     if (callbacks[ind]) {
-      ret = callbacks[ind](request->value, &reply->payload);
+      ret = callbacks[ind](request->value, &response->payload);
       if (ret == 0) {
-        reply->msg->type = 0;
-        reply->msg->length = sizeof(message) + strlen(reply->msg->value) + 1;
-
-        if (reply->payload) {
+        response->msg->type = 0;
+        if (response->payload) {
           if (request->type == 23) { // LISTSYNC
-            folders = (psync_folder_list_t *)reply->payload;
-            reply->payloadsz = sizeof(psync_folder_list_t) +
-                               folders->foldercnt * sizeof(psync_folder_t);
+            folders = (psync_folder_list_t *)response->payload;
+            response->payloadsz = sizeof(psync_folder_list_t) +
+                                  folders->foldercnt * sizeof(psync_folder_t);
           } else if (request->type == 24) { // ADDSYNC
-            reply->payloadsz = sizeof(psync_syncid_t);
+            response->payloadsz = sizeof(psync_syncid_t);
+          } else {
+            response->payloadsz = 0;
           }
           debug(D_NOTICE, "Callback succeeded with reply data, length: %zu",
-                reply->payloadsz);
+                response->payloadsz);
         } else {
+          response->payloadsz = 0;
           debug(D_NOTICE, "Callback succeeded with no reply data");
         }
       } else {
-        reply->msg->type = ret;
-        memcpy(reply->msg->value, "No.", 4);
+        response->msg->type = ret;
+        snprintf(response->msg->value, available_space, "No.");
+        response->payloadsz = 0;
         debug(D_NOTICE, "Callback failed with return code: %d", ret);
       }
     } else {
-      reply->msg->type = 13;
-      memcpy(reply->msg->value, "No callback with this id registered.", 37);
-      reply->msg->length = sizeof(message) + 37;
+      response->msg->type = 13;
+      snprintf(response->msg->value, available_space,
+               "No callback with this id registered.");
       debug(D_NOTICE, "No callback registered for type: %u", request->type);
     }
   } else {
-    reply->msg->type = 13;
-    memcpy(reply->msg->value, "Invalid type.", 14);
-    reply->msg->length = sizeof(message) + 14;
+    response->msg->type = 13;
+    snprintf(response->msg->value, available_space, "Invalid type.");
     debug(D_NOTICE, "Invalid request type: %u", request->type);
   }
 
-  if (reply->payload == NULL) {
+  if (response->payload == NULL) {
+    response->payloadsz = 0;
     debug(D_NOTICE, "No reply data received");
   }
 
   // Set default reply value if not set elsewhere
-  if (reply->msg->type != 13) {
-    memcpy(reply->msg->value, "Ok.", 4);
+  if (response->msg->type != 13 && response->msg->value[0] == '\0') {
+    snprintf(response->msg->value, available_space, "Ok.");
   }
 
-  return;
+  // Calculate final message length (safely)
+  size_t value_length = strnlen(response->msg->value, available_space);
+  response->msg->length =
+      sizeof(message) + value_length + 1; // +1 for null terminator
+
+  // Ensure we don't exceed the allocated buffer
+  if (response->msg->length > POVERLAY_BUFSIZE) {
+    response->msg->length = POVERLAY_BUFSIZE;
+    response->msg->value[available_space - 1] = '\0'; // Ensure null termination
+    debug(D_WARNING, "Response message truncated to fit buffer");
+  }
 }
 
 int psync_overlays_running() { return overlays_running; }
