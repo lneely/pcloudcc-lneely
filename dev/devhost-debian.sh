@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# This script creates a fully-fledged Debian container using Podman
+# This script creates a fully-fledged Debian container using Podman with FUSE support
 
 set -e
 
 # Configuration
 HOST_USER="$USER"
 CONTAINER_NAME="debian-full-${HOST_USER}"
-IMAGE="debian:bullseye"
+IMAGE="debian:latest"
 USERNAME="debuser"
 USER_PASSWORD="changeMe123!"  # You should change this!
 SOURCE_DIR="$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")"  # Parent of 'dev' directory
@@ -16,7 +16,7 @@ SOURCE_NAME="$(basename "$SOURCE_DIR")"
 # Function to display help
 show_help() {
     echo "Usage: $0 [OPTIONS]"
-    echo "Set up a fully-fledged Debian distribution in a Podman container."
+    echo "Set up a fully-fledged Debian distribution in a Podman container with FUSE support."
     echo
     echo "Options:"
     echo "  -n, --name NAME      Specify the name for the container (default: debian-full-${HOST_USER})"
@@ -29,6 +29,15 @@ show_help() {
     echo "Note: This script assumes it's located in a 'dev' subdirectory of the source root."
     echo "      The entire source root will be copied to /src/<source_root_name> in the container."
     echo "      The container name will include the host username: ${CONTAINER_NAME}"
+}
+
+# Function to check if FUSE is available on the host
+check_fuse() {
+    if [ ! -e /dev/fuse ]; then
+        echo "ERROR: FUSE is not available on the host. Please ensure FUSE is installed and loaded."
+        echo "You may need to run 'sudo modprobe fuse' on the host system."
+        exit 1
+    fi
 }
 
 # Function to stop and remove the container
@@ -68,8 +77,15 @@ build_container() {
     echo "Source root directory: $SOURCE_DIR"
     echo "Source name: $SOURCE_NAME"
 
-    # Create the container
-    podman run --name "$CONTAINER_NAME" -d "$IMAGE" sleep infinity
+    # Check if FUSE is available on the host
+    check_fuse
+
+    # Create the container with FUSE support
+    podman run --name "$CONTAINER_NAME" -d \
+        --device /dev/fuse \
+        --cap-add SYS_ADMIN \
+        --security-opt apparmor:unconfined \
+        "$IMAGE" sleep infinity
 
     # Update and install necessary packages
     podman exec "$CONTAINER_NAME" apt update
@@ -80,6 +96,11 @@ build_container() {
         build-essential libfuse-dev libudev-dev libsqlite3-dev \
         libmbedtls-dev zlib1g-dev libboost-system-dev \
         libboost-program-options-dev fuse llvm gdb
+
+    # Check if FUSE is properly set up
+    if ! podman exec "$CONTAINER_NAME" ls /dev/fuse > /dev/null 2>&1; then
+        echo "WARNING: FUSE device not found in the container. FUSE might not work properly."
+    fi
 
     # Configure locale
     podman exec "$CONTAINER_NAME" sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen
@@ -122,6 +143,7 @@ build_container() {
     echo "Source root copied to: /src/$SOURCE_NAME"
     echo "Ownership of /src changed to $USERNAME recursively"
     echo "/usr/lib/x86_64-linux-gnu/ added to system library search path"
+    echo "FUSE support enabled (check warning messages, if any)"
 }
 
 # Parse command line arguments
@@ -164,4 +186,3 @@ echo
 echo "You can start the container with: podman start $CONTAINER_NAME"
 echo "To enter the container, use: $0 -e"
 echo "To stop and remove the container, use: $0 -r"
-
