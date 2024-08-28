@@ -108,6 +108,3 @@ This will sync files from `/path/to/project` on the host to `/home/dev/project` 
 If you encounter issues with FUSE support, ensure that FUSE is properly installed and loaded on your host system. You may need to run `sudo modprobe fuse` on the host system.
 
 For any other issues or questions, please open an issue in the repository.
-```
-
-This README.md file provides a comprehensive guide on how to use the devhost-fedora.sh, devhost-debian.sh, and sync.sh scripts. It includes information on prerequisites, usage instructions with examples, and notes on troubleshooting. Users can refer to this file to quickly understand how to set up and manage their development environments using these scripts.
