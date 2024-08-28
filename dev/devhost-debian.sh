@@ -1,20 +1,31 @@
 #!/bin/bash
 
-# This script creates a fully-fledged Debian container using Podman with FUSE support and SSH access
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# This script builds a development host based on Debian.
 
 set -e
 
-# Configuration
 HOST_USER="$USER"
 CONTAINER_NAME="devhost-debian-${HOST_USER}"
 IMAGE="debian:latest"
 USERNAME="dev"
 USER_PASSWORD="devhost"
-SOURCE_DIR="$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")"  # Parent of 'dev' directory
+SOURCE_DIR="$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")" 
 SOURCE_NAME="$(basename "$SOURCE_DIR")"
-SSH_PORT="2222"  # Default SSH port
+SSH_PORT="2222" 
 
-# Function to display help
 show_help() {
     echo "Usage: $0 [OPTIONS]"
     echo "Set up a fully-fledged Debian distribution in a Podman container with FUSE support and SSH access."
@@ -34,7 +45,6 @@ show_help() {
     echo "      SSH public keys from $HOME/.ssh/*.pub will be copied to the container for key-based authentication."
 }
 
-# Function to check if FUSE is available on the host
 check_fuse() {
     if [ ! -e /dev/fuse ]; then
         echo "ERROR: FUSE is not available on the host. Please ensure FUSE is installed and loaded."
@@ -43,7 +53,6 @@ check_fuse() {
     fi
 }
 
-# Function to stop and remove the container
 stop_and_remove_container() {
     if podman ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         echo "Stopping container ${CONTAINER_NAME}..."
@@ -58,7 +67,6 @@ stop_and_remove_container() {
     fi
 }
 
-# Function to enter the container
 enter_container() {
     if ! podman ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         echo "Container ${CONTAINER_NAME} does not exist. Building it now..."
@@ -74,17 +82,14 @@ enter_container() {
     exit 0
 }
 
-# Function to build the container
 build_container() {
     echo "Setting up Debian container: $CONTAINER_NAME"
     echo "Source root directory: $SOURCE_DIR"
     echo "Source name: $SOURCE_NAME"
     echo "SSH Port: $SSH_PORT"
 
-    # Check if FUSE is available on the host
+    # create container
     check_fuse
-
-    # Create the container with FUSE support and forward SSH port
     podman run --name "$CONTAINER_NAME" -d \
         --device /dev/fuse \
         --cap-add SYS_ADMIN \
@@ -92,7 +97,7 @@ build_container() {
         -p ${SSH_PORT}:22 \
         "$IMAGE" sleep infinity
 
-    # Update and install necessary packages
+    # install system
     podman exec "$CONTAINER_NAME" apt update
     podman exec "$CONTAINER_NAME" apt upgrade -y
     podman exec "$CONTAINER_NAME" apt install -y \
@@ -101,55 +106,39 @@ build_container() {
         build-essential libfuse-dev libudev-dev libsqlite3-dev \
         libmbedtls-dev zlib1g-dev libboost-system-dev \
         libboost-program-options-dev fuse llvm gdb iproute2 \
-        openssh-server
+        openssh-server rsync
 
-    # Check if FUSE is properly set up
+    # verify fuse
     if ! podman exec "$CONTAINER_NAME" ls /dev/fuse > /dev/null 2>&1; then
         echo "WARNING: FUSE device not found in the container. FUSE might not work properly."
     fi
 
-    # Configure locale
+    # setup system
     podman exec "$CONTAINER_NAME" sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen
     podman exec "$CONTAINER_NAME" locale-gen
     podman exec "$CONTAINER_NAME" update-locale LANG=en_US.UTF-8
-
-    # Create user account
     podman exec "$CONTAINER_NAME" useradd -m -s /bin/bash "$USERNAME"
     podman exec "$CONTAINER_NAME" bash -c "echo $USERNAME:$USER_PASSWORD | chpasswd"
-
-    # Add user to sudo group
     podman exec "$CONTAINER_NAME" usermod -aG sudo "$USERNAME"
 
-    # Configure sudo
     podman exec "$CONTAINER_NAME" bash -c 'echo "%sudo ALL=(ALL) ALL" > /etc/sudoers.d/sudo-group'
 
-    # Set up .bashrc for the new user
     podman exec --user "$USERNAME" "$CONTAINER_NAME" bash -c 'echo "export PS1=\"\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ \"" >> ~/.bashrc'
 
-    # Create /src directory and subdirectory for the source
+    # setup /src tree
     podman exec "$CONTAINER_NAME" mkdir -p "/src/$SOURCE_NAME"
-
-    # Copy source directory to container
-    podman cp "$SOURCE_DIR/." "$CONTAINER_NAME:/src/$SOURCE_NAME/"
-
-    # Change ownership of /src to the new user recursively
     podman exec "$CONTAINER_NAME" chown -R "$USERNAME:$USERNAME" /src
 
-    # Add /usr/lib/x86_64-linux-gnu/ to the system library search path
+    # setup ld.so.conf
     podman exec "$CONTAINER_NAME" bash -c 'echo "/usr/lib/x86_64-linux-gnu/" >> /etc/ld.so.conf'
     podman exec "$CONTAINER_NAME" ldconfig
 
-    # Enable and configure SSH
-    podman exec "$CONTAINER_NAME" systemctl enable ssh
-
-    # Configure SSH key authentication
+    # setup ssh authentication
     podman exec "$CONTAINER_NAME" mkdir -p "/home/$USERNAME/.ssh"
     podman exec "$CONTAINER_NAME" touch "/home/$USERNAME/.ssh/authorized_keys"
     podman exec "$CONTAINER_NAME" chown -R "$USERNAME:$USERNAME" "/home/$USERNAME/.ssh"
     podman exec "$CONTAINER_NAME" chmod 700 "/home/$USERNAME/.ssh"
     podman exec "$CONTAINER_NAME" chmod 600 "/home/$USERNAME/.ssh/authorized_keys"
-
-    # Copy SSH public keys from host to container
     for pubkey in "$HOME"/.ssh/*.pub; do
         if [ -f "$pubkey" ]; then
             podman cp "$pubkey" "$CONTAINER_NAME:/tmp/$(basename "$pubkey")"
@@ -158,14 +147,12 @@ build_container() {
         fi
     done
 
-    # Configure sshd
+    # setup and run sshd
     podman exec "$CONTAINER_NAME" sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
     podman exec "$CONTAINER_NAME" sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-
-    # Start SSH service
     podman exec "$CONTAINER_NAME" service ssh start
 
-    # Clean up
+    # mop up
     podman exec "$CONTAINER_NAME" apt clean
     podman exec "$CONTAINER_NAME" rm -rf /var/lib/apt/lists/*
 
@@ -180,7 +167,6 @@ build_container() {
     echo "SSH public keys copied from $HOME/.ssh/*.pub to /home/$USERNAME/.ssh/authorized_keys"
 }
 
-# Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         -n|--name)
@@ -216,8 +202,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-# If no options are provided, build the container
 build_container
 
 echo
