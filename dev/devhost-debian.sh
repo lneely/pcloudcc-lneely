@@ -6,12 +6,13 @@ set -e
 
 # Configuration
 HOST_USER="$USER"
-CONTAINER_NAME="debian-full-${HOST_USER}"
+CONTAINER_NAME="devhost-debian-${HOST_USER}"
 IMAGE="debian:latest"
-USERNAME="debuser"
-USER_PASSWORD="changeMe123!"  # You should change this!
+USERNAME="dev"
+USER_PASSWORD="devhost"
 SOURCE_DIR="$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")"  # Parent of 'dev' directory
 SOURCE_NAME="$(basename "$SOURCE_DIR")"
+SSH_PORT="2222"  # Default SSH port
 
 # Function to display help
 show_help() {
@@ -19,9 +20,10 @@ show_help() {
     echo "Set up a fully-fledged Debian distribution in a Podman container with FUSE support and SSH access."
     echo
     echo "Options:"
-    echo "  -n, --name NAME      Specify the name for the container (default: debian-full-${HOST_USER})"
-    echo "  -u, --user USER      Specify the username to create (default: debuser)"
-    echo "  -p, --password PASS  Specify the user's password (default: changeMe123!)"
+    echo "  -n, --name NAME      Specify the name for the container (default: devhost-debian-${HOST_USER})"
+    echo "  -u, --user USER      Specify the username to create (default: dev)"
+    echo "  -p, --password PASS  Specify the user's password (default: devhost)"
+    echo "  -s, --ssh-port PORT  Specify the SSH port to forward (default: 2222)"
     echo "  -r, --remove         Stop and remove the container if it exists"
     echo "  -e, --enter          Enter the container as the specified user (builds if not exists)"
     echo "  -h, --help           Display this help message"
@@ -77,16 +79,17 @@ build_container() {
     echo "Setting up Debian container: $CONTAINER_NAME"
     echo "Source root directory: $SOURCE_DIR"
     echo "Source name: $SOURCE_NAME"
+    echo "SSH Port: $SSH_PORT"
 
     # Check if FUSE is available on the host
     check_fuse
 
-    # Create the container with FUSE support and use host network
+    # Create the container with FUSE support and forward SSH port
     podman run --name "$CONTAINER_NAME" -d \
         --device /dev/fuse \
         --cap-add SYS_ADMIN \
         --security-opt apparmor:unconfined \
-        --network host \
+        -p ${SSH_PORT}:22 \
         "$IMAGE" sleep infinity
 
     # Update and install necessary packages
@@ -192,6 +195,10 @@ while [[ $# -gt 0 ]]; do
             USER_PASSWORD="$2"
             shift 2
             ;;
+        -s|--ssh-port)
+            SSH_PORT="$2"
+            shift 2
+            ;;
         -r|--remove)
             stop_and_remove_container
             ;;
@@ -217,4 +224,4 @@ echo
 echo "You can start the container with: podman start $CONTAINER_NAME"
 echo "To enter the container, use: $0 -e"
 echo "To stop and remove the container, use: $0 -r"
-echo "To SSH into the container, use: ssh $USERNAME@localhost"
+echo "To SSH into the container, use: ssh -p $SSH_PORT $USERNAME@localhost"
