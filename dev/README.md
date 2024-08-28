@@ -73,28 +73,36 @@ Additional option for devhost-debian.sh:
 
 ### Syncing Project Files
 
-To sync your project files between the host and the container, use the `sync.sh` script:
+To sync your project files from the host to the container, use the `sync.sh` script:
 
 ```bash
-./sync.sh [OPTIONS]
+./sync.sh [OPTIONS] -c CONTAINER_NAME
 ```
 
 Options:
 
-- `-c, --container NAME`: Specify the container name (required)
+- `-c, --container CONTAINER_NAME`: Specify the devhost container name (required)
 - `-s, --source DIR`: Specify the source directory on the host (default: current directory)
-- `-d, --destination DIR`: Specify the destination directory in the container (default: /src)
+- `-d, --dest DIR`: Specify the destination directory in the container
 - `-u, --user USER`: Specify the user in the container (default: dev)
-- `-w, --way`: Specify the sync direction (to-container, from-container, or both) (default: both)
+- `-p, --port PORT`: Specify the SSH port (default: 2222)
+- `-o, --once`: Sync files once and exit
+- `-w, --watch`: Watch for changes and sync continuously (default)
 - `-h, --help`: Display the help message
 
 Example:
 
 ```bash
-./sync.sh -c mydevhost-fedora -s /path/to/project -d /home/dev/project -w to-container
+./sync.sh -c mydevhost-fedora -s /path/to/project -d /src/project -u dev -p 2222 -w
 ```
 
-This will sync files from `/path/to/project` on the host to `/home/dev/project` in the container named `mydevhost-fedora`.
+This will sync files from `/path/to/project` on the host to `/src/project` in the container named `mydevhost-fedora`, using the user `dev` and SSH port 2222. It will continue to watch for changes and sync automatically.
+
+Note:
+- The script syncs files one-way: from the host to the container.
+- The `-c` or `--container` option is required.
+- By default, it watches for changes and syncs continuously. Use the `-o` or `--once` option for a single sync.
+- Make sure you have `rsync` installed on your host, and `watchexec` if you want to use the watch feature.
 
 ## Notes
 
