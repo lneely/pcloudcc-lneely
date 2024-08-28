@@ -13,14 +13,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# This script builds a development host based on Debian or Ubuntu.
+# This script builds a development host based on Fedora.
 
 set -e
 
 HOST_USER="$USER"
-CONTAINER_NAME="devhost-debian-${HOST_USER}"
-IMAGE="debian:latest"
-DISTRO="debian"
+CONTAINER_NAME="devhost-fedora-${HOST_USER}"
+IMAGE="fedora:latest"
 USERNAME="dev"
 USER_PASSWORD="devhost"
 SOURCE_DIR="$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")" 
@@ -29,14 +28,13 @@ SSH_PORT="2222"
 
 show_help() {
     echo "Usage: $0 [OPTIONS]"
-    echo "Set up a fully-fledged Debian or Ubuntu distribution in a Podman container with FUSE support and SSH access."
+    echo "Set up a fully-fledged Fedora distribution in a Podman container with FUSE support and SSH access."
     echo
     echo "Options:"
-    echo "  -n, --name NAME      Specify the name for the container (default: devhost-debian-${HOST_USER})"
+    echo "  -n, --name NAME      Specify the name for the container (default: devhost-fedora-${HOST_USER})"
     echo "  -u, --user USER      Specify the username to create (default: dev)"
     echo "  -p, --password PASS  Specify the user's password (default: devhost)"
     echo "  -s, --ssh-port PORT  Specify the SSH port to forward (default: 2222)"
-    echo "  -d, --distro DISTRO  Specify the distribution (debian or ubuntu) (default: debian)"
     echo "  -r, --remove         Stop and remove the container if it exists"
     echo "  -e, --enter          Enter the container as the specified user (builds if not exists)"
     echo "  -h, --help           Display this help message"
@@ -85,7 +83,7 @@ enter_container() {
 }
 
 build_container() {
-    echo "Setting up ${DISTRO^} container: $CONTAINER_NAME"
+    echo "Setting up Fedora container: $CONTAINER_NAME"
     echo "Source root directory: $SOURCE_DIR"
     echo "Source name: $SOURCE_NAME"
     echo "SSH Port: $SSH_PORT"
@@ -100,15 +98,13 @@ build_container() {
         "$IMAGE" sleep infinity
 
     # install system
-    podman exec "$CONTAINER_NAME" apt update
-    podman exec "$CONTAINER_NAME" apt upgrade -y
-    podman exec "$CONTAINER_NAME" apt install -y \
-        sudo vim nano curl wget git htop tmux man-db locales \
-        bash-completion ca-certificates ssh systemd systemd-sysv \
-        build-essential libfuse-dev libudev-dev libsqlite3-dev \
-        libmbedtls-dev zlib1g-dev libboost-system-dev \
-        libboost-program-options-dev fuse llvm gdb iproute2 \
-        openssh-server rsync
+    podman exec "$CONTAINER_NAME" dnf update -y
+    podman exec "$CONTAINER_NAME" dnf install -y \
+        sudo vim nano curl wget git htop tmux man-db \
+        bash-completion ca-certificates openssh-server \
+        gcc gcc-c++ make fuse-devel systemd-devel sqlite-devel \
+        mbedtls-devel zlib-devel boost-devel fuse llvm gdb iproute \
+        rsync
 
     # verify fuse
     if ! podman exec "$CONTAINER_NAME" ls /dev/fuse > /dev/null 2>&1; then
@@ -116,14 +112,11 @@ build_container() {
     fi
 
     # setup system
-    podman exec "$CONTAINER_NAME" sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen
-    podman exec "$CONTAINER_NAME" locale-gen
-    podman exec "$CONTAINER_NAME" update-locale LANG=en_US.UTF-8
     podman exec "$CONTAINER_NAME" useradd -m -s /bin/bash "$USERNAME"
     podman exec "$CONTAINER_NAME" bash -c "echo $USERNAME:$USER_PASSWORD | chpasswd"
-    podman exec "$CONTAINER_NAME" usermod -aG sudo "$USERNAME"
+    podman exec "$CONTAINER_NAME" usermod -aG wheel "$USERNAME"
 
-    podman exec "$CONTAINER_NAME" bash -c 'echo "%sudo ALL=(ALL) ALL" > /etc/sudoers.d/sudo-group'
+    podman exec "$CONTAINER_NAME" bash -c 'echo "%wheel ALL=(ALL) ALL" > /etc/sudoers.d/wheel-group'
 
     podman exec --user "$USERNAME" "$CONTAINER_NAME" bash -c 'echo "export PS1=\"\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ \"" >> ~/.bashrc'
 
@@ -132,7 +125,7 @@ build_container() {
     podman exec "$CONTAINER_NAME" chown -R "$USERNAME:$USERNAME" /src
 
     # setup ld.so.conf
-    podman exec "$CONTAINER_NAME" bash -c 'echo "/usr/lib/x86_64-linux-gnu/" >> /etc/ld.so.conf'
+    podman exec "$CONTAINER_NAME" bash -c 'echo "/usr/lib64/" >> /etc/ld.so.conf'
     podman exec "$CONTAINER_NAME" ldconfig
 
     # setup ssh authentication
@@ -150,20 +143,20 @@ build_container() {
     done
 
     # setup and run sshd
+    podman exec "$CONTAINER_NAME" ssh-keygen -A
     podman exec "$CONTAINER_NAME" sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
     podman exec "$CONTAINER_NAME" sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-    podman exec "$CONTAINER_NAME" service ssh start
+    podman exec "$CONTAINER_NAME" /usr/sbin/sshd
 
     # mop up
-    podman exec "$CONTAINER_NAME" apt clean
-    podman exec "$CONTAINER_NAME" rm -rf /var/lib/apt/lists/*
+    podman exec "$CONTAINER_NAME" dnf clean all
 
-    echo "${DISTRO^} container setup complete!"
+    echo "Fedora container setup complete!"
     echo "Container name: $CONTAINER_NAME"
     echo "Username: $USERNAME"
     echo "Source root copied to: /src/$SOURCE_NAME"
     echo "Ownership of /src changed to $USERNAME recursively"
-    echo "/usr/lib/x86_64-linux-gnu/ added to system library search path"
+    echo "/usr/lib64/ added to system library search path"
     echo "FUSE support enabled (check warning messages, if any)"
     echo "SSH server enabled and configured for key-based authentication"
     echo "SSH public keys copied from $HOME/.ssh/*.pub to /home/$USERNAME/.ssh/authorized_keys"
@@ -185,16 +178,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         -s|--ssh-port)
             SSH_PORT="$2"
-            shift 2
-            ;;
-        -d|--distro)
-            DISTRO="$2"
-            if [[ "$DISTRO" != "debian" && "$DISTRO" != "ubuntu" ]]; then
-                echo "Error: Invalid distribution. Use 'debian' or 'ubuntu'."
-                exit 1
-            fi
-            IMAGE="${DISTRO}:latest"
-            CONTAINER_NAME="devhost-${DISTRO}-${HOST_USER}"
             shift 2
             ;;
         -r|--remove)
