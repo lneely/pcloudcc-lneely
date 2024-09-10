@@ -350,37 +350,6 @@ void process_commands() {
     }
 }
 
-
-
-// void process_commands() {
-//   std::cout << "Type 'help' or '?' for a list of supported commands."
-//             << std::endl;
-//   std::cout << "> ";
-//   for (std::string line; std::getline(std::cin, line);) {
-//     if (!line.compare("finalize")) {
-//       finalize();
-//       break;
-//     } else if (!line.compare("help") || !line.compare("?")) {
-//       help();
-//     } else if (!line.compare("stopcrypto")) {
-//       stop_crypto();
-//     } else if (!line.compare(0, 11, "startcrypto", 0, 11) &&
-//                (line.length() > 12)) {
-//       start_crypto(line.c_str() + 12);
-//     } else if (!line.compare("q") || !line.compare("quit")) {
-//       break;
-//     } else if (!line.compare("syncls")) {
-//       list_sync_folders();
-//     } else if (!line.compare(0, 7, "syncadd", 0, 7) && (line.length() > 7)) {
-//       auto [lpath, rpath] = split_paths(line.c_str() + 8);
-//       add_sync_folder(lpath, rpath);
-//     } else if (!line.compare(0, 6, "syncrm", 0, 6) && (line.length() > 6)) {
-//       remove_sync_folder(line.c_str() + 7);
-//     }
-//     std::cout << "> ";
-//   }
-// }
-
 int daemonize(bool do_commands) {
   pid_t pid, sid;
 
