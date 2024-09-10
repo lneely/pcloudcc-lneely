@@ -309,7 +309,7 @@ void help() {
 }
 
 void process_commands() {
-    CLI::App app{"Interactive CLI"};
+    CLI::App app{"pcloudcc-lneely"};
     app.fallthrough();
     app.footer("Type 'help' or '?' for a list of supported commands.");
 
