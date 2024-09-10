@@ -296,58 +296,88 @@ int finalize() {
 }
 
 void help() {
-  std::cout << "Supported commands are:" << std::endl
-            << "help(?): Show this help message" << std::endl
-            << "startcrypto <crypto pass>: Unlock crypto folder" << std::endl
-            << "stopcrypto: Lock crypto folder" << std::endl
-            << "finalize: Kill daemon and quit" << std::endl
-            << "syncls: List sync folders" << std::endl
-            << "syncadd <localpath> <remotepath>: Add sync folder (full sync)"
-            << std::endl
-            << "syncrm <folderid>: Remove sync folder" << std::endl
-            << "quit(q): Exit this program" << std::endl;
+    std::cout << "Supported commands are:" << std::endl
+              << "  help(?): Show this help message" << std::endl
+              << "  crypto(c):" << std::endl
+              << "    start <crypto pass>: Unlock crypto folder" << std::endl
+              << "    stop: Lock crypto folder" << std::endl
+              << "  sync(s):" << std::endl
+              << "    list(ls): List sync folders" << std::endl
+              << "    add <localpath> <remotepath>: Add sync folder" << std::endl
+              << "    remove(rm) <folderid>: Remove sync folder" << std::endl
+              << "  finalize(f): Kill daemon and quit" << std::endl
+              << "  quit(q): Exit this program" << std::endl;
 }
 
 void process_commands() {
-    CLI::App app{"pcloudcc-lneely"};
-    app.fallthrough();
-    app.footer("Type 'help' or '?' for a list of supported commands.");
+	CLI::App app{"pcloudcc-lneely"};
+	app.fallthrough();
+	app.footer("Type 'help' or '?' for a list of supported commands.");
 
-    app.add_subcommand("finalize", "Finalize and exit")->callback([]{ 
-        finalize(); 
-        exit(0);
-    });
+	// top-level commands
+	app.add_subcommand("help", "Show help")->alias("?")->callback(help);
+	auto crypto_cmd = app.add_subcommand("crypto", "Crypto-related commands")->alias("c");
+	auto sync_cmd = app.add_subcommand("sync", "Sync-related commands")->alias("s");
+	app.add_subcommand("finalize", "Finalize and exit")->alias("f")->callback([]{ 
+		finalize(); 
+		exit(0);
+	});
+	app.add_subcommand("quit", "Quit the program")->alias("q")->callback([]{ exit(0); });
 
-    app.add_subcommand("help", "Show help")->alias("?")->callback(help);
-    app.add_subcommand("stopcrypto", "Stop crypto")->callback(stop_crypto);
+	// crypto subcommands
+	auto start_crypto_cmd = crypto_cmd->add_subcommand("start", "Start crypto");
+	std::string crypto_arg;
+	start_crypto_cmd->add_option("arg", crypto_arg, "Crypto argument")->required();
+	start_crypto_cmd->callback([&]{ start_crypto(crypto_arg.c_str()); });
+		
+	crypto_cmd->add_subcommand("stop", "Stop crypto")->callback(stop_crypto);
 
-    auto start_crypto_cmd = app.add_subcommand("startcrypto", "Start crypto");
-    std::string crypto_arg;
-    start_crypto_cmd->add_option("arg", crypto_arg, "Crypto argument")->required();
-    start_crypto_cmd->callback([&]{ start_crypto(crypto_arg.c_str()); });
+	// sync subcommands
+	sync_cmd->add_subcommand("list", "List sync folders")->alias("ls")->callback(list_sync_folders);
+    
+	auto sync_add_cmd = sync_cmd->add_subcommand("add", "Add sync folder");
+	std::string syncadd_arg;
+	sync_add_cmd->add_option("arg", syncadd_arg, "Paths")->required();
+	sync_add_cmd->callback([&]{
+		auto [lpath, rpath] = split_paths(syncadd_arg.c_str());
+		add_sync_folder(lpath, rpath);
+	});
+		
+	auto sync_remove_cmd = sync_cmd->add_subcommand("remove", "Remove sync folder")->alias("rm");
+	std::string syncrm_arg;
+	sync_remove_cmd->add_option("arg", syncrm_arg, "Path")->required();
+	sync_remove_cmd->callback([&]{ remove_sync_folder(syncrm_arg.c_str()); });
 
-    app.add_subcommand("quit", "Quit the program")->alias("q")->callback([]{ exit(0); });
-    app.add_subcommand("syncls", "List sync folders")->callback(list_sync_folders);
+	// command loop
+	while (true) {
+		std::cout << "> ";
+		std::string line;
+		if (!std::getline(std::cin, line)) break;
+		try {
+			app.parse(line);
+		} catch (const CLI::ParseError &e) {
+			std::vector<std::string> args;
+			std::istringstream iss(line);
+			std::string arg;
+			while (iss >> arg) {
+				args.push_back(arg);
+			}
 
-    auto syncadd_cmd = app.add_subcommand("syncadd", "Add sync folder");
-    std::string syncadd_arg;
-    syncadd_cmd->add_option("arg", syncadd_arg, "Paths")->required();
-    syncadd_cmd->callback([&]{
-        auto [lpath, rpath] = split_paths(syncadd_arg.c_str());
-        add_sync_folder(lpath, rpath);
-    });
+			if (!args.empty()) {
+				auto* subcom = app.get_subcommand(args[0]);
+				if (subcom) {
+					std::cout << "Usage for '" << args[0] << "':" << std::endl;
+					std::cout << subcom->help() << std::endl;
+				} else {
+					std::cout << "Invalid command: '" << line << "'. Type 'help' or '?' to get a list of valid commands." << std::endl;
+				}
+			} else {
+				std::cout << "Invalid command: '" << line << "'. Type 'help' or '?' to get a list of valid commands." << std::endl;
+			}
+		}
+	}
 
-    auto syncrm_cmd = app.add_subcommand("syncrm", "Remove sync folder");
-    std::string syncrm_arg;
-    syncrm_cmd->add_option("arg", syncrm_arg, "Path")->required();
-    syncrm_cmd->callback([&]{ remove_sync_folder(syncrm_arg.c_str()); });
 
-    while (true) {
-        std::cout << "> ";
-        std::string line;
-        if (!std::getline(std::cin, line)) break;
-        app.parse(line);
-    }
 }
 
 int daemonize(bool do_commands) {
