@@ -43,6 +43,8 @@
 #include "pclsync_lib.h"
 #include "psynclib.h"
 
+#include "CLI11.hpp"
+
 namespace cc = console_client;
 
 namespace control_tools {
@@ -307,33 +309,77 @@ void help() {
 }
 
 void process_commands() {
-  std::cout << "Type 'help' or '?' for a list of supported commands."
-            << std::endl;
-  std::cout << "> ";
-  for (std::string line; std::getline(std::cin, line);) {
-    if (!line.compare("finalize")) {
-      finalize();
-      break;
-    } else if (!line.compare("help") || !line.compare("?")) {
-      help();
-    } else if (!line.compare("stopcrypto")) {
-      stop_crypto();
-    } else if (!line.compare(0, 11, "startcrypto", 0, 11) &&
-               (line.length() > 12)) {
-      start_crypto(line.c_str() + 12);
-    } else if (!line.compare("q") || !line.compare("quit")) {
-      break;
-    } else if (!line.compare("syncls")) {
-      list_sync_folders();
-    } else if (!line.compare(0, 7, "syncadd", 0, 7) && (line.length() > 7)) {
-      auto [lpath, rpath] = split_paths(line.c_str() + 8);
-      add_sync_folder(lpath, rpath);
-    } else if (!line.compare(0, 6, "syncrm", 0, 6) && (line.length() > 6)) {
-      remove_sync_folder(line.c_str() + 7);
+    CLI::App app{"Interactive CLI"};
+    app.fallthrough();
+    app.footer("Type 'help' or '?' for a list of supported commands.");
+
+    app.add_subcommand("finalize", "Finalize and exit")->callback([]{ 
+        finalize(); 
+        exit(0);
+    });
+
+    app.add_subcommand("help", "Show help")->alias("?")->callback(help);
+    app.add_subcommand("stopcrypto", "Stop crypto")->callback(stop_crypto);
+
+    auto start_crypto_cmd = app.add_subcommand("startcrypto", "Start crypto");
+    std::string crypto_arg;
+    start_crypto_cmd->add_option("arg", crypto_arg, "Crypto argument")->required();
+    start_crypto_cmd->callback([&]{ start_crypto(crypto_arg.c_str()); });
+
+    app.add_subcommand("quit", "Quit the program")->alias("q")->callback([]{ exit(0); });
+    app.add_subcommand("syncls", "List sync folders")->callback(list_sync_folders);
+
+    auto syncadd_cmd = app.add_subcommand("syncadd", "Add sync folder");
+    std::string syncadd_arg;
+    syncadd_cmd->add_option("arg", syncadd_arg, "Paths")->required();
+    syncadd_cmd->callback([&]{
+        auto [lpath, rpath] = split_paths(syncadd_arg.c_str());
+        add_sync_folder(lpath, rpath);
+    });
+
+    auto syncrm_cmd = app.add_subcommand("syncrm", "Remove sync folder");
+    std::string syncrm_arg;
+    syncrm_cmd->add_option("arg", syncrm_arg, "Path")->required();
+    syncrm_cmd->callback([&]{ remove_sync_folder(syncrm_arg.c_str()); });
+
+    while (true) {
+        std::cout << "> ";
+        std::string line;
+        if (!std::getline(std::cin, line)) break;
+        app.parse(line);
     }
-    std::cout << "> ";
-  }
 }
+
+
+
+// void process_commands() {
+//   std::cout << "Type 'help' or '?' for a list of supported commands."
+//             << std::endl;
+//   std::cout << "> ";
+//   for (std::string line; std::getline(std::cin, line);) {
+//     if (!line.compare("finalize")) {
+//       finalize();
+//       break;
+//     } else if (!line.compare("help") || !line.compare("?")) {
+//       help();
+//     } else if (!line.compare("stopcrypto")) {
+//       stop_crypto();
+//     } else if (!line.compare(0, 11, "startcrypto", 0, 11) &&
+//                (line.length() > 12)) {
+//       start_crypto(line.c_str() + 12);
+//     } else if (!line.compare("q") || !line.compare("quit")) {
+//       break;
+//     } else if (!line.compare("syncls")) {
+//       list_sync_folders();
+//     } else if (!line.compare(0, 7, "syncadd", 0, 7) && (line.length() > 7)) {
+//       auto [lpath, rpath] = split_paths(line.c_str() + 8);
+//       add_sync_folder(lpath, rpath);
+//     } else if (!line.compare(0, 6, "syncrm", 0, 6) && (line.length() > 6)) {
+//       remove_sync_folder(line.c_str() + 7);
+//     }
+//     std::cout << "> ";
+//   }
+// }
 
 int daemonize(bool do_commands) {
   pid_t pid, sid;
