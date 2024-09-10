@@ -318,10 +318,10 @@ void process_commands() {
   app.add_subcommand("help", "Show help")->alias("?")->callback(help);
   auto crypto_cmd =
       app.add_subcommand("crypto", "Crypto-related commands")->alias("c");
-	crypto_cmd->require_subcommand();
+  crypto_cmd->require_subcommand();
   auto sync_cmd =
       app.add_subcommand("sync", "Sync-related commands")->alias("s");
-	sync_cmd->require_subcommand();
+  sync_cmd->require_subcommand();
   app.add_subcommand("finalize", "Finalize and exit")->alias("f")->callback([] {
     finalize();
     exit(0);
@@ -375,21 +375,22 @@ void process_commands() {
       }
 
       if (!args.empty()) {
-				try {
-        auto *subcom = app.get_subcommand(args[0]);
-        if (subcom) {
-          std::cout << "Usage for '" << args[0] << "':" << std::endl;
-          std::cout << subcom->help() << std::endl;
-        } else {
+        try {
+          auto *subcom = app.get_subcommand(args[0]);
+          if (subcom) {
+            std::cout << "Usage for '" << args[0] << "':" << std::endl;
+            std::cout << subcom->help() << std::endl;
+          } else {
+            std::cout
+                << "Invalid command: '" << line
+                << "'. Type 'help' or '?' to get a list of valid commands."
+                << std::endl;
+          }
+        } catch (...) {
           std::cout << "Invalid command: '" << line
                     << "'. Type 'help' or '?' to get a list of valid commands."
                     << std::endl;
         }
-				} catch (...) {
-          std::cout << "Invalid command: '" << line
-                    << "'. Type 'help' or '?' to get a list of valid commands."
-                    << std::endl;
-				}
       } else {
         std::cout << "Invalid command: '" << line
                   << "'. Type 'help' or '?' to get a list of valid commands."
