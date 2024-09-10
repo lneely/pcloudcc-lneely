@@ -96,6 +96,10 @@ syncrm <folderid>: Remove sync folder
 quit(q): Exit this program
 ```
 
+**Note**. The interactive CLI has been updated to use
+`CLI11.hpp`. Command line arguments that include special characters
+(e.g., the `startcrypto` password) must now be quoted or escaped.
+
 ## Warning
 
 **Stopping daemon will break pending background transfers!**
