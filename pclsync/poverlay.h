@@ -42,6 +42,7 @@
 #endif
 
 #include "psynclib.h"
+#include "poverlay_protocol.h"
 
 extern int overlays_running;
 extern int callbacks_running;

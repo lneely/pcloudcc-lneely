@@ -35,7 +35,7 @@
 #include "pcompiler.h"
 #include "psynclib.h"
 
-#define PSYNC_INVALID_FOLDERID ((psync_folderid_t)-1)
+#define PSYNC_INVALID_FOLDERID ((psync_folderid_t) - 1)
 #define PSYNC_INVALID_PATH NULL
 
 #define PSYNC_FOLDER_FLAG_ENCRYPTED 1

@@ -32,8 +32,9 @@
 #ifndef _PSYNC_DATABASE_H
 #define _PSYNC_DATABASE_H
 
-#include "pcompat.h"
 #include <sqlite3.h>
+
+#include "pcompat.h"
 
 #if defined(SQLITE_VERSION_NUMBER) && SQLITE_VERSION_NUMBER >= 3008002
 #define P_SQL_WOWROWID "WITHOUT ROWID"

@@ -39,6 +39,8 @@ Dependencies:
 extern "C" {
 #endif
 
+#include <stddef.h>
+
 typedef enum _pCloud_FileState {
   FileStateInSync = 0,
   FileStateNoSync,
