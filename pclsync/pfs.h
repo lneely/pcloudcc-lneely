@@ -32,6 +32,8 @@
 #ifndef _PSYNC_FS_H
 #define _PSYNC_FS_H
 
+#include <pthread.h>
+
 #include "papi.h"
 #include "pcompat.h"
 #include "pcrc32c.h"
@@ -44,7 +46,6 @@
 #include "psynclib.h"
 #include "ptimer.h"
 #include "ptree.h"
-#include <pthread.h>
 
 #define psync_fs_need_per_folder_refresh() psync_fs_need_per_folder_refresh_f()
 #define psync_fs_need_per_folder_refresh_const() 1

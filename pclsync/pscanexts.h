@@ -29,6 +29,8 @@
    DAMAGE.
 */
 
+#include <stdint.h>
+
 #define PSYNC_SCAN_EXTENSIONS_CNT 166
 #define PSYNC_SCAN_TYPES_CNT 5
 

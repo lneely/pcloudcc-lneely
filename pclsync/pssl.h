@@ -29,19 +29,17 @@
    DAMAGE.
 */
 
-/*
-  Dependencies:
-  - pcompat.h
-  - pcompiler.h
-  - <mbedtls/aes.h>
-  - <mbedtls/rsa.h>
-  - <mbedtls/mbedtls_sha1.h>
-  - <mbedtls/mbedtls_sha256.h>
-  - <mbedtls/mbedtls_sha512.h>
-*/
-
 #ifndef _PSYNC_SSL_H
 #define _PSYNC_SSL_H
+
+#include <mbedtls/aes.h>
+#include <mbedtls/rsa.h>
+#include <mbedtls/sha1.h>
+#include <mbedtls/sha256.h>
+#include <mbedtls/sha512.h>
+
+#include "pcompat.h"
+#include "pcompiler.h"
 
 #define PSYNC_AES256_BLOCK_SIZE 16
 #define PSYNC_AES256_KEY_SIZE 32

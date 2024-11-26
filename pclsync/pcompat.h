@@ -31,8 +31,6 @@
 #ifndef _PSYNC_COMPAT_H
 #define _PSYNC_COMPAT_H
 
-#include "pcompiler.h"
-
 #define P_OS_LINUX
 #define P_OS_ID 7 // linux
 #ifndef _GNU_SOURCE
@@ -71,6 +69,8 @@ typedef unsigned long psync_uint_t;
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+
+#include "pcompiler.h"
 
 #define P_PRI_U64 PRIu64
 #define P_PRI_D64 PRId64
