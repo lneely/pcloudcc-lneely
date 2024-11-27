@@ -38,7 +38,7 @@
 #include <unistd.h>
 
 #include "control_tools.h"
-#include "overlay_client.h"
+#include "pclsync/overlay_client.h"
 
 #include "pclsync_lib.h"
 #include "psynclib.h"
