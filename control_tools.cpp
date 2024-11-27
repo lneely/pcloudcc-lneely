@@ -38,10 +38,12 @@
 #include <unistd.h>
 
 #include "control_tools.h"
-#include "overlay_client.h"
+#include "pclsync/overlay_client.h"
 
 #include "pclsync_lib.h"
 #include "psynclib.h"
+
+#include "CLI11.hpp"
 
 namespace cc = console_client;
 
@@ -295,43 +297,106 @@ int finalize() {
 
 void help() {
   std::cout << "Supported commands are:" << std::endl
-            << "help(?): Show this help message" << std::endl
-            << "startcrypto <crypto pass>: Unlock crypto folder" << std::endl
-            << "stopcrypto: Lock crypto folder" << std::endl
-            << "finalize: Kill daemon and quit" << std::endl
-            << "syncls: List sync folders" << std::endl
-            << "syncadd <localpath> <remotepath>: Add sync folder (full sync)"
-            << std::endl
-            << "syncrm <folderid>: Remove sync folder" << std::endl
-            << "quit(q): Exit this program" << std::endl;
+            << "  help(?): Show this help message" << std::endl
+            << "  crypto(c):" << std::endl
+            << "    start <crypto pass>: Unlock crypto folder" << std::endl
+            << "    stop: Lock crypto folder" << std::endl
+            << "  sync(s):" << std::endl
+            << "    list(ls): List sync folders" << std::endl
+            << "    add <localpath> <remotepath>: Add sync folder" << std::endl
+            << "    remove(rm) <folderid>: Remove sync folder" << std::endl
+            << "  finalize(f): Kill daemon and quit" << std::endl
+            << "  quit(q): Exit this program" << std::endl;
 }
 
 void process_commands() {
-  std::cout << "Type 'help' or '?' for a list of supported commands."
-            << std::endl;
-  std::cout << "> ";
-  for (std::string line; std::getline(std::cin, line);) {
-    if (!line.compare("finalize")) {
-      finalize();
-      break;
-    } else if (!line.compare("help") || !line.compare("?")) {
-      help();
-    } else if (!line.compare("stopcrypto")) {
-      stop_crypto();
-    } else if (!line.compare(0, 11, "startcrypto", 0, 11) &&
-               (line.length() > 12)) {
-      start_crypto(line.c_str() + 12);
-    } else if (!line.compare("q") || !line.compare("quit")) {
-      break;
-    } else if (!line.compare("syncls")) {
-      list_sync_folders();
-    } else if (!line.compare(0, 7, "syncadd", 0, 7) && (line.length() > 7)) {
-      auto [lpath, rpath] = split_paths(line.c_str() + 8);
-      add_sync_folder(lpath, rpath);
-    } else if (!line.compare(0, 6, "syncrm", 0, 6) && (line.length() > 6)) {
-      remove_sync_folder(line.c_str() + 7);
-    }
+  CLI::App app{"pcloudcc-lneely"};
+  app.fallthrough();
+  app.footer("Type 'help' or '?' for a list of supported commands.");
+
+  // top-level commands
+  app.add_subcommand("help", "Show help")->alias("?")->callback(help);
+  auto crypto_cmd =
+      app.add_subcommand("crypto", "Crypto-related commands")->alias("c");
+  crypto_cmd->require_subcommand();
+  auto sync_cmd =
+      app.add_subcommand("sync", "Sync-related commands")->alias("s");
+  sync_cmd->require_subcommand();
+  app.add_subcommand("finalize", "Finalize and exit")->alias("f")->callback([] {
+    finalize();
+    exit(0);
+  });
+  app.add_subcommand("quit", "Quit the program")->alias("q")->callback([] {
+    exit(0);
+  });
+
+  // crypto subcommands
+  auto start_crypto_cmd = crypto_cmd->add_subcommand("start", "Start crypto");
+  std::string crypto_arg;
+  start_crypto_cmd->add_option("arg", crypto_arg, "Crypto argument")
+      ->required();
+  start_crypto_cmd->callback([&] { start_crypto(crypto_arg.c_str()); });
+
+  crypto_cmd->add_subcommand("stop", "Stop crypto")->callback(stop_crypto);
+
+  // sync subcommands
+  sync_cmd->add_subcommand("list", "List sync folders")
+      ->alias("ls")
+      ->callback(list_sync_folders);
+
+  auto sync_add_cmd = sync_cmd->add_subcommand("add", "Add sync folder");
+  std::string syncadd_arg;
+  sync_add_cmd->add_option("arg", syncadd_arg, "Paths")->required();
+  sync_add_cmd->callback([&] {
+    auto [lpath, rpath] = split_paths(syncadd_arg.c_str());
+    add_sync_folder(lpath, rpath);
+  });
+
+  auto sync_remove_cmd =
+      sync_cmd->add_subcommand("remove", "Remove sync folder")->alias("rm");
+  std::string syncrm_arg;
+  sync_remove_cmd->add_option("arg", syncrm_arg, "Path")->required();
+  sync_remove_cmd->callback([&] { remove_sync_folder(syncrm_arg.c_str()); });
+
+  // command loop
+  while (true) {
     std::cout << "> ";
+    std::string line;
+    if (!std::getline(std::cin, line))
+      break;
+    try {
+      app.parse(line);
+    } catch (const CLI::ParseError &e) {
+      std::vector<std::string> args;
+      std::istringstream iss(line);
+      std::string arg;
+      while (iss >> arg) {
+        args.push_back(arg);
+      }
+
+      if (!args.empty()) {
+        try {
+          auto *subcom = app.get_subcommand(args[0]);
+          if (subcom) {
+            std::cout << "Usage for '" << args[0] << "':" << std::endl;
+            std::cout << subcom->help() << std::endl;
+          } else {
+            std::cout
+                << "Invalid command: '" << line
+                << "'. Type 'help' or '?' to get a list of valid commands."
+                << std::endl;
+          }
+        } catch (...) {
+          std::cout << "Invalid command: '" << line
+                    << "'. Type 'help' or '?' to get a list of valid commands."
+                    << std::endl;
+        }
+      } else {
+        std::cout << "Invalid command: '" << line
+                  << "'. Type 'help' or '?' to get a list of valid commands."
+                  << std::endl;
+      }
+    }
   }
 }
 
