@@ -32,10 +32,11 @@
 #ifndef _PSYNC_TIMER_H
 #define _PSYNC_TIMER_H
 
-#include "plist.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
+
+#include "plist.h"
 
 #define PSYNC_INVALID_TIMER NULL
 

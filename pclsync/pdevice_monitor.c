@@ -28,6 +28,11 @@
    USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
    DAMAGE.
 */
+#include <libudev.h>
+#include <locale.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include "plibs.h"
 #include "psynclib.h"
@@ -35,11 +40,6 @@
 #include "pdevice_monitor.h"
 #include "plocalscan.h"
 #include "ptimer.h"
-#include <libudev.h>
-#include <locale.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 
 #define DEV_MONITOR_ACTIVITY_TIMER_INT 20
 

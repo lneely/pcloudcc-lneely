@@ -32,13 +32,14 @@
 #ifndef _PSYNC_FSTASKS_H
 #define _PSYNC_FSTASKS_H
 
+#include <stddef.h>
+#include <string.h>
+#include <time.h>
+
 #include "pfsfolder.h"
 #include "plibs.h"
 #include "psynclib.h"
 #include "ptree.h"
-#include <stddef.h>
-#include <string.h>
-#include <time.h>
 
 #define PSYNC_FS_TASK_MKDIR 1
 #define PSYNC_FS_TASK_RMDIR 2

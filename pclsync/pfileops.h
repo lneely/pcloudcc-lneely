@@ -37,7 +37,7 @@
 #include "psettings.h"
 #include "psynclib.h"
 
-#define PSYNC_INVALID_FOLDERID ((psync_folderid_t)-1)
+#define PSYNC_INVALID_FOLDERID ((psync_folderid_t) - 1)
 #define PSYNC_INVALID_PATH NULL
 
 static inline uint64_t psync_get_permissions(const binresult *meta) {
