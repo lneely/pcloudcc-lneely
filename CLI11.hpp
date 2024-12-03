@@ -11,6 +11,7 @@ used by this program.
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 // Forward declaration
 class ParseError : public std::runtime_error {
