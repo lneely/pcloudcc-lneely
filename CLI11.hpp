@@ -4,6 +4,7 @@ used by this program.
 */
 
 #pragma once
+#include <algorithm>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -11,7 +12,6 @@ used by this program.
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <algorithm>
 
 // Forward declaration
 class ParseError : public std::runtime_error {
