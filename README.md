@@ -6,6 +6,30 @@ This is a simple **linux** console client for pCloud cloud storage, derived from
 
 This version of pcloudcc is independently maintained by me, whose only affiliation with pCloud is as a user of their services. As of June 2024, the console-client repo (https://github.com/pcloudcom/console-client) seems to have been inactive for several years. This was an attractive alternative for myself and other like-minded weirdos who don't enjoy unneeded GUIs, and it is a shame to see it abandoned.
 
+## Validating Your Device
+
+pCloud requires "first time" validation for all devices. In the standard use case, where the user is running `pcloudcc` on the same host s/he normally works on, this can be completed by simply logging into pcloud.com using the web browser (and often, it already has been). Non-standard use cases (e.g., running `pcloudcc` on a remote server) require a different approach. 
+
+### Tested Workarounds
+
+Props to [@tieum](https://github.com/tieum), [@ebouda333](https://github.com/ebouda33), [@CorvusCorax](https://github.com/CorvusCorax), and [@tomash](https://github.com/tomash) for suggesting the following workarounds:
+ 
+**Dockerized Carbonyl**. *Requires Docker or Podman on the host.*. Run [carbonyl](https://github.com/fathyb/carbonyl) in a container on the target host to complete the validation.
+
+```
+docker run --network host --rm -ti fathyb/carbonyl https://my.pcloud.com
+```
+
+**SOCKS proxy over SSH** *Requires TCP port forwarding over SSH*. Log in to the remote host using the command `ssh -D <port>` to enable a SOCKS proxy on `localhost:<port>`. Configure your local web browser to use `localhost:<port>` as its proxy, then log in to pcloud.com and validate the device. *Do not forget to remove the proxy from your browser configuration when done.*
+
+### Untested Workarounds
+
+Fundamentally, the workaround is to log in to pcloud.com using a web browser from the target device. Therefore the following (untested) workarounds may also work.
+
+**SSH/X11 forwarding**. *Requires web browser, X11 forwarding over SSH on host. Requires X11 client on local machine.*. If a sufficiently capable web browser and X11 forwarding are available on the host, login to SSH with X11 forwarding enabled (`ssh -X <targethost>`) and run the web browser from the SSH session to log in and validate the device. 
+
+**Remote Desktop / VNC**. *Requires a sufficiently capable web browser and RDP/VNC capabilities on host*. Run the web browser in a remote desktop session to log in and validate the device. 
+
 ## Supported Distributions & Packages
 
 pcloudcc-lneely seeks to support as many Linux distributions as possible and has been tested on recent versions of Fedora, Debian, Ubuntu, Arch, and Artix. 
