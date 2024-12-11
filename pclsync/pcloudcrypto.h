@@ -33,9 +33,9 @@
 #define _PCLOUD_CRYPTO_H
 
 #include "papi.h"
-#include "pcompiler.h"
 #include "pcrypto.h"
-#include "pfs.h"
+#include "pfsfolder.h"
+#include "psynclib.h"
 
 #define PSYNC_CRYPTO_SYM_FLAG_ISDIR 1
 
