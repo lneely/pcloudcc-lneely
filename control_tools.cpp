@@ -332,10 +332,10 @@ void process_commands() {
 
   // crypto subcommands
   auto start_crypto_cmd = crypto_cmd->add_subcommand("start", "Start crypto");
-  std::string crypto_arg;
-  start_crypto_cmd->add_option("arg", crypto_arg, "Crypto argument")
+  std::string start_crypto_pwd;
+  start_crypto_cmd->add_option("password", start_crypto_pwd, "Crypto password")
       ->required();
-  start_crypto_cmd->callback([&] { start_crypto(crypto_arg.c_str()); });
+  start_crypto_cmd->callback([&] { start_crypto(start_crypto_pwd.c_str()); });
 
   crypto_cmd->add_subcommand("stop", "Stop crypto")->callback(stop_crypto);
 
@@ -345,22 +345,22 @@ void process_commands() {
       ->callback(list_sync_folders);
 
   auto sync_add_cmd = sync_cmd->add_subcommand("add", "Add sync folder");
-  std::string syncadd_arg;
-  sync_add_cmd->add_option("arg", syncadd_arg, "Paths")->required();
+  std::string syncadd_lpath, syncadd_rpath;
+  sync_add_cmd->add_option("localpath", syncadd_lpath, "Local Path")->required();
+  sync_add_cmd->add_option("remotepath", syncadd_rpath, "Remote Path")->required();
   sync_add_cmd->callback([&] {
-    auto [lpath, rpath] = split_paths(syncadd_arg.c_str());
-    add_sync_folder(lpath, rpath);
+    add_sync_folder(syncadd_lpath, syncadd_rpath);
   });
 
   auto sync_remove_cmd =
-      sync_cmd->add_subcommand("remove", "Remove sync folder")->alias("rm");
-  std::string syncrm_arg;
-  sync_remove_cmd->add_option("arg", syncrm_arg, "Path")->required();
-  sync_remove_cmd->callback([&] { remove_sync_folder(syncrm_arg.c_str()); });
+      sync_cmd->add_subcommand("remove", "Remove sync folder (use ls to get folder ID)")->alias("rm");
+  std::string syncrm_fid;
+  sync_remove_cmd->add_option("folderid", syncrm_fid, "Folder ID")->required();
+  sync_remove_cmd->callback([&] { remove_sync_folder(syncrm_fid.c_str()); });
 
   // command loop
   while (true) {
-    std::cout << "> ";
+    std::cout << "pcloud> ";
     std::string line;
     if (!std::getline(std::cin, line))
       break;
