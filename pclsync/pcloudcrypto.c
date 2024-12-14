@@ -42,15 +42,14 @@
 #include "pcache.h"
 #include "pcloudcrypto.h"
 #include "pcrypto.h"
-#include "pdiff.h"
 #include "pfileops.h"
 #include "pfolder.h"
+#include "pfs.h"
 #include "plibs.h"
 #include "pmemlock.h"
 #include "pnetlibs.h"
 #include "psettings.h"
 #include "pssl.h"
-#include "pstatus.h"
 #include <string.h>
 #define PSYNC_CRYPTO_API_ERR_INTERNAL -511
 
