@@ -6,6 +6,10 @@ This is a simple **linux** console client for pCloud cloud storage, derived from
 
 This version of pcloudcc is independently maintained by me, whose only affiliation with pCloud is as a user of their services. As of June 2024, the console-client repo (https://github.com/pcloudcom/console-client) seems to have been inactive for several years. This was an attractive alternative for myself and other like-minded weirdos who don't enjoy unneeded GUIs, and it is a shame to see it abandoned.
 
+## Security Notice
+
+While security enhancements are currently being planned, you should be aware that this program currently stores your password and crypto password as an unencrypted string in memory (see: [pclsync_lib.cpp](https://github.com/lneely/pcloudcc-lneely/blob/main/pclsync_lib.cpp). Advise running this program only on a host that you trust and do not share with anyone else.
+
 ## Validating Your Device
 
 pCloud requires "first time" validation for all devices. In the standard use case, where the user is running `pcloudcc` on the same host s/he normally works on, this can be completed by simply logging into pcloud.com using the web browser (and often, it already has been). Non-standard use cases (e.g., running `pcloudcc` on a remote server) require a different approach. 
