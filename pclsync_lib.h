@@ -46,6 +46,7 @@ public:
   ~pclsync_lib();
   pclsync_lib();
 
+  bool trusted_device_;
   bool crypto_on_;
   bool save_pass_;
   bool setup_crypto_;
@@ -55,12 +56,16 @@ public:
   bool was_init_;
 
   // Getters
+  const bool get_trusted_device();
+  const std::string &get_tfa_code();
   const std::string &get_username();
   const std::string &get_password();
   const std::string &get_crypto_pass();
   const std::string &get_mount();
 
   // Setters
+  void set_trusted_device(bool arg);
+  void set_tfa_code(const std::string& arg);
   void set_username(const std::string &arg);
   void set_password(const std::string &arg);
   void set_crypto_pass(const std::string &arg);
@@ -75,6 +80,7 @@ public:
   static pclsync_lib &get_lib();
 
   // Console
+  void get_tfa_code_from_console();
   void get_pass_from_console();
   void get_cryptopass_from_console();
 
@@ -97,6 +103,7 @@ public:
 private:
   std::string username_;
   std::string password_;
+  std::string tfa_code_;
   std::string crypto_pass_;
   std::string mount_;
 

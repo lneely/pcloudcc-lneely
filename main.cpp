@@ -45,6 +45,7 @@ int main(int argc, char **argv) {
   std::cout << "pCloud console client (" << version << ")" << std::endl;
   std::string username = "";
   std::string password = "";
+  std::string tfa_code = "";
   bool daemon = false;
   bool commands = false;
   bool commands_only = false;
@@ -52,15 +53,22 @@ int main(int argc, char **argv) {
   bool passwordsw = false;
   bool save_pass = false;
   bool crypto = false;
+  bool trusted_device = false;
   po::variables_map vm;
 
   try {
     po::options_description desc("Allowed options");
     desc.add_options()("help,h", "Show this help message.")(
         "username,u", po::value<std::string>(&username),
-        "pCloud account name.")("password,p", po::bool_switch(&passwordsw),
-                                "Ask for pCloud account password.")(
-        "crypto,c", po::bool_switch(&crypto), "Ask for crypto password.")(
+        "pCloud account name.")(
+        "password,p", po::bool_switch(&passwordsw),
+        "Ask for pCloud account password.")(
+        "tfa_code,t", po::value<std::string>(&tfa_code),
+        "pCloud tfa code")(
+        "trusted_device,r", po::bool_switch(&trusted_device),
+        "Trust this device.")(
+        "crypto,c", po::bool_switch(&crypto),
+        "Ask for crypto password.")(
         "passascrypto,y", po::value<std::string>(),
         "User password is the same as crypto password.")(
         "daemonize,d", po::bool_switch(&daemon),
@@ -113,6 +121,8 @@ int main(int argc, char **argv) {
     if (passwordsw) {
       cc::clibrary::pclsync_lib::get_lib().get_pass_from_console();
     }
+    cc::clibrary::pclsync_lib::get_lib().set_tfa_code(tfa_code);
+    cc::clibrary::pclsync_lib::get_lib().set_trusted_device(trusted_device);
     if (crypto) {
       cc::clibrary::pclsync_lib::get_lib().setup_crypto_ = true;
       if (vm.count("passascrypto")) {

@@ -54,6 +54,10 @@ clib::pclsync_lib::pclsync_lib()
 
 clib::pclsync_lib::~pclsync_lib() {}
 
+const bool clib::pclsync_lib::get_trusted_device() { return trusted_device_; };
+
+const std::string &clib::pclsync_lib::get_tfa_code() { return tfa_code_; }
+
 const std::string &clib::pclsync_lib::get_username() { return username_; }
 
 const std::string &clib::pclsync_lib::get_password() { return password_; }
@@ -64,6 +68,12 @@ const std::string &clib::pclsync_lib::get_crypto_pass() {
 
 const std::string &clib::pclsync_lib::get_mount() { return mount_; }
 
+void clib::pclsync_lib::set_trusted_device(bool arg) {
+  trusted_device_ = arg;
+}
+void clib::pclsync_lib::set_tfa_code(const std::string &arg) {
+  tfa_code_ = arg;
+}
 void clib::pclsync_lib::set_username(const std::string &arg) {
   username_ = arg;
 }
@@ -91,6 +101,18 @@ char *clib::pclsync_lib::get_token() { return psync_get_token(); }
 
 void clib::pclsync_lib::get_pass_from_console() {
   do_get_pass_from_console(password_);
+}
+
+void clib::pclsync_lib::get_tfa_code_from_console()
+{
+  if (daemon_) {
+    std::cout << "Not able to read 2fa code when started as daemon." 
+              << std::endl;
+    exit(1);
+  }
+  std::cout << "Please enter 2fa code" 
+            << std::endl;
+  getline(std::cin, tfa_code_);
 }
 
 void clib::pclsync_lib::get_cryptopass_from_console() {
@@ -233,6 +255,10 @@ static const char *status2string(uint32_t status) {
     return "USER_MISMATCH";
   case PSTATUS_ACCOUT_EXPIRED:
     return "ACCOUT_EXPIRED";
+  case PSTATUS_TFA_REQUIRED:
+    return "TFA_REQUIRED";
+  case PSTATUS_BAD_TFA_CODE:
+    return "BAD_TFA_CODE";
   default:
     return "Unrecognized status";
   }
@@ -256,6 +282,14 @@ static void status_change(pstatus_t *status) {
                         clib::pclsync_lib::get_lib().get_password().c_str(),
                         (int)clib::pclsync_lib::get_lib().save_pass_);
     std::cout << "logging in" << std::endl;
+  } else if (status->status == PSTATUS_TFA_REQUIRED) {
+    if (clib::pclsync_lib::get_lib().get_tfa_code().empty()) {
+      clib::pclsync_lib::get_lib().get_tfa_code_from_console();
+    }
+
+    psync_tfa_set_code(clib::pclsync_lib::get_lib().get_tfa_code().c_str(),
+                       clib::pclsync_lib::get_lib().get_trusted_device(), 
+                       0);
   } else if (status->status == PSTATUS_BAD_LOGIN_DATA) {
     if (!clib::pclsync_lib::get_lib().newuser_) {
       clib::pclsync_lib::get_lib().get_pass_from_console();
