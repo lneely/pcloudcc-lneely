@@ -29,11 +29,12 @@
 /*
   Dependencies:
   - <string>
-  - pclsync_lib_c.h
 */
 
 #ifndef PCLSYNC_LIB_H
 #define PCLSYNC_LIB_H
+
+#include <string>
 
 struct pstatus_struct_;
 typedef void (*status_callback_t)(int status, const char *stat_string);

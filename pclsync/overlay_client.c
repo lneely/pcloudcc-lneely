@@ -344,7 +344,7 @@ int read_response(int fd, char **out, size_t *out_size, int *ret,
     return -1;
   }
 
-  *out = malloc(value_size + 1);
+  *out = (char *)malloc(value_size + 1);
   if (*out == NULL) {
     const char *error_msg = "Memory allocation failed";
     *out = strdup(error_msg);

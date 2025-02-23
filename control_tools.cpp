@@ -41,7 +41,7 @@
 #include "pclsync/overlay_client.h"
 
 #include "pclsync_lib.h"
-#include "psynclib.h"
+#include "pclsync/psynclib.h"
 
 #include "CLI11.hpp"
 
@@ -59,56 +59,6 @@ enum command_ids_ {
   ADDSYNC,
   STOPSYNC
 };
-
-std::pair<std::string, std::string> split_paths(const std::string &input) {
-  std::string path1, path2;
-  bool in_quotes = false;
-  bool escaped = false;
-  std::string current_path;
-
-  for (char c : input) {
-    if (escaped) {
-      current_path += c;
-      escaped = false;
-    } else if (c == '\\') {
-      escaped = true;
-    } else if (c == '"') {
-      in_quotes = !in_quotes;
-      current_path += c;
-    } else if (c == ' ' && !in_quotes) {
-      if (!current_path.empty()) {
-        if (path1.empty()) {
-          path1 = current_path;
-        } else {
-          path2 = current_path;
-          break;
-        }
-        current_path.clear();
-      }
-    } else {
-      current_path += c;
-    }
-  }
-
-  if (!current_path.empty()) {
-    if (path1.empty()) {
-      path1 = current_path;
-    } else if (path2.empty()) {
-      path2 = current_path;
-    }
-  }
-
-  auto remove_quotes = [](std::string &s) {
-    if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
-      s = s.substr(1, s.size() - 2);
-    }
-  };
-
-  remove_quotes(path1);
-  remove_quotes(path2);
-
-  return {path1, path2};
-}
 
 int list_sync_folders() {
   int ret;

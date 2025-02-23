@@ -15,7 +15,7 @@ a.out
 cmd/pcloudcc/build/pcloudcc
 **/*/.cache/
 compile_commands.json
-
+compile_commands.events.json
 /cmd/pcloudcc/build/
 /.cache/
 /lib/poverlay_linux/overlay_client
