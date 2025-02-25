@@ -26,8 +26,7 @@ that gets created when the server is started.
   socket -> poverlay : request
   poverlay -> poverlay : poverlay_handle_request
   poverlay -> poverlay : poverlay_get_response
-  poverlay -> poverlay : serialize_response_message
-  poverlay -> socket : response (serialized)
+  poverlay -> socket : response
   socket -> overlay_client : read_response
   overlay_client -> control_tools : (msg, msgsz, payload, payloadsz)
   control_tools -> user : print results

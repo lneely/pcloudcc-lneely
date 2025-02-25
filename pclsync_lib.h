@@ -89,12 +89,12 @@ public:
   int init();
   // std::string& username, std::string& password, std::string*
   // crypto_pass, int setup_crypto = 1, int usesrypto_userpass = 0);
-  static int start_crypto(const char *pass, void **rep);
-  static int stop_crypto(const char *path, void **rep);
-  static int finalize(const char *path, void **rep);
-  static int list_sync_folders(const char *path, void **rep);
-  static int add_sync_folder(const char *path, void **rep);
-  static int remove_sync_folder(const char *path, void **rep);
+  static int start_crypto(const char *pass);
+  static int stop_crypto(const char *path);
+  static int finalize(const char *path);
+  static int list_sync_folders(const char *path);
+  static int add_sync_folder(const char *path);
+  static int remove_sync_folder(const char *path);
 
   char *get_token();
   int logout();
@@ -107,6 +107,7 @@ private:
   std::string tfa_code_;
   std::string crypto_pass_;
   std::string mount_;
+
 
   bool to_set_mount_;
   bool daemon_;

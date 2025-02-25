@@ -41,11 +41,14 @@
 
 #include "poverlay.h"
 #include "psynclib.h"
+#include "pshm.h"
 
 #include "pclsync_lib.h"
 
 namespace cc = console_client;
 namespace clib = cc::clibrary;
+
+static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 
 static const std::string client_name = "pCloud CC v3.0.0";
 
@@ -331,16 +334,13 @@ static void status_change(pstatus_t *status) {
     psync_free(err);
 }
 
-int clib::pclsync_lib::start_crypto(const char *pass, void **payload) {
-  (void)payload;
-
+int clib::pclsync_lib::start_crypto(const char *pass) {
   std::cout << "calling startcrypto pass: " << pass << std::endl;
   get_lib().crypto_pass_ = pass;
   return lib_setup_cripto();
 }
 
-int clib::pclsync_lib::stop_crypto(const char *path, void **payload) {
-  (void)payload;
+int clib::pclsync_lib::stop_crypto(const char *path) {
   (void)path;
 
   psync_crypto_stop();
@@ -348,20 +348,15 @@ int clib::pclsync_lib::stop_crypto(const char *path, void **payload) {
   return 0;
 }
 
-int clib::pclsync_lib::finalize(const char *path, void **payload) {
-  (void)payload;
+int clib::pclsync_lib::finalize(const char *path) {
   (void)path;
 
   psync_destroy();
   exit(0);
 }
 
-int clib::pclsync_lib::add_sync_folder(const char *path, void **payload) {
-  if (payload == nullptr) {
-    std::cerr << "Error: payload pointer is null" << std::endl;
-    return -255;
-  }
-
+// path is the local and remote path delimited by '|'
+int clib::pclsync_lib::add_sync_folder(const char *path) {
   if (path == nullptr) {
     std::cerr << "Error: path is nullptr" << std::endl;
     return -255;
@@ -377,53 +372,48 @@ int clib::pclsync_lib::add_sync_folder(const char *path, void **payload) {
 
   std::string localpath = combined.substr(0, delimiter_pos);
   std::string remotepath = combined.substr(delimiter_pos + 1);
+  psync_syncid_t syncid = psync_add_sync_by_path(localpath.c_str(), remotepath.c_str(), PSYNC_FULL);
 
-  psync_syncid_t syncid =
-      psync_add_sync_by_path(localpath.c_str(), remotepath.c_str(), PSYNC_FULL);
-
-  uint64_t *payload_ptr =
-      static_cast<uint64_t *>(psync_malloc(sizeof(uint64_t)));
-  if (payload_ptr == nullptr) {
-    std::cerr << "Error: Failed to allocate memory for payload" << std::endl;
-    return -255;
-  }
-
+  pthread_mutex_lock(&mtx);
   if (syncid == PSYNC_INVALID_SYNCID) {
-    std::cerr << "psync_add_sync_by_path returned PSYNC_INVALID_SYNCID"
-              << std::endl;
-    *payload_ptr = (static_cast<uint64_t>(1) << 32) |
-                   static_cast<uint32_t>(PSYNC_INVALID_SYNCID);
-    return -1;
-  } else {
-    *payload_ptr = static_cast<uint64_t>(syncid);
+      std::cerr << "psync_add_sync_by_path returned PSYNC_INVALID_SYNCID" << std::endl;
+      uint64_t error_value = (static_cast<uint64_t>(1) << 32) | PSYNC_INVALID_SYNCID;
+      pshm_write(&error_value, sizeof(uint64_t));
+      pthread_mutex_unlock(&mtx);
+      return -1;
   }
-  *payload = payload_ptr;
+  pshm_write(&syncid, sizeof(psync_syncid_t));
+  pthread_mutex_unlock(&mtx);
   return 0;
 }
 
-int clib::pclsync_lib::remove_sync_folder(const char *path, void **payload) {
-  (void)payload;
+// path is the folderid to remove
+int clib::pclsync_lib::remove_sync_folder(const char *path) {
   psync_folderid_t folderid;
   folderid = static_cast<psync_folderid_t>(std::stoull(path, nullptr, 10));
   return psync_delete_sync_by_folderid(folderid);
 }
 
-int clib::pclsync_lib::list_sync_folders(const char *path, void **payload) {
+// path is not used
+int clib::pclsync_lib::list_sync_folders(const char *path) {
   (void)path;
 
-  psync_folder_list_t *folders = psync_get_sync_list();
+  psync_folder_list_t *folders;
+  size_t folderssz;
+
+  folders = psync_get_sync_list();
   if (!folders) {
     return -1;
   }
-  size_t alloc_size =
-      sizeof(*folders) + folders->foldercnt * sizeof(psync_folder_t);
-  *payload = psync_malloc(alloc_size);
-  if (*payload == NULL) {
-    psync_free(folders);
-    return -1;
-  }
-  memcpy(*payload, folders, alloc_size);
+  folderssz =
+      sizeof(psync_folder_list_t) + (folders->foldercnt * sizeof(psync_folder_t));
+
+  pthread_mutex_lock(&mtx);
+  pshm_write(folders, folderssz);
+  pthread_mutex_unlock(&mtx);
+
   psync_free(folders);
+
   return 0;
 }
 

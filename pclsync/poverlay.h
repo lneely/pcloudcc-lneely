@@ -49,8 +49,7 @@ extern int callbacks_running;
 
 void psync_overlay_main_loop(VOID);
 void psync_overlay_handle_request(LPVOID);
-void psync_overlay_get_response(request_message *rq /*IN*/,
-                                response_message *rs /*OUT*/);
+void psync_overlay_get_response(message*, message*);
 void psync_overlay_stop_overlays();
 void psync_overlay_start_overlays();
 void psync_overlay_stop_overlay_callbacks();
@@ -59,6 +58,6 @@ int psync_overlay_overlays_running();
 int psync_overlay_callbacks_running();
 
 void psync_overlay_init_callbacks();
-int psync_overlay_register_callback(int id, poverlay_callback callback);
+int psync_overlay_register_callback(int, poverlay_callback);
 
 #endif // POVERLAY_H

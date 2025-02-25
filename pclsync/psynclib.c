@@ -71,6 +71,7 @@
 #include "ppathstatus.h"
 #include "pscanner.h"
 #include "psettings.h"
+#include "pshm.h"
 #include "pssl.h"
 #include "pstatus.h"
 #include "psyncer.h"
@@ -355,6 +356,9 @@ uint32_t psync_download_state() { return 0; }
 
 void psync_destroy() {
   psync_do_run = 0;
+  if (pshm_cleanup() == -1) {
+    debug(D_ERROR, "failed to cleanup shm");
+  }
   psync_fs_stop();
   psync_terminate_status_waiters();
   psync_send_status_update();
