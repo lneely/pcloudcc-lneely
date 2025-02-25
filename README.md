@@ -1,10 +1,6 @@
 # pCloud Console Client (undead)
 
-This is a simple **linux** console client for pCloud cloud storage, derived from the console-client developed by pCloud.
-
-## Braaaaaains (Fork, please)
-
-This version of pcloudcc is independently maintained by me, whose only affiliation with pCloud is as a user of their services. As of June 2024, the console-client repo (https://github.com/pcloudcom/console-client) seems to have been inactive for several years. This was an attractive alternative for myself and other like-minded weirdos who don't enjoy unneeded GUIs, and it is a shame to see it abandoned.
+`pcloudcc` is simple **linux** console client for pCloud cloud storage derived from the console-client developed by pCloud. This version is independently maintained by me, whose only affiliation with pCloud is as a user of their services. Due credit goes to Anton Titov, Ivan Stoev, and pCloud.
 
 ## Security Notice
 
@@ -23,27 +19,11 @@ Props to [@tieum](https://github.com/tieum), [@ebouda333](https://github.com/ebo
 ```
 docker run --network host --rm -ti fathyb/carbonyl https://my.pcloud.com
 ```
-
 **SOCKS proxy over SSH** *Requires TCP port forwarding over SSH*. Log in to the remote host using the command `ssh -D <port>` to enable a SOCKS proxy on `localhost:<port>`. Configure your local web browser to use `localhost:<port>` as its proxy, then log in to pcloud.com and validate the device. *Do not forget to remove the proxy from your browser configuration when done.*
-
-### Untested Workarounds
-
-Fundamentally, the workaround is to log in to pcloud.com using a web browser from the target device. Therefore the following (untested) workarounds may also work.
-
-**SSH/X11 forwarding**. *Requires web browser, X11 forwarding over SSH on host. Requires X11 client on local machine.*. If a sufficiently capable web browser and X11 forwarding are available on the host, login to SSH with X11 forwarding enabled (`ssh -X <targethost>`) and run the web browser from the SSH session to log in and validate the device. 
-
-**Remote Desktop / VNC**. *Requires a sufficiently capable web browser and RDP/VNC capabilities on host*. Run the web browser in a remote desktop session to log in and validate the device. 
 
 ## Supported Distributions & Packages
 
-pcloudcc-lneely seeks to support as many Linux distributions as possible and has been tested on recent versions of Fedora, Debian, Ubuntu, Arch, and Artix. 
-
-I use Artix and maintain an [AUR](https://aur.archlinux.org/packages/pcloudcc-lneely) package. I do not plan on providing or maintaining any other packages, but encourage anyone interested in doing so for their own distributions.
-
-## Due Credit
-- Anton Titov
-- Ivan Stoev
-- pCloud
+I aim to support as many distributions as possible, and maintain an [AUR](https://aur.archlinux.org/packages/pcloudcc-lneely) package. I do not plan on providing or maintaining any other packages, but encourage anyone interested in doing so for their own distributions.
 
 ## Dependencies
 - zlib (-lz)
@@ -52,7 +32,7 @@ I use Artix and maintain an [AUR](https://aur.archlinux.org/packages/pcloudcc-ln
 - udev (-ludev)
 - libfuse (-lfuse)
 - libsqlite (-lsqlite3)
-- libmbedtls (-l:libmbedtls.so.14, -l:libmbedx509.so.1, -l:libmbedcrypto.so.7)
+- libmbedtls (3.x)
 
 ## Building
 
@@ -60,9 +40,7 @@ I use Artix and maintain an [AUR](https://aur.archlinux.org/packages/pcloudcc-ln
 make
 ```
 
-It's really that easy. Use `make install` to install, and `make uninstall` to uninstall. Specify `DESTDIR` if desired (see **Make Options**). 
-
-## Make Options
+### Build Options
 
 ```
 make BUILD=debug            # include debug symbols, ASan instrumentation. (default: release)
@@ -88,8 +66,11 @@ database. Verify that file system starts and mounts normally after the
 
 > pcloudcc -u example@myemail.com -p -s
 
+Optionally specify your own mount point.
 
-### Registration
+> pcloudcc -u example@myemail.com -p -s -m /path/to/mountpoint
+
+### Registration (UNTESTED)
 
 If you don't have existing user use -n switch to register new user:
 
@@ -127,7 +108,7 @@ Command Reference:
 ```
 
 **Note**. Command line arguments that include special characters (e.g., the
-  `crypto start` password or paths with spaces) must now be quoted or
+  `crypto start` password or paths with spaces) must be quoted or
   escaped. In other words, instead of:
 
   `startcrypto Str0ng p4$$word 4 great jUSTicE!`
