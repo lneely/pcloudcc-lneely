@@ -1809,7 +1809,7 @@ void psync_get_folder_ownerid(psync_folderid_t folderid,
 //   void** pointer is null, then do not write any data back out for
 //   the client.
 //
-typedef int (*poverlay_callback)(const char *, void **);
+typedef int (*poverlay_callback)(const char *);
 
 /* Registers file manager extension callback that will be called when packet
  * with id equals to the give one had arrived from extension. The id must be

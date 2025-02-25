@@ -925,3 +925,4 @@ psync_folder_list_t *psync_list_get_list(char *syncTypes) {
 
   return ret;
 }
+

@@ -41,7 +41,8 @@
 #include "pclsync/overlay_client.h"
 
 #include "pclsync_lib.h"
-#include "psynclib.h"
+#include "pclsync/psynclib.h"
+#include "pclsync/pshm.h"
 
 #include "CLI11.hpp"
 
@@ -60,62 +61,10 @@ enum command_ids_ {
   STOPSYNC
 };
 
-std::pair<std::string, std::string> split_paths(const std::string &input) {
-  std::string path1, path2;
-  bool in_quotes = false;
-  bool escaped = false;
-  std::string current_path;
-
-  for (char c : input) {
-    if (escaped) {
-      current_path += c;
-      escaped = false;
-    } else if (c == '\\') {
-      escaped = true;
-    } else if (c == '"') {
-      in_quotes = !in_quotes;
-      current_path += c;
-    } else if (c == ' ' && !in_quotes) {
-      if (!current_path.empty()) {
-        if (path1.empty()) {
-          path1 = current_path;
-        } else {
-          path2 = current_path;
-          break;
-        }
-        current_path.clear();
-      }
-    } else {
-      current_path += c;
-    }
-  }
-
-  if (!current_path.empty()) {
-    if (path1.empty()) {
-      path1 = current_path;
-    } else if (path2.empty()) {
-      path2 = current_path;
-    }
-  }
-
-  auto remove_quotes = [](std::string &s) {
-    if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
-      s = s.substr(1, s.size() - 2);
-    }
-  };
-
-  remove_quotes(path1);
-  remove_quotes(path2);
-
-  return {path1, path2};
-}
-
 int list_sync_folders() {
   int ret;
   char *errm;
   size_t errmsz;
-  void *rep;
-  size_t repsz;
   int result;
   psync_folder_list_t *flist;
   psync_folder_t *folder;
@@ -123,51 +72,50 @@ int list_sync_folders() {
 
   errm = NULL;
   errmsz = 0;
-  rep = NULL;
-  repsz = 0;
   rval = 0;
 
-  result = SendCall(LISTSYNC, "", &ret, &errm, &errmsz, &rep, &repsz);
+  result = SendCall(LISTSYNC, "", &ret, &errm, &errmsz);
 
   if (result != 0) {
     std::cout << "List Sync Folders failed. return is " << ret
               << " and message is " << (errm ? errm : "no message")
               << std::endl;
     rval = result;
-  } else if (rep && repsz > 0) {
-    flist = static_cast<psync_folder_list_t *>(rep);
+  } 
 
-    if (repsz < sizeof(psync_folder_list_t)) {
-      std::cout << "Error: Insufficient data for folder list structure"
-                << std::endl;
-      rval = -1;
-    } else {
+  if(pshm_read((void**)&flist, NULL)) {
+    const int id_width = 12;
+    const int path_width = 30;
 
-      const int id_width = 12;
-      const int path_width = 30;
-
+    if(flist->foldercnt > 0) {
       std::cout << std::left << std::setw(id_width) << "Folder ID"
                 << std::setw(path_width) << "Local Path"
                 << std::setw(path_width) << "Remote Path" << std::endl;
       std::cout << std::string(id_width, '-')
                 << std::string(path_width - 1, '-')
                 << std::string(path_width - 1, '-') << std::endl;
-
       for (uint32_t i = 0; i < flist->foldercnt; i++) {
         folder = &flist->folders[i];
         std::cout << std::left << std::setw(id_width) << folder->folderid
                   << std::setw(path_width) << folder->localpath
                   << std::setw(path_width) << folder->remotepath << std::endl;
       }
+    } else {
+      std::cout << "No synchronized folders found." << std::endl;
       rval = ret;
     }
-  } else {
-    std::cout << "No synchronized folders found." << std::endl;
     rval = ret;
+
+    free(flist);
+  } else {
+    std::cout << "failed to read folder list from shm" << std::endl;
+    return -1;
   }
 
-  free(errm);
-  free(rep);
+  if(errm) {
+      free(errm);
+  }
+
   return rval;
 }
 
@@ -176,7 +124,8 @@ int start_crypto(const char *pass) {
   char *errm;
   size_t errm_size;
 
-  int result = SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size, NULL, NULL);
+  int result = SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size);
+
   if (result != 0 || ret != 0) {
     std::cout << "Start Crypto failed. return is " << ret << " and message is "
               << (errm ? errm : "no message") << std::endl;
@@ -193,7 +142,7 @@ int stop_crypto() {
   char *errm;
   size_t errm_size;
 
-  int result = SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size, NULL, NULL);
+  int result = SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size);
   if (result != 0) {
     std::cout << "Stop Crypto failed. return is " << ret << " and message is "
               << (errm ? errm : "no message") << std::endl;
@@ -217,7 +166,7 @@ int remove_sync_folder(const char *folderid) {
   errmsz = 0;
   rval = 0;
 
-  result = SendCall(STOPSYNC, folderid, &ret, &errm, &errmsz, NULL, NULL);
+  result = SendCall(STOPSYNC, folderid, &ret, &errm, &errmsz);
   if (result != 0) {
     std::cout << "Remove Sync Folder failed with unknown error. return is "
               << ret << " and message is " << (errm ? errm : "no message")
@@ -227,7 +176,10 @@ int remove_sync_folder(const char *folderid) {
     std::cout << "Successfully removed sync folder with folderid " << folderid
               << std::endl;
   }
-  free(errm);
+
+  if(errm) {
+      free(errm);
+  }
   return rval;
 }
 
@@ -237,20 +189,15 @@ int add_sync_folder(std::string localpath, std::string remotepath) {
   int ret;
   char *errm;
   size_t errmsz;
-  void *rep;
-  size_t repsz;
   int result;
   int rval;
 
   errm = NULL;
   errmsz = 0;
-  rep = NULL;
-  repsz = 0;
   rval = 0;
 
   std::string combinedPaths = localpath + '|' + remotepath;
-  result = SendCall(ADDSYNC, combinedPaths.c_str(), &ret, &errm, &errmsz, &rep,
-                    &repsz);
+  result = SendCall(ADDSYNC, combinedPaths.c_str(), &ret, &errm, &errmsz);
 
   if (result != 0) {
     if (result == -1) {
@@ -262,22 +209,14 @@ int add_sync_folder(std::string localpath, std::string remotepath) {
                 << std::endl;
     }
     rval = result;
-  } else if (rep && repsz > 0) {
-    if (repsz < sizeof(psync_syncid_t)) {
-      std::cout << "Error: Insufficient data for folder list structure"
-                << std::endl;
-      rval = -1;
-    } else {
-      rval = ret;
-    }
   } else {
-    std::cout << "Error: Did not get a syncid from add_sync_folder."
-              << std::endl;
     rval = ret;
   }
 
-  free(errm);
-  free(rep);
+  if(errm) {
+      free(errm);
+  }
+
   return rval;
 }
 
@@ -286,11 +225,12 @@ int finalize() {
   char *errm;
   size_t errm_size;
 
-  SendCall(FINALIZE, "", &ret, &errm, &errm_size, NULL, NULL);
+  SendCall(FINALIZE, "", &ret, &errm, &errm_size);
   std::cout << "Exiting ..." << std::endl;
 
-  if (errm)
-    free(errm);
+  if (errm){
+      free(errm);
+  }
 
   return ret;
 }

@@ -55,47 +55,6 @@
 int overlays_running = 1;
 int callbacks_running = 1;
 
-// Serialization function
-size_t serialize_response_message(const response_message *resp,
-                                  char **out_buffer) {
-  // Calculate total size needed
-  size_t msg_size = sizeof(uint32_t) + sizeof(uint64_t) + resp->msg->length;
-  size_t total_size =
-      sizeof(size_t) + msg_size + sizeof(size_t) + resp->payloadsz;
-
-  // Allocate buffer
-  *out_buffer = (char *)malloc(total_size);
-  if (*out_buffer == NULL)
-    return 0;
-
-  char *ptr = *out_buffer;
-
-  // Serialize msg size
-  *(size_t *)ptr = htobe64(msg_size);
-  ptr += sizeof(size_t);
-
-  // Serialize msg
-  *(uint32_t *)ptr = htonl(resp->msg->type);
-  ptr += sizeof(uint32_t);
-
-  *(uint64_t *)ptr = htobe64(resp->msg->length);
-  ptr += sizeof(uint64_t);
-
-  memcpy(ptr, resp->msg->value, resp->msg->length);
-  ptr += resp->msg->length;
-
-  // Serialize payload size
-  *(size_t *)ptr = htobe64(resp->payloadsz);
-  ptr += sizeof(size_t);
-
-  // Serialize payload
-  if (resp->payloadsz > 0 && resp->payload != NULL) {
-    memcpy(ptr, resp->payload, resp->payloadsz);
-  }
-
-  return total_size;
-}
-
 void psync_overlay_main_loop() {
   struct sockaddr_un addr;
   int fd, cl;
@@ -144,8 +103,8 @@ void psync_overlay_handle_request(void *lpvParam) {
   int readbytes;                // total bytes read from request
   char rqbuf[POVERLAY_BUFSIZE]; // request buffer, contains the request message
   char *rqbufp;                 // request buffer ptr, for convenient iteration
-  request_message *request;     // request message
-  response_message *response;   // response message and payload
+  message *request;     // request message
+  message *response;   // response message and payload
 
   request = NULL;
   response = NULL;
@@ -159,7 +118,7 @@ void psync_overlay_handle_request(void *lpvParam) {
     readbytes += rc;
     rqbufp = rqbufp + rc;
     if (readbytes > 12) {
-      request = (request_message *)rqbuf;
+      request = (message *)rqbuf;
       if (request->length == (uint64_t)readbytes)
         break;
     }
@@ -172,50 +131,23 @@ void psync_overlay_handle_request(void *lpvParam) {
     goto cleanup;
   }
 
-  // allocate and initialize response message
-  response = (response_message *)psync_malloc(sizeof(response_message));
-  memset(response, 0, sizeof(response_message));
-  response->msg = NULL;
-  response->payload = NULL;
-  response->payloadsz = 0;
-
-  // get the response for the request, and write the response to the
-  // sockfd.
-  request = (request_message *)rqbuf;
+  request = (message *)rqbuf;
+  response = (message *)malloc(POVERLAY_BUFSIZE);
   if (request) {
     psync_overlay_get_response(request, response);
 
-    char *rsbufp;
-    size_t bytes_written = 0;
-    size_t responsesz = serialize_response_message(response, &rsbufp);
-    if (responsesz <= 0) {
-      debug(D_ERROR, "failed to serialize response message");
-      return;
+    ssize_t total_size = sizeof(uint32_t) + sizeof(uint64_t) + response->length;
+    ssize_t bytes_written = write(*sockfd, response, total_size);
+
+    if (bytes_written == -1) {
+        debug(D_ERROR, "Failed to write to socket: %s", strerror(errno));
+        return;
+    } else if (bytes_written < total_size) {
+        debug(D_ERROR, "Incomplete write to socket: wrote %zd of %zd bytes", bytes_written, total_size);
+        return;
     }
 
-    while (bytes_written < responsesz) {
-      ssize_t written =
-          write(*sockfd, rsbufp + bytes_written, responsesz - bytes_written);
-      if (written == -1) {
-        if (errno == EINTR) {
-          // Interrupted by signal, try again
-          continue;
-        }
-        debug(D_ERROR, "failed to write to socket: %s", strerror(errno));
-        break;
-      }
-      bytes_written += written;
-    }
-    free(rsbufp);
-    if (bytes_written < responsesz) {
-      debug(D_ERROR, "failed to write entire message to socket");
-      return;
-    }
-
-    debug(D_NOTICE,
-          "Successfully sent full reply: %zu bytes structure, %zu bytes "
-          "additional data",
-          response->msg->length, response->payloadsz);
+    debug(D_NOTICE, "Successfully wrote %zd bytes to socket", bytes_written);
   } else {
     debug(D_ERROR, "No valid request received");
   }
@@ -225,12 +157,6 @@ cleanup:
     close(*sockfd);
   }
   if (response) {
-    if (response->msg) {
-      psync_free(response->msg);
-    }
-    if (response->payload) {
-      psync_free(response->payload);
-    }
     psync_free(response);
   }
 
@@ -264,8 +190,8 @@ void psync_overlay_init_callbacks() {
   memset(callbacks, 0, sizeof(poverlay_callback) * callbacks_size);
 }
 
-static void psync_overlay_get_status_response(request_message *request,
-                                              response_message *response,
+static void psync_overlay_get_status_response(message *request,
+                                              message *response,
                                               size_t available_space) {
   psync_path_status_t stat;
 
@@ -276,56 +202,24 @@ static void psync_overlay_get_status_response(request_message *request,
   }
   switch (psync_path_status_get_status(stat)) {
   case PSYNC_PATH_STATUS_IN_SYNC:
-    response->msg->type = 10;
+    response->type = 10;
     break;
   case PSYNC_PATH_STATUS_IN_PROG:
-    response->msg->type = 12;
+    response->type = 12;
     break;
   case PSYNC_PATH_STATUS_PAUSED:
   case PSYNC_PATH_STATUS_REMOTE_FULL:
   case PSYNC_PATH_STATUS_LOCAL_FULL:
-    response->msg->type = 11;
+    response->type = 11;
     break;
   default:
-    response->msg->type = 13;
-    snprintf(response->msg->value, available_space, "No.");
+    response->type = 13;
+    snprintf(response->value, available_space, "No.");
   }
 }
 
-static void
-psync_overlay_get_overlay_response_payload(request_message *request,
-                                           response_message *response) {
-  if (!response->payload) {
-    response->payloadsz = 0;
-    debug(D_NOTICE, "Callback succeeded with no reply data");
-    return;
-  }
-
-  if (request->type == 23) {
-    // LISTSYNC
-    psync_folder_list_t *folders = (psync_folder_list_t *)response->payload;
-    response->payloadsz = sizeof(psync_folder_list_t) +
-                          folders->foldercnt * sizeof(psync_folder_t);
-  } else if (request->type == 24) {
-    // ADDSYNC
-    response->payloadsz = sizeof(psync_syncid_t);
-  } else {
-    // default: response has no payload
-    response->payloadsz = 0;
-  }
-
-  if (response->payload == NULL) {
-    response->payloadsz = 0;
-    debug(D_NOTICE, "No reply data received");
-    return;
-  }
-
-  debug(D_NOTICE, "Callback succeeded with reply data, length: %zu",
-        response->payloadsz);
-}
-
-static void psync_overlay_get_overlay_response(request_message *request,
-                                               response_message *response,
+static void psync_overlay_get_overlay_response(message *request,
+                                               message *response,
                                                size_t available_space) {
   int cbidx; // callback index (based on message type)
   int cbret; // callback return value
@@ -335,44 +229,40 @@ static void psync_overlay_get_overlay_response(request_message *request,
 
   if (!callbacks_running || (request->type >= ((uint32_t)calbacks_lower_band +
                                                (uint32_t)callbacks_size))) {
-    response->msg->type = 13;
-    snprintf(response->msg->value, available_space, "Invalid type.");
+    response->type = 13;
+    snprintf(response->value, available_space, "Invalid type.");
     debug(D_NOTICE, "Invalid request type: %u", request->type);
     return;
   }
 
   if (!callbacks[cbidx]) {
-    response->msg->type = 13;
-    snprintf(response->msg->value, available_space,
+    response->type = 13;
+    snprintf(response->value, available_space,
              "No callback with this id registered.");
     debug(D_NOTICE, "No callback registered for type: %u", request->type);
     return;
   }
 
-  cbret = callbacks[cbidx](request->value, &response->payload);
+  cbret = callbacks[cbidx](request->value);
   if (cbret == 0) {
-    response->msg->type = 0;
-    psync_overlay_get_overlay_response_payload(request, response);
+    response->type = 0;
   } else {
-    response->msg->type = cbret;
-    snprintf(response->msg->value, available_space,
+    response->type = cbret;
+    snprintf(response->value, available_space,
              "Callback returned error code.");
     debug(D_NOTICE, "Callback failed with return code: %d", cbret);
   }
 }
 
-void psync_overlay_get_response(request_message *request,
-                                response_message *response) {
+void psync_overlay_get_response(message *request,
+                                message *response) {
 
   const char *dbgmsg; // debug messages
   size_t value_avail; // space available to store value (flexible array)
 
   dbgmsg = NULL;
-  response->msg = (message *)psync_malloc(POVERLAY_BUFSIZE);
-  memset(response->msg, 0, POVERLAY_BUFSIZE);
-  response->msg->length = 0;
-  response->payload = NULL;
-  response->payloadsz = 0;
+  memset(response, 0, POVERLAY_BUFSIZE);
+  response->length = 0;
   value_avail = POVERLAY_BUFSIZE - sizeof(message);
 
   // never print the crypto password to the logs in plain text
@@ -388,21 +278,21 @@ void psync_overlay_get_response(request_message *request,
 
   // a message with a type != 13 and a null string value after
   // processing is considered successful. set value to "Ok."
-  if (response->msg->type != 13 && response->msg->value[0] == '\0') {
-    snprintf(response->msg->value, value_avail, "Ok.");
+  if (response->type != 13 && response->value[0] == '\0') {
+    snprintf(response->value, value_avail, "Ok.");
   } else {
     debug(D_WARNING,
           "not updating value to Ok: response->msg->type=%d, "
           "response->msg->value=%s",
-          response->msg->type, response->msg->value);
+          response->type, response->value);
   }
 
   // truncate messages that exceed the buffer boundaries
-  size_t value_length = strnlen(response->msg->value, value_avail);
-  response->msg->length = sizeof(message) + value_length + 1;
-  if (response->msg->length > POVERLAY_BUFSIZE) {
-    response->msg->length = POVERLAY_BUFSIZE;
-    response->msg->value[value_avail - 1] = '\0';
+  size_t value_length = strnlen(response->value, value_avail);
+  response->length = sizeof(message) + value_length + 1;
+  if (response->length > POVERLAY_BUFSIZE) {
+    response->length = POVERLAY_BUFSIZE;
+    response->value[value_avail - 1] = '\0';
     debug(D_WARNING, "Response message truncated to fit buffer");
   }
 }
