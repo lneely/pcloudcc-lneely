@@ -105,6 +105,8 @@ int list_sync_folders() {
       rval = ret;
     }
     rval = ret;
+
+    free(flist);
   } else {
     std::cout << "failed to read folder list from shm" << std::endl;
     return -1;
