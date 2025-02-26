@@ -33,7 +33,7 @@ show_help() {
     echo
     echo "Options:"
     echo "  -i, --image IMAGE    Specify the base image (default: debian)"
-    echo "  -t, --tag TAG        Specify the tag for the base image (default: latest)"
+    echo "  -t, --tag TAG        Specify the tag for the base image (default: trixie)"
     echo "  -n, --name NAME      Specify the name for the container (default: debian-build)"
     echo "  -l, --list           List supported distributions"
     echo "  -h, --help           Display this help message"
@@ -51,7 +51,7 @@ show_help() {
 
 # Default values
 IMAGE="debian"
-TAG="latest"
+TAG="trixie"
 NAME="debian-build"
 
 # Parse command line arguments
