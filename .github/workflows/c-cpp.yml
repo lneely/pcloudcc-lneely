@@ -16,7 +16,7 @@ jobs:
     - name: Install dependencies
       run: |
         apt-get update
-        apt-get install -y libudev-dev libfuse-dev libsqlite3-dev zlib1g-dev libboost-dev libboost-system-dev libboost-program-options-dev libmbedtls-dev
+        apt-get install -y build-essential libudev-dev libfuse-dev libsqlite3-dev zlib1g-dev libboost-dev libboost-system-dev libboost-program-options-dev libmbedtls-dev
     - name: make
       run: make
 
