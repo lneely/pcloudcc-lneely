@@ -47,6 +47,7 @@
 #include "pcloudcrypto.h"
 #include "pcompat.h"
 #include "pcontacts.h"
+#include "pdevice.h"
 #include "pdiff.h"
 #include "pdownload.h"
 #include "pfileops.h"
@@ -64,7 +65,6 @@
 #include "ptimer.h"
 #include "ptools.h"
 #include "publiclinks.h"
-#include <ctype.h>
 
 #define PSYNC_SQL_DOWNLOAD                                                     \
   "synctype&" NTO_STR(PSYNC_DOWNLOAD_ONLY) "=" NTO_STR(PSYNC_DOWNLOAD_ONLY)
@@ -304,8 +304,8 @@ static psync_socket *get_connected_socket() {
   }
 
   debug(D_NOTICE, "using deviceid %s", deviceid);
-  appversion = psync_appname();
-  devicestring = psync_device_string();
+  appversion = pdevice_get_software();
+  devicestring = pdevice_name();
 
   while (1) {
     psync_free(auth);
@@ -362,7 +362,7 @@ static psync_socket *get_connected_socket() {
       psync_milisleep(PSYNC_SLEEP_BEFORE_RECONNECT);
       continue;
     }
-    osversion = psync_deviceos();
+    osversion = pdevice_get_os();
 
     if (psync_my_2fa_token && psync_my_2fa_code_type && psync_my_2fa_code[0]) {
       const char *method = psync_my_2fa_code_type == 1

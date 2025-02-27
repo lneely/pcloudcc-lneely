@@ -522,7 +522,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
           add_modified_file(fdisk, fdb, folderid, localfolderid, syncid,
                             synctype);
         if (fdisk->isfolder &&
-            psync_deviceid_short(fdisk->deviceid) != fdb->deviceid &&
+            pdevice_id_short(fdisk->deviceid) != fdb->deviceid &&
             fdisk->inode != fdb->inode) {
           if (fdisk->deviceid == deviceid) {
             debug(D_NOTICE,
@@ -746,7 +746,7 @@ static void scan_create_folder(sync_folderlist *fl) {
   psync_sql_bind_uint(res, 1, fl->localparentfolderid);
   psync_sql_bind_uint(res, 2, fl->syncid);
   psync_sql_bind_uint(res, 3, fl->inode);
-  psync_sql_bind_uint(res, 4, psync_deviceid_short(fl->deviceid));
+  psync_sql_bind_uint(res, 4, pdevice_id_short(fl->deviceid));
   psync_sql_bind_uint(res, 5, psync_mtime_native_to_mtime(fl->mtimenat));
   psync_sql_bind_uint(res, 6, fl->mtimenat);
   psync_sql_bind_string(res, 7, fl->name);
@@ -769,7 +769,7 @@ static void scan_create_folder(sync_folderlist *fl) {
         "UPDATE localfolder SET inode=?, deviceid=?, mtime=?, mtimenative=?, "
         "flags=0 WHERE syncid=? AND localparentfolderid=? AND name=?");
     psync_sql_bind_uint(res, 1, fl->inode);
-    psync_sql_bind_uint(res, 2, psync_deviceid_short(fl->deviceid));
+    psync_sql_bind_uint(res, 2, pdevice_id_short(fl->deviceid));
     psync_sql_bind_uint(res, 3, psync_mtime_native_to_mtime(fl->mtimenat));
     psync_sql_bind_uint(res, 4, fl->mtimenat);
     psync_sql_bind_uint(res, 5, fl->syncid);

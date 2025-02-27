@@ -28,7 +28,34 @@
    DAMAGE.
 */
 
+#include <ctype.h>
+#include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <grp.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <netinet/tcp.h>
+#include <pthread.h>
+#include <pwd.h>
+#include <signal.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <utime.h>
+
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/statvfs.h>
+#include <sys/sysinfo.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
+
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
@@ -36,38 +63,12 @@
 #include <mbedtls/ssl.h>
 
 #include "pcompat.h"
+#include "pdevice.h"
 #include "plibs.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "psynclib.h"
 #include "ptimer.h"
-#include <pthread.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <string.h>
-#include <time.h>
-
-#include <sys/sysinfo.h>
-
-#include <ctype.h>
-#include <dirent.h>
-#include <fcntl.h>
-#include <grp.h>
-#include <ifaddrs.h>
-#include <net/if.h>
-#include <netinet/tcp.h>
-#include <pwd.h>
-#include <signal.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/resource.h>
-#include <sys/stat.h>
-#include <sys/statvfs.h>
-#include <sys/types.h>
-#include <sys/utsname.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <utime.h>
 
 extern char **environ;
 
@@ -102,9 +103,6 @@ static char proxy_host[256];
 static char proxy_port[8];
 
 static int psync_page_size;
-
-static const char *psync_software_name = PSYNC_LIB_VERSION;
-static const char *psync_os_name = NULL;
 
 PSYNC_THREAD const char *psync_thread_name = "no name";
 static pthread_mutex_t socket_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -953,7 +951,7 @@ static int connect_socket_connect_proxy(const char *host,
   ln = psync_slprintf(
       buff, sizeof(buff),
       "CONNECT %s:%s HTTP/1.0\015\012User-Agent: %s\015\012\015\012", host,
-      port, psync_software_name);
+      port, pdevice_get_software());
   wr = 0;
   while (wr < ln) {
     r = write(sock, buff + wr, ln - wr);
@@ -2277,61 +2275,6 @@ int64_t psync_file_size(int fd) {
     return -1;
   else
     return st.st_size;
-}
-
-void psync_set_software_name(const char *snm) { psync_software_name = snm; }
-
-void psync_set_os_name(const char *osnm) { psync_os_name = osnm; }
-
-char *psync_deviceos() {
-  return psync_os_name ? psync_strdup(psync_os_name) : psync_deviceid();
-}
-
-char *psync_device_string() {
-  char *osname = psync_deviceos();
-  char *ret = psync_strcat(osname, ", ", psync_software_name, NULL);
-  free(osname);
-  return ret;
-}
-
-const char *psync_appname() { return psync_software_name; }
-
-char *psync_deviceid() {
-  char *device;
-  DIR *dh;
-  // struct dirent entry; // DELETEME: not used
-  struct dirent *de;
-  const char *hardware;
-  char *path, buf[8];
-  int fd;
-  hardware = "Desktop";
-  dh = opendir("/sys/class/power_supply");
-  if (dh) {
-
-    // while (!readdir_r(dh, &entry, &de) && de) { // DELETEME: deprecated
-    while ((de = readdir(dh))) {
-      if (de->d_name[0] != '.' ||
-          (de->d_name[1] != 0 &&
-           (de->d_name[1] != '.' || de->d_name[2] != 0))) {
-        path =
-            psync_strcat("/sys/class/power_supply/", de->d_name, "/type", NULL);
-        fd = open(path, O_RDONLY);
-        psync_free(path);
-        if (fd == -1)
-          continue;
-        if (read(fd, buf, 7) == 7 && !memcmp(buf, "Battery", 7)) {
-          close(fd);
-          hardware = "Laptop";
-          break;
-        }
-        close(fd);
-      }
-    }
-    closedir(dh);
-  }
-  device = psync_strcat(hardware, ", Linux", NULL);
-  debug(D_NOTICE, "detected device: %s", device);
-  return device;
 }
 
 #define PSYNC_RUN_CMD "xdg-open" // XXX: verify this...

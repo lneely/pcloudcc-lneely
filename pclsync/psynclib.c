@@ -47,6 +47,7 @@
 #include "pcloudcrypto.h"
 #include "pcompat.h"
 #include "pcontacts.h"
+#include "pdevice.h"
 #include "pdevice_monitor.h"
 #include "pdiff.h"
 #include "pdownload.h"
@@ -205,16 +206,6 @@ void psync_set_alloc(psync_malloc_t malloc_call, psync_realloc_t realloc_call,
   psync_real_malloc = malloc_call;
   psync_real_realloc = realloc_call;
   psync_real_free = free_call;
-}
-
-void psync_set_software_string(const char *str) {
-  debug(D_NOTICE, "setting software name to %s", str);
-  psync_set_software_name(str);
-}
-
-void psync_set_os_string(const char *str) {
-  debug(D_NOTICE, "setting os name to %s", str);
-  psync_set_os_name(str);
 }
 
 static void psync_stop_crypto_on_sleep() {
@@ -1238,7 +1229,7 @@ int psync_change_password(const char *currentpass, const char *newpass,
   char *device;
   int ret;
   binresult *res;
-  device = psync_deviceid();
+  device = pdevice_id();
   {
     binparam params[] = {P_STR("auth", psync_my_auth),
                          P_STR("oldpassword", currentpass),

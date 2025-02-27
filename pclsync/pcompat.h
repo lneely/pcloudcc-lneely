@@ -127,16 +127,13 @@ typedef void (*psync_thread_start1)(void *);
 #define psync_stat_inode(s) ((s)->st_ino)
 #define psync_stat_device(s) ((s)->st_dev)
 #define psync_stat_device_full(s) ((s)->st_dev)
-#define psync_deviceid_short(deviceid) (deviceid)
+#define pdevice_id_short(deviceid) (deviceid)
 #define psync_def_var_arr(name, type, size) type name[size]
 #define psync_stat_fast_isfolder(a) ((a)->isfolder)
 
 // System Initialization and Configuration
 void psync_sys_init();
 int psync_get_page_size();
-void psync_set_os_name(const char *osnm);
-void psync_set_software_name(const char *snm);
-const char *psync_appname();
 int psync_stat_mode_ok(struct stat *buf, unsigned int bits) PSYNC_PURE;
 
 // Time and Sleep Functions
@@ -226,11 +223,6 @@ int psync_wait_socket_read_timeout(int sock);
 int psync_wait_socket_write_timeout(int sock);
 int psync_select_in(int *sockets, int cnt, int64_t timeoutmillisec);
 psync_interface_list_t *psync_list_ip_adapters();
-
-// Device Information
-char *psync_device_string();
-char *psync_deviceid();
-char *psync_deviceos();
 
 
 #endif

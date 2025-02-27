@@ -45,6 +45,7 @@
 
 #include "papi.h"
 #include "pcache.h"
+#include "pdevice.h"
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "psettings.h"
@@ -2625,7 +2626,7 @@ int psync_send_debug(int thread, const char *file, const char *function,
   va_list ap;
   char *ret;
   int sz, l;
-  ret = psync_deviceid();
+  ret = pdevice_id();
   snprintf(format, sizeof(format), "%s %s: %s:%u (function %s): %s\n", ret,
            psync_thread_name, file, line, function, fmt);
   psync_free(ret);
