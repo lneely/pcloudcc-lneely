@@ -43,6 +43,5 @@ void psync_diff_update_file(const binresult *meta);
 void psync_diff_delete_file(const binresult *meta);
 void psync_diff_update_folder(const binresult *meta);
 void psync_diff_delete_folder(const binresult *meta);
-void psync_delete_cached_crypto_keys();
 
 #endif
