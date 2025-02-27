@@ -133,8 +133,6 @@ typedef void (*psync_thread_start1)(void *);
 
 // System Initialization and Configuration
 void psync_sys_init();
-int psync_get_page_size();
-int psync_stat_mode_ok(struct stat *buf, unsigned int bits) PSYNC_PURE;
 
 // Time and Sleep Functions
 time_t psync_time();
@@ -150,6 +148,7 @@ int psync_mlock(void *ptr, size_t size);
 int psync_munlock(void *ptr, size_t size);
 void psync_anon_reset(void *ptr, size_t size);
 void psync_get_random_seed(unsigned char *seed, const void *addent, size_t aelen, int fast);
+int psync_get_page_size();
 
 // Thread Management
 void psync_run_thread(const char *name, psync_thread_start0 run);
@@ -180,6 +179,7 @@ int psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime);
 int psync_set_crtime_mtime_by_fd(int fd, const char *path, time_t crtime, time_t mtime);
 int psync_invalidate_os_cache(const char *path);
 int psync_invalidate_os_cache_needed();
+int psync_stat_mode_ok(struct stat *buf, unsigned int bits) PSYNC_PURE;
 
 // Directory and Path Operations
 int psync_list_dir(const char *path, psync_list_dir_callback callback, void *ptr);

@@ -72,12 +72,6 @@
 
 extern char **environ;
 
-#if defined(MAP_ANONYMOUS)
-#define PSYNC_MAP_ANONYMOUS MAP_ANONYMOUS
-#elif defined(MAP_ANON)
-#define PSYNC_MAP_ANONYMOUS MAP_ANON
-#endif
-
 #define PROXY_NONE 0
 #define PROXY_CONNECT 1
 
@@ -2317,9 +2311,9 @@ extern int overlays_running;
 int psync_invalidate_os_cache(const char *path) { return 0; }
 
 void *psync_mmap_anon(size_t size) {
-#if defined(PSYNC_MAP_ANONYMOUS)
+#if defined(MAP_ANONYMOUS)
   return mmap(NULL, size, PROT_READ | PROT_WRITE,
-              MAP_PRIVATE | PSYNC_MAP_ANONYMOUS, -1, 0);
+              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #else
   return malloc(size);
 #endif
@@ -2352,7 +2346,7 @@ void *psync_mmap_anon_safe(size_t size) {
 }
 
 int psync_munmap_anon(void *ptr, size_t size) {
-#if defined(PSYNC_MAP_ANONYMOUS)
+#if defined(MAP_ANONYMOUS)
   return munmap(ptr, size);
 #else
   free(ptr);
@@ -2361,7 +2355,7 @@ int psync_munmap_anon(void *ptr, size_t size) {
 }
 
 void psync_anon_reset(void *ptr, size_t size) {
-#if defined(PSYNC_MAP_ANONYMOUS) && defined(MADV_DONTNEED)
+#if defined(MAP_ANONYMOUS) && defined(MADV_DONTNEED)
   madvise(ptr, size, MADV_DONTNEED);
 #endif
 }
