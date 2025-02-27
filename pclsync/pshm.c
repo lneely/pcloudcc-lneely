@@ -7,8 +7,7 @@
 #include <stdbool.h>
 #include <errno.h>
 
-#include "debug.h"
-
+#include "plibs.h"
 #include "pshm.h"
 
 key_t pshm_get_key() {
