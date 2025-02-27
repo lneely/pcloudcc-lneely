@@ -121,7 +121,7 @@ static void psync_hmac_sha512(const unsigned char *msg, size_t msglen,
 
 static void xor16_unaligned_inplace(unsigned char *data,
                                     const unsigned char *key) {
-  psync_uint_t i;
+  unsigned long i;
   for (i = 0; i < PSYNC_AES256_BLOCK_SIZE; i++)
     data[i] ^= key[i];
 }

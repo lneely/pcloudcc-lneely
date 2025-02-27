@@ -445,7 +445,7 @@ external_status do_psync_external_status(char *path) {
   char *fsroot = NULL;
   char *folder = NULL;
   int syncid = 0, rootlen = 0;
-  psync_stat_t st;
+  struct stat st;
   external_status result = INVSYNC;
   char *pcpath = NULL;
 
@@ -467,7 +467,7 @@ external_status do_psync_external_status(char *path) {
     }
   }
   do_normalize_path(pcpath);
-  if (!psync_stat(path, &st)) {
+  if (!stat(path, &st)) {
     if (!psync_stat_isfolder(&st)) {
       result = do_psync_external_status_file(pcpath);
       if (syncid && (result == INVSYNC))

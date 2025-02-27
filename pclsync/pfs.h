@@ -97,8 +97,8 @@ typedef struct {
   psync_timer_t writetimer;
   time_t currentsec;
   time_t origctime;
-  psync_file_t datafile;
-  psync_file_t indexfile;
+  int datafile;
+  int indexfile;
   uint32_t refcnt;
   uint32_t runningreads;
   uint32_t currentspeed;
@@ -124,7 +124,7 @@ typedef struct {
   psync_interval_tree_t *authenticatedints;
   psync_fast_hash256_ctx loghashctx;
   psync_enc_file_extender_t *extender;
-  psync_file_t logfile;
+  int logfile;
   uint32_t logoffset;
 } psync_openfile_t;
 
@@ -137,14 +137,14 @@ typedef struct {
   int dummy[0];
 } psync_fs_index_header;
 
-#if IS_DEBUG && defined(P_OS_LINUX)
+#if IS_DEBUG
 #define psync_fs_lock_file(of) psync_fs_do_lock_file(of, __FILE__, __LINE__)
 
 static inline void psync_fs_do_lock_file(psync_openfile_t *of, const char *file,
                                          unsigned long line) {
   if (unlikely(pthread_mutex_trylock(&of->mutex))) {
     struct timespec tm;
-    psync_nanotime(&tm);
+    clock_gettime(CLOCK_REALTIME, &tm);
     tm.tv_sec += 60;
     if (pthread_mutex_timedlock(&of->mutex, &tm)) {
       debug(D_BUG,
@@ -174,7 +174,7 @@ int psync_fs_rename_openfile_locked(psync_fsfileid_t fileid,
                                     const char *name);
 void psync_fs_mark_openfile_deleted(uint64_t taskid);
 int64_t psync_fs_get_file_writeid(uint64_t taskid);
-int64_t psync_fs_load_interval_tree(psync_file_t fd, uint64_t size,
+int64_t psync_fs_load_interval_tree(int fd, uint64_t size,
                                     psync_interval_tree_t **tree);
 int psync_fs_remount();
 void psync_fs_inc_of_refcnt_locked(psync_openfile_t *of);

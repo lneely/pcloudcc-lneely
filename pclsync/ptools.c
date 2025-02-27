@@ -43,19 +43,16 @@
 #include "stdlib.h"
 #include "string.h"
 
-#if defined(P_OS_LINUX)
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#endif
 
 char *getMACaddr() {
   char buffer[128];
 
   memset(buffer, 0, sizeof(buffer));
 
-#if defined(P_OS_LINUX)
   int fd;
   struct ifreq ifr;
   char *iface = "eth0";
@@ -75,7 +72,6 @@ char *getMACaddr() {
   sprintf(buffer, "%.2x%.2x%.2x%.2x%.2x%.2x", mac[0], mac[1], mac[2], mac[3],
           mac[4], mac[5]);
   buffer[12] = 0;
-#endif
 
   if (buffer[0] == 0) {
     return psync_strdup("GENERIC_MAC");
@@ -349,15 +345,10 @@ char *get_machine_name() {
 
   pcName[0] = 0;
 
-#if defined(P_OS_LINUX)
   gethostname(pcName, nameSize);
-#endif
 
   if (pcName[0] == 0) {
-
-#if defined(P_OS_LINUX)
     strcpy(pcName, "LinuxMachine");
-#endif
   }
 
   return psync_strdup(pcName);

@@ -153,7 +153,7 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
                                               const char *destination,
                                               const unsigned char *hexsum,
                                               uint64_t fsize);
-int psync_file_writeall_checkoverquota(psync_file_t fd, const void *buf,
+int psync_file_writeall_checkoverquota(int fd, const void *buf,
                                        size_t count);
 
 int psync_set_default_sendbuf(psync_socket *sock);
@@ -161,7 +161,7 @@ void psync_account_downloaded_bytes(int unsigned bytes);
 int psync_socket_readall_download(psync_socket *sock, void *buff, int num);
 int psync_socket_readall_download_thread(psync_socket *sock, void *buff,
                                          int num);
-psync_int_t psync_socket_writeall_upload(psync_socket *sock, const void *buff,
+long psync_socket_writeall_upload(psync_socket *sock, const void *buff,
                                          int num);
 
 psync_http_socket *psync_http_connect(const char *host, const char *path,
@@ -192,10 +192,10 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
                               char *const *files, uint32_t filecnt);
 int psync_net_scan_file_for_blocks(psync_socket *api, psync_list *rlist,
                                    psync_fileid_t fileid, uint64_t filehash,
-                                   psync_file_t fd);
+                                   int fd);
 int psync_net_scan_upload_for_blocks(psync_socket *api, psync_list *rlist,
                                      psync_uploadid_t uploadid,
-                                     psync_file_t fd);
+                                     int fd);
 
 int psync_is_revision_of_file(const unsigned char *localhashhex,
                               uint64_t filesize, psync_fileid_t fileid,

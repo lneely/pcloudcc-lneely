@@ -29,6 +29,7 @@
    DAMAGE.
 */
 
+#include <errno.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
@@ -103,7 +104,7 @@ static const size_t min_packet_size[] = {
 
 static pthread_mutex_t p2pmutex = PTHREAD_MUTEX_INITIALIZER;
 
-static psync_socket_t udpsock;
+static int udpsock;
 static int files_serving = 0;
 static int running = 0;
 static int tcpport;
@@ -263,13 +264,13 @@ static void psync_p2p_process_packet(const char *packet, size_t plen) {
   }
 }
 
-static int socket_write_all(psync_socket_t sock, const void *buff, size_t len) {
+static int socket_write_all(int sock, const void *buff, size_t len) {
   ssize_t ret;
   while (len) {
-    ret = psync_write_socket(sock, buff, len);
+    ret = write(sock, buff, len);
     if (ret == SOCKET_ERROR) {
-      if (psync_sock_err() == P_INTR || psync_sock_err() == P_AGAIN ||
-          psync_sock_err() == P_WOULDBLOCK)
+      if (errno == EINTR || errno == EAGAIN ||
+          errno == EWOULDBLOCK)
         continue;
       return -1;
     }
@@ -279,13 +280,13 @@ static int socket_write_all(psync_socket_t sock, const void *buff, size_t len) {
   return 0;
 }
 
-static int socket_read_all(psync_socket_t sock, void *buff, size_t len) {
+static int socket_read_all(int sock, void *buff, size_t len) {
   ssize_t ret;
   while (len) {
-    ret = psync_read_socket(sock, buff, len);
+    ret = read(sock, buff, len);
     if (ret == SOCKET_ERROR) {
-      if (psync_sock_err() == P_INTR || psync_sock_err() == P_AGAIN ||
-          psync_sock_err() == P_WOULDBLOCK)
+      if (errno == EINTR || errno == EAGAIN ||
+          errno == EWOULDBLOCK)
         continue;
       return -1;
     } else if (ret == 0)
@@ -329,11 +330,11 @@ static void psync_p2p_tcphandler(void *ptr) {
   char *token, *localpath;
   uint64_t off;
   size_t rd;
-  psync_socket_t sock;
-  psync_file_t fd;
+  int sock;
+  int fd;
   uint32_t keylen, enctype;
   unsigned char hashhex[PSYNC_HASH_DIGEST_HEXLEN], buff[4096];
-  sock = *((psync_socket_t *)ptr);
+  sock = *((int *)ptr);
   psync_free(ptr);
   debug(D_NOTICE, "got tcp connection");
   if (unlikely_log(socket_read_all(sock, &packet, sizeof(packet))))
@@ -370,7 +371,7 @@ static void psync_p2p_tcphandler(void *ptr) {
   localpath = psync_local_path_for_local_file(localfileid, NULL);
   if (unlikely_log(!localpath))
     goto err0;
-  fd = psync_file_open(localpath, P_O_RDONLY, 0);
+  fd = psync_file_open(localpath, O_RDONLY, 0);
   debug(D_NOTICE, "sending file %s to peer", localpath);
   psync_free(localpath);
   if (fd == INVALID_HANDLE_VALUE) {
@@ -415,7 +416,7 @@ static void psync_p2p_tcphandler(void *ptr) {
   psync_file_close(fd);
   debug(D_NOTICE, "file sent successfuly");
 err0:
-  psync_close_socket(sock);
+  close(sock);
 }
 
 static void psync_p2p_thread() {
@@ -423,7 +424,7 @@ static void psync_p2p_thread() {
   char buff[2048];
   /*  struct sockaddr_in6 addr; */
   struct sockaddr_in addr4;
-  psync_socket_t tcpsock, socks[2], *inconn;
+  int tcpsock, socks[2], *inconn;
   socklen_t sl;
   int sret;
   psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
@@ -488,8 +489,8 @@ static void psync_p2p_thread() {
       pthread_mutex_lock(&p2pmutex);
       if (!psync_setting_get_bool(_PS(p2psync))) {
         running = 0;
-        psync_close_socket(tcpsock);
-        psync_close_socket(udpsock);
+        close(tcpsock);
+        close(udpsock);
         pthread_mutex_unlock(&p2pmutex);
         return;
       }
@@ -510,7 +511,7 @@ static void psync_p2p_thread() {
       else
         psync_milisleep(1);
     } else if (sret == 1) {
-      inconn = psync_new(psync_socket_t);
+      inconn = psync_new(int);
       *inconn = accept(tcpsock, NULL, NULL);
       if (unlikely_log(*inconn == INVALID_SOCKET))
         psync_free(inconn);
@@ -521,8 +522,8 @@ static void psync_p2p_thread() {
 ex:
   pthread_mutex_lock(&p2pmutex);
   running = 0;
-  psync_close_socket(tcpsock);
-  psync_close_socket(udpsock);
+  close(tcpsock);
+  close(udpsock);
   pthread_mutex_unlock(&p2pmutex);
 }
 
@@ -534,7 +535,7 @@ static void psync_p2p_start() {
 }
 
 static void psync_p2p_wake() {
-  psync_socket_t sock;
+  int sock;
   struct sockaddr_in addr;
   packet_type_t pack;
   sock = psync_create_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -546,8 +547,8 @@ static void psync_p2p_wake() {
   addr.sin_addr.s_addr = htonl(0x7f000001UL);
   pack = P2P_WAKE;
   if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) != SOCKET_ERROR)
-    assertw(psync_write_socket(sock, &pack, sizeof(pack)) == sizeof(pack));
-  psync_close_socket(sock);
+    assertw(write(sock, &pack, sizeof(pack)) == sizeof(pack));
+  close(sock);
 }
 
 void psync_p2p_init() {
@@ -648,7 +649,7 @@ static int psync_p2p_get_download_token(psync_fileid_t fileid,
   return PSYNC_NET_OK;
 }
 
-static int psync_p2p_download(psync_socket_t sock, psync_fileid_t fileid,
+static int psync_p2p_download(int sock, psync_fileid_t fileid,
                               const unsigned char *filehashhex, uint64_t fsize,
                               const char *filename) {
   uint32_t keylen = 0, enctype = 0;
@@ -658,7 +659,7 @@ static int psync_p2p_download(psync_socket_t sock, psync_fileid_t fileid,
   psync_hash_ctx hashctx;
   uint64_t off;
   size_t rd;
-  psync_file_t fd;
+  int fd;
   unsigned char buff[4096];
   unsigned char hashbin[PSYNC_HASH_DIGEST_LEN],
       hashhex[PSYNC_HASH_DIGEST_HEXLEN];
@@ -688,7 +689,7 @@ static int psync_p2p_download(psync_socket_t sock, psync_fileid_t fileid,
   psync_ssl_free_symmetric_key(key);
   if (decoder == PSYNC_CRYPTO_INVALID_ENCODER)
     return PSYNC_NET_PERMFAIL;
-  fd = psync_file_open(filename, P_O_WRONLY, P_O_CREAT | P_O_TRUNC);
+  fd = psync_file_open(filename, O_WRONLY, O_CREAT | O_TRUNC);
   if (unlikely(fd == INVALID_HANDLE_VALUE)) {
     psync_crypto_aes256_ctr_encoder_decoder_free(decoder);
     debug(D_ERROR, "could not open %s", filename);
@@ -738,9 +739,9 @@ int psync_p2p_check_download(psync_fileid_t fileid,
   packet_check_resp resp;
   struct timeval tv;
   psync_interface_list_t *il;
-  psync_socket_t *sockets;
+  int *sockets;
   size_t i, tlen;
-  psync_socket_t sock, msock;
+  int sock, msock;
   packet_resp_t bresp;
   unsigned char hashsource[PSYNC_HASH_BLOCK_SIZE],
       hashbin[PSYNC_HASH_DIGEST_LEN], hashhex[PSYNC_HASH_DIGEST_HEXLEN];
@@ -763,7 +764,7 @@ int psync_p2p_check_download(psync_fileid_t fileid,
   psync_binhex(pct1.genhash, hashbin, PSYNC_HASH_DIGEST_LEN);
   memcpy(pct1.computername, computername, PSYNC_HASH_DIGEST_HEXLEN);
   il = psync_list_ip_adapters();
-  sockets = psync_new_cnt(psync_socket_t, il->interfacecnt);
+  sockets = psync_new_cnt(int, il->interfacecnt);
   FD_ZERO(&rfds);
   msock = 0;
   for (i = 0; i < il->interfacecnt; i++) {
@@ -779,7 +780,7 @@ int psync_p2p_check_download(psync_fileid_t fileid,
     setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (const char *)&on, sizeof(on));
     if (unlikely_log(bind(sock, (struct sockaddr *)&il->interfaces[i].address,
                           il->interfaces[i].addrsize) == SOCKET_ERROR)) {
-      psync_close_socket(sock);
+      close(sock);
       continue;
     }
     if (il->interfaces[i].broadcast.ss_family == AF_INET)
@@ -796,7 +797,7 @@ int psync_p2p_check_download(psync_fileid_t fileid,
       if (sock >= msock)
         msock = sock + 1;
     } else
-      psync_close_socket(sock);
+      close(sock);
   }
   if (unlikely_log(!msock))
     goto err_perm;
@@ -836,7 +837,7 @@ int psync_p2p_check_download(psync_fileid_t fileid,
     }
   for (i = 0; i < il->interfacecnt; i++)
     if (sockets[i] != INVALID_SOCKET)
-      psync_close_socket(sockets[i]);
+      close(sockets[i]);
   psync_free(il);
   psync_free(sockets);
   if (bresp == P2P_RESP_NOPE)
@@ -894,7 +895,7 @@ int psync_p2p_check_download(psync_fileid_t fileid,
   }
   psync_free(token);
   sret = psync_p2p_download(sock, fileid, filehashhex, fsize, filename);
-  psync_close_socket(sock);
+  close(sock);
   return sret;
 err_perm3:
   psync_free(token);
@@ -902,13 +903,13 @@ err_perm3:
 err_perm:
   for (i = 0; i < il->interfacecnt; i++)
     if (sockets[i] != INVALID_SOCKET)
-      psync_close_socket(sockets[i]);
+      close(sockets[i]);
   psync_free(il);
   psync_free(sockets);
 err_perm2:
   return PSYNC_NET_PERMFAIL;
 err_temp3:
-  psync_close_socket(sock);
+  close(sock);
   psync_free(token);
 err_temp2:
   return PSYNC_NET_TEMPFAIL;

@@ -246,7 +246,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
                                   size_t *restrict nextstrid) {
   binresult *ret;
   long cond;
-  psync_uint_t type, len;
+  unsigned long type, len;
   type = **indata;
   (*indata)++;
   if ((cond = (type >= RPARAM_SHORT_STR_BASE &&
@@ -301,7 +301,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     return (binresult *)&BOOL_FALSE;
   else if (type == RPARAM_ARRAY) {
     binresult **arr;
-    psync_uint_t cnt, alloc;
+    unsigned long cnt, alloc;
     ret = (binresult *)(*odata);
     *odata += sizeof(binresult);
     ret->type = PARAM_ARRAY;
@@ -325,7 +325,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     return ret;
   } else if (type == RPARAM_HASH) {
     struct _hashpair *arr;
-    psync_uint_t cnt, alloc;
+    unsigned long cnt, alloc;
     binresult *key;
     ret = (binresult *)(*odata);
     *odata += sizeof(binresult);

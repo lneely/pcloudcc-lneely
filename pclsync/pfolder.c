@@ -501,7 +501,7 @@ char *psync_local_path_for_local_folder(psync_folderid_t localfolderid,
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
   }
-  ret = psync_join_string_list(PSYNC_DIRECTORY_SEPARATOR, &folderlist, retlen);
+  ret = psync_join_string_list("/", &folderlist, retlen);
   psync_free_string_list(&folderlist);
   return ret;
 }
@@ -542,7 +542,7 @@ char *psync_local_path_for_local_file(psync_fileid_t localfileid,
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
   }
-  ret = psync_join_string_list(PSYNC_DIRECTORY_SEPARATOR, &folderlist, retlen);
+  ret = psync_join_string_list("/", &folderlist, retlen);
   psync_free_string_list(&folderlist);
   return ret;
 }
@@ -885,10 +885,10 @@ psync_folder_list_t *psync_list_get_list(char *syncTypes) {
 
     l--;
 
-    while (l && str[l] != PSYNC_DIRECTORY_SEPARATORC && str[l] != '/')
+    while (l && str[l] != '/' && str[l] != '/')
       l--;
 
-    if ((str[l] == PSYNC_DIRECTORY_SEPARATORC || str[l] == '/') && str[l + 1])
+    if ((str[l] == '/' || str[l] == '/') && str[l + 1])
       l++;
 
     strncpy(ret->folders[i].localname, str,

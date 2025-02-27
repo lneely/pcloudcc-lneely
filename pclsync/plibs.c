@@ -405,7 +405,7 @@ static int psync_sql_wal_hook(void *ptr, sqlite3 *db, const char *name,
 int psync_sql_connect(const char *db) {
   static int initmutex = 1;
   pthread_mutexattr_t mattr;
-  psync_stat_t st;
+  struct stat st;
   uint64_t dbver;
   int initdbneeded = 0;
   int code;
@@ -419,7 +419,7 @@ int psync_sql_connect(const char *db) {
     debug(D_CRITICAL, "sqlite is compiled without thread support");
     return -1;
   }
-  if (psync_stat(db, &st) != 0)
+  if (stat(db, &st) != 0)
     initdbneeded = 1;
 
   code = sqlite3_open(db, &psync_db);
@@ -636,7 +636,7 @@ int psync_sql_do_trylock(const char *file, unsigned line) {
   if (psync_rwlock_trywrlock(&psync_db_lock))
     return -1;
   if (++sqllockcnt == 1) {
-    psync_nanotime(&sqllockstart);
+    clock_gettime(CLOCK_REALTIME, &sqllockstart);
     record_wrlock(file, line);
   }
   return 0;
@@ -650,7 +650,7 @@ void psync_sql_do_lock(const char *file, unsigned line) {
   if (psync_rwlock_trywrlock(&psync_db_lock)) {
     struct timespec start, end;
     unsigned long msec;
-    psync_nanotime(&start);
+    clock_gettime(CLOCK_REALTIME, &start);
     memcpy(&end, &start, sizeof(end));
     end.tv_sec += PSYNC_DEBUG_LOCK_TIMEOUT;
     if (psync_rwlock_timedwrlock(&psync_db_lock, &end)) {
@@ -659,7 +659,7 @@ void psync_sql_do_lock(const char *file, unsigned line) {
       psync_sql_dump_locks();
       abort();
     }
-    psync_nanotime(&end);
+    clock_gettime(CLOCK_REALTIME, &end);
     msec = (end.tv_sec - start.tv_sec) * 1000 + end.tv_nsec / 1000000 -
            start.tv_nsec / 1000000;
     if (msec >= 5)
@@ -669,7 +669,7 @@ void psync_sql_do_lock(const char *file, unsigned line) {
     memcpy(&sqllockstart, &end, sizeof(struct timespec));
     record_wrlock(file, line);
   } else if (++sqllockcnt == 1) {
-    psync_nanotime(&sqllockstart);
+    clock_gettime(CLOCK_REALTIME, &sqllockstart);
     record_wrlock(file, line);
   }
 }
@@ -683,7 +683,7 @@ void psync_sql_unlock() {
   if (--sqllockcnt == 0) {
     struct timespec end;
     unsigned long msec;
-    psync_nanotime(&end);
+    clock_gettime(CLOCK_REALTIME, &end);
     msec = (end.tv_sec - sqllockstart.tv_sec) * 1000 + end.tv_nsec / 1000000 -
            sqllockstart.tv_nsec / 1000000;
     if (msec >= 10)
@@ -704,7 +704,7 @@ void psync_sql_do_rdlock(const char *file, unsigned line) {
   if (psync_rwlock_tryrdlock(&psync_db_lock)) {
     struct timespec start, end;
     unsigned long msec;
-    psync_nanotime(&start);
+    clock_gettime(CLOCK_REALTIME, &start);
     memcpy(&end, &start, sizeof(end));
     end.tv_sec += PSYNC_DEBUG_LOCK_TIMEOUT;
     if (psync_rwlock_timedrdlock(&psync_db_lock, &end)) {
@@ -713,7 +713,7 @@ void psync_sql_do_rdlock(const char *file, unsigned line) {
       psync_sql_dump_locks();
       abort();
     }
-    psync_nanotime(&end);
+    clock_gettime(CLOCK_REALTIME, &end);
     msec = (end.tv_sec - start.tv_sec) * 1000 + end.tv_nsec / 1000000 -
            start.tv_nsec / 1000000;
     if (msec >= 5)
@@ -722,7 +722,7 @@ void psync_sql_do_rdlock(const char *file, unsigned line) {
     memcpy(&sqlrdlockstart, &end, sizeof(struct timespec));
     record_rdlock(file, line, &sqlrdlockstart);
   } else if (++sqlrdlockcnt == 1) {
-    psync_nanotime(&sqlrdlockstart);
+    clock_gettime(CLOCK_REALTIME, &sqlrdlockstart);
     record_rdlock(file, line, &sqlrdlockstart);
   }
 }
@@ -741,7 +741,7 @@ void psync_sql_rdunlock() {
     unsigned long msec;
     rd_lock_data *lock;
     psync_rwlock_unlock(&psync_db_lock);
-    psync_nanotime(&end);
+    clock_gettime(CLOCK_REALTIME, &end);
     lock = record_rdunlock();
     msec = (end.tv_sec - sqlrdlockstart.tv_sec) * 1000 + end.tv_nsec / 1000000 -
            sqlrdlockstart.tv_nsec / 1000000;
@@ -1681,7 +1681,7 @@ const uint64_t *psync_sql_fetch_rowint(psync_sql_res *res) {
 psync_full_result_int *psync_sql_fetchall_int(psync_sql_res *res) {
   uint64_t *data;
   psync_full_result_int *ret;
-  psync_uint_t rows, cols, off, i, all;
+  unsigned long rows, cols, off, i, all;
   int code;
   cols = res->column_count;
   rows = 0;
@@ -1717,8 +1717,8 @@ uint64_t psync_sql_insertid() { return sqlite3_last_insert_rowid(psync_db); }
 int psync_rename_conflicted_file(const char *path) {
   char *npath;
   size_t plen, dotidx;
-  psync_stat_t st;
-  psync_int_t num, l;
+  struct stat st;
+  long num, l;
   plen = strlen(path);
   dotidx = plen;
   while (dotidx && path[dotidx] != '.')
@@ -1730,13 +1730,13 @@ int psync_rename_conflicted_file(const char *path) {
   num = 0;
   while (1) {
     if (num)
-      l = psync_slprintf(npath + dotidx, 32, " (conflicted %" P_PRI_I ")", num);
+      l = psync_slprintf(npath + dotidx, 32, " (conflicted %ld)", num);
     else {
       l = 13;
       memcpy(npath + dotidx, " (conflicted)", l);
     }
     memcpy(npath + dotidx + l, path + dotidx, plen - dotidx + 1);
-    if (psync_stat(npath, &st)) {
+    if (stat(npath, &st)) {
       debug(D_NOTICE, "renaming conflict %s to %s", path, npath);
       l = psync_file_rename(path, npath);
       psync_free(npath);
@@ -1747,7 +1747,7 @@ int psync_rename_conflicted_file(const char *path) {
 }
 
 void psync_libs_init() {
-  psync_uint_t i;
+  unsigned long i;
   for (i = 0; i < 256; i++)
     normalize_table[i] = i;
   normalize_table[':'] = '_';
@@ -1828,7 +1828,7 @@ uint32_t psync_ato32(const char *str) {
 
 typedef struct {
   psync_list list;
-  psync_uint_t used;
+  unsigned long used;
   char elements[];
 } psync_list_element_list;
 
@@ -1840,7 +1840,7 @@ typedef struct {
 
 typedef struct {
   psync_list list;
-  psync_uint_t used;
+  unsigned long used;
   uint32_t numbers[1000];
 } psync_list_num_list;
 
@@ -1856,7 +1856,7 @@ struct psync_list_builder_t_ {
   psync_list_string_list *last_strings;
   psync_list number_list;
   psync_list_num_list *last_numbers;
-  psync_uint_t popoff;
+  unsigned long popoff;
   char *current_element;
   uint32_t *cstrcnt;
 };
@@ -1997,7 +1997,7 @@ void *psync_list_builder_finalize(psync_list_builder_t *builder) {
   char *ret, *elem, *str;
   char **pstr;
   psync_list_element_list *el;
-  psync_uint_t i;
+  unsigned long i;
   uint32_t j, scnt, offset, length;
   size_t sz;
   sz = builder->elements_offset + builder->element_size * builder->cnt +
@@ -2532,7 +2532,7 @@ static void time_format(time_t tm, unsigned long ns, char *result) {
   static const char day_names[7][4] = {"Sun", "Mon", "Tue", "Wed",
                                        "Thu", "Fri", "Sat"};
   struct tm dt;
-  psync_uint_t y;
+  unsigned long y;
   ns /= 1000000;
   gmtime_r(&tm, &dt);
   memcpy(result, day_names[dt.tm_wday], 3);
@@ -2575,7 +2575,7 @@ int psync_debug(const char *file, const char *function, int unsigned line,
     return 1;
 
   static const struct {
-    psync_uint_t level;
+    unsigned long level;
     const char *name;
   } debug_levels[] = DEBUG_LEVELS;
   static FILE *log = NULL;
@@ -2583,7 +2583,7 @@ int psync_debug(const char *file, const char *function, int unsigned line,
   char dttime[36], format[512];
   va_list ap;
   const char *errname;
-  psync_uint_t i;
+  unsigned long i;
   unsigned int u;
   pthread_t threadid;
   errname = "BAD_ERROR_CODE";
@@ -2597,7 +2597,7 @@ int psync_debug(const char *file, const char *function, int unsigned line,
     if (!log)
       return 1;
   }
-  psync_nanotime(&ts);
+  clock_gettime(CLOCK_REALTIME, &ts);
   time_format(ts.tv_sec, ts.tv_nsec, dttime);
   threadid = pthread_self();
   memcpy(&u, &threadid, sizeof(u));

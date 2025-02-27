@@ -75,7 +75,7 @@ static uint32_t get_ext_id(const char *ext) {
 }
 
 static uint32_t get_extid_type(uint32_t extid) {
-  psync_uint_t lo, hi, mid;
+  unsigned long lo, hi, mid;
   uint32_t n;
   lo = 0;
   hi = PSYNC_SCAN_EXTENSIONS_CNT;
@@ -103,7 +103,7 @@ static uint32_t get_file_type(const char *name) {
 
 static void dir_scan(void *ptr, psync_pstat_fast *st) {
   scan_folder *f = (scan_folder *)ptr;
-  psync_uint_t i;
+  unsigned long i;
   for (i = 0; i < ARRAY_SIZE(ignore_patters); i++)
     if (psync_match_pattern(st->name, ignore_patters[i].str,
                             ignore_patters[i].len))
@@ -118,7 +118,7 @@ static void dir_scan(void *ptr, psync_pstat_fast *st) {
     psync_list_init(&nf->subfolders);
     path = (char *)(nf + 1);
     memcpy(path, f->path, o);
-    path[o++] = PSYNC_DIRECTORY_SEPARATORC;
+    path[o++] = '/';
     memcpy(path + o, st->name, l);
     o += l;
     path[o] = 0;
@@ -141,7 +141,7 @@ static void scan_folder_by_ptr(scan_folder *f) {
 static void add_subfolder_counts(scan_folder *f) {
   psync_list *e;
   scan_folder *s;
-  psync_uint_t i;
+  unsigned long i;
   psync_list_for_each(e, &f->subfolders) {
     s = psync_list_element(e, scan_folder, nextfolder);
     add_subfolder_counts(s);
@@ -153,7 +153,7 @@ static void add_subfolder_counts(scan_folder *f) {
 static void suggest_folders(scan_folder *f, psync_list *suggestions) {
   psync_list *e;
   suggested_folder *s;
-  psync_uint_t i;
+  unsigned long i;
   uint32_t sum;
   sum = 0;
   for (i = 1; i < PSYNC_SCAN_TYPES_CNT; i++)
@@ -190,7 +190,7 @@ psuggested_folders_t *psync_scanner_scan_folder(const char *path) {
   scan_folder *f;
   psync_list suggestions;
   suggested_folder *s, *sf[PSYNC_SCANNER_MAX_SUGGESTIONS];
-  psync_uint_t cnt, i;
+  unsigned long cnt, i;
   size_t off, ln;
   psuggested_folders_t *ret;
   char *str;
@@ -247,7 +247,7 @@ psuggested_folders_t *psync_scanner_scan_folder(const char *path) {
     memcpy(str, sf[i]->folder->path, sf[i]->folder->pathlen + 1);
     str += sf[i]->folder->pathlen + 1;
     ret->entries[i].name =
-        strrchr(ret->entries[i].localpath, PSYNC_DIRECTORY_SEPARATORC);
+        strrchr(ret->entries[i].localpath, '/');
     if (ret->entries[i].name)
       ret->entries[i].name++;
     else {

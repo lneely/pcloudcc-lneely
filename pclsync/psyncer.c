@@ -376,18 +376,18 @@ int psync_str_is_prefix(const char *str1, const char *str2) {
   len2 = strlen(str2);
 
   while (len1 > 1 && (str1[len1 - 1] == '/' ||
-                      str1[len1 - 1] == PSYNC_DIRECTORY_SEPARATORC))
+                      str1[len1 - 1] == '/'))
     len1--;
 
   if (len2 < len1) {
-    if (str1[len2] != '/' && str1[len2] != PSYNC_DIRECTORY_SEPARATORC)
+    if (str1[len2] != '/' && str1[len2] != '/')
       return 0;
     len1 = len2;
   } else {
-    if (str2[len1] != '/' && str2[len1] != PSYNC_DIRECTORY_SEPARATORC)
+    if (str2[len1] != '/' && str2[len1] != '/')
       return 0;
   }
-  return !psync_filename_cmpn(str1, str2, len1);
+  return !memcmp(str1, str2, len1);
 }
 
 int psync_left_str_is_prefix(const char *str1, const char *str2) {
@@ -396,22 +396,22 @@ int psync_left_str_is_prefix(const char *str1, const char *str2) {
   len2 = strlen(str2);
 
   while (len1 > 1 && (str1[len1 - 1] == '/' ||
-                      str1[len1 - 1] == PSYNC_DIRECTORY_SEPARATORC))
+                      str1[len1 - 1] == '/'))
     len1--;
 
   while (len2 > 1 && (str2[len2 - 1] == '/' ||
-                      str1[len2 - 1] == PSYNC_DIRECTORY_SEPARATORC))
+                      str1[len2 - 1] == '/'))
     len2--;
 
   if (len2 < len1) {
     return 0;
   }
 
-  return !psync_filename_cmpn(str1, str2, len1);
+  return !memcmp(str1, str2, len1);
 }
 
 void psync_syncer_check_delayed_syncs() {
-  psync_stat_t st;
+  struct stat st;
   psync_sql_res *res, *res2, *stmt;
   psync_variant_row row;
   psync_uint_row urow;
@@ -433,11 +433,11 @@ re:
       mbedtls_md = 7;
     else
       mbedtls_md = 5;
-    if (unlikely_log(psync_stat(localpath, &st)) ||
+    if (unlikely_log(stat(localpath, &st)) ||
         unlikely_log(!psync_stat_isfolder(&st)) ||
         unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md))) {
       debug(D_WARNING,
-            "ignoring delayed sync id %" P_PRI_U64 " for local path %s", id,
+            "ignoring delayed sync id %" PRIu64 " for local path %s", id,
             localpath);
       delete_delayed_sync(id);
       continue;
@@ -451,7 +451,7 @@ re:
             "skipping localfolder %s, remote %s, because of same parent to %s",
             localpath, remotepath, srow[0]);
         mbedtls_md = 1;
-      } else if (!psync_filename_cmp(srow[0], localpath)) {
+      } else if (!strcmp(srow[0], localpath)) {
         debug(D_WARNING,
               "skipping localfolder %s, remote %s, because of same dir to %s",
               localpath, remotepath, srow[0]);

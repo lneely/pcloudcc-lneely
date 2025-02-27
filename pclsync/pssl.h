@@ -260,7 +260,7 @@ typedef psync_encrypted_data_t psync_rsa_signature_t;
 
 int psync_ssl_init();
 void psync_ssl_memclean(void *ptr, size_t len);
-int psync_ssl_connect(psync_socket_t sock, void **sslconn,
+int psync_ssl_connect(int sock, void **sslconn,
                       const char *hostname);
 int psync_ssl_connect_finish(void *sslconn, const char *hostname);
 void psync_ssl_free(void *sslconn);

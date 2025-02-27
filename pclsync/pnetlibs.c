@@ -29,13 +29,19 @@
    DAMAGE.
 */
 
+#include <ctype.h>
+#include <errno.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <stdarg.h>
+#include <stdio.h>
+
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/pkcs5.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/ssl.h>
-#include <pthread.h>
 
 #include "papi.h"
 #include "pcache.h"
@@ -46,14 +52,10 @@
 #include "pstatus.h"
 #include "ptimer.h"
 #include "ptree.h"
-#include <ctype.h>
-#include <semaphore.h>
-#include <stdarg.h>
-#include <stdio.h>
 
 struct time_bytes {
   time_t tm;
-  psync_uint_t bytes;
+  unsigned long bytes;
 };
 
 struct _psync_file_lock_t {
@@ -75,7 +77,7 @@ typedef struct {
 } psync_file_checksums;
 
 typedef struct {
-  psync_uint_t elementcnt;
+  unsigned long elementcnt;
   uint32_t elements[];
 } psync_file_checksum_hash;
 
@@ -92,15 +94,15 @@ typedef struct {
 } psync_block_action;
 
 static time_t current_download_sec = 0;
-static psync_uint_t download_bytes_this_sec = 0;
-static psync_uint_t download_bytes_off = 0;
-static psync_uint_t download_speed = 0;
+static unsigned long download_bytes_this_sec = 0;
+static unsigned long download_bytes_off = 0;
+static unsigned long download_speed = 0;
 
 static time_t current_upload_sec = 0;
-static psync_uint_t upload_bytes_this_sec = 0;
-static psync_uint_t upload_bytes_off = 0;
-static psync_uint_t upload_speed = 0;
-static psync_uint_t dyn_upload_speed = PSYNC_UPL_AUTO_SHAPER_INITIAL;
+static unsigned long upload_bytes_this_sec = 0;
+static unsigned long upload_bytes_off = 0;
+static unsigned long upload_speed = 0;
+static unsigned long dyn_upload_speed = PSYNC_UPL_AUTO_SHAPER_INITIAL;
 
 static psync_tree *file_lock_tree = PSYNC_TREE_EMPTY;
 static pthread_mutex_t file_lock_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -338,10 +340,10 @@ void psync_apipool_release_bad(psync_socket *api) { psync_ret_api(api); }
 
 static void rm_all(void *vpath, psync_pstat *st) {
   char *path;
-  path = psync_strcat((char *)vpath, PSYNC_DIRECTORY_SEPARATOR, st->name, NULL);
+  path = psync_strcat((char *)vpath, "/", st->name, NULL);
   if (psync_stat_isfolder(&st->stat)) {
     psync_list_dir(path, rm_all, path);
-    psync_rmdir(path);
+    rmdir(path);
   } else
     psync_file_delete(path);
   psync_free(path);
@@ -351,32 +353,32 @@ static void rm_ign(void *vpath, psync_pstat *st) {
   char *path;
   int ign;
   ign = psync_is_name_to_ignore(st->name);
-  path = psync_strcat((char *)vpath, PSYNC_DIRECTORY_SEPARATOR, st->name, NULL);
+  path = psync_strcat((char *)vpath, "/", st->name, NULL);
   if (psync_stat_isfolder(&st->stat)) {
     if (ign)
       psync_list_dir(path, rm_all, path);
     else
       psync_list_dir(path, rm_ign, path);
-    psync_rmdir(path);
+    rmdir(path);
   } else if (ign)
     psync_file_delete(path);
   psync_free(path);
 }
 
 int psync_rmdir_with_trashes(const char *path) {
-  if (!psync_rmdir(path))
+  if (!rmdir(path))
     return 0;
-  if (psync_fs_err() != P_NOTEMPTY && psync_fs_err() != P_EXIST)
+  if (errno != ENOTEMPTY && errno != EEXIST)
     return -1;
   if (psync_list_dir(path, rm_ign, (void *)path))
     return -1;
-  return psync_rmdir(path);
+  return rmdir(path);
 }
 
 int psync_rmdir_recursive(const char *path) {
   if (psync_list_dir(path, rm_all, (void *)path))
     return -1;
-  return psync_rmdir(path);
+  return rmdir(path);
 }
 
 void psync_set_local_full(int over) {
@@ -457,7 +459,7 @@ int psync_get_remote_file_checksum(psync_fileid_t fileid, unsigned char *hexsum,
   return PSYNC_NET_OK;
 }
 
-static int file_changed(psync_stat_t *st1, psync_stat_t *st2) {
+static int file_changed(struct stat *st1, struct stat *st2) {
   return psync_stat_size(st1) != psync_stat_size(st2) ||
          psync_stat_mtime_native(st1) != psync_stat_mtime_native(st2);
 }
@@ -465,21 +467,21 @@ static int file_changed(psync_stat_t *st1, psync_stat_t *st2) {
 int psync_get_local_file_checksum(const char *restrict filename,
                                   unsigned char *restrict hexsum,
                                   uint64_t *restrict fsize) {
-  psync_stat_t st, st2;
+  struct stat st, st2;
   psync_hash_ctx hctx;
   uint64_t rsz;
   void *buff;
   size_t rs;
   ssize_t rrs;
-  psync_uint_t cnt;
-  psync_file_t fd;
+  unsigned long cnt;
+  int fd;
   unsigned char hashbin[PSYNC_HASH_DIGEST_LEN];
-  fd = psync_file_open(filename, P_O_RDONLY, 0);
+  fd = psync_file_open(filename, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE)
     return PSYNC_NET_PERMFAIL;
   buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
 retry:
-  if (unlikely_log(psync_fstat(fd, &st)))
+  if (unlikely_log(fstat(fd, &st)))
     goto err1;
   psync_hash_init(&hctx);
   rsz = psync_stat_size(&st);
@@ -491,13 +493,13 @@ retry:
       rs = rsz;
     rrs = psync_file_read(fd, buff, rs);
     if (unlikely(rrs <= 0)) {
-      if (rrs == 0 && !psync_fstat(fd, &st2) && file_changed(&st, &st2)) {
+      if (rrs == 0 && !fstat(fd, &st2) && file_changed(&st, &st2)) {
         debug(D_NOTICE,
               "file %s changed while calculating checksum, restarting",
               filename);
         psync_hash_final(hashbin, &hctx);
         psync_milisleep(PSYNC_SLEEP_FILE_CHANGE);
-        psync_file_seek(fd, 0, P_SEEK_SET);
+        psync_file_seek(fd, 0, SEEK_SET);
         goto retry;
       }
       goto err1;
@@ -507,14 +509,14 @@ retry:
     if (++cnt % 16 == 0)
       psync_milisleep(5);
   }
-  if (unlikely_log(psync_fstat(fd, &st2)))
+  if (unlikely_log(fstat(fd, &st2)))
     goto err1;
   if (unlikely(file_changed(&st, &st2))) {
     debug(D_NOTICE, "file %s changed while calculating checksum, restarting",
           filename);
     psync_hash_final(hashbin, &hctx);
     psync_milisleep(PSYNC_SLEEP_FILE_CHANGE);
-    psync_file_seek(fd, 0, P_SEEK_SET);
+    psync_file_seek(fd, 0, SEEK_SET);
     goto retry;
   }
   psync_free(buff);
@@ -535,19 +537,19 @@ int psync_get_local_file_checksum_part(const char *restrict filename,
                                        uint64_t *restrict fsize,
                                        unsigned char *restrict phexsum,
                                        uint64_t pfsize) {
-  psync_stat_t st;
+  struct stat st;
   psync_hash_ctx hctx, hctxp;
   uint64_t rsz;
   void *buff;
   size_t rs;
   ssize_t rrs;
-  psync_uint_t cnt;
-  psync_file_t fd;
+  unsigned long cnt;
+  int fd;
   unsigned char hashbin[PSYNC_HASH_DIGEST_LEN];
-  fd = psync_file_open(filename, P_O_RDONLY, 0);
+  fd = psync_file_open(filename, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE)
     return PSYNC_NET_PERMFAIL;
-  if (unlikely_log(psync_fstat(fd, &st)))
+  if (unlikely_log(fstat(fd, &st)))
     goto err1;
   buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
   psync_hash_init(&hctx);
@@ -592,7 +594,7 @@ err1:
   return PSYNC_NET_PERMFAIL;
 }
 
-int psync_file_writeall_checkoverquota(psync_file_t fd, const void *buf,
+int psync_file_writeall_checkoverquota(int fd, const void *buf,
                                        size_t count) {
   ssize_t wr;
   while (count) {
@@ -601,7 +603,7 @@ int psync_file_writeall_checkoverquota(psync_file_t fd, const void *buf,
       psync_set_local_full(0);
       return 0;
     } else if (wr == -1) {
-      if (psync_fs_err() == P_NOSPC || psync_fs_err() == P_DQUOT) {
+      if (errno == ENOSPC || errno == EDQUOT) {
         psync_set_local_full(1);
         psync_milisleep(PSYNC_SLEEP_ON_DISK_FULL);
       }
@@ -617,19 +619,19 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
                                               const char *destination,
                                               const unsigned char *hexsum,
                                               uint64_t fsize) {
-  psync_file_t sfd, dfd;
+  int sfd, dfd;
   psync_hash_ctx hctx;
   void *buff;
   size_t rrd;
   ssize_t rd;
   unsigned char hashbin[PSYNC_HASH_DIGEST_LEN];
   char hashhex[PSYNC_HASH_DIGEST_HEXLEN];
-  sfd = psync_file_open(source, P_O_RDONLY, 0);
+  sfd = psync_file_open(source, O_RDONLY, 0);
   if (unlikely_log(sfd == INVALID_HANDLE_VALUE))
     goto err0;
   if (unlikely_log(psync_file_size(sfd) != fsize))
     goto err1;
-  dfd = psync_file_open(destination, P_O_WRONLY, P_O_CREAT | P_O_TRUNC);
+  dfd = psync_file_open(destination, O_WRONLY, O_CREAT | O_TRUNC);
   if (unlikely_log(dfd == INVALID_HANDLE_VALUE))
     goto err1;
   psync_hash_init(&hctx);
@@ -644,7 +646,7 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
       goto err2;
     if (unlikely_log(psync_file_writeall_checkoverquota(dfd, buff, rd)))
       goto err2;
-    psync_yield_cpu();
+    sched_yield();
     psync_hash_update(&hctx, buff, rd);
     fsize -= rd;
   }
@@ -712,7 +714,7 @@ void psync_account_downloaded_bytes(int unsigned bytes) {
     download_bytes_this_sec += bytes;
   else {
     uint64_t sum;
-    psync_uint_t i;
+    unsigned long i;
     download_bytes_sec[download_bytes_off].tm = current_download_sec;
     download_bytes_sec[download_bytes_off].bytes = download_bytes_this_sec;
     current_download_sec = psync_current_time;
@@ -729,7 +731,7 @@ void psync_account_downloaded_bytes(int unsigned bytes) {
   }
 }
 
-static psync_uint_t get_download_bytes_this_sec() {
+static unsigned long get_download_bytes_this_sec() {
   if (current_download_sec == psync_current_time)
     return download_bytes_this_sec;
   else
@@ -738,8 +740,8 @@ static psync_uint_t get_download_bytes_this_sec() {
 
 static int psync_socket_readall_download_th(psync_socket *sock, void *buff,
                                             int num, int th) {
-  psync_int_t dwlspeed, readbytes, pending, lpending, rd, rrd;
-  psync_uint_t thissec, ds;
+  long dwlspeed, readbytes, pending, lpending, rd, rrd;
+  unsigned long thissec, ds;
   dwlspeed = psync_setting_get_int(_PS(maxdownloadspeed));
   if (dwlspeed == 0) {
     if (th)
@@ -808,7 +810,7 @@ static void account_uploaded_bytes(int unsigned bytes) {
     upload_bytes_this_sec += bytes;
   else {
     uint64_t sum;
-    psync_uint_t i;
+    unsigned long i;
     upload_bytes_sec[upload_bytes_off].tm = current_upload_sec;
     upload_bytes_sec[upload_bytes_off].bytes = upload_bytes_this_sec;
     upload_bytes_off = (upload_bytes_off + 1) % PSYNC_SPEED_CALC_AVERAGE_SEC;
@@ -824,7 +826,7 @@ static void account_uploaded_bytes(int unsigned bytes) {
   }
 }
 
-static psync_uint_t get_upload_bytes_this_sec() {
+static unsigned long get_upload_bytes_this_sec() {
   if (current_upload_sec == psync_current_time)
     return upload_bytes_this_sec;
   else
@@ -841,10 +843,10 @@ int psync_set_default_sendbuf(psync_socket *sock) {
   return 0;
 }
 
-psync_int_t psync_socket_writeall_upload(psync_socket *sock, const void *buff,
+long psync_socket_writeall_upload(psync_socket *sock, const void *buff,
                                          int num) {
-  psync_int_t uplspeed, writebytes, wr, wwr;
-  psync_uint_t thissec;
+  long uplspeed, writebytes, wr, wwr;
+  unsigned long thissec;
   uplspeed = psync_setting_get_int(_PS(maxuploadspeed));
   if (uplspeed == 0) {
     writebytes = 0;
@@ -930,13 +932,13 @@ psync_http_socket *psync_http_connect(const char *host, const char *path,
     if (to)
       rl = snprintf(
           readbuff, PSYNC_HTTP_RESP_BUFFER,
-          "GET %s HTTP/1.1\015\012Host: %s\015\012Range: bytes=%" P_PRI_U64
-          "-%" P_PRI_U64 "\015\012Connection: Keep-Alive\015\012%s\015\012",
+          "GET %s HTTP/1.1\015\012Host: %s\015\012Range: bytes=%" PRIu64
+          "-%" PRIu64 "\015\012Connection: Keep-Alive\015\012%s\015\012",
           path, host, from, to, addhdr);
     else
       rl = snprintf(
           readbuff, PSYNC_HTTP_RESP_BUFFER,
-          "GET %s HTTP/1.1\015\012Host: %s\015\012Range: bytes=%" P_PRI_U64
+          "GET %s HTTP/1.1\015\012Host: %s\015\012Range: bytes=%" PRIu64
           "-\015\012Connection: Keep-Alive\015\012%s\015\012",
           path, host, from, addhdr);
   } else
@@ -1389,8 +1391,8 @@ int psync_http_request_range_additional(psync_http_socket *sock,
     return psync_http_request(sock, host, path, from, to, NULL);
   rl = snprintf(
       sock->readbuff, PSYNC_HTTP_RESP_BUFFER,
-      "GET %s HTTP/1.1\015\012Host: %s\015\012Range: bytes=%" P_PRI_U64
-      "-%" P_PRI_U64 "\015\012Connection: Keep-Alive\015\012%s\015\012",
+      "GET %s HTTP/1.1\015\012Host: %s\015\012Range: bytes=%" PRIu64
+      "-%" PRIu64 "\015\012Connection: Keep-Alive\015\012%s\015\012",
       path, host, from, to, addhdr);
   if (unlikely(rl >= PSYNC_HTTP_RESP_BUFFER - 1))
     return psync_http_request(sock, host, path, from, to, NULL);
@@ -1407,13 +1409,13 @@ int psync_http_request(psync_http_socket *sock, const char *host,
     if (to)
       rl = snprintf(
           sock->readbuff, PSYNC_HTTP_RESP_BUFFER,
-          "GET %s HTTP/1.1\015\012Host: %s\015\012Range: bytes=%" P_PRI_U64
-          "-%" P_PRI_U64 "\015\012Connection: Keep-Alive\015\012%s\015\012",
+          "GET %s HTTP/1.1\015\012Host: %s\015\012Range: bytes=%" PRIu64
+          "-%" PRIu64 "\015\012Connection: Keep-Alive\015\012%s\015\012",
           path, host, from, to, addhdr);
     else
       rl = snprintf(
           sock->readbuff, PSYNC_HTTP_RESP_BUFFER,
-          "GET %s HTTP/1.1\015\012Host: %s\015\012Range: bytes=%" P_PRI_U64
+          "GET %s HTTP/1.1\015\012Host: %s\015\012Range: bytes=%" PRIu64
           "-\015\012Connection: Keep-Alive\015\012%s\015\012",
           path, host, from, addhdr);
   } else
@@ -1746,8 +1748,8 @@ static psync_block_checksum
 psync_sha1_cmp); return ret;
 }*/
 
-static int psync_is_prime(psync_uint_t num) {
-  psync_uint_t i;
+static int psync_is_prime(unsigned long num) {
+  unsigned long i;
   for (i = 5; i * i <= num; i += 2)
     if (num % i == 0)
       return 0;
@@ -1765,7 +1767,7 @@ static int psync_is_prime(psync_uint_t num) {
 static psync_file_checksum_hash *
 psync_net_create_hash(const psync_file_checksums *checksums) {
   psync_file_checksum_hash *h;
-  psync_uint_t cnt, col;
+  unsigned long cnt, col;
   uint32_t i, o;
   cnt = ((checksums->blockcnt + 1) / 2) * 6 + 1;
   while (1) {
@@ -1978,15 +1980,15 @@ static void psync_net_check_file_for_blocks(
     psync_block_action *restrict blockactions, uint32_t fileidx) {
   unsigned char *buff;
   uint64_t buffoff;
-  psync_uint_t buffersize, hbuffersize, bufferlen, inbyteoff, outbyteoff,
+  unsigned long buffersize, hbuffersize, bufferlen, inbyteoff, outbyteoff,
       blockmask;
   ssize_t rd;
-  psync_file_t fd;
+  int fd;
   uint32_t adler, off;
   psync_sha1_ctx ctx;
   unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
   debug(D_NOTICE, "scanning file %s for blocks", name);
-  fd = psync_file_open(name, P_O_RDONLY, 0);
+  fd = psync_file_open(name, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE)
     return;
   if (checksums->blocksize * 2 > PSYNC_COPY_BUFFER_SIZE)
@@ -2140,19 +2142,19 @@ fulldownload:
 
 static int check_range_for_blocks(psync_file_checksums *checksums,
                                   psync_file_checksum_hash *hash, uint64_t off,
-                                  uint64_t len, psync_file_t fd,
+                                  uint64_t len, int fd,
                                   psync_list *nr) {
   unsigned char *buff;
   psync_upload_range_list_t *ur;
   uint64_t buffoff, blen;
-  psync_uint_t buffersize, hbuffersize, bufferlen, inbyteoff, outbyteoff,
+  unsigned long buffersize, hbuffersize, bufferlen, inbyteoff, outbyteoff,
       blockmask;
   ssize_t rd;
   uint32_t adler, blockidx;
   int32_t skipbytes;
   psync_sha1_ctx ctx;
   unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
-  if (unlikely_log(psync_file_seek(fd, off, P_SEEK_SET) == -1))
+  if (unlikely_log(psync_file_seek(fd, off, SEEK_SET) == -1))
     return PSYNC_NET_TEMPFAIL;
   debug(D_NOTICE, "scanning in range starting %lu, length %lu, blocksize %u",
         (unsigned long)off, (unsigned long)len, (unsigned)checksums->blocksize);
@@ -2321,7 +2323,7 @@ static void merge_list_to_element(psync_upload_range_list_t *le,
 
 int psync_net_scan_file_for_blocks(psync_socket *api, psync_list *rlist,
                                    psync_fileid_t fileid, uint64_t filehash,
-                                   psync_file_t fd) {
+                                   int fd) {
   psync_file_checksums *checksums;
   psync_file_checksum_hash *hash;
   psync_list *l, *lb;
@@ -2363,7 +2365,7 @@ int psync_net_scan_file_for_blocks(psync_socket *api, psync_list *rlist,
 
 int psync_net_scan_upload_for_blocks(psync_socket *api, psync_list *rlist,
                                      psync_uploadid_t uploadid,
-                                     psync_file_t fd) {
+                                     int fd) {
   psync_file_checksums *checksums;
   psync_file_checksum_hash *hash;
   psync_list *l, *lb;
@@ -2518,7 +2520,7 @@ psync_file_lock_t *psync_lock_file(const char *path) {
   tr = file_lock_tree;
   at = &file_lock_tree;
   while (tr) {
-    cmp = psync_filename_cmp(
+    cmp = strcmp(
         path, psync_tree_element(tr, psync_file_lock_t, tree)->filename);
     if (cmp < 0) {
       if (tr->left)

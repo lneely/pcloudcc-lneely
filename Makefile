@@ -28,11 +28,11 @@ LIBOUT		:= libpcloudcc_lib.so
 
 # Build type specific flags
 ifeq ($(BUILD), debug)
-    CFLAGS += -g -O0 -DDEBUG -Wall 
-    CXXFLAGS += -g -O0 -DDEBUG -Wall
+    CFLAGS += -g -O0 -DDEBUG -Wall -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE
+    CXXFLAGS += -g -O0 -DDEBUG -Wall -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE
 else ifeq ($(BUILD), release)
-    CFLAGS += -O2 -DNDEBUG
-    CXXFLAGS += -O2 -DNDEBUG
+    CFLAGS += -O2 -DNDEBUG -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE
+    CXXFLAGS += -O2 -DNDEBUG -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE
     COMMONFLAGS := $(filter-out -fsanitize=address,$(COMMONFLAGS))
     LIBLDFLAGS := $(filter-out -fsanitize=address,$(LIBLDFLAGS))
     EXECLDFLAGS := $(filter-out -fsanitize=address,$(EXECLDFLAGS))

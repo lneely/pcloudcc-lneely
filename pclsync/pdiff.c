@@ -69,6 +69,16 @@
 #define PSYNC_SQL_DOWNLOAD                                                     \
   "synctype&" NTO_STR(PSYNC_DOWNLOAD_ONLY) "=" NTO_STR(PSYNC_DOWNLOAD_ONLY)
 
+#define create_entry()                                                         \
+  binresult entry;                                                             \
+  hashpair pair;                                                               \
+  entry.type = PARAM_HASH;                                                     \
+  entry.length = 1;                                                            \
+  entry.hash = &pair;                                                          \
+  pair.key = "metadata";                                                       \
+  pair.value = (binresult *)meta;
+
+
 typedef struct {
   psync_eventtype_t eventid;
   psync_share_event_t *event_data;
@@ -88,8 +98,8 @@ typedef struct {
 
 static uint64_t used_quota = 0, current_quota = 0, free_quota = 0;
 static time_t last_event = 0;
-static psync_uint_t needdownload = 0;
-static psync_socket_t exceptionsockwrite = INVALID_SOCKET;
+static unsigned long needdownload = 0;
+static int exceptionsockwrite = INVALID_SOCKET;
 static pthread_mutex_t diff_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int initialdownload = 0;
 static paccount_cache_callback_t psync_cache_callback = NULL;
@@ -116,7 +126,7 @@ static void psync_notify_cache_change(psync_changetype_t event) {
 static void psync_diff_refresh_fs_add_folder(psync_folderid_t folderid);
 static void do_send_eventdata(void *param);
 
-static void delete_cached_crypto_keys() {
+void psync_delete_cached_crypto_keys() { 
   psync_sql_statement(
       "DELETE FROM setting WHERE id IN ('crypto_public_key', "
       "'crypto_private_key', 'crypto_private_iter', "
@@ -128,8 +138,6 @@ static void delete_cached_crypto_keys() {
   psync_sql_statement("DELETE FROM cryptofolderkey");
   psync_sql_statement("DELETE FROM cryptofilekey");
 }
-
-void psync_delete_cached_crypto_keys() { void delete_cached_crypto_keys(); }
 
 static binresult *
 get_userinfo_user_digest(psync_socket *sock, const char *username,
@@ -206,20 +214,6 @@ get_userinfo_user_pass(psync_socket *sock, const char *username,
   return ret;
 }
 
-char *generate_device_id() {
-  psync_sql_res *q;
-  unsigned char deviceidbin[16];
-  char deviceidhex[32 + 2];
-  psync_ssl_rand_strong(deviceidbin, sizeof(deviceidbin));
-  psync_binhex(deviceidhex, deviceidbin, sizeof(deviceidbin));
-  deviceidhex[sizeof(deviceidbin) * 2] = 0;
-  q = psync_sql_prep_statement(
-      "REPLACE INTO setting (id, value) VALUES ('deviceid', ?)");
-  psync_sql_bind_string(q, 1, deviceidhex);
-  psync_sql_run_free(q);
-  return psync_strdup(deviceidhex);
-}
-
 int check_active_subscribtion(const binresult *res) {
   const binresult *sub;
   char *status;
@@ -294,8 +288,20 @@ static psync_socket *get_connected_socket() {
   psync_is_business = 0;
   deviceid = psync_sql_cellstr("SELECT value FROM setting WHERE id='deviceid'");
 
-  if (!deviceid)
-    deviceid = generate_device_id();
+  // generate deviceid if needed
+  if (!deviceid) {
+    psync_sql_res *q;
+    unsigned char deviceidbin[16];
+    char deviceidhex[32 + 2];
+    psync_ssl_rand_strong(deviceidbin, sizeof(deviceidbin));
+    psync_binhex(deviceidhex, deviceidbin, sizeof(deviceidbin));
+    deviceidhex[sizeof(deviceidbin) * 2] = 0;
+    q = psync_sql_prep_statement(
+        "REPLACE INTO setting (id, value) VALUES ('deviceid', ?)");
+    psync_sql_bind_string(q, 1, deviceidhex);
+    psync_sql_run_free(q);
+    deviceid = psync_strdup(deviceidhex);
+  }
 
   debug(D_NOTICE, "using deviceid %s", deviceid);
   appversion = psync_appname();
@@ -335,14 +341,12 @@ static psync_socket *get_connected_socket() {
     if (!pass && psync_my_pass)
       pass = psync_strdup(psync_my_pass);
     if (!auth && (!pass || !user)) {
-#if defined(P_OS_LINUX)
       if (tfa) {
         tfa = 0;
         psync_milisleep(1000);
         debug(D_WARNING, "tfa sleep");
         continue;
       }
-#endif
       psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
       psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       continue;
@@ -682,11 +686,11 @@ static psync_socket *get_connected_socket() {
                  psync_find_result(res, "publicsha1", PARAM_STR)->str) ||
           strcmp(privatesha1,
                  psync_find_result(res, "privatesha1", PARAM_STR)->str))
-        delete_cached_crypto_keys();
+        psync_delete_cached_crypto_keys();
       psync_free(privatesha1);
       psync_free(publicsha1);
     } else
-      delete_cached_crypto_keys();
+      psync_delete_cached_crypto_keys();
     psync_sql_bind_string(q, 1, "cryptosubscription");
     psync_sql_bind_uint(
         q, 2, psync_find_result(res, "cryptosubscription", PARAM_BOOL)->num);
@@ -1672,15 +1676,6 @@ static void start_download() {
   }
 }
 
-#define create_entry()                                                         \
-  binresult entry;                                                             \
-  hashpair pair;                                                               \
-  entry.type = PARAM_HASH;                                                     \
-  entry.length = 1;                                                            \
-  entry.hash = &pair;                                                          \
-  pair.key = "metadata";                                                       \
-  pair.value = (binresult *)meta;
-
 void psync_diff_update_file(const binresult *meta) {
   create_entry();
   process_modifyfile(&entry);
@@ -1711,7 +1706,7 @@ void psync_diff_delete_folder(const binresult *meta) {
 
 static void stop_crypto_thread() {
   psync_crypto_stop();
-  delete_cached_crypto_keys();
+  psync_delete_cached_crypto_keys();
 }
 
 static void process_modifyuserinfo(const binresult *entry) {
@@ -2503,7 +2498,7 @@ static void process_modifybshareout(const binresult *entry) {
 }
 
 static void process_cryptopasschange(const binresult *entry) {
-  delete_cached_crypto_keys();
+  psync_delete_cached_crypto_keys();
 }
 
 static void process_modifyaccountinfo(const binresult *entry) {
@@ -2618,12 +2613,12 @@ static void check_overquota() {
 static void diff_exception_handler() {
   debug(D_NOTICE, "got exception");
   if (likely(exceptionsockwrite != INVALID_SOCKET))
-    psync_pipe_write(exceptionsockwrite, "e", 1);
+    write(exceptionsockwrite, "e", 1);
 }
 
-static psync_socket_t setup_exeptions() {
-  psync_socket_t pfds[2];
-  if (psync_pipe(pfds) == SOCKET_ERROR)
+static int setup_exeptions() {
+  int pfds[2];
+  if (pipe(pfds) == SOCKET_ERROR)
     return INVALID_SOCKET;
   exceptionsockwrite = pfds[1];
   psync_timer_exception_handler(diff_exception_handler);
@@ -2966,14 +2961,14 @@ static void psync_diff_adapter_timer(psync_timer_t timer, void *ptr) {
   if (memcmp(adapter_hash, hash, PSYNC_FAST_HASH256_LEN)) {
     memcpy(adapter_hash, hash, PSYNC_FAST_HASH256_LEN);
     debug(D_NOTICE, "network adapter list changed, sending exception");
-    psync_pipe_write(exceptionsockwrite, "e", 1);
+    write(exceptionsockwrite, "e", 1);
   }
 }
 
 void psync_diff_wake() {
   if (last_event >= psync_timer_time() - 1)
     return;
-  psync_pipe_write(exceptionsockwrite, "c", 1);
+  write(exceptionsockwrite, "c", 1);
 }
 
 static void psync_diff_thread() {
@@ -2981,7 +2976,7 @@ static void psync_diff_thread() {
   binresult *res = NULL;
   const binresult *entries;
   uint64_t newdiffid, result;
-  psync_socket_t exceptionsock, socks[2];
+  int exceptionsock, socks[2];
   subscribed_ids ids = {0, 0, 0, 0};
   int sel, ret = 0;
   char ex;
@@ -3083,11 +3078,11 @@ restart:
     if (sel == 0) {
       if (!psync_do_run)
         break;
-      if (psync_pipe_read(exceptionsock, &ex, 1) != 1)
+      if (read(exceptionsock, &ex, 1) != 1)
         continue;
       handle_exception(&sock, &ids, ex);
       while (psync_select_in(socks, 1, 0) == 0 &&
-             psync_pipe_read(exceptionsock, &ex, 1) == 1)
+             read(exceptionsock, &ex, 1) == 1)
         ;
       socks[1] = sock->sock;
     } else if (sel == 1) {
@@ -3183,8 +3178,8 @@ cleanup:
     psync_free(res);
   }
   psync_socket_close(sock);
-  psync_pipe_close(exceptionsock);
-  psync_pipe_close(exceptionsockwrite);
+  close(exceptionsock);
+  close(exceptionsockwrite);
 }
 
 void psync_diff_init() { psync_run_thread("diff", psync_diff_thread); }

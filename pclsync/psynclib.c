@@ -269,7 +269,8 @@ int psync_init() {
   }
   psync_locked_init();
   psync_cache_init();
-  psync_compat_init();
+  psync_sys_init();
+
   if (!psync_database) {
     psync_database = psync_get_default_database_path();
     if (unlikely_log(!psync_database)) {
@@ -756,7 +757,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   psync_uint_row row;
   psync_str_row srow;
   uint64_t perms;
-  psync_stat_t st;
+  struct stat st;
   psync_syncid_t ret;
   int unsigned mbedtls_md;
 
@@ -765,7 +766,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   if (unlikely_log(synctype < PSYNC_SYNCTYPE_MIN ||
                    synctype > PSYNC_SYNCTYPE_MAX))
     return_isyncid(PERROR_INVALID_SYNCTYPE);
-  if (unlikely_log(psync_stat(localpath, &st)) ||
+  if (unlikely_log(stat(localpath, &st)) ||
       unlikely_log(!psync_stat_isfolder(&st)))
     return_isyncid(PERROR_LOCAL_FOLDER_NOT_FOUND);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
@@ -777,7 +778,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   syncmp = psync_fs_getmountpoint();
   if (syncmp) {
     size_t len = strlen(syncmp);
-    if (!psync_filename_cmpn(syncmp, localpath, len) &&
+    if (!memcmp(syncmp, localpath, len) &&
         (localpath[len] == 0 || localpath[len] == '/' ||
          localpath[len] == '\\')) {
       psync_free(syncmp);
@@ -792,7 +793,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
     if (psync_str_is_prefix(srow[0], localpath)) {
       psync_sql_free_result(res);
       return_isyncid(PERROR_PARENT_OR_SUBFOLDER_ALREADY_SYNCING);
-    } else if (!psync_filename_cmp(srow[0], localpath)) {
+    } else if (!strcmp(srow[0], localpath)) {
       psync_sql_free_result(res);
       return_isyncid(PERROR_FOLDER_ALREADY_SYNCING);
     }
@@ -844,12 +845,12 @@ int psync_add_sync_by_path_delayed(const char *localpath,
                                    const char *remotepath,
                                    psync_synctype_t synctype) {
   psync_sql_res *res;
-  psync_stat_t st;
+  struct stat st;
   int unsigned mbedtls_md;
   if (unlikely_log(synctype < PSYNC_SYNCTYPE_MIN ||
                    synctype > PSYNC_SYNCTYPE_MAX))
     return_error(PERROR_INVALID_SYNCTYPE);
-  if (unlikely_log(psync_stat(localpath, &st)) ||
+  if (unlikely_log(stat(localpath, &st)) ||
       unlikely_log(!psync_stat_isfolder(&st)))
     return_error(PERROR_LOCAL_FOLDER_NOT_FOUND);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
@@ -876,7 +877,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   psync_uint_row urow;
   psync_folderid_t folderid;
   uint64_t perms;
-  psync_stat_t st;
+  struct stat st;
   int unsigned mbedtls_md;
   psync_synctype_t oldsynctype;
   if (unlikely_log(synctype < PSYNC_SYNCTYPE_MIN ||
@@ -899,7 +900,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
     psync_sql_rollback_transaction();
     return 0;
   }
-  if (unlikely_log(psync_stat(psync_get_string(row[1]), &st)) ||
+  if (unlikely_log(stat(psync_get_string(row[1]), &st)) ||
       unlikely_log(!psync_stat_isfolder(&st))) {
     psync_sql_free_result(res);
     psync_sql_rollback_transaction();
@@ -1879,9 +1880,9 @@ static void psync_del_all_except(void *ptr, psync_pstat_fast *st) {
   const char **nmarr;
   char *fp;
   nmarr = (const char **)ptr;
-  if (!psync_filename_cmp(st->name, nmarr[1]) || psync_stat_fast_isfolder(st))
+  if (!strcmp(st->name, nmarr[1]) || psync_stat_fast_isfolder(st))
     return;
-  fp = psync_strcat(nmarr[0], PSYNC_DIRECTORY_SEPARATOR, st->name, NULL);
+  fp = psync_strcat(nmarr[0], "/", st->name, NULL);
   debug(D_NOTICE, "deleting old update file %s", fp);
   if (psync_file_delete(fp))
     debug(D_WARNING, "could not delete %s", fp);
@@ -1902,7 +1903,7 @@ static char *psync_filename_from_res(const binresult *res) {
   nmarr[0] = path;
   nmarr[1] = nmd;
   psync_list_dir_fast(path, psync_del_all_except, (void *)nmarr);
-  ret = psync_strcat(path, PSYNC_DIRECTORY_SEPARATOR, nmd, NULL);
+  ret = psync_strcat(path, "/", nmd, NULL);
   psync_free(nmd);
   psync_free(path);
   return ret;
@@ -1913,8 +1914,8 @@ static int psync_download_new_version(const binresult *res, char **lpath) {
   psync_http_socket *sock;
   char *buff, *filename;
   uint64_t size;
-  psync_stat_t st;
-  psync_file_t fd;
+  struct stat st;
+  int fd;
   int rd;
   char cookie[128];
   sock = psync_http_connect_multihost(
@@ -1939,13 +1940,13 @@ static int psync_download_new_version(const binresult *res, char **lpath) {
     psync_http_close(sock);
     return 1;
   }
-  if (!psync_stat(filename, &st) && psync_stat_size(&st) == size) {
+  if (!stat(filename, &st) && psync_stat_size(&st) == size) {
     *lpath = filename;
     psync_http_close(sock);
     return 0;
   }
   if (unlikely_log(
-          (fd = psync_file_open(filename, P_O_WRONLY, P_O_CREAT | P_O_TRUNC)) ==
+          (fd = psync_file_open(filename, O_WRONLY, O_CREAT | O_TRUNC)) ==
           INVALID_HANDLE_VALUE)) {
     psync_free(filename);
     psync_http_close(sock);
@@ -2090,17 +2091,17 @@ int psync_upload_data_as(const char *remote_path, const char *remote_filename,
 
 static int psync_load_file(const char *local_path, char **data,
                            size_t *length) {
-  psync_file_t fd;
-  psync_stat_t st1, st2;
+  int fd;
+  struct stat st1, st2;
   char *buff;
   size_t len, off;
   ssize_t rd;
   int tries;
   for (tries = 0; tries < 15; tries++) {
-    fd = psync_file_open(local_path, P_O_RDONLY, 0);
+    fd = psync_file_open(local_path, O_RDONLY, 0);
     if (fd == INVALID_HANDLE_VALUE)
       goto err0;
-    if (psync_fstat(fd, &st1))
+    if (fstat(fd, &st1))
       goto err1;
     len = psync_stat_size(&st1);
     buff = psync_malloc(len);
@@ -2114,7 +2115,7 @@ static int psync_load_file(const char *local_path, char **data,
       off += rd;
     }
     psync_file_close(fd);
-    if (off == len && !psync_stat(local_path, &st2) &&
+    if (off == len && !stat(local_path, &st2) &&
         psync_stat_size(&st2) == len &&
         psync_stat_mtime_native(&st1) == psync_stat_mtime_native(&st2)) {
       *data = buff;
@@ -2775,7 +2776,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
       *errMsg = psync_strdup("There is already an active sync or backup for a "
                              "parent of this folder.");
       return PERROR_PARENT_OR_SUBFOLDER_ALREADY_SYNCING;
-    } else if (!psync_filename_cmp(srow[0], localPath)) {
+    } else if (!strcmp(srow[0], localPath)) {
       psync_sql_free_result(sql);
 
       *errMsg = psync_strdup(
@@ -2794,7 +2795,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
     size_t len = strlen(syncmp);
 
     debug(D_NOTICE, "Do check.");
-    if (!psync_filename_cmpn(syncmp, localPath, len) &&
+    if (!memcmp(syncmp, localPath, len) &&
         (localPath[len] == 0 || localPath[len] == '/' ||
          localPath[len] == '\\')) {
       psync_free(syncmp);

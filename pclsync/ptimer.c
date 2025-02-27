@@ -85,8 +85,8 @@ PSYNC_NOINLINE static void timer_sleep_detected(time_t lt) {
   psync_timer_notify_exception();
 }
 
-static void timer_check_upper_levels(time_t tmdiv, psync_uint_t level,
-                                     psync_uint_t sh) {
+static void timer_check_upper_levels(time_t tmdiv, unsigned long level,
+                                     unsigned long sh) {
   psync_list *l1, *l2, *l;
   time_t m;
   m = tmdiv % TIMER_ARRAY_SIZE;
@@ -170,7 +170,7 @@ static void timer_thread() {
 }
 
 void psync_timer_init() {
-  psync_uint_t i, j;
+  unsigned long i, j;
   for (i = 0; i < TIMER_LEVELS; i++)
     for (j = 0; j < TIMER_ARRAY_SIZE; j++)
       psync_list_init(&timerlists[i][j]);

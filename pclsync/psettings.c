@@ -59,7 +59,7 @@ typedef struct {
     char *str;
     int boolean;
   };
-  psync_uint_t type;
+  unsigned long type;
 } psync_setting_t;
 
 static void lower_patterns(void *ptr);
@@ -120,11 +120,11 @@ void psync_settings_reset() {
   char *home, *defaultfs, *defaultcache;
   psync_settingid_t i;
   home = psync_get_home_dir();
-  defaultfs = psync_strcat(home, PSYNC_DIRECTORY_SEPARATOR,
+  defaultfs = psync_strcat(home, "/",
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
   psync_free(home);
   home = psync_get_pcloud_path();
-  defaultcache = psync_strcat(home, PSYNC_DIRECTORY_SEPARATOR,
+  defaultcache = psync_strcat(home, "/",
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
   psync_free(home);
   for (i = 0; i < ARRAY_SIZE(settings); i++)
@@ -175,11 +175,11 @@ void psync_settings_init() {
   char *home, *defaultfs, *defaultcache;
   psync_settingid_t i;
   home = psync_get_home_dir();
-  defaultfs = psync_strcat(home, PSYNC_DIRECTORY_SEPARATOR,
+  defaultfs = psync_strcat(home, "/",
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
   psync_free(home);
   home = psync_get_pcloud_path();
-  defaultcache = psync_strcat(home, PSYNC_DIRECTORY_SEPARATOR,
+  defaultcache = psync_strcat(home, "/",
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
   psync_free(home);
   settings[_PS(ignorepatterns)].str = PSYNC_IGNORE_PATTERNS_DEFAULT;
@@ -230,7 +230,7 @@ void psync_settings_init() {
             settings[i].fix_callback(&settings[i].boolean);
         } else
           debug(D_BUG,
-                "bad setting type for settingid %d (%s) expected %" P_PRI_U, i,
+                "bad setting type for settingid %d (%s) expected %lu", i,
                 name, settings[i].type);
       }
   }

@@ -29,6 +29,7 @@
    DAMAGE.
 */
 
+#include <errno.h>
 #include <ctype.h>
 #include <mbedtls/bignum.h>
 #include <mbedtls/ctr_drbg.h>
@@ -212,7 +213,7 @@ typedef struct {
   mbedtls_net_context srv;
   mbedtls_ssl_context ssl;
   mbedtls_ssl_config cfg;
-  psync_socket_t sock;
+  int sock;
   int isbroken;
   char cachekey[];
 } ssl_connection_t;
@@ -278,7 +279,7 @@ static int psync_ssl_detect_aes_hw() {
 
 int psync_ssl_init() {
   unsigned char seed[PSYNC_LHASH_DIGEST_LEN];
-  psync_uint_t i;
+  unsigned long i;
   int result;
 
 #if defined(PSYNC_AES_HW)
@@ -354,10 +355,10 @@ static int psync_mbed_read(void *ptr, unsigned char *buf, size_t len) {
   ssize_t ret;
   int err;
   conn = (ssl_connection_t *)ptr;
-  ret = psync_read_socket(conn->sock, buf, len);
+  ret = read(conn->sock, buf, len);
   if (ret == -1) {
-    err = psync_sock_err();
-    if (err == P_WOULDBLOCK || err == P_AGAIN || err == P_INTR)
+    err = errno;
+    if (err == EWOULDBLOCK || err == EAGAIN || err == EINTR)
       return MBEDTLS_ERR_SSL_WANT_READ;
     else
       return MBEDTLS_ERR_NET_RECV_FAILED;
@@ -370,10 +371,10 @@ static int psync_mbed_write(void *ptr, const unsigned char *buf, size_t len) {
   ssize_t ret;
   int err;
   conn = (ssl_connection_t *)ptr;
-  ret = psync_write_socket(conn->sock, buf, len);
+  ret = write(conn->sock, buf, len);
   if (ret == -1) {
-    err = psync_sock_err();
-    if (err == P_WOULDBLOCK || err == P_AGAIN || err == P_INTR)
+    err = errno;
+    if (err == EWOULDBLOCK || err == EAGAIN || err == EINTR)
       return MBEDTLS_ERR_SSL_WANT_WRITE;
     else
       return MBEDTLS_ERR_NET_SEND_FAILED;
@@ -434,7 +435,7 @@ static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
   return -1;
 }
 
-int psync_ssl_connect(psync_socket_t sock, void **sslconn, const char *hostname) {
+int psync_ssl_connect(int sock, void **sslconn, const char *hostname) {
   ssl_connection_t *conn;
   mbedtls_ssl_session *sess;
   int ret;

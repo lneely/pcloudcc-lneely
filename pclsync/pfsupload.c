@@ -29,12 +29,16 @@
    DAMAGE.
 */
 
+#include <ctype.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
+
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/pkcs5.h>
 #include <mbedtls/ssl.h>
-#include <pthread.h>
 
 #include "pcache.h"
 #include "pdiff.h"
@@ -53,8 +57,6 @@
 #include "pstatus.h"
 #include "ptimer.h"
 #include "pupload.h"
-#include <ctype.h>
-#include <string.h>
 
 #include "pcallbacks.h"
 
@@ -223,8 +225,8 @@ static int psync_process_task_rmdir(fsupload_task_t *task) {
 
 static int psync_send_task_creat_upload_small(psync_socket *api,
                                               fsupload_task_t *task,
-                                              psync_file_t fd,
-                                              psync_stat_t *st) {
+                                              int fd,
+                                              struct stat *st) {
   unsigned char *data;
   uint64_t size;
   size_t len;
@@ -513,10 +515,10 @@ static int large_upload_save(psync_socket *api, uint64_t uploadid,
                              uint64_t oldhash, const char *key,
                              const char *filepath) {
   binresult *res;
-  psync_stat_t st;
+  struct stat st;
   uint64_t result;
   int ret;
-  if (psync_stat(filepath, &st)) {
+  if (stat(filepath, &st)) {
     debug(D_WARNING, "could not stat file %s", filepath);
     psync_apipool_release(api);
     return -1;
@@ -603,7 +605,7 @@ static void perm_fail_upload_task(uint64_t taskid) {
   psync_status_recalc_to_upload_async();
 }
 
-static int copy_file(psync_socket *api, const psync_stat_t *st,
+static int copy_file(psync_socket *api, const struct stat *st,
                      psync_fileid_t fileid, uint64_t hash,
                      psync_folderid_t folderid, const char *name,
                      uint64_t taskid, uint64_t writeid) {
@@ -658,7 +660,7 @@ static int copy_file_if_exists(psync_socket *api, const char *filename,
       P_LSTR(PSYNC_CHECKSUM, hashhex, PSYNC_HASH_DIGEST_HEXLEN)};
   binresult *res;
   const binresult *metas, *meta;
-  psync_stat_t st;
+  struct stat st;
   uint64_t result;
   int ret;
   res = send_command(api, "getfilesbychecksum", params);
@@ -678,7 +680,7 @@ static int copy_file_if_exists(psync_socket *api, const char *filename,
     return 0;
   }
   meta = metas->array[0];
-  if (psync_stat(filename, &st)) {
+  if (stat(filename, &st)) {
     psync_free(res);
     return -1;
   }
@@ -710,7 +712,7 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
   uint64_t usize, fsize, result, asize;
   size_t rd;
   ssize_t rrd;
-  psync_file_t fd;
+  int fd;
   int ret;
   unsigned char uploadhash[PSYNC_HASH_DIGEST_HEXLEN],
       filehash[PSYNC_HASH_DIGEST_HEXLEN],
@@ -781,12 +783,12 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
     psync_sql_bind_uint(sql, 2, uploadid);
     psync_sql_run_free(sql);
   }
-  fd = psync_file_open(filename, P_O_RDONLY, 0);
+  fd = psync_file_open(filename, O_RDONLY, 0);
   if (unlikely_log(fd == INVALID_HANDLE_VALUE))
     goto ret0;
   if (usize) {
     debug(D_NOTICE, "resuming from offset %lu", (unsigned long)usize);
-    if (unlikely_log(psync_file_seek(fd, usize, P_SEEK_SET) == -1))
+    if (unlikely_log(psync_file_seek(fd, usize, SEEK_SET) == -1))
       goto ret01;
   }
   if (large_upload_creat_send_write(api, uploadid, usize, fsize - usize))
@@ -902,7 +904,7 @@ static int upload_modify_send_copy_from(psync_socket *api,
 
 static int upload_modify_send_local(psync_socket *api,
                                     psync_uploadid_t uploadid, uint64_t offset,
-                                    uint64_t length, psync_file_t fd,
+                                    uint64_t length, int fd,
                                     uint64_t *upl) {
   binparam params[] = {P_STR("auth", psync_my_auth),
                        P_NUM("uploadoffset", offset),
@@ -913,7 +915,7 @@ static int upload_modify_send_local(psync_socket *api,
   ssize_t rrd;
   debug(D_NOTICE, "uploading %lu byte from local file at offset %lu",
         (unsigned long)length, (unsigned long)offset);
-  if (unlikely_log(psync_file_seek(fd, offset, P_SEEK_SET) == -1) ||
+  if (unlikely_log(psync_file_seek(fd, offset, SEEK_SET) == -1) ||
       unlikely_log(!do_send_command(api, "upload_write", strlen("upload_write"),
                                     params, ARRAY_SIZE(params), length, 0)))
     return PSYNC_NET_TEMPFAIL;
@@ -982,18 +984,18 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
   int64_t fsize, coff, len;
   uint64_t result, asize;
   psync_uploadid_t uploadid;
-  psync_uint_t reqs;
-  psync_file_t fd;
-  psync_fs_err_t err;
+  unsigned long reqs;
+  int fd;
+  int err;
   int ret;
   debug(D_NOTICE, "uploading modified file %s writeid %lu as %lu/%s", filename,
         (unsigned long)writeid, (unsigned long)folderid, name);
   asize = 0;
-  fd = psync_file_open(indexname, P_O_RDONLY, 0);
+  fd = psync_file_open(indexname, O_RDONLY, 0);
   if (unlikely(fd == INVALID_HANDLE_VALUE)) {
-    err = psync_fs_err();
+    err = errno;
     debug(D_WARNING, "can not open %s", indexname);
-    if (err == P_NOENT) {
+    if (err == ENOENT) {
       perm_fail_upload_task(taskid);
       return 0;
     } else
@@ -1034,13 +1036,13 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
   psync_sql_bind_uint(sql, 1, taskid);
   psync_sql_bind_uint(sql, 2, uploadid);
   psync_sql_run_free(sql);
-  fd = psync_file_open(filename, P_O_RDONLY, 0);
+  fd = psync_file_open(filename, O_RDONLY, 0);
   if (unlikely(fd == INVALID_HANDLE_VALUE)) {
-    err = psync_fs_err();
+    err = errno;
     debug(D_WARNING, "can not open %s", filename);
     psync_apipool_release(api);
     psync_interval_tree_free(tree);
-    if (err == P_NOENT) {
+    if (err == ENOENT) {
       perm_fail_upload_task(taskid);
       return 0;
     } else
@@ -1182,9 +1184,9 @@ static void large_upload() {
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     cname = psync_setting_get_string(_PS(fscachepath));
-    filename = psync_strcat(cname, PSYNC_DIRECTORY_SEPARATOR, fileidhex, NULL);
+    filename = psync_strcat(cname, "/", fileidhex, NULL);
     fileidhex[sizeof(psync_fsfileid_t)] = 'i';
-    indexname = psync_strcat(cname, PSYNC_DIRECTORY_SEPARATOR, fileidhex, NULL);
+    indexname = psync_strcat(cname, "/", fileidhex, NULL);
     res = psync_sql_query_rdlock("SELECT uploadid FROM fstaskupload WHERE "
                                  "fstaskid=? ORDER BY uploadid DESC LIMIT 1");
     psync_sql_bind_uint(res, 1, taskid);
@@ -1265,14 +1267,14 @@ int psync_fsupload_in_current_small_uploads_batch_locked(uint64_t taskid) {
                                         task->type == PSYNC_FS_TASK_CREAT) {
     char fileidhex[sizeof(psync_fsfileid_t) * 2 + 2];
     char *filename;
-    psync_stat_t st;
+    struct stat st;
     int stret;
     psync_binhex(fileidhex, &task->id, sizeof(psync_fsfileid_t));
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     filename = psync_strcat(psync_setting_get_string(_PS(fscachepath)),
-                            PSYNC_DIRECTORY_SEPARATOR, fileidhex, NULL);
-    stret = psync_stat(filename, &st);
+                            "/", fileidhex, NULL);
+    stret = stat(filename, &st);
     if (stret)
       debug(D_WARNING, "can not stat %s", filename);
     psync_free(filename);
@@ -1290,19 +1292,19 @@ static int psync_send_task_creat(psync_socket *api, fsupload_task_t *task) {
   if (api) {
     char fileidhex[sizeof(psync_fsfileid_t) * 2 + 2];
     char *filename;
-    psync_stat_t st;
+    struct stat st;
     uint64_t size;
-    psync_file_t fd;
+    int fd;
     int ret;
     psync_binhex(fileidhex, &task->id, sizeof(psync_fsfileid_t));
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     filename = psync_strcat(psync_setting_get_string(_PS(fscachepath)),
-                            PSYNC_DIRECTORY_SEPARATOR, fileidhex, NULL);
-    fd = psync_file_open(filename, P_O_RDONLY, 0);
+                            "/", fileidhex, NULL);
+    fd = psync_file_open(filename, O_RDONLY, 0);
     psync_free(filename);
     if (unlikely_log(fd == INVALID_HANDLE_VALUE) ||
-        unlikely_log(psync_fstat(fd, &st))) {
+        unlikely_log(fstat(fd, &st))) {
       if (fd != INVALID_HANDLE_VALUE)
         psync_file_close(fd);
       perm_fail_upload_task(task->id);
@@ -1680,13 +1682,13 @@ static void psync_delete_write_cache_file(uint64_t taskid, int index) {
   fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
   cachepath = psync_setting_get_string(_PS(fscachepath));
   filename =
-      psync_strcat(cachepath, PSYNC_DIRECTORY_SEPARATOR, fileidhex, NULL);
+      psync_strcat(cachepath, "/", fileidhex, NULL);
   assertw(psync_file_delete(filename) == 0);
   psync_free(filename);
   if (index) {
     fileidhex[sizeof(psync_fsfileid_t)] = 'i';
     filename =
-        psync_strcat(cachepath, PSYNC_DIRECTORY_SEPARATOR, fileidhex, NULL);
+        psync_strcat(cachepath, "/", fileidhex, NULL);
     assertw(psync_file_delete(filename) == 0);
     psync_free(filename);
   }
@@ -2028,12 +2030,12 @@ static void clean_stuck_tasks() {
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     filename =
-        psync_strcat(cachepath, PSYNC_DIRECTORY_SEPARATOR, fileidhex, NULL);
+        psync_strcat(cachepath, "/", fileidhex, NULL);
     psync_file_delete(filename);
     psync_free(filename);
     fileidhex[sizeof(psync_fsfileid_t)] = 'i';
     filename =
-        psync_strcat(cachepath, PSYNC_DIRECTORY_SEPARATOR, fileidhex, NULL);
+        psync_strcat(cachepath, "/", fileidhex, NULL);
     psync_file_delete(filename);
     psync_free(filename);
     psync_sql_start_transaction();

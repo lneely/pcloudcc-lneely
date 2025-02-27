@@ -28,6 +28,7 @@
    DAMAGE.
 */
 
+#include <errno.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
@@ -46,9 +47,7 @@
 #include <string.h>
 #include <time.h>
 
-#if defined(P_OS_LINUX)
 #include <sys/sysinfo.h>
-#endif // P_OS_LINUX
 
 #include <ctype.h>
 #include <dirent.h>
@@ -123,9 +122,7 @@ const unsigned char psync_invalid_filename_chars[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-int psync_user_is_admin() { return 0; }
-
-void psync_compat_init() {
+void psync_sys_init() {
   struct rlimit limit;
   limit.rlim_cur = limit.rlim_max = 2048;
   if (setrlimit(RLIMIT_NOFILE, &limit))
@@ -146,15 +143,11 @@ void psync_compat_init() {
   psync_gids = psync_new_cnt(gid_t, psync_gids_cnt);
   if (unlikely_log(getgroups(psync_gids_cnt, psync_gids) != psync_gids_cnt))
     psync_gids_cnt = 0;
-#if defined(PAGESIZE)
-  psync_page_size = PAGESIZE;
-#else
   psync_page_size = sysconf(_SC_PAGESIZE);
-#endif
   debug(D_NOTICE, "detected page size %d", psync_page_size);
 }
 
-int psync_stat_mode_ok(psync_stat_t *buf, unsigned int bits) {
+int psync_stat_mode_ok(struct stat *buf, unsigned int bits) {
   int i;
   if (psync_uid == 0)
     return 1;
@@ -189,7 +182,7 @@ char *psync_get_default_database_path_old() {
       return NULL;
     dir = result->pw_dir;
   }
-  return psync_strcat(dir, PSYNC_DIRECTORY_SEPARATOR,
+  return psync_strcat(dir, "/",
                       PSYNC_DEFAULT_POSIX_DBNAME, NULL);
 }
 
@@ -208,17 +201,17 @@ static char *psync_get_pcloud_path_nc() {
       return NULL;
     dir = result->pw_dir;
   }
-  return psync_strcat(dir, PSYNC_DIRECTORY_SEPARATOR, PSYNC_DEFAULT_POSIX_DIR,
+  return psync_strcat(dir, "/", PSYNC_DEFAULT_POSIX_DIR,
                       NULL);
 }
 
 char *psync_get_pcloud_path() {
   char *path;
-  psync_stat_t st;
+  struct stat st;
   path = psync_get_pcloud_path_nc();
   if (unlikely_log(!path))
     return NULL;
-  if (psync_stat(path, &st) && unlikely_log(psync_mkdir(path))) {
+  if (stat(path, &st) && unlikely_log(mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE))) {
     psync_free(path);
     return NULL;
   }
@@ -227,13 +220,13 @@ char *psync_get_pcloud_path() {
 
 char *psync_get_private_dir(char *name) {
   char *path, *rpath;
-  psync_stat_t st;
+  struct stat st;
   path = psync_get_pcloud_path();
   if (!path)
     return NULL;
-  rpath = psync_strcat(path, PSYNC_DIRECTORY_SEPARATOR, name, NULL);
+  rpath = psync_strcat(path, "/", name, NULL);
   free(path);
-  if (psync_stat(rpath, &st) && psync_mkdir(rpath)) {
+  if (stat(rpath, &st) && mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE)) {
     psync_free(rpath);
     return NULL;
   }
@@ -246,16 +239,16 @@ char *psync_get_private_tmp_dir() {
 
 char *psync_get_default_database_path() {
   char *dirpath, *path;
-  psync_stat_t st;
+  struct stat st;
   dirpath = psync_get_pcloud_path();
   if (!dirpath)
     return NULL;
-  path = psync_strcat(dirpath, PSYNC_DIRECTORY_SEPARATOR, PSYNC_DEFAULT_DB_NAME,
+  path = psync_strcat(dirpath, "/", PSYNC_DEFAULT_DB_NAME,
                       NULL);
   psync_free(dirpath);
-  if (psync_stat(path, &st) &&
+  if (stat(path, &st) &&
       (dirpath = psync_get_default_database_path_old())) {
-    if (!psync_stat(dirpath, &st)) {
+    if (!stat(dirpath, &st)) {
       if (psync_sql_reopen(dirpath)) {
         psync_free(path);
         return dirpath;
@@ -284,8 +277,6 @@ char *psync_get_home_dir() {
   }
   return psync_strdup(dir);
 }
-
-void psync_yield_cpu() { sched_yield(); }
 
 static void thread_started() {
   // debug(D_NOTICE, "thread started"); //This repeats too many times because of
@@ -384,11 +375,9 @@ time_t psync_time() {
 #endif
 }
 
-void psync_nanotime(struct timespec *tm) { clock_gettime(CLOCK_REALTIME, tm); }
-
 uint64_t psync_millitime() {
   struct timespec tm;
-  psync_nanotime(&tm);
+  clock_gettime(CLOCK_REALTIME, &tm);
   return tm.tv_sec * 1000 + tm.tv_nsec / 1000000;
 }
 
@@ -414,7 +403,6 @@ static void psync_add_file_to_seed(const char *fn, psync_lhash_ctx *hctx,
   }
 }
 
-#if defined(P_OS_LINUX)
 static void psync_get_random_seed_linux(psync_lhash_ctx *hctx) {
   struct sysinfo si;
   if (likely_log(!sysinfo(&si)))
@@ -429,7 +417,6 @@ static void psync_get_random_seed_linux(psync_lhash_ctx *hctx) {
   psync_add_file_to_seed("/proc/net/dev", hctx, 0);
   psync_add_file_to_seed("/proc/net/arp", hctx, 0);
 }
-#endif
 
 static void psync_get_random_seed_from_query(psync_lhash_ctx *hctx,
                                              psync_sql_res *res) {
@@ -443,7 +430,7 @@ static void psync_get_random_seed_from_query(psync_lhash_ctx *hctx,
     psync_lhash_update(hctx, row, sizeof(psync_variant) * res->column_count);
   }
   psync_sql_free_result(res);
-  psync_nanotime(&tm);
+  clock_gettime(CLOCK_REALTIME, &tm);
   psync_lhash_update(hctx, &tm, sizeof(&tm));
 }
 
@@ -451,7 +438,7 @@ static void psync_get_random_seed_from_db(psync_lhash_ctx *hctx) {
   psync_sql_res *res;
   struct timespec tm;
   unsigned char rnd[PSYNC_LHASH_DIGEST_LEN];
-  psync_nanotime(&tm);
+  clock_gettime(CLOCK_REALTIME, &tm);
   psync_lhash_update(hctx, &tm, sizeof(&tm));
   res = psync_sql_query_rdlock("SELECT * FROM setting ORDER BY RANDOM()");
   psync_get_random_seed_from_query(hctx, res);
@@ -460,23 +447,23 @@ static void psync_get_random_seed_from_db(psync_lhash_ctx *hctx) {
   psync_get_random_seed_from_query(hctx, res);
   psync_sql_statement(
       "REPLACE INTO setting (id, value) VALUES ('random', RANDOM())");
-  psync_nanotime(&tm);
+  clock_gettime(CLOCK_REALTIME, &tm);
   psync_lhash_update(hctx, &tm, sizeof(&tm));
   psync_sql_sync();
-  psync_nanotime(&tm);
+  clock_gettime(CLOCK_REALTIME, &tm);
   psync_lhash_update(hctx, &tm, sizeof(&tm));
   sqlite3_randomness(sizeof(rnd), rnd);
   psync_lhash_update(hctx, rnd, sizeof(rnd));
 }
 
-static void psync_rehash_cnt(unsigned char *hashbin, psync_uint_t cnt) {
+static void psync_rehash_cnt(unsigned char *hashbin, unsigned long cnt) {
   psync_lhash_ctx hctx;
-  psync_uint_t i;
+  unsigned long i;
   struct timespec tm;
   for (i = 0; i < cnt; i++) {
     psync_lhash_init(&hctx);
     if ((i & 511) == 0) {
-      psync_nanotime(&tm);
+      clock_gettime(CLOCK_REALTIME, &tm);
       psync_lhash_update(&hctx, &tm, sizeof(&tm));
     } else
       psync_lhash_update(&hctx, &i, sizeof(i));
@@ -513,10 +500,10 @@ void psync_get_random_seed(unsigned char *seed, const void *addent,
   static unsigned char lastseed[PSYNC_LHASH_DIGEST_LEN];
   psync_lhash_ctx hctx;
   struct timespec tm;
-  psync_stat_t st;
+  struct stat st;
   char *home;
   void *ptr;
-  psync_uint_t i, j;
+  unsigned long i, j;
   int64_t i64;
   pthread_t threadid;
   unsigned char lsc[64][PSYNC_LHASH_DIGEST_LEN];
@@ -525,7 +512,7 @@ void psync_get_random_seed(unsigned char *seed, const void *addent,
   struct statvfs stfs;
   char **env;
   pid_t pid;
-  psync_nanotime(&tm);
+  clock_gettime(CLOCK_REALTIME, &tm);
   psync_lhash_init(&hctx);
   psync_lhash_update(&hctx, &tm, sizeof(tm));
   if (likely_log(!uname(&un)))
@@ -541,14 +528,10 @@ void psync_get_random_seed(unsigned char *seed, const void *addent,
   if (likely_log(!clock_gettime(CLOCK_MONOTONIC, &tm)))
     psync_lhash_update(&hctx, &tm, sizeof(tm));
 #endif
-#if defined(P_OS_LINUX)
+
   psync_add_file_to_seed("/dev/urandom", &hctx, PSYNC_HASH_DIGEST_LEN);
-#else
-  psync_add_file_to_seed("/dev/random", &hctx, PSYNC_HASH_DIGEST_LEN);
-#endif
-#if defined(P_OS_LINUX)
   psync_get_random_seed_linux(&hctx);
-#endif
+
   threadid = pthread_self();
   psync_lhash_update(&hctx, &threadid, sizeof(threadid));
   ptr = (void *)&ptr;
@@ -566,7 +549,7 @@ void psync_get_random_seed(unsigned char *seed, const void *addent,
     i64 = psync_get_free_space_by_path(home);
     psync_lhash_update(&hctx, &i64, sizeof(i64));
     psync_lhash_update(&hctx, home, strlen(home));
-    if (likely_log(!psync_stat(home, &st)))
+    if (likely_log(!stat(home, &st)))
       psync_lhash_update(&hctx, &st, sizeof(st));
     psync_free(home);
   }
@@ -589,7 +572,7 @@ void psync_get_random_seed(unsigned char *seed, const void *addent,
       psync_lhash_update(&hctx, &j, sizeof(j));
       psync_lhash_update(&hctx, lsc, sizeof(lsc));
     }
-    psync_nanotime(&tm);
+    clock_gettime(CLOCK_REALTIME, &tm);
     psync_lhash_update(&hctx, &tm, sizeof(&tm));
   }
   psync_lhash_final(seed, &hctx);
@@ -599,7 +582,7 @@ void psync_get_random_seed(unsigned char *seed, const void *addent,
   debug(D_NOTICE, "out");
 }
 
-static int psync_wait_socket_writable_microsec(psync_socket_t sock, long sec,
+static int psync_wait_socket_writable_microsec(int sock, long sec,
                                                long usec) {
   fd_set wfds;
   struct timeval tv;
@@ -612,18 +595,18 @@ static int psync_wait_socket_writable_microsec(psync_socket_t sock, long sec,
   if (res == 1)
     return 0;
   if (res == 0)
-    psync_sock_set_err(P_TIMEDOUT);
+    errno = (ETIMEDOUT);
   return SOCKET_ERROR;
 }
 
 #define psync_wait_socket_writable(sock, sec)                                  \
   psync_wait_socket_writable_microsec(sock, sec, 0)
 
-int psync_wait_socket_write_timeout(psync_socket_t sock) {
+int psync_wait_socket_write_timeout(int sock) {
   return psync_wait_socket_writable(sock, PSYNC_SOCK_WRITE_TIMEOUT);
 }
 
-static int psync_wait_socket_readable_microsec(psync_socket_t sock, long sec,
+static int psync_wait_socket_readable_microsec(int sock, long sec,
                                                long usec) {
   fd_set rfds;
   struct timeval tv;
@@ -637,13 +620,13 @@ static int psync_wait_socket_readable_microsec(psync_socket_t sock, long sec,
   FD_ZERO(&rfds);
   FD_SET(sock, &rfds);
 #if IS_DEBUG
-  psync_nanotime(&start);
+  clock_gettime(CLOCK_REALTIME, &start);
 #endif
   res = select(sock + 1, &rfds, NULL, NULL, &tv);
 
   if (res == 1) {
 #if IS_DEBUG
-    psync_nanotime(&end);
+    clock_gettime(CLOCK_REALTIME, &end);
     msec = (end.tv_sec - start.tv_sec) * 1000 + end.tv_nsec / 1000000 -
            start.tv_nsec / 1000000;
     if (msec >= 30000)
@@ -656,7 +639,7 @@ static int psync_wait_socket_readable_microsec(psync_socket_t sock, long sec,
   if (res == 0) {
     if (sec)
       debug(D_WARNING, "socket read timeouted on %ld seconds", sec);
-    psync_sock_set_err(P_TIMEDOUT);
+    errno = (ETIMEDOUT);
   } else
     debug(D_WARNING, "select returned %d", res);
 
@@ -666,12 +649,12 @@ static int psync_wait_socket_readable_microsec(psync_socket_t sock, long sec,
 #define psync_wait_socket_readable(sock, sec)                                  \
   psync_wait_socket_readable_microsec(sock, sec, 0)
 
-int psync_wait_socket_read_timeout(psync_socket_t sock) {
+int psync_wait_socket_read_timeout(int sock) {
   return psync_wait_socket_readable(sock, PSYNC_SOCK_READ_TIMEOUT);
 }
 
-static psync_socket_t connect_res(struct addrinfo *res) {
-  psync_socket_t sock;
+static int connect_res(struct addrinfo *res) {
+  int sock;
 #if defined(SOCK_NONBLOCK)
 #if defined(SOCK_CLOEXEC)
 #define PSOCK_TYPE_OR (SOCK_NONBLOCK | SOCK_CLOEXEC)
@@ -691,18 +674,18 @@ static psync_socket_t connect_res(struct addrinfo *res) {
       fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK);
 #endif
       if ((connect(sock, res->ai_addr, res->ai_addrlen) != SOCKET_ERROR) ||
-          (psync_sock_err() == P_INPROGRESS &&
+          (errno == EINPROGRESS &&
            !psync_wait_socket_writable(sock, PSYNC_SOCK_CONNECT_TIMEOUT)))
         return sock;
-      psync_close_socket(sock);
+      close(sock);
     }
     res = res->ai_next;
   }
   return INVALID_SOCKET;
 }
 
-psync_socket_t psync_create_socket(int domain, int type, int protocol) {
-  psync_socket_t ret;
+int psync_create_socket(int domain, int type, int protocol) {
+  int ret;
   ret = socket(domain, type, protocol);
   return ret;
 }
@@ -815,14 +798,14 @@ typedef struct {
 
 static void connect_res_callback(void *h, void *ptr) {
   struct addrinfo *res;
-  psync_socket_t sock;
+  int sock;
   int r;
   res = (struct addrinfo *)ptr;
   sock = connect_res(res);
   r = psync_task_complete(h, (void *)(uintptr_t)sock);
   psync_free(res);
   if (r && sock != INVALID_SOCKET)
-    psync_close_socket(sock);
+    close(sock);
 }
 
 static void resolve_callback(void *h, void *ptr) {
@@ -857,11 +840,11 @@ static void detect_proxy() {
   // noop, only implemented for windows
 }
 
-static psync_socket_t connect_socket_direct(const char *host,
+static int connect_socket_direct(const char *host,
                                             const char *port) {
   struct addrinfo *res, *dbres;
   struct addrinfo hints;
-  psync_socket_t sock;
+  int sock;
   int rc;
   debug(D_NOTICE, "connecting to %s:%s", host, port);
   dbres = addr_load_from_db(host, port);
@@ -887,7 +870,7 @@ static psync_socket_t connect_socket_direct(const char *host,
     addr_save_to_db(host, port, res);
     if (addr_still_valid(dbres, res)) {
       debug(D_NOTICE, "successfully reused cached IP for %s:%s", host, port);
-      sock = (psync_socket_t)(uintptr_t)psync_task_get_result(tasks, 0);
+      sock = (int)(uintptr_t)psync_task_get_result(tasks, 0);
     } else {
       debug(D_NOTICE, "cached IP not valid for %s:%s", host, port);
       sock = connect_res(res);
@@ -911,11 +894,9 @@ static psync_socket_t connect_socket_direct(const char *host,
   }
   if (likely(sock != INVALID_SOCKET)) {
     int sock_opt = 1;
-#if defined(P_OS_LINUX)
     setsockopt(sock, SOL_TCP, TCP_NODELAY, (char *)&sock_opt, sizeof(sock_opt));
     setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *)&sock_opt,
                sizeof(sock_opt));
-#endif
 #if defined(SOL_TCP)
 #if defined(TCP_KEEPCNT)
     sock_opt = 3;
@@ -959,10 +940,10 @@ static int check_http_resp(char *str) {
   return 1;
 }
 
-static psync_socket_t connect_socket_connect_proxy(const char *host,
+static int connect_socket_connect_proxy(const char *host,
                                                    const char *port) {
   char buff[2048], *str;
-  psync_socket_t sock;
+  int sock;
   int ln, wr, r, rc;
   sock = connect_socket_direct(proxy_host, proxy_port);
   if (unlikely(sock == INVALID_SOCKET)) {
@@ -975,11 +956,11 @@ static psync_socket_t connect_socket_connect_proxy(const char *host,
       port, psync_software_name);
   wr = 0;
   while (wr < ln) {
-    r = psync_write_socket(sock, buff + wr, ln - wr);
+    r = write(sock, buff + wr, ln - wr);
     if (unlikely(r == SOCKET_ERROR)) {
-      if (likely_log((psync_sock_err() == P_WOULDBLOCK ||
-                      psync_sock_err() == P_AGAIN ||
-                      psync_sock_err() == P_INTR) &&
+      if (likely_log((errno == EWOULDBLOCK ||
+                      errno == EAGAIN ||
+                      errno == EINTR) &&
                      !psync_wait_socket_write_timeout(sock)))
         continue;
       else
@@ -995,15 +976,15 @@ static psync_socket_t connect_socket_connect_proxy(const char *host,
             proxy_host, proxy_port);
       goto err1;
     }
-    r = psync_read_socket(sock, buff + wr, sizeof(buff) - 1 - wr);
+    r = read(sock, buff + wr, sizeof(buff) - 1 - wr);
     if (unlikely(r == 0 || r == SOCKET_ERROR)) {
       if (r == 0) {
         debug(D_NOTICE, "proxy server %s:%s closed connection", proxy_host,
               proxy_port);
         goto err1;
       }
-      if (likely_log(psync_sock_err() == P_WOULDBLOCK ||
-                     psync_sock_err() == P_AGAIN || psync_sock_err() == P_INTR))
+      if (likely_log(errno == EWOULDBLOCK ||
+                     errno == EAGAIN || errno == EINTR))
         continue;
       else
         goto err1;
@@ -1028,7 +1009,7 @@ static psync_socket_t connect_socket_connect_proxy(const char *host,
     }
   }
 err1:
-  psync_close_socket(sock);
+  close(sock);
 err0:
   detect_proxy();
   if (proxy_type != PROXY_CONNECT)
@@ -1037,7 +1018,7 @@ err0:
     return INVALID_SOCKET;
 }
 
-static psync_socket_t connect_socket(const char *host, const char *port) {
+static int connect_socket(const char *host, const char *port) {
   if (unlikely(!proxy_detected)) {
     proxy_detected = 1;
     detect_proxy();
@@ -1048,7 +1029,7 @@ static psync_socket_t connect_socket(const char *host, const char *port) {
     return connect_socket_connect_proxy(host, port);
 }
 
-static int wait_sock_ready_for_ssl(psync_socket_t sock) {
+static int wait_sock_ready_for_ssl(int sock) {
   fd_set fds, *rfds, *wfds;
   struct timeval tv;
   int res;
@@ -1065,7 +1046,7 @@ static int wait_sock_ready_for_ssl(psync_socket_t sock) {
   } else {
     debug(D_BUG, "this functions should only be called when SSL returns "
                  "WANT_READ/WANT_WRITE");
-    psync_sock_set_err(P_INVAL);
+    errno = (EINVAL);
     return SOCKET_ERROR;
   }
   tv.tv_usec = 0;
@@ -1074,7 +1055,7 @@ static int wait_sock_ready_for_ssl(psync_socket_t sock) {
     return 0;
   if (res == 0) {
     debug(D_WARNING, "socket timeouted");
-    psync_sock_set_err(P_TIMEDOUT);
+    errno = (ETIMEDOUT);
   }
   return PRINT_RETURN_CONST(SOCKET_ERROR);
 }
@@ -1083,7 +1064,7 @@ psync_socket *psync_socket_connect(const char *host, int unsigned port,
                                    int ssl) {
   psync_socket *ret;
   void *sslc;
-  psync_socket_t sock;
+  int sock;
   char sport[8];
   psync_slprintf(sport, sizeof(sport), "%d", port);
 
@@ -1102,7 +1083,7 @@ psync_socket *psync_socket_connect(const char *host, int unsigned port,
       ssl = psync_ssl_connect_finish(sslc, host);
     }
     if (unlikely_log(ssl != PSYNC_SSL_SUCCESS)) {
-      psync_close_socket(sock);
+      close(sock);
       return NULL;
     }
   } else {
@@ -1124,7 +1105,7 @@ void psync_socket_close(psync_socket *sock) {
         break;
       }
   psync_socket_clear_write_buffered(sock);
-  psync_close_socket(sock->sock);
+  close(sock->sock);
   psync_free(sock);
 }
 
@@ -1132,7 +1113,7 @@ void psync_socket_close_bad(psync_socket *sock) {
   if (sock->ssl)
     psync_ssl_free(sock->ssl);
   psync_socket_clear_write_buffered(sock);
-  psync_close_socket(sock->sock);
+  close(sock->sock);
   psync_free(sock);
 }
 
@@ -1225,7 +1206,7 @@ int psync_socket_pendingdata_buf_thread(psync_socket *sock) {
   return ret;
 }
 
-int psync_socket_try_write_buffer(psync_socket *sock) {
+int intry_write_buffer(psync_socket *sock) {
   if (sock->buffer) {
     psync_socket_buffer *b;
     int wrt, cw;
@@ -1250,12 +1231,12 @@ int psync_socket_try_write_buffer(psync_socket *sock) {
           }
         }
       } else {
-        cw = psync_write_socket(sock->sock, b->buff + b->roffset,
+        cw = write(sock->sock, b->buff + b->roffset,
                                 b->woffset - b->roffset);
         if (cw == SOCKET_ERROR) {
-          if (likely_log(psync_sock_err() == P_WOULDBLOCK ||
-                         psync_sock_err() == P_AGAIN ||
-                         psync_sock_err() == P_INTR))
+          if (likely_log(errno == EWOULDBLOCK ||
+                         errno == EAGAIN ||
+                         errno == EINTR))
             break;
           else {
             if (!wrt)
@@ -1276,16 +1257,16 @@ int psync_socket_try_write_buffer(psync_socket *sock) {
     return 0;
 }
 
-int psync_socket_try_write_buffer_thread(psync_socket *sock) {
+int intry_write_buffer_thread(psync_socket *sock) {
   int ret;
   pthread_mutex_lock(&socket_mutex);
-  ret = psync_socket_try_write_buffer(sock);
+  ret = intry_write_buffer(sock);
   pthread_mutex_unlock(&socket_mutex);
   return ret;
 }
 
 int psync_socket_readable(psync_socket *sock) {
-  psync_socket_try_write_buffer(sock);
+  intry_write_buffer(sock);
   if (sock->ssl && psync_ssl_pendingdata(sock->ssl))
     return 1;
   else if (psync_wait_socket_readable(sock->sock, 0))
@@ -1304,13 +1285,13 @@ int psync_socket_writable(psync_socket *sock) {
 
 static int psync_socket_read_ssl(psync_socket *sock, void *buff, int num) {
   int r;
-  psync_socket_try_write_buffer(sock);
+  intry_write_buffer(sock);
   if (!psync_ssl_pendingdata(sock->ssl) && !sock->pending &&
       psync_wait_socket_read_timeout(sock->sock))
     return -1;
   sock->pending = 0;
   while (1) {
-    psync_socket_try_write_buffer(sock);
+    intry_write_buffer(sock);
     r = psync_ssl_read(sock->ssl, buff, num);
     if (r == PSYNC_SSL_FAIL) {
       if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
@@ -1322,7 +1303,7 @@ static int psync_socket_read_ssl(psync_socket *sock, void *buff, int num) {
         } else
           continue;
       } else {
-        psync_sock_set_err(P_CONNRESET);
+        errno = (ECONNRESET);
         return -1;
       }
     } else
@@ -1333,18 +1314,18 @@ static int psync_socket_read_ssl(psync_socket *sock, void *buff, int num) {
 static int psync_socket_read_plain(psync_socket *sock, void *buff, int num) {
   int r;
   while (1) {
-    psync_socket_try_write_buffer(sock);
+    intry_write_buffer(sock);
     if (sock->pending)
       sock->pending = 0;
     else if (psync_wait_socket_read_timeout(sock->sock)) {
       debug(D_WARNING, "timeouted on socket with pending buffers");
       return -1;
     } else
-      psync_socket_try_write_buffer(sock);
-    r = psync_read_socket(sock->sock, buff, num);
+      intry_write_buffer(sock);
+    r = read(sock->sock, buff, num);
     if (r == SOCKET_ERROR) {
-      if (likely_log(psync_sock_err() == P_WOULDBLOCK ||
-                     psync_sock_err() == P_AGAIN))
+      if (likely_log(errno == EWOULDBLOCK ||
+                     errno == EAGAIN))
         continue;
       else
         return -1;
@@ -1370,7 +1351,7 @@ static int psync_socket_read_noblock_ssl(psync_socket *sock, void *buff,
                    psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE))
       return PSYNC_SOCKET_WOULDBLOCK;
     else {
-      psync_sock_set_err(P_CONNRESET);
+      errno = (ECONNRESET);
       return -1;
     }
   } else
@@ -1380,11 +1361,11 @@ static int psync_socket_read_noblock_ssl(psync_socket *sock, void *buff,
 static int psync_socket_read_noblock_plain(psync_socket *sock, void *buff,
                                            int num) {
   int r;
-  r = psync_read_socket(sock->sock, buff, num);
+  r = read(sock->sock, buff, num);
   if (r == SOCKET_ERROR) {
     sock->pending = 0;
-    if (likely_log(psync_sock_err() == P_WOULDBLOCK ||
-                   psync_sock_err() == P_AGAIN))
+    if (likely_log(errno == EWOULDBLOCK ||
+                   errno == EAGAIN))
       return PSYNC_SOCKET_WOULDBLOCK;
     else
       return -1;
@@ -1393,7 +1374,7 @@ static int psync_socket_read_noblock_plain(psync_socket *sock, void *buff,
 }
 
 int psync_socket_read_noblock(psync_socket *sock, void *buff, int num) {
-  psync_socket_try_write_buffer(sock);
+  intry_write_buffer(sock);
   if (sock->ssl)
     return psync_socket_read_noblock_ssl(sock, buff, num);
   else
@@ -1404,7 +1385,7 @@ static int psync_socket_read_ssl_thread(psync_socket *sock, void *buff,
                                         int num) {
   int r;
   pthread_mutex_lock(&socket_mutex);
-  psync_socket_try_write_buffer(sock);
+  intry_write_buffer(sock);
   pthread_mutex_unlock(&socket_mutex);
   if (!psync_ssl_pendingdata(sock->ssl) && !sock->pending &&
       psync_wait_socket_read_timeout(sock->sock))
@@ -1412,7 +1393,7 @@ static int psync_socket_read_ssl_thread(psync_socket *sock, void *buff,
   sock->pending = 0;
   while (1) {
     pthread_mutex_lock(&socket_mutex);
-    psync_socket_try_write_buffer(sock);
+    intry_write_buffer(sock);
     r = psync_ssl_read(sock->ssl, buff, num);
     pthread_mutex_unlock(&socket_mutex);
     if (r == PSYNC_SSL_FAIL) {
@@ -1423,7 +1404,7 @@ static int psync_socket_read_ssl_thread(psync_socket *sock, void *buff,
         else
           continue;
       } else {
-        psync_sock_set_err(P_CONNRESET);
+        errno = (ECONNRESET);
         return -1;
       }
     } else
@@ -1435,7 +1416,7 @@ static int psync_socket_read_plain_thread(psync_socket *sock, void *buff,
                                           int num) {
   int r;
   pthread_mutex_lock(&socket_mutex);
-  psync_socket_try_write_buffer(sock);
+  intry_write_buffer(sock);
   pthread_mutex_unlock(&socket_mutex);
   while (1) {
     if (sock->pending)
@@ -1443,12 +1424,12 @@ static int psync_socket_read_plain_thread(psync_socket *sock, void *buff,
     else if (psync_wait_socket_read_timeout(sock->sock))
       return -1;
     pthread_mutex_lock(&socket_mutex);
-    psync_socket_try_write_buffer(sock);
-    r = psync_read_socket(sock->sock, buff, num);
+    intry_write_buffer(sock);
+    r = read(sock->sock, buff, num);
     pthread_mutex_unlock(&socket_mutex);
     if (r == SOCKET_ERROR) {
-      if (likely_log(psync_sock_err() == P_WOULDBLOCK ||
-                     psync_sock_err() == P_AGAIN))
+      if (likely_log(errno == EWOULDBLOCK ||
+                     errno == EAGAIN))
         continue;
       else
         return -1;
@@ -1518,10 +1499,10 @@ int psync_socket_write(psync_socket *sock, const void *buff, int num) {
         return -1;
     }
   } else {
-    r = psync_write_socket(sock->sock, buff, num);
+    r = write(sock->sock, buff, num);
     if (r == SOCKET_ERROR) {
-      if (likely_log(psync_sock_err() == P_WOULDBLOCK ||
-                     psync_sock_err() == P_AGAIN || psync_sock_err() == P_INTR))
+      if (likely_log(errno == EWOULDBLOCK ||
+                     errno == EAGAIN || errno == EINTR))
         return 0;
       else
         return -1;
@@ -1534,7 +1515,7 @@ static int psync_socket_readall_ssl(psync_socket *sock, void *buff, int num) {
   int br, r;
   br = 0;
 
-  psync_socket_try_write_buffer(sock);
+  intry_write_buffer(sock);
 
   if (!psync_ssl_pendingdata(sock->ssl) && !sock->pending &&
       psync_wait_socket_read_timeout(sock->sock)) {
@@ -1544,7 +1525,7 @@ static int psync_socket_readall_ssl(psync_socket *sock, void *buff, int num) {
   sock->pending = 0;
 
   while (br < num) {
-    psync_socket_try_write_buffer(sock);
+    intry_write_buffer(sock);
 
     r = psync_ssl_read(sock->ssl, (char *)buff + br, num - br);
 
@@ -1556,7 +1537,7 @@ static int psync_socket_readall_ssl(psync_socket *sock, void *buff, int num) {
         else
           continue;
       } else {
-        psync_sock_set_err(P_CONNRESET);
+        errno = (ECONNRESET);
         return -1;
       }
     }
@@ -1572,17 +1553,17 @@ static int psync_socket_readall_plain(psync_socket *sock, void *buff, int num) {
   int br, r;
   br = 0;
   while (br < num) {
-    psync_socket_try_write_buffer(sock);
+    intry_write_buffer(sock);
     if (sock->pending)
       sock->pending = 0;
     else if (psync_wait_socket_read_timeout(sock->sock))
       return -1;
     else
-      psync_socket_try_write_buffer(sock);
-    r = psync_read_socket(sock->sock, (char *)buff + br, num - br);
+      intry_write_buffer(sock);
+    r = read(sock->sock, (char *)buff + br, num - br);
     if (r == SOCKET_ERROR) {
-      if (likely_log(psync_sock_err() == P_WOULDBLOCK ||
-                     psync_sock_err() == P_AGAIN))
+      if (likely_log(errno == EWOULDBLOCK ||
+                     errno == EAGAIN))
         continue;
       else
         return -1;
@@ -1616,7 +1597,7 @@ static int psync_socket_writeall_ssl(psync_socket *sock, const void *buff,
         else
           continue;
       } else {
-        psync_sock_set_err(P_CONNRESET);
+        errno = (ECONNRESET);
         return -1;
       }
     }
@@ -1627,14 +1608,14 @@ static int psync_socket_writeall_ssl(psync_socket *sock, const void *buff,
   return br;
 }
 
-static int psync_socket_writeall_plain(psync_socket_t sock, const void *buff,
+static int psync_socket_writeall_plain(int sock, const void *buff,
                                        int num) {
   int br, r;
   br = 0;
   while (br < num) {
-    r = psync_write_socket(sock, (const char *)buff + br, num - br);
+    r = write(sock, (const char *)buff + br, num - br);
     if (r == SOCKET_ERROR) {
-      if (psync_sock_err() == P_WOULDBLOCK || psync_sock_err() == P_AGAIN) {
+      if (errno == EWOULDBLOCK || errno == EAGAIN) {
         if (psync_wait_socket_write_timeout(sock))
           return -1;
         else
@@ -1661,7 +1642,7 @@ static int psync_socket_readall_ssl_thread(psync_socket *sock, void *buff,
   int br, r;
   br = 0;
   pthread_mutex_lock(&socket_mutex);
-  psync_socket_try_write_buffer(sock);
+  intry_write_buffer(sock);
   r = psync_ssl_pendingdata(sock->ssl);
   pthread_mutex_unlock(&socket_mutex);
   if (!r && !sock->pending && psync_wait_socket_read_timeout(sock->sock))
@@ -1669,7 +1650,7 @@ static int psync_socket_readall_ssl_thread(psync_socket *sock, void *buff,
   sock->pending = 0;
   while (br < num) {
     pthread_mutex_lock(&socket_mutex);
-    psync_socket_try_write_buffer(sock);
+    intry_write_buffer(sock);
     r = psync_ssl_read(sock->ssl, (char *)buff + br, num - br);
     pthread_mutex_unlock(&socket_mutex);
     if (r == PSYNC_SSL_FAIL) {
@@ -1680,7 +1661,7 @@ static int psync_socket_readall_ssl_thread(psync_socket *sock, void *buff,
         else
           continue;
       } else {
-        psync_sock_set_err(P_CONNRESET);
+        errno = (ECONNRESET);
         return -1;
       }
     }
@@ -1696,7 +1677,7 @@ static int psync_socket_readall_plain_thread(psync_socket *sock, void *buff,
   int br, r;
   br = 0;
   pthread_mutex_lock(&socket_mutex);
-  psync_socket_try_write_buffer(sock);
+  intry_write_buffer(sock);
   pthread_mutex_unlock(&socket_mutex);
   while (br < num) {
     if (sock->pending)
@@ -1704,12 +1685,12 @@ static int psync_socket_readall_plain_thread(psync_socket *sock, void *buff,
     else if (psync_wait_socket_read_timeout(sock->sock))
       return -1;
     pthread_mutex_lock(&socket_mutex);
-    psync_socket_try_write_buffer(sock);
-    r = psync_read_socket(sock->sock, (char *)buff + br, num - br);
+    intry_write_buffer(sock);
+    r = read(sock->sock, (char *)buff + br, num - br);
     pthread_mutex_unlock(&socket_mutex);
     if (r == SOCKET_ERROR) {
-      if (likely_log(psync_sock_err() == P_WOULDBLOCK ||
-                     psync_sock_err() == P_AGAIN))
+      if (likely_log(errno == EWOULDBLOCK ||
+                     errno == EAGAIN))
         continue;
       else
         return -1;
@@ -1747,7 +1728,7 @@ static int psync_socket_writeall_ssl_thread(psync_socket *sock,
         else
           continue;
       } else {
-        psync_sock_set_err(P_CONNRESET);
+        errno = (ECONNRESET);
         return -1;
       }
     }
@@ -1767,10 +1748,10 @@ static int psync_socket_writeall_plain_thread(psync_socket *sock,
     if (sock->buffer)
       r = psync_socket_write_to_buf(sock, buff, num);
     else
-      r = psync_write_socket(sock->sock, (const char *)buff + br, num - br);
+      r = write(sock->sock, (const char *)buff + br, num - br);
     pthread_mutex_unlock(&socket_mutex);
     if (r == SOCKET_ERROR) {
-      if (psync_sock_err() == P_WOULDBLOCK || psync_sock_err() == P_AGAIN) {
+      if (errno == EWOULDBLOCK || errno == EAGAIN) {
         if (psync_wait_socket_write_timeout(sock->sock))
           return -1;
         else
@@ -1857,23 +1838,7 @@ empty:
   return ret;
 }
 
-int psync_pipe(psync_socket_t pipefd[2]) { return pipe(pipefd); }
-
-int psync_pipe_close(psync_socket_t pfd) { return psync_close_socket(pfd); }
-
-int psync_pipe_read(psync_socket_t pfd, void *buff, int num) {
-  return read(pfd, buff, num);
-}
-
-int psync_pipe_write(psync_socket_t pfd, const void *buff, int num) {
-  return write(pfd, buff, num);
-}
-
-int psync_socket_pair(psync_socket_t sfd[2]) {
-  return socketpair(AF_UNIX, SOCK_STREAM, 0, sfd);
-}
-
-int psync_socket_is_broken(psync_socket_t sock) {
+int psync_socket_is_broken(int sock) {
   fd_set rfds;
   struct timeval tv;
   memset(&tv, 0, sizeof(tv));
@@ -1882,10 +1847,10 @@ int psync_socket_is_broken(psync_socket_t sock) {
   return select(sock + 1, NULL, NULL, &rfds, &tv) == 1;
 }
 
-int psync_select_in(psync_socket_t *sockets, int cnt, int64_t timeoutmillisec) {
+int psync_select_in(int *sockets, int cnt, int64_t timeoutmillisec) {
   fd_set rfds;
   struct timeval tv, *ptv;
-  psync_socket_t max;
+  int max;
   int i;
   if (timeoutmillisec < 0)
     ptv = NULL;
@@ -1907,7 +1872,7 @@ int psync_select_in(psync_socket_t *sockets, int cnt, int64_t timeoutmillisec) {
       if (FD_ISSET(sockets[i], &rfds))
         return i;
   } else if (i == 0)
-    psync_sock_set_err(P_TIMEDOUT);
+    errno = (ETIMEDOUT);
   return SOCKET_ERROR;
 }
 
@@ -1935,8 +1900,8 @@ int psync_list_dir(const char *path, psync_list_dir_callback callback,
   cpath = (char *)psync_malloc(pl + namelen + 2);
   entry = (struct dirent *)psync_malloc(entrylen);
   memcpy(cpath, path, pl);
-  if (!pl || cpath[pl - 1] != PSYNC_DIRECTORY_SEPARATORC)
-    cpath[pl++] = PSYNC_DIRECTORY_SEPARATORC;
+  if (!pl || cpath[pl - 1] != '/')
+    cpath[pl++] = '/';
   pst.path = cpath;
 
   // while (!readdir_r(dh, entry, &de) && de) {// DELETEME: deprecated
@@ -1984,8 +1949,8 @@ int psync_list_dir_fast(const char *path, psync_list_dir_callback_fast callback,
   cpath = (char *)psync_malloc(pl + namelen + 2);
   entry = (struct dirent *)psync_malloc(entrylen);
   memcpy(cpath, path, pl);
-  if (!pl || cpath[pl - 1] != PSYNC_DIRECTORY_SEPARATORC)
-    cpath[pl++] = PSYNC_DIRECTORY_SEPARATORC;
+  if (!pl || cpath[pl - 1] != '/')
+    cpath[pl++] = '/';
   // while (!readdir_r(dh, entry, &de) && de) { // DELETEME: deprecated
   while ((de = readdir(dh))) {
     if (de->d_name[0] != '.' ||
@@ -2032,25 +1997,19 @@ int64_t psync_get_free_space_by_path(const char *path) {
     return (int64_t)buf.f_bavail * (int64_t)buf.f_frsize;
 }
 
-int psync_mkdir(const char *path) {
-  return mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE);
-}
-
-int psync_rmdir(const char *path) { return rmdir(path); }
-
 int psync_file_rename(const char *oldpath, const char *newpath) {
   return rename(oldpath, newpath);
 }
 
 int psync_file_rename_overwrite(const char *oldpath, const char *newpath) {
-  if (!psync_filename_cmp(oldpath, newpath))
+  if (!strcmp(oldpath, newpath))
     return 0;
   return rename(oldpath, newpath);
 }
 
 int psync_file_delete(const char *path) { return unlink(path); }
 
-psync_file_t psync_file_open(const char *path, int access, int flags) {
+int psync_file_open(const char *path, int access, int flags) {
   int fd;
 #if defined(O_CLOEXEC)
   flags |= O_CLOEXEC;
@@ -2070,9 +2029,9 @@ psync_file_t psync_file_open(const char *path, int access, int flags) {
   return fd;
 }
 
-int psync_file_close(psync_file_t fd) { return close(fd); }
+int psync_file_close(int fd) { return close(fd); }
 
-int psync_file_sync(psync_file_t fd) {
+int psync_file_sync(int fd) {
 #if defined(F_FULLFSYNC)
   if (unlikely(fcntl(fd, F_FULLFSYNC))) {
     while (errno == EINTR) {
@@ -2109,8 +2068,8 @@ int psync_file_sync(psync_file_t fd) {
 #endif
 }
 
-int psync_file_schedulesync(psync_file_t fd) {
-#if defined(P_OS_LINUX) && defined(SYNC_FILE_RANGE_WRITE)
+int psync_file_schedulesync(int fd) {
+#if defined(SYNC_FILE_RANGE_WRITE)
   return sync_file_range(fd, 0, 0, SYNC_FILE_RANGE_WRITE);
 #elif _POSIX_MAPPED_FILES > 0 && _POSIX_SYNCHRONIZED_IO > 0
   struct stat st;
@@ -2151,9 +2110,9 @@ int psync_folder_sync(const char *path) {
   return ret;
 }
 
-psync_file_t psync_file_dup(psync_file_t fd) { return dup(fd); }
+int psync_file_dup(int fd) { return dup(fd); }
 
-int psync_file_set_creation(psync_file_t fd, time_t ctime) { return -1; }
+int psync_file_set_creation(int fd, time_t ctime) { return -1; }
 
 int psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime) {
   if (mtime) {
@@ -2173,7 +2132,7 @@ int psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime) {
     return 0;
 }
 
-int psync_set_crtime_mtime_by_fd(psync_file_t fd, const char *path,
+int psync_set_crtime_mtime_by_fd(int fd, const char *path,
                                  time_t crtime, time_t mtime) {
   return psync_set_crtime_mtime(path, crtime, mtime);
 }
@@ -2181,7 +2140,7 @@ int psync_set_crtime_mtime_by_fd(psync_file_t fd, const char *path,
 typedef struct {
   uint64_t offset;
   size_t count;
-  psync_file_t fd;
+  int fd;
 } psync_file_preread_t;
 
 static void psync_file_preread_thread(void *ptr) {
@@ -2202,9 +2161,9 @@ static void psync_file_preread_thread(void *ptr) {
   psync_free(pr);
 }
 
-int psync_file_preread(psync_file_t fd, uint64_t offset, size_t count) {
+int psync_file_preread(int fd, uint64_t offset, size_t count) {
   psync_file_preread_t *pr;
-  psync_file_t cfd;
+  int cfd;
   cfd = psync_file_dup(fd);
   if (cfd == INVALID_HANDLE_VALUE)
     return -1;
@@ -2217,7 +2176,7 @@ int psync_file_preread(psync_file_t fd, uint64_t offset, size_t count) {
   return 0;
 }
 
-int psync_file_readahead(psync_file_t fd, uint64_t offset, size_t count) {
+int psync_file_readahead(int fd, uint64_t offset, size_t count) {
 #if defined(POSIX_FADV_WILLNEED)
   return posix_fadvise(fd, offset, count, POSIX_FADV_WILLNEED);
 #elif defined(F_RDADVISE)
@@ -2228,7 +2187,7 @@ int psync_file_readahead(psync_file_t fd, uint64_t offset, size_t count) {
 #endif
 }
 
-ssize_t psync_file_read(psync_file_t fd, void *buf, size_t count) {
+ssize_t psync_file_read(int fd, void *buf, size_t count) {
   ssize_t ret;
   ret = read(fd, buf, count);
   if (unlikely(ret == -1)) {
@@ -2243,7 +2202,7 @@ ssize_t psync_file_read(psync_file_t fd, void *buf, size_t count) {
   return ret;
 }
 
-ssize_t psync_file_pread(psync_file_t fd, void *buf, size_t count,
+ssize_t psync_file_pread(int fd, void *buf, size_t count,
                          uint64_t offset) {
   ssize_t ret;
   ret = pread(fd, buf, count, offset);
@@ -2259,7 +2218,7 @@ ssize_t psync_file_pread(psync_file_t fd, void *buf, size_t count,
   return ret;
 }
 
-ssize_t psync_file_write(psync_file_t fd, const void *buf, size_t count) {
+ssize_t psync_file_write(int fd, const void *buf, size_t count) {
   ssize_t ret;
   ret = write(fd, buf, count);
   if (unlikely(ret == -1)) {
@@ -2274,7 +2233,7 @@ ssize_t psync_file_write(psync_file_t fd, const void *buf, size_t count) {
   return ret;
 }
 
-ssize_t psync_file_pwrite(psync_file_t fd, const void *buf, size_t count,
+ssize_t psync_file_pwrite(int fd, const void *buf, size_t count,
                           uint64_t offset) {
   ssize_t ret;
   ret = pwrite(fd, buf, count, offset);
@@ -2290,11 +2249,11 @@ ssize_t psync_file_pwrite(psync_file_t fd, const void *buf, size_t count,
   return ret;
 }
 
-int64_t psync_file_seek(psync_file_t fd, uint64_t offset, int whence) {
+int64_t psync_file_seek(int fd, uint64_t offset, int whence) {
   return lseek(fd, offset, whence);
 }
 
-int psync_file_truncate(psync_file_t fd) {
+int intruncate(int fd) {
   off_t off;
   off = lseek(fd, 0, SEEK_CUR);
   if (likely_log(off != (off_t)-1)) {
@@ -2312,7 +2271,7 @@ int psync_file_truncate(psync_file_t fd) {
     return -1;
 }
 
-int64_t psync_file_size(psync_file_t fd) {
+int64_t psync_file_size(int fd) {
   struct stat st;
   if (unlikely_log(fstat(fd, &st)))
     return -1;
@@ -2329,21 +2288,16 @@ char *psync_deviceos() {
 }
 
 char *psync_device_string() {
-#if defined(P_OS_LINUX)
   char *osname = psync_deviceos();
   char *ret = psync_strcat(osname, ", ", psync_software_name, NULL);
   free(osname);
   return ret;
-
-#endif
-  return psync_strcat(psync_deviceid(), ", ", psync_software_name, NULL);
 }
 
 const char *psync_appname() { return psync_software_name; }
 
 char *psync_deviceid() {
   char *device;
-#if defined(P_OS_LINUX)
   DIR *dh;
   // struct dirent entry; // DELETEME: not used
   struct dirent *de;
@@ -2376,9 +2330,6 @@ char *psync_deviceid() {
     closedir(dh);
   }
   device = psync_strcat(hardware, ", Linux", NULL);
-#else
-  device = psync_strcat("Desktop", NULL);
-#endif
   debug(D_NOTICE, "detected device: %s", device);
   return device;
 }
@@ -2386,7 +2337,6 @@ char *psync_deviceid() {
 #define PSYNC_RUN_CMD "xdg-open" // XXX: verify this...
 
 int psync_run_update_file(const char *path) {
-#if defined(P_OS_LINUX)
   pid_t pid;
   debug(D_NOTICE, "running %s with " PSYNC_RUN_CMD, path);
   pid = fork();
@@ -2415,9 +2365,6 @@ int psync_run_update_file(const char *path) {
     psync_free(ex);
     exit(1);
   }
-#else
-  return -1;
-#endif
 }
 
 int psync_invalidate_os_cache_needed() { return 0; }
