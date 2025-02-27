@@ -1887,4 +1887,8 @@ void psync_init_data_event_handler(void *ptr);
 }
 #endif
 
+// moved from pdiff
+void psync_delete_cached_crypto_keys();
+
+
 #endif

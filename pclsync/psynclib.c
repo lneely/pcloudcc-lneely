@@ -3227,3 +3227,17 @@ int psync_create_backend_event(const char *category, const char *action,
 }
 
 void psync_init_data_event_handler(void *ptr) { psync_init_data_event(ptr); }
+
+// moved from pdiff
+void psync_delete_cached_crypto_keys() { 
+  psync_sql_statement(
+      "DELETE FROM setting WHERE id IN ('crypto_public_key', "
+      "'crypto_private_key', 'crypto_private_iter', "
+      "'crypto_private_salt', 'crypto_private_sha1', 'crypto_public_sha1')");
+  if (psync_sql_affected_rows()) {
+    debug(D_NOTICE, "deleted cached crypto keys");
+    psync_cloud_crypto_clean_cache();
+  }
+  psync_sql_statement("DELETE FROM cryptofolderkey");
+  psync_sql_statement("DELETE FROM cryptofilekey");
+}

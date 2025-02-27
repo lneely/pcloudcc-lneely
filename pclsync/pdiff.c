@@ -60,6 +60,7 @@
 #include "ppathstatus.h"
 #include "psettings.h"
 #include "pstatus.h"
+#include "psynclib.h"
 #include "psyncer.h"
 #include "ptasks.h"
 #include "ptimer.h"
@@ -125,19 +126,6 @@ static void psync_notify_cache_change(psync_changetype_t event) {
 
 static void psync_diff_refresh_fs_add_folder(psync_folderid_t folderid);
 static void do_send_eventdata(void *param);
-
-void psync_delete_cached_crypto_keys() { 
-  psync_sql_statement(
-      "DELETE FROM setting WHERE id IN ('crypto_public_key', "
-      "'crypto_private_key', 'crypto_private_iter', "
-      "'crypto_private_salt', 'crypto_private_sha1', 'crypto_public_sha1')");
-  if (psync_sql_affected_rows()) {
-    debug(D_NOTICE, "deleted cached crypto keys");
-    psync_cloud_crypto_clean_cache();
-  }
-  psync_sql_statement("DELETE FROM cryptofolderkey");
-  psync_sql_statement("DELETE FROM cryptofilekey");
-}
 
 static binresult *
 get_userinfo_user_digest(psync_socket *sock, const char *username,
