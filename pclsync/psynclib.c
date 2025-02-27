@@ -1117,7 +1117,6 @@ int psync_is_name_to_ignore(const char *name) {
 static void psync_set_run_status(uint32_t status) {
   psync_set_status(PSTATUS_TYPE_RUN, status);
   psync_set_uint_value("runstatus", status);
-  psync_rebuild_icons();
 }
 
 int psync_pause() {

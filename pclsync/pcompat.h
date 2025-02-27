@@ -231,7 +231,6 @@ psync_interface_list_t *psync_list_ip_adapters();
 char *psync_device_string();
 char *psync_deviceid();
 char *psync_deviceos();
-void psync_rebuild_icons();
 
 
 #endif

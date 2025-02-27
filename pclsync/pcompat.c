@@ -2371,12 +2371,6 @@ int psync_invalidate_os_cache_needed() { return 0; }
 
 extern int overlays_running;
 
-void psync_rebuild_icons() {
-  if (!overlays_running)
-    return;
-  return;
-}
-
 int psync_invalidate_os_cache(const char *path) { return 0; }
 
 void *psync_mmap_anon(size_t size) {
