@@ -16,10 +16,8 @@ static void *thread_entry(void *data) {
   psync_thread_name = td->name;
   
   if (td->ptr) {
-    // For prun_thread1 calls
     td->run(td->ptr);
   } else {
-    // For prun_thread calls
     ((thread0_run)td->run)();
   }
   
