@@ -1,11 +1,9 @@
 
-#include <ctype.h>
 #include <errno.h>
 #include <ifaddrs.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 
-#include "pdevice.h"
 #include "plibs.h"
 #include "psettings.h"
 #include "psock.h"
