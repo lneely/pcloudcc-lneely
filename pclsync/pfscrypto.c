@@ -44,6 +44,7 @@
 #include "plibs.h"
 #include "ppagecache.h"
 #include "ppath.h"
+#include "prun.h"
 
 // this is only for debug, adds needless checks of tree for local files
 #if IS_DEBUG
@@ -1892,7 +1893,7 @@ static int psync_fs_crypto_run_extender(psync_openfile_t *of, uint64_t size) {
   ext->finalizelog = 1;
   of->extender = ext;
   psync_fs_inc_of_refcnt_locked(of);
-  psync_run_thread1("extender", psync_fs_extender_thread, of);
+  prun_thread1("extender", psync_fs_extender_thread, of);
   return 0;
 }
 

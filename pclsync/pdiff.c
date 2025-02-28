@@ -57,6 +57,7 @@
 #include "pnetlibs.h"
 #include "pnotifications.h"
 #include "ppathstatus.h"
+#include "prun.h"
 #include "psettings.h"
 #include "pstatus.h"
 #include "psynclib.h"
@@ -168,7 +169,7 @@ static void psync_notify_cache_change(psync_changetype_t event) {
   *chtype = event;
   callback = psync_cache_callback;
   if (callback)
-    psync_run_thread1("cache start callback", callback, chtype);
+    prun_thread1("cache start callback", callback, chtype);
   else
     psync_free(chtype);
 }
@@ -1067,7 +1068,7 @@ static void process_modifyfolder(const binresult *entry) {
       (flags & PSYNC_FOLDER_FLAG_BACKUP_ROOT) == 0) {
     debug(D_NOTICE, "Stop backup root");
     psync_delete_sync_by_folderid(folderid);
-    // psync_run_thread1("psync_async_backup_delete",
+    // prun_thread1("psync_async_backup_delete",
     // psync_delete_sync_by_folderid, folderid);
   }
 
@@ -1732,7 +1733,7 @@ static void process_modifyuserinfo(const binresult *entry) {
   psync_sql_bind_uint(q, 2, u);
   psync_sql_run(q);
   if (!u)
-    psync_run_thread("stop crypto moduserinfo", stop_crypto_thread);
+    prun_thread("stop crypto moduserinfo", stop_crypto_thread);
   else
     crst = 1;
   psync_sql_bind_string(q, 1, "cryptosubscription");
@@ -1918,7 +1919,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     params->fromuserid = fromuserid;
     params->teamid = teamid;
     params->str = str;
-    psync_run_thread1("Share notify", do_send_eventdata, params);
+    prun_thread1("Share notify", do_send_eventdata, params);
   } else {
     fill_str(e->toemail, email, emaillen);
     fill_str(e->fromemail, email, emaillen);
@@ -2750,7 +2751,7 @@ static void psync_diff_refresh_fs(const binresult *entries) {
     ptr = psync_new(refresh_folders_ptr_t);
     ptr->refresh_folders = refresh_folders;
     ptr->refresh_last = refresh_last;
-    psync_run_thread1("fs folder refresh", psync_diff_refresh_thread, ptr);
+    prun_thread1("fs folder refresh", psync_diff_refresh_thread, ptr);
     refresh_folders = NULL;
     refresh_allocated = 0;
     refresh_last = 0;
@@ -3088,7 +3089,7 @@ void do_register_account_events_callback(paccount_cache_callback_t callback) {
 }
 
 void psync_diff_init() { 
-  psync_run_thread("diff", psync_diff_thread); 
+  prun_thread("diff", psync_diff_thread); 
 }
 
 void psync_diff_wake() {

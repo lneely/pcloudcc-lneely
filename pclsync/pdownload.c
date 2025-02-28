@@ -51,6 +51,7 @@
 #include "pnetlibs.h"
 #include "pp2p.h"
 #include "ppathstatus.h"
+#include "prun.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "pstatus.h"
@@ -1060,7 +1061,7 @@ static void free_task_timer_thread(void *ptr) {
 
 static void free_task_timer(psync_timer_t timer, void *ptr) {
   psync_timer_stop(timer);
-  psync_run_thread1("free task", free_task_timer_thread, ptr);
+  prun_thread1("free task", free_task_timer_thread, ptr);
 }
 
 static void handle_async_error(download_task_t *dt, psync_async_result_t *res) {
@@ -1324,7 +1325,7 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
       psync_milisleep(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
     }
   } else {
-    psync_run_thread1("download file", task_run_download_file_thread, dt);
+    prun_thread1("download file", task_run_download_file_thread, dt);
     psync_milisleep(25); // do not run downloads strictly in parallel so we
                          // reuse some API connections
   }
@@ -1526,7 +1527,7 @@ void psync_wake_download() {
 
 void psync_download_init() {
   psync_timer_exception_handler(psync_wake_download);
-  psync_run_thread("download main", download_thread);
+  prun_thread("download main", download_thread);
 }
 
 void psync_delete_download_tasks_for_file(psync_fileid_t fileid,

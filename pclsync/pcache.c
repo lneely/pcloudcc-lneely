@@ -39,6 +39,7 @@
 #include "pcompat.h"
 #include "plibs.h"
 #include "plist.h"
+#include "prun.h"
 #include "pssl.h"
 #include "psynclib.h"
 #include "ptimer.h"

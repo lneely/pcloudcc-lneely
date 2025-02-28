@@ -71,6 +71,7 @@
 #include "ppagecache.h"
 #include "ppassword.h"
 #include "ppathstatus.h"
+#include "prun.h"
 #include "pscanner.h"
 #include "psettings.h"
 #include "pshm.h"
@@ -294,7 +295,7 @@ int psync_init() {
     pthread_mutex_unlock(&psync_libstate_mutex);
   }
 
-  psync_run_thread("Overlay main thread", psync_overlay_main_loop);
+  prun_thread("Overlay main thread", psync_overlay_main_loop);
   psync_overlay_init_callbacks();
   if (PSYNC_SSL_DEBUG_LEVEL)
     psync_set_ssl_debug_callback(ssl_debug_cb);
@@ -859,7 +860,7 @@ int psync_add_sync_by_path_delayed(const char *localpath,
   psync_sql_run_free(res);
   psync_sql_sync();
   if (psync_status_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_ONLINE)
-    psync_run_thread("check delayed syncs", psync_syncer_check_delayed_syncs);
+    prun_thread("check delayed syncs", psync_syncer_check_delayed_syncs);
   return 0;
 }
 
@@ -3088,7 +3089,7 @@ int psync_delete_sync_by_folderid(psync_folderid_t fId) {
   syncId = (psync_syncid_t)row[0];
   psync_sql_free_result(sqlRes);
 
-  psync_run_thread1("psync_async_sync_delete", psync_async_delete_sync,
+  prun_thread1("psync_async_sync_delete", psync_async_delete_sync,
                     (void *)(uintptr_t)syncId);
 
   return 0;

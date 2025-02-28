@@ -33,6 +33,7 @@
 #include "pcache.h"
 #include "pcompat.h"
 #include "pcompiler.h"
+#include "prun.h"
 #include "plibs.h"
 #include "psynclib.h"
 
@@ -175,7 +176,7 @@ void psync_timer_init() {
     for (j = 0; j < TIMER_ARRAY_SIZE; j++)
       psync_list_init(&timerlists[i][j]);
   psync_current_time = psync_time();
-  psync_run_thread("timer", timer_thread);
+  prun_thread("timer", timer_thread);
   timer_running = 1;
 }
 

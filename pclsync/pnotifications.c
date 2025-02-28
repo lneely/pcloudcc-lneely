@@ -36,6 +36,8 @@
 #include "ptimer.h"
 #include "ptree.h"
 #include "ppath.h"
+#include "prun.h"
+
 
 typedef struct {
   psync_tree tree;
@@ -193,7 +195,7 @@ void psync_notifications_set_callback(
   ntf_callback = notification_callback;
   if (!ntf_thread_running && notification_callback) {
     ntf_thread_running = 1;
-    psync_run_thread("notifications", psync_notifications_thread);
+    prun_thread("notifications", psync_notifications_thread);
   }
   pthread_mutex_unlock(&ntf_mutex);
 }

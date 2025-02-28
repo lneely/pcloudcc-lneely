@@ -36,6 +36,7 @@
 
 #include "papi.h"
 #include "pcompat.h"
+#include "prun.h"
 #include "pcrc32c.h"
 #include "pcrypto.h"
 #include "pfsfolder.h"

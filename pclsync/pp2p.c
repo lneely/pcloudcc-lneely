@@ -46,6 +46,7 @@
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "pp2p.h"
+#include "prun.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "pstatus.h"
@@ -516,7 +517,7 @@ static void psync_p2p_thread() {
       if (unlikely_log(*inconn == INVALID_SOCKET))
         psync_free(inconn);
       else
-        psync_run_thread1("p2p tcp", psync_p2p_tcphandler, inconn);
+        prun_thread1("p2p tcp", psync_p2p_tcphandler, inconn);
     }
   }
 ex:
@@ -529,7 +530,7 @@ ex:
 
 static void psync_p2p_start() {
   pthread_mutex_lock(&p2pmutex);
-  psync_run_thread("p2p", psync_p2p_thread);
+  prun_thread("p2p", psync_p2p_thread);
   running = 1;
   pthread_mutex_unlock(&p2pmutex);
 }

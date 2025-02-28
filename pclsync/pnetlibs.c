@@ -48,6 +48,7 @@
 #include "pdevice.h"
 #include "plibs.h"
 #include "pnetlibs.h"
+#include "prun.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "pstatus.h"
@@ -1218,7 +1219,7 @@ void psync_http_connect_and_cache_host(const char *host) {
   }
   pthread_mutex_unlock(&connect_cache_mutex);
   if (node)
-    psync_run_thread1("connect http cache", connect_cache_thread, node);
+    prun_thread1("connect http cache", connect_cache_thread, node);
   else
     debug(D_NOTICE, "connection for %s is already in progress", host);
 }
@@ -2591,7 +2592,7 @@ static void logout2_thread() { psync_logout2(PSTATUS_AUTH_BADTOKEN, 0); }
 // this is called when ANY api call returns non zero result
 void psync_process_api_error(uint64_t result) {
   if (result == 2000)
-    psync_run_thread("logout from process_api_error", logout2_thread);
+    prun_thread("logout from process_api_error", logout2_thread);
 }
 
 static void psync_netlibs_timer(psync_timer_t timer, void *ptr) {
@@ -2643,7 +2644,7 @@ int psync_send_debug(int thread, const char *file, const char *function,
   } while (l >= sz);
   if (l > 0) {
     if (thread)
-      psync_run_thread1("send debug", psync_send_debug_thread, ret);
+      prun_thread1("send debug", psync_send_debug_thread, ret);
     else
       psync_send_debug_thread(ret);
   } else

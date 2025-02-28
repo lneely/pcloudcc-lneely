@@ -40,6 +40,7 @@
 #include "pcallbacks.h"
 #include "pfolder.h"
 #include "plibs.h"
+#include "prun.h"
 #include "plist.h"
 #include "plocalnotify.h"
 #include "plocalscan.h"
@@ -1340,7 +1341,7 @@ void psync_localscan_init() {
   psync_syncid_t syncid;
   psync_list_init(&scan_folders_list);
   psync_timer_exception_handler(psync_wake_localscan_noscan);
-  psync_run_thread("localscan", scanner_thread);
+  prun_thread("localscan", scanner_thread);
   localnotify = psync_localnotify_init();
   res = psync_sql_query_rdlock(
       "SELECT id, localpath FROM syncfolder WHERE synctype&" NTO_STR(

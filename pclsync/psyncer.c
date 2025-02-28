@@ -44,6 +44,7 @@
 #include "plocalnotify.h"
 #include "plocalscan.h"
 #include "ppathstatus.h"
+#include "prun.h"
 #include "pstatus.h"
 #include "psyncer.h"
 #include "ptasks.h"
@@ -349,7 +350,7 @@ static void psync_do_sync_thread(void *ptr) {
 void psync_syncer_new(psync_syncid_t syncid) {
   psync_syncid_t *psid = psync_new(psync_syncid_t);
   *psid = syncid;
-  psync_run_thread1("syncer", psync_do_sync_thread, psid);
+  prun_thread1("syncer", psync_do_sync_thread, psid);
 }
 
 static void psync_syncer_thread() {
@@ -527,5 +528,5 @@ void psync_syncer_init() {
     psync_add_folder_to_downloadlist_locked(row[0]);
   pthread_mutex_unlock(&sync_down_mutex);
   psync_sql_free_result(res);
-  psync_run_thread("syncer", psync_syncer_thread);
+  prun_thread("syncer", psync_syncer_thread);
 }

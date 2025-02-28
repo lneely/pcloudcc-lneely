@@ -34,6 +34,7 @@
 #include "pdatabase.h"
 #include "plocks.h"
 #include "pnetlibs.h"
+#include "prun.h"
 #include "psettings.h"
 #include "ptimer.h"
 #include "ptree.h"
@@ -398,7 +399,7 @@ static void psync_sql_wal_checkpoint() {
 static int psync_sql_wal_hook(void *ptr, sqlite3 *db, const char *name,
                               int numpages) {
   if (numpages >= PSYNC_DB_CHECKPOINT_AT_PAGES)
-    psync_run_thread("checkpoint charlie", psync_sql_wal_checkpoint);
+    prun_thread("checkpoint charlie", psync_sql_wal_checkpoint);
   return SQLITE_OK;
 }
 
@@ -2118,7 +2119,7 @@ psync_task_run_tasks(psync_task_callback_t const *callbacks,
     pthread_cond_init(&t->cond, NULL);
     t->id = i;
     t->status = PSYNC_TASK_STATUS_RUNNING;
-    psync_run_thread1("task", psync_task_entry, t);
+    prun_thread1("task", psync_task_entry, t);
   }
   return ret;
 }

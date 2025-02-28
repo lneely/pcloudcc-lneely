@@ -43,6 +43,7 @@
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "ppagecache.h"
+#include "prun.h"
 #include "psettings.h"
 #include "ppath.h"
 
@@ -220,7 +221,7 @@ static psync_cache_page_t *psync_pagecache_get_free_page_if_available() {
     page = NULL;
   pthread_mutex_unlock(&cache_mutex);
   if (runthread)
-    psync_run_thread("flush pages get free page ifav", flush_pages_noret);
+    prun_thread("flush pages get free page ifav", flush_pages_noret);
   return page;
 }
 
@@ -274,7 +275,7 @@ psync_pagecache_get_free_page(int runflushcacheinside) {
   cache_pages_free--;
   pthread_mutex_unlock(&cache_mutex);
   if (runthread)
-    psync_run_thread("flush pages get free page", flush_pages_noret);
+    prun_thread("flush pages get free page", flush_pages_noret);
   return page;
 }
 
@@ -1505,14 +1506,14 @@ static int flush_pages(int nosleep) {
     ret = psync_sql_commit_transaction();
     pthread_mutex_unlock(&flush_cache_mutex);
     if (free_db_pages <= CACHE_PAGES * 2)
-      psync_run_thread("clean cache", clean_cache);
+      prun_thread("clean cache", clean_cache);
     return ret;
   } else {
     pthread_mutex_unlock(&cache_mutex);
     psync_sql_rollback_transaction();
     pthread_mutex_unlock(&flush_cache_mutex);
     if (free_db_pages == 0)
-      psync_run_thread("clean cache", clean_cache);
+      prun_thread("clean cache", clean_cache);
     return 0;
   }
 }
@@ -1527,7 +1528,7 @@ int psync_pagecache_flush() {
 static void psync_pagecache_flush_timer(psync_timer_t timer, void *ptr) {
   if (!flushedbetweentimers &&
       (cache_pages_in_hash || cachepages_to_update_cnt))
-    psync_run_thread("flush pages timer", flush_pages_noret);
+    prun_thread("flush pages timer", flush_pages_noret);
   flushedbetweentimers = 0;
   pthread_mutex_lock(&cache_mutex);
   if (cache_pages_free == CACHE_PAGES && !cache_pages_reset) {
@@ -1570,7 +1571,7 @@ static void mark_pagecache_used(uint64_t pagecacheid) {
   }
   pthread_mutex_unlock(&cache_mutex);
   if (runthread)
-    psync_run_thread("flush pages mark_pagecache_used", flush_pages_noret);
+    prun_thread("flush pages mark_pagecache_used", flush_pages_noret);
 }
 
 static void mark_pagescache_used(uint64_t first_page_id, unsigned long pagecnt,
@@ -1610,7 +1611,7 @@ static void mark_pagescache_used(uint64_t first_page_id, unsigned long pagecnt,
   }
   pthread_mutex_unlock(&cache_mutex);
   if (runthread)
-    psync_run_thread("flush pages mark_pagescache_used", flush_pages_noret);
+    prun_thread("flush pages mark_pagescache_used", flush_pages_noret);
 }
 
 PSYNC_NOINLINE static void mark_page_free(uint64_t pagecacheid) {
@@ -2620,7 +2621,7 @@ int psync_pagecache_read_unmodified_locked(psync_openfile_t *of, char *buf,
     rq->hash = hash;
     rq->needkey = 0;
     psync_fs_inc_of_refcnt_and_readers(of);
-    psync_run_thread1("read unmodified", psync_pagecache_read_unmodified_thread,
+    prun_thread1("read unmodified", psync_pagecache_read_unmodified_thread,
                       rq);
   } else
     psync_free(rq);
@@ -2869,7 +2870,7 @@ int psync_pagecache_read_unmodified_encrypted_locked(psync_openfile_t *of,
     rq->hash = hash;
     rq->needkey = needkey;
     psync_fs_inc_of_refcnt_and_readers(of);
-    psync_run_thread1("crypto read unmodified",
+    prun_thread1("crypto read unmodified",
                       psync_pagecache_read_unmodified_thread, rq);
   } else
     psync_free(rq);
@@ -3099,7 +3100,7 @@ int psync_pagecache_readv_locked(psync_openfile_t *of,
     rq->hash = hash;
     rq->needkey = needkey;
     psync_fs_inc_of_refcnt_and_readers(of);
-    psync_run_thread1("readv unmodified",
+    prun_thread1("readv unmodified",
                       psync_pagecache_read_unmodified_thread, rq);
   }
   ret = 0;
@@ -3560,7 +3561,7 @@ static void psync_pagecache_add_task(uint32_t type, uint64_t taskid,
   }
   psync_sql_run_free(res);
   if (run)
-    psync_run_thread("upload to cache", psync_pagecache_upload_to_cache);
+    prun_thread("upload to cache", psync_pagecache_upload_to_cache);
 }
 
 void psync_pagecache_creat_to_pagecache(uint64_t taskid, uint64_t hash,
@@ -3827,7 +3828,7 @@ void psync_pagecache_init() {
   pthread_mutex_unlock(&flush_cache_mutex);
   psync_sql_lock();
   if (psync_sql_cellint("SELECT COUNT(*) FROM pagecachetask", 0)) {
-    psync_run_thread("upload to cache", psync_pagecache_upload_to_cache);
+    prun_thread("upload to cache", psync_pagecache_upload_to_cache);
     upload_to_cache_thread_run = 1;
   }
   psync_sql_unlock();

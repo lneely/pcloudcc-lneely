@@ -31,6 +31,7 @@
 #include "pfsfolder.h"
 #include "plibs.h"
 #include "pnetlibs.h"
+#include "prun.h"
 #include "ptimer.h"
 #include <stdio.h>
 #include <string.h>
@@ -114,7 +115,7 @@ int64_t do_psync_screenshot_public_link(const char *path, int hasdelay,
       do_psync_file_public_link(path, &params->linkid, link, err, 0, 0, 0);
   if (hasdelay) {
     params->delay = delay;
-    psync_run_thread1("Modify link expiration.", modify_screenshot_public_link,
+    prun_thread1("Modify link expiration.", modify_screenshot_public_link,
                       params);
   } else
     psync_free(params);

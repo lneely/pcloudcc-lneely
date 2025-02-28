@@ -50,7 +50,10 @@
 #include "pnetlibs.h"
 #include "psettings.h"
 #include "pssl.h"
+#include "prun.h"
+
 #include <string.h>
+
 #define PSYNC_CRYPTO_API_ERR_INTERNAL -511
 
 static PSYNC_THREAD int crypto_api_errno;
@@ -766,7 +769,7 @@ static void save_folder_key_to_db(psync_folderid_t folderid,
   t = psync_new(insert_folder_key_task);
   t->key = psync_ssl_copy_encrypted_symmetric_key(enckey);
   t->id = folderid;
-  psync_run_thread1("save folder key to db task", save_folder_key_task, t);
+  prun_thread1("save folder key to db task", save_folder_key_task, t);
 }
 
 typedef struct {
@@ -796,7 +799,7 @@ static void save_file_key_to_db(psync_fileid_t fileid, uint64_t hash,
   t->key = psync_ssl_copy_encrypted_symmetric_key(enckey);
   t->id = fileid;
   t->hash = hash;
-  psync_run_thread1("save file key to db task", save_file_key_task, t);
+  prun_thread1("save file key to db task", save_file_key_task, t);
 }
 
 static psync_encrypted_symmetric_key_t

@@ -36,6 +36,8 @@
 
 #include "plibs.h"
 #include "psynclib.h"
+#include "prun.h"
+
 
 #include "pdevice_monitor.h"
 #include "plocalscan.h"
@@ -122,6 +124,6 @@ void device_monitor_thread() {
 }
 
 void psync_devmon_init() {
-  psync_run_thread("libusb handle events completed thread",
+  prun_thread("libusb handle events completed thread",
                    device_monitor_thread);
 }

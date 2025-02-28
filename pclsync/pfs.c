@@ -49,11 +49,13 @@
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "ppagecache.h"
+#include "prun.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "pstatus.h"
 #include "ppath.h"
 #include "ptimer.h"
+
 #include <errno.h>
 #include <fuse.h>
 #include <pthread.h>
@@ -1837,7 +1839,7 @@ static void psync_fs_write_timer(psync_timer_t timer, void *ptr) {
     ofw->writeid = of->writeid;
     pthread_mutex_unlock(&of->mutex);
     debug(D_NOTICE, "running separate thread to release file for upload");
-    psync_run_thread1("upload release timer", psync_fs_upload_release_timer,
+    prun_thread1("upload release timer", psync_fs_upload_release_timer,
                       ofw);
     return;
   } else
@@ -2602,7 +2604,7 @@ static int psync_fs_unlink(const char *path) {
     // file.
     debug(D_NOTICE, "Backedup file deleted in P drive. Send event. Flags: [%d]",
           fpath->flags);
-    psync_run_thread1("psync_async_sync_delete", psync_async_ui_callback,
+    prun_thread1("psync_async_sync_delete", psync_async_ui_callback,
                       (void *)PEVENT_BKUP_F_DEL_DRIVE);
   }
 
@@ -3259,7 +3261,7 @@ static void psync_fs_start_callback_timer(psync_timer_t timer, void *ptr) {
   psync_timer_stop(timer);
   callback = psync_start_callback;
   if (callback)
-    psync_run_thread("fs start callback", callback);
+    prun_thread("fs start callback", callback);
 }
 
 static void *psync_fs_init(struct fuse_conn_info *conn) {
@@ -3305,7 +3307,7 @@ static void psync_fs_refresh_timer(psync_timer_t timer, void *ptr) {
   fsrefreshtimerscheduled = 0;
   lastfsrefresh = ct;
   pthread_mutex_unlock(&fsrefreshmutex);
-  psync_run_thread("os cache invalidate timer",
+  prun_thread("os cache invalidate timer",
                    psync_invalidate_os_cache_noret);
 }
 
@@ -3328,7 +3330,7 @@ void psync_fs_refresh() {
   pthread_mutex_unlock(&fsrefreshmutex);
   if (todo == 0) {
     debug(D_NOTICE, "running cache invalidate direct");
-    psync_run_thread("os cache invalidate", psync_invalidate_os_cache_noret);
+    prun_thread("os cache invalidate", psync_invalidate_os_cache_noret);
   } else if (todo == 1) {
     debug(D_NOTICE, "setting timer to invalidate cache");
     psync_timer_register(psync_fs_refresh_timer, REFRESH_SEC, NULL);
@@ -3519,7 +3521,7 @@ static void psync_signal_handler(int sig) {
 #if IS_DEBUG
 static void psync_usr1_handler(int sig) {
   //  debug(D_NOTICE, "got signal %d", sig);
-  psync_run_thread("dump signal", psync_fs_dump_internals);
+  prun_thread("dump signal", psync_fs_dump_internals);
 }
 #endif
 
@@ -3680,7 +3682,7 @@ static int psync_fs_do_start() {
   started = 1;
   pthread_mutex_unlock(&start_mutex);
   fuse_opt_free_args(&args);
-  psync_run_thread("fuse", psync_fuse_thread);
+  prun_thread("fuse", psync_fuse_thread);
   return 0;
 err1:
   fuse_unmount(mp, psync_fuse_channel);
@@ -3715,7 +3717,7 @@ void psync_fs_pause_until_login() {
   if (waitingforlogin == 0) {
     waitingforlogin = 1;
     debug(D_NOTICE, "stopping fs until login");
-    psync_run_thread("fs wait login", psync_fs_wait_login);
+    prun_thread("fs wait login", psync_fs_wait_login);
   }
   psync_sql_unlock();
 }
@@ -3738,7 +3740,7 @@ int psync_fs_start() {
   if (status == PSTATUS_AUTH_PROVIDED)
     return psync_fs_do_start();
   else {
-    psync_run_thread("fs wait login", psync_fs_wait_start);
+    prun_thread("fs wait login", psync_fs_wait_start);
     return 0;
   }
 }

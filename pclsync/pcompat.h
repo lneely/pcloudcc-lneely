@@ -50,7 +50,6 @@
 
 #include "pcompiler.h"
 
-extern PSYNC_THREAD const char *psync_thread_name;
 extern const unsigned char psync_invalid_filename_chars[];
 
 typedef struct _psync_socket_buffer {
@@ -80,10 +79,6 @@ typedef struct {
   size_t interfacecnt;
   psync_interface_t interfaces[];
 } psync_interface_list_t;
-
-// callback signatures
-typedef void (*psync_thread_start0)();
-typedef void (*psync_thread_start1)(void *);
 
 // constants
 #define INVALID_HANDLE_VALUE -1
@@ -136,10 +131,6 @@ int psync_munlock(void *ptr, size_t size);
 void psync_anon_reset(void *ptr, size_t size);
 void psync_get_random_seed(unsigned char *seed, const void *addent, size_t aelen, int fast);
 int psync_get_page_size();
-
-// Thread Management
-void psync_run_thread(const char *name, psync_thread_start0 run);
-void psync_run_thread1(const char *name, psync_thread_start1 run, void *ptr);
 
 // File Operations
 int psync_file_open(const char *path, int access, int flags);

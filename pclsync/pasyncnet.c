@@ -43,6 +43,7 @@
 #include "pcompression.h"
 #include "plibs.h"
 #include "pnetlibs.h"
+#include "prun.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "ptree.h"
@@ -768,7 +769,7 @@ static int psync_async_start_thread_locked() {
   tparams->api = api;
   tparams->privsock = pair[1];
   at_sock = pair[0];
-  psync_run_thread1("async transfer", psync_async_thread, tparams);
+  prun_thread1("async transfer", psync_async_thread, tparams);
   running++;
   return 0;
 err3:

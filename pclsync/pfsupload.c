@@ -1242,7 +1242,7 @@ static int psync_sent_task_creat_upload_large(fsupload_task_t *task) {
   // psync_fs_uploading_openfile(task->id);
   if (!large_upload_running) {
     large_upload_running = 1;
-    psync_run_thread("large file fs upload", large_upload);
+    prun_thread("large file fs upload", large_upload);
   }
   psync_sql_run_free(res);
   return 0;
@@ -2146,7 +2146,7 @@ static void psync_fsupload_thread() {
 void psync_fsupload_init() {
   psync_fs_crypto_check_logs();
   psync_timer_exception_handler(psync_fsupload_wake);
-  psync_run_thread("fsupload main", psync_fsupload_thread);
+  prun_thread("fsupload main", psync_fsupload_thread);
 }
 
 void psync_fsupload_wake() {

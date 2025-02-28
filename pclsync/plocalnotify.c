@@ -41,6 +41,7 @@
 #include "plocalnotify.h"
 #include "pcompat.h"
 #include "plibs.h"
+#include "prun.h"
 #include "plist.h"
 #include "plocalscan.h"
 #include "psettings.h"
@@ -289,7 +290,7 @@ int psync_localnotify_init() {
   e.data.ptr = NULL;
   if (unlikely_log(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pipe_read, &e)))
     goto err2;
-  psync_run_thread("localnotify", psync_localnotify_thread);
+  prun_thread("localnotify", psync_localnotify_thread);
   return 0;
 err2:
   close(epoll_fd);

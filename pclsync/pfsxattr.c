@@ -34,6 +34,8 @@
 #include "pfsxattr.h"
 #include "pfsfolder.h"
 #include "pfstasks.h"
+#include "prun.h"
+
 #include "plibs.h"
 #include <errno.h>
 #include <fuse.h>

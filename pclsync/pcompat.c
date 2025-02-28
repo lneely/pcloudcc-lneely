@@ -65,6 +65,7 @@
 #include "pcompat.h"
 #include "pdevice.h"
 #include "plibs.h"
+#include "prun.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "psynclib.h"
@@ -75,17 +76,6 @@ extern char **environ;
 
 #define PROXY_NONE 0
 #define PROXY_CONNECT 1
-
-typedef struct {
-  psync_thread_start0 run;
-  const char *name;
-} psync_run_data0;
-
-typedef struct {
-  psync_thread_start1 run;
-  void *ptr;
-  const char *name;
-} psync_run_data1;
 
 static uid_t psync_uid;
 static gid_t psync_gid;
@@ -158,69 +148,6 @@ int psync_stat_mode_ok(struct stat *buf, unsigned int bits) {
       return (buf->st_mode & bits) == bits;
     }
   return (buf->st_mode & bits) == bits;
-}
-
-static void thread_started() {
-  // debug(D_NOTICE, "thread started"); //This repeats too many times because of
-  // the overlays
-}
-
-static void thread_exited() {
-  // debug(D_NOTICE, "thread exited"); //This repeats too many times because of
-  // the overlays
-}
-
-static void *thread_entry0(void *data) {
-  psync_thread_start0 run;
-  run = ((psync_run_data0 *)data)->run;
-  psync_thread_name = ((psync_run_data0 *)data)->name;
-  psync_free(data);
-  thread_started();
-  run();
-  thread_exited();
-  return NULL;
-}
-
-void psync_run_thread(const char *name, psync_thread_start0 run) {
-  psync_run_data0 *data;
-  pthread_t thread;
-  pthread_attr_t attr;
-  data = psync_new(psync_run_data0);
-  data->run = run;
-  data->name = name;
-  pthread_attr_init(&attr);
-  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-  pthread_attr_setstacksize(&attr, PSYNC_STACK_SIZE);
-  pthread_create(&thread, &attr, thread_entry0, data);
-  pthread_attr_destroy(&attr);
-}
-
-static void *thread_entry1(void *data) {
-  psync_thread_start1 run;
-  void *ptr;
-  run = ((psync_run_data1 *)data)->run;
-  ptr = ((psync_run_data1 *)data)->ptr;
-  psync_thread_name = ((psync_run_data1 *)data)->name;
-  psync_free(data);
-  thread_started();
-  run(ptr);
-  thread_exited();
-  return NULL;
-}
-
-void psync_run_thread1(const char *name, psync_thread_start1 run, void *ptr) {
-  psync_run_data1 *data;
-  pthread_t thread;
-  pthread_attr_t attr;
-  data = psync_new(psync_run_data1);
-  data->run = run;
-  data->ptr = ptr;
-  data->name = name;
-  pthread_attr_init(&attr);
-  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-  pthread_attr_setstacksize(&attr, PSYNC_STACK_SIZE);
-  pthread_create(&thread, &attr, thread_entry1, data);
-  pthread_attr_destroy(&attr);
 }
 
 static void psync_check_no_sql_lock(uint64_t millisec) {
@@ -1932,7 +1859,7 @@ int psync_file_preread(int fd, uint64_t offset, size_t count) {
   pr->offset = offset;
   pr->count = count;
   pr->fd = cfd;
-  psync_run_thread1("pre-read (readahead) thread", psync_file_preread_thread,
+  prun_thread1("pre-read (readahead) thread", psync_file_preread_thread,
                     pr);
   return 0;
 }
