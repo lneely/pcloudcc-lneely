@@ -8,65 +8,39 @@
 #include "plibs.h"
 #include "psettings.h"
 
-static char *psync_get_pcloud_path_nc() {
-  struct stat st;
-  const char *dir;
-  dir = getenv("HOME");
-  if (unlikely_log(!dir) || unlikely_log(stat(dir, &st)) ||
-      unlikely_log(!psync_stat_mode_ok(&st, 7))) {
-    struct passwd pwd;
-    struct passwd *result;
-    char buff[4096];
-    if (unlikely_log(getpwuid_r(getuid(), &pwd, buff, sizeof(buff), &result)) ||
-        unlikely_log(stat(result->pw_dir, &st)) ||
-        unlikely_log(!psync_stat_mode_ok(&st, 7)))
-      return NULL;
-    dir = result->pw_dir;
-  }
-  return psync_strcat(dir, "/", PSYNC_DEFAULT_POSIX_DIR,
-                      NULL);
-}
-
-static char *psync_get_default_database_path_old() {
-  struct stat st;
-  const char *dir;
-  dir = getenv("HOME");
-  if (unlikely_log(!dir) || unlikely_log(stat(dir, &st)) ||
-      unlikely_log(!psync_stat_mode_ok(&st, 7))) {
-    struct passwd pwd;
-    struct passwd *result;
-    char buff[4096];
-    if (unlikely_log(getpwuid_r(getuid(), &pwd, buff, sizeof(buff), &result)) ||
-        unlikely_log(stat(result->pw_dir, &st)) ||
-        unlikely_log(!psync_stat_mode_ok(&st, 7)))
-      return NULL;
-    dir = result->pw_dir;
-  }
-  return psync_strcat(dir, "/",
-                      PSYNC_DEFAULT_POSIX_DBNAME, NULL);
-}
-
 char *ppath_default_db() {
-  char *dirpath, *path;
+  char *pcdir, *dbp, *home, *oldp;
   struct stat st;
-  dirpath = ppath_pcloud();
-  if (!dirpath)
+  
+  pcdir = ppath_pcloud();
+  if (!pcdir) {
     return NULL;
-  path = psync_strcat(dirpath, "/", PSYNC_DEFAULT_DB_NAME,
-                      NULL);
-  psync_free(dirpath);
-  if (stat(path, &st) &&
-      (dirpath = psync_get_default_database_path_old())) {
-    if (!stat(dirpath, &st)) {
-      if (psync_sql_reopen(dirpath)) {
-        psync_free(path);
-        return dirpath;
-      } else
-        psync_file_rename(dirpath, path);
-    }
-    psync_free(dirpath);
   }
-  return path;
+    
+  dbp = psync_strcat(pcdir, "/", PSYNC_DEFAULT_DB_NAME, NULL);
+  psync_free(pcdir);
+  
+  if (stat(dbp, &st)) {
+    // Inline the old database path function here
+    if ((home = ppath_home())) {
+      oldp = psync_strcat(home, "/", PSYNC_DEFAULT_POSIX_DBNAME, NULL);
+      psync_free(home);
+      
+      if (oldp) {
+        if (!stat(oldp, &st)) {
+          if (psync_sql_reopen(oldp)) {
+            psync_free(dbp);
+            return oldp;
+          } else {
+            psync_file_rename(oldp, dbp);
+          }
+        }
+        psync_free(oldp);
+      }
+    }
+  }
+  
+  return dbp;
 }
 
 int64_t ppath_free_space(const char *path) {
@@ -95,130 +69,118 @@ char *ppath_home() {
   return psync_strdup(dir);
 }
 
-int ppath_ls(const char *path, ppath_ls_cb callback,
-                   void *ptr) {
+int ppath_ls(const char *path, ppath_ls_cb callback, void *ptr) {
   ppath_stat pst;
   DIR *dh;
   char *cpath;
-  size_t pl, entrylen;
-  long namelen;
-  struct dirent *entry; // XXX: still useful?
+  size_t pl;
   struct dirent *de;
+  
   dh = opendir(path);
   if (unlikely(!dh)) {
     debug(D_WARNING, "could not open directory %s", path);
-    goto err1;
+    psync_error = PERROR_LOCAL_FOLDER_NOT_FOUND;
+    return -1;
   }
+  
   pl = strlen(path);
-  namelen = pathconf(path, _PC_NAME_MAX);
-  if (unlikely_log(namelen == -1))
-    namelen = 255;
-  if (namelen < sizeof(de->d_name) - 1)
-    namelen = sizeof(de->d_name) - 1;
-  entrylen = offsetof(struct dirent, d_name) + namelen + 1;
-  cpath = (char *)psync_malloc(pl + namelen + 2);
-  entry = (struct dirent *)psync_malloc(entrylen);
+  cpath = (char *)psync_malloc(pl + NAME_MAX + 2);
   memcpy(cpath, path, pl);
   if (!pl || cpath[pl - 1] != '/')
     cpath[pl++] = '/';
+  
   pst.path = cpath;
-
+  
   while ((de = readdir(dh))) {
-    if (de->d_name[0] != '.' ||
-        (de->d_name[1] != 0 && (de->d_name[1] != '.' || de->d_name[2] != 0))) {
-      psync_strlcpy(cpath + pl, de->d_name, namelen + 1);
-      if (likely_log(!lstat(cpath, &pst.stat)) &&
-          (S_ISREG(pst.stat.st_mode) || S_ISDIR(pst.stat.st_mode))) {
-        pst.name = de->d_name;
-        callback(ptr, &pst);
-      }
+    // Skip . and .. entries
+    if (de->d_name[0] == '.' && 
+        (de->d_name[1] == 0 || (de->d_name[1] == '.' && de->d_name[2] == 0)))
+      continue;
+      
+    psync_strlcpy(cpath + pl, de->d_name, NAME_MAX + 1);
+    
+    if (likely_log(!lstat(cpath, &pst.stat)) &&
+        (S_ISREG(pst.stat.st_mode) || S_ISDIR(pst.stat.st_mode))) {
+      pst.name = de->d_name;
+      callback(ptr, &pst);
     }
   }
-
-  psync_free(entry);
+  
   psync_free(cpath);
   closedir(dh);
   return 0;
-err1:
-  psync_error = PERROR_LOCAL_FOLDER_NOT_FOUND;
-  return -1;
 }
 
-int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback,
-                        void *ptr) {
+int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback, void *ptr) {
   ppath_fast_stat pst;
   struct stat st;
   DIR *dh;
   char *cpath;
-  size_t pl, entrylen;
-  long namelen;
-  struct dirent *entry; // XXX: still useful?
+  size_t pl;
   struct dirent *de;
+  
   dh = opendir(path);
-  if (unlikely_log(!dh))
-    goto err1;
+  if (unlikely_log(!dh)) {
+    psync_error = PERROR_LOCAL_FOLDER_NOT_FOUND;
+    return -1;
+  }
+  
   pl = strlen(path);
-  namelen = pathconf(path, _PC_NAME_MAX);
-  if (namelen == -1)
-    namelen = 255;
-  if (namelen < sizeof(de->d_name) - 1)
-    namelen = sizeof(de->d_name) - 1;
-  entrylen = offsetof(struct dirent, d_name) + namelen + 1;
-  cpath = (char *)psync_malloc(pl + namelen + 2);
-  entry = (struct dirent *)psync_malloc(entrylen);
+  cpath = (char *)psync_malloc(pl + NAME_MAX + 2);
   memcpy(cpath, path, pl);
   if (!pl || cpath[pl - 1] != '/')
     cpath[pl++] = '/';
-  // while (!readdir_r(dh, entry, &de) && de) { // DELETEME: deprecated
+  
   while ((de = readdir(dh))) {
-    if (de->d_name[0] != '.' ||
-        (de->d_name[1] != 0 && (de->d_name[1] != '.' || de->d_name[2] != 0))) {
-
-#if defined(DT_UNKNOWN) && defined(DT_DIR) && defined(DT_REG)
-      pst.name = de->d_name;
-      if (de->d_type == DT_UNKNOWN) {
-        psync_strlcpy(cpath + pl, de->d_name, namelen + 1);
-        if (unlikely_log(lstat(cpath, &st)))
-          continue;
-        pst.isfolder = S_ISDIR(st.st_mode);
-      } else if (de->d_type == DT_DIR)
-        pst.isfolder = 1;
-      else if (de->d_type == DT_REG)
-        pst.isfolder = 0;
-      else
-        continue;
+    // Skip . and .. entries
+    if (de->d_name[0] == '.' && 
+        (de->d_name[1] == 0 || (de->d_name[1] == '.' && de->d_name[2] == 0)))
+      continue;
+      
+    pst.name = de->d_name;
+    
+    if (de->d_type == DT_DIR) {
+      pst.isfolder = 1;
       callback(ptr, &pst);
-#else
-#include "ppath.h"
-
-      psync_strlcpy(cpath + pl, de->d_name, namelen + 1);
-      if (likely_log(!lstat(cpath, &st))) {
-        pst.name = de->d_name;
+    } 
+    else if (de->d_type == DT_REG) {
+      pst.isfolder = 0;
+      callback(ptr, &pst);
+    }
+    else if (de->d_type == DT_UNKNOWN) {
+      // Fall back to lstat for unknown file types
+      psync_strlcpy(cpath + pl, de->d_name, NAME_MAX + 1);
+      if (!unlikely_log(lstat(cpath, &st))) {
         pst.isfolder = S_ISDIR(st.st_mode);
         callback(ptr, &pst);
       }
-#endif
     }
+    // Ignore other file types
   }
-  psync_free(entry);
+  
   psync_free(cpath);
   closedir(dh);
   return 0;
-err1:
-  psync_error = PERROR_LOCAL_FOLDER_NOT_FOUND;
-  return -1;
 }
 
 char *ppath_pcloud() {
-  char *path;
+  char *homedir, *path;
   struct stat st;
-  path = psync_get_pcloud_path_nc();
-  if (unlikely_log(!path))
+  
+  if (!(homedir = ppath_home())) {
     return NULL;
+  }
+
+  path = psync_strcat(homedir, "/", PSYNC_DEFAULT_POSIX_DIR, NULL);
+  psync_free(homedir);
+  if (unlikely_log(!path)) {
+    return NULL; 
+  }
+
   if (stat(path, &st) && unlikely_log(mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE))) {
     psync_free(path);
     return NULL;
-  }
+  } 
   return path;
 }
 
