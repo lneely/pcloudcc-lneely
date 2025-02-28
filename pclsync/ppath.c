@@ -27,7 +27,6 @@ static char *psync_get_pcloud_path_nc() {
                       NULL);
 }
 
-
 static char *psync_get_default_database_path_old() {
   struct stat st;
   const char *dir;
@@ -47,6 +46,54 @@ static char *psync_get_default_database_path_old() {
                       PSYNC_DEFAULT_POSIX_DBNAME, NULL);
 }
 
+char *ppath_default_db() {
+  char *dirpath, *path;
+  struct stat st;
+  dirpath = ppath_pcloud();
+  if (!dirpath)
+    return NULL;
+  path = psync_strcat(dirpath, "/", PSYNC_DEFAULT_DB_NAME,
+                      NULL);
+  psync_free(dirpath);
+  if (stat(path, &st) &&
+      (dirpath = psync_get_default_database_path_old())) {
+    if (!stat(dirpath, &st)) {
+      if (psync_sql_reopen(dirpath)) {
+        psync_free(path);
+        return dirpath;
+      } else
+        psync_file_rename(dirpath, path);
+    }
+    psync_free(dirpath);
+  }
+  return path;
+}
+
+int64_t ppath_free_space(const char *path) {
+  struct statvfs buf;
+  if (unlikely_log(statvfs(path, &buf)))
+    return -1;
+  else
+    return (int64_t)buf.f_bavail * (int64_t)buf.f_frsize;
+}
+
+char *ppath_home() {
+  struct stat st;
+  const char *dir;
+  dir = getenv("HOME");
+  if (unlikely_log(!dir) || unlikely_log(stat(dir, &st)) ||
+      unlikely_log(!psync_stat_mode_ok(&st, 7))) {
+    struct passwd pwd;
+    struct passwd *result;
+    char buff[4096];
+    if (unlikely_log(getpwuid_r(getuid(), &pwd, buff, sizeof(buff), &result)) ||
+        unlikely_log(stat(result->pw_dir, &st)) ||
+        unlikely_log(!psync_stat_mode_ok(&st, 7)))
+      return NULL;
+    dir = result->pw_dir;
+  }
+  return psync_strdup(dir);
+}
 
 int ppath_ls(const char *path, ppath_ls_cb callback,
                    void *ptr) {
@@ -162,33 +209,6 @@ err1:
   return -1;
 }
 
-char *ppath_home() {
-  struct stat st;
-  const char *dir;
-  dir = getenv("HOME");
-  if (unlikely_log(!dir) || unlikely_log(stat(dir, &st)) ||
-      unlikely_log(!psync_stat_mode_ok(&st, 7))) {
-    struct passwd pwd;
-    struct passwd *result;
-    char buff[4096];
-    if (unlikely_log(getpwuid_r(getuid(), &pwd, buff, sizeof(buff), &result)) ||
-        unlikely_log(stat(result->pw_dir, &st)) ||
-        unlikely_log(!psync_stat_mode_ok(&st, 7)))
-      return NULL;
-    dir = result->pw_dir;
-  }
-  return psync_strdup(dir);
-}
-
-
-int64_t ppath_free_space(const char *path) {
-  struct statvfs buf;
-  if (unlikely_log(statvfs(path, &buf)))
-    return -1;
-  else
-    return (int64_t)buf.f_bavail * (int64_t)buf.f_frsize;
-}
-
 char *ppath_pcloud() {
   char *path;
   struct stat st;
@@ -219,27 +239,4 @@ char *ppath_private(char *name) {
 
 char *ppath_private_tmp() {
   return ppath_private(PSYNC_DEFAULT_TMP_DIR);
-}
-
-char *ppath_default_db() {
-  char *dirpath, *path;
-  struct stat st;
-  dirpath = ppath_pcloud();
-  if (!dirpath)
-    return NULL;
-  path = psync_strcat(dirpath, "/", PSYNC_DEFAULT_DB_NAME,
-                      NULL);
-  psync_free(dirpath);
-  if (stat(path, &st) &&
-      (dirpath = psync_get_default_database_path_old())) {
-    if (!stat(dirpath, &st)) {
-      if (psync_sql_reopen(dirpath)) {
-        psync_free(path);
-        return dirpath;
-      } else
-        psync_file_rename(dirpath, path);
-    }
-    psync_free(dirpath);
-  }
-  return path;
 }
