@@ -38,7 +38,6 @@
 #include <mbedtls/sha256.h>
 #include <mbedtls/sha512.h>
 
-#include "pcompat.h"
 #include "pcompiler.h"
 
 #define PSYNC_AES256_BLOCK_SIZE 16

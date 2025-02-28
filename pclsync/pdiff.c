@@ -62,6 +62,7 @@
 #include "pstatus.h"
 #include "psynclib.h"
 #include "psyncer.h"
+#include "psys.h"
 #include "ptasks.h"
 #include "ptimer.h"
 #include "ptools.h"
@@ -378,7 +379,7 @@ static psync_socket *get_connected_socket() {
     if (!auth && (!pass || !user)) {
       if (tfa) {
         tfa = 0;
-        psync_milisleep(1000);
+        sys_sleep_milliseconds(1000);
         debug(D_WARNING, "tfa sleep");
         continue;
       }
@@ -394,7 +395,7 @@ static psync_socket *get_connected_socket() {
 
     if (unlikely_log(!sock)) {
       psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
-      psync_milisleep(PSYNC_SLEEP_BEFORE_RECONNECT);
+      sys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       continue;
     }
     osversion = pdevice_get_os();
@@ -451,7 +452,7 @@ static psync_socket *get_connected_socket() {
     if (unlikely_log(!res)) {
       psync_socket_close(sock);
       psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
-      psync_milisleep(PSYNC_SLEEP_BEFORE_RECONNECT);
+      sys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       psync_api_conn_fail_inc();
       continue;
     }
@@ -530,7 +531,7 @@ static psync_socket *get_connected_socket() {
             debug(D_NOTICE,
                   "got %lu, for user=%s, not rising PSTATUS_AUTH_BADLOGIN",
                   (unsigned long)result, user);
-            psync_milisleep(1000);
+            sys_sleep_milliseconds(1000);
             continue;
           } else {
             psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADLOGIN);
@@ -543,7 +544,7 @@ static psync_socket *get_connected_socket() {
         }
         psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       } else if (result == 4000)
-        psync_milisleep(5 * 60 * 1000);
+        sys_sleep_milliseconds(5 * 60 * 1000);
       else if (result == 2205 || result == 2229) {
         psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
         psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_EXPIRED);
@@ -552,7 +553,7 @@ static psync_socket *get_connected_socket() {
         digest = 0;
         continue;
       } else
-        psync_milisleep(PSYNC_SLEEP_BEFORE_RECONNECT);
+        sys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       continue;
     }
 
@@ -1754,7 +1755,7 @@ static void process_modifyuserinfo(const binresult *entry) {
     if (!crst)
       crstat = 1;
     else {
-      if (psync_time() > crexp)
+      if (sys_time_seconds() > crexp)
         crstat = 3;
       else
         crstat = 2;
@@ -2712,7 +2713,7 @@ static void psync_diff_refresh_thread(void *ptr) {
   refresh_folders_ptr_t *fr;
   psync_folderid_t lastfolderid;
   uint32_t i;
-  psync_milisleep(1000);
+  sys_sleep_milliseconds(1000);
   fr = (refresh_folders_ptr_t *)ptr;
   qsort(fr->refresh_folders, fr->refresh_last, sizeof(psync_folderid_t),
         cmp_folderid);
@@ -2799,7 +2800,7 @@ static void psync_run_analyze_if_needed() {
       psync_sql_statement(sql);
       psync_free(sql);
       debug(D_NOTICE, "table done");
-      psync_milisleep(5);
+      sys_sleep_milliseconds(5);
     }
     psync_free(tablenames);
     res = psync_sql_prep_statement(
@@ -2909,7 +2910,7 @@ restart:
       debug(D_ERROR, "diff returned error %u: %s", (unsigned int)result,
             psync_find_result(res, "error", PARAM_STR)->str);
       psync_socket_close(sock);
-      psync_milisleep(PSYNC_SLEEP_BEFORE_RECONNECT);
+      sys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       goto restart;
     }
     entries = psync_find_result(res, "entries", PARAM_ARRAY);
@@ -2933,7 +2934,7 @@ restart:
   debug(D_NOTICE, "initial sync finished");
   if (psync_diff_check_quota(sock)) {
     psync_socket_close(sock);
-    psync_milisleep(PSYNC_SLEEP_BEFORE_RECONNECT);
+    sys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
     goto restart;
   }
   check_overquota();
@@ -2953,7 +2954,7 @@ restart:
   psync_timer_register(psync_diff_adapter_timer,
                        PSYNC_DIFF_CHECK_ADAPTER_CHANGE_SEC, NULL);
   send_diff_command(sock, ids);
-  psync_milisleep(50);
+  sys_sleep_milliseconds(50);
   last_event = 0;
 
   while (psync_do_run) {

@@ -33,6 +33,7 @@
 #define _PSYNC_SETTINGS_H
 
 #include "pcompiler.h"
+#include "pssl.h"
 #include <stdint.h>
 
 #define PSYNC_LIB_VERSION "1.5.1"

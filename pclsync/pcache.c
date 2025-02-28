@@ -42,6 +42,7 @@
 #include "prun.h"
 #include "pssl.h"
 #include "psynclib.h"
+#include "psys.h"
 #include "ptimer.h"
 #include <string.h>
 
@@ -80,7 +81,7 @@ void psync_cache_init() {
     pthread_mutexattr_destroy(&mattr);
   }
   // do not use psync_ssl_rand_* here as it is not yet initialized
-  hash_seed = psync_time() * 0xc2b2ae35U;
+  hash_seed = sys_time_seconds() * 0xc2b2ae35U;
 }
 
 static uint32_t hash_func(const char *key) {

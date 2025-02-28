@@ -113,15 +113,6 @@ typedef struct {
 #define psync_def_var_arr(name, type, size) type name[size]
 #define psync_stat_fast_isfolder(a) ((a)->isfolder)
 
-// System Initialization and Configuration
-void psync_sys_init();
-
-// Time and Sleep Functions
-time_t psync_time();
-uint64_t psync_millitime();
-void psync_milisleep(uint64_t millisec);
-void psync_milisleep_nosqlcheck(uint64_t millisec);
-
 // Entropy
 void psync_get_random_seed(unsigned char *seed, const void *addent, size_t aelen, int fast);
 

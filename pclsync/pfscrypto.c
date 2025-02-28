@@ -45,6 +45,7 @@
 #include "ppagecache.h"
 #include "ppath.h"
 #include "prun.h"
+#include "psys.h"
 
 // this is only for debug, adds needless checks of tree for local files
 #if IS_DEBUG
@@ -345,7 +346,7 @@ static int psync_fs_crypto_wait_no_extender_locked(psync_openfile_t *of) {
     ret = of->extender->error;
     do {
       pthread_mutex_unlock(&of->mutex);
-      psync_milisleep(1);
+      sys_sleep_milliseconds(1);
       psync_fs_lock_file(of);
     } while (of->extender);
     debug(D_NOTICE, "waited for extender to finish");
@@ -924,7 +925,7 @@ static int psync_fs_crypto_process_log(int lfd, int dfd,
 static void wait_before_flush(psync_openfile_t *of, uint32_t millisec) {
   debug(D_NOTICE, "waiting up to %u milliseconds before flush of %s",
         (unsigned)millisec, of->currentname);
-  psync_milisleep(millisec);
+  sys_sleep_milliseconds(millisec);
 }
 
 /*static int psync_fs_flush_cache_dir(){
@@ -1865,7 +1866,7 @@ static void psync_fs_extender_thread(void *ptr) {
     debug(D_NOTICE, "waiting for waiters to finish");
     pthread_cond_broadcast(&ext->cond);
     pthread_mutex_unlock(&of->mutex);
-    psync_milisleep(1);
+    sys_sleep_milliseconds(1);
     psync_fs_lock_file(of);
   }
   of->extender = NULL;

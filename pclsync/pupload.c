@@ -46,12 +46,11 @@
 #include "pfolder.h"
 #include "plibs.h"
 #include "plist.h"
-#include "plocalscan.h"
 #include "pnetlibs.h"
 #include "ppathstatus.h"
 #include "prun.h"
 #include "psettings.h"
-#include "pssl.h"
+#include "psys.h"
 #include "pstatus.h"
 #include "ptasks.h"
 #include "ptimer.h"
@@ -1362,12 +1361,12 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
         if (ctime < psync_stat_mtime(&st))
           ctime = psync_stat_mtime(&st);
         if (psync_stat_mtime(&st) + PSYNC_UPLOAD_OLDER_THAN_SEC > ctime)
-          psync_milisleep(
+          sys_sleep_milliseconds(
               (psync_stat_mtime(&st) + PSYNC_UPLOAD_OLDER_THAN_SEC - ctime) *
                   1000 +
               500);
         else
-          psync_milisleep(500);
+          sys_sleep_milliseconds(500);
         if (stat(localpath, &st)) {
           debug(D_NOTICE, "can not stat %s anymore, failing for now",
                 localpath);
@@ -1390,7 +1389,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
   if (!lock) {
     debug(D_NOTICE, "file %s is currently locked, skipping for now", localpath);
     psync_free(localpath);
-    psync_milisleep(PSYNC_SLEEP_ON_LOCKED_FILE);
+    sys_sleep_milliseconds(PSYNC_SLEEP_ON_LOCKED_FILE);
     return -1;
   }
   res = psync_sql_query_rdlock("SELECT uploadid FROM localfileupload WHERE "
@@ -1557,7 +1556,7 @@ static void task_run_upload_file_thread(void *ptr) {
   ut = (upload_task_t *)ptr;
   if (task_uploadfile(ut->upllist.syncid, ut->upllist.localfileid, ut->filename,
                       &ut->upllist)) {
-    psync_milisleep(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
+    sys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
     res = psync_sql_prep_statement("UPDATE task SET inprogress=0 WHERE id=?");
     psync_sql_bind_uint(res, 1, ut->upllist.taskid);
     psync_sql_run_free(res);
@@ -1738,7 +1737,7 @@ static void upload_thread() {
           psync_sql_run_free(res);
         }
       } else if (type != PSYNC_UPLOAD_FILE)
-        psync_milisleep(PSYNC_SLEEP_ON_FAILED_UPLOAD);
+        sys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_UPLOAD);
       psync_free(row);
       continue;
     }

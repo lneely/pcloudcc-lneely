@@ -37,7 +37,7 @@
 #include "prun.h"
 #include "psettings.h"
 #include "ptimer.h"
-#include "ptree.h"
+#include "psys.h"
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -386,7 +386,7 @@ static void psync_sql_wal_checkpoint() {
   debug(D_NOTICE, "checkpointing database");
   code = sqlite3_wal_checkpoint(psync_db, NULL);
   while (code == SQLITE_LOCKED) {
-    psync_milisleep(2);
+    sys_sleep_milliseconds(2);
     code = sqlite3_wal_checkpoint(psync_db, NULL);
   }
   pthread_mutex_unlock(&psync_db_checkpoint_mutex);
@@ -478,7 +478,7 @@ int psync_sql_close() {
       psync_cache_clean_all();
       tries++;
       if (tries > 100) {
-        psync_milisleep_nosqlcheck(tries - 90);
+        sys_sleep_milliseconds_fast(tries - 90);
         if (tries > 200) {
           debug(D_ERROR, "failed to close database");
           break;

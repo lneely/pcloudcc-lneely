@@ -51,9 +51,8 @@
 #include "plist.h"
 #include "pnetlibs.h"
 #include "ppagecache.h"
-#include "ppathstatus.h"
 #include "psettings.h"
-#include "pssl.h"
+#include "psys.h"
 #include "pstatus.h"
 #include "ptimer.h"
 #include "pupload.h"
@@ -378,7 +377,7 @@ static int handle_upload_api_error_taskid(uint64_t result, uint64_t taskid) {
     if (locked)
       psync_sql_commit_transaction();
     assert(!psync_sql_islocked());
-    psync_milisleep(PSYNC_SLEEP_ON_DISK_FULL);
+    sys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
     if (locked)
       psync_sql_start_transaction();
     return -1;
@@ -1224,7 +1223,7 @@ static void large_upload() {
       psync_sql_free_result(res);
       if (uploadid != 2)
         psync_fsupload_wake();
-      psync_milisleep(PSYNC_SLEEP_ON_FAILED_UPLOAD);
+      sys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_UPLOAD);
     }
     psync_free(indexname);
     psync_free(filename);
@@ -2008,7 +2007,7 @@ err:
   async_result_reader_destroy(&reader);
   psync_timer_notify_exception();
   upload_wakes++;
-  psync_milisleep(PSYNC_SLEEP_ON_FAILED_UPLOAD);
+  sys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_UPLOAD);
 }
 
 static void clean_stuck_tasks() {
@@ -2131,7 +2130,7 @@ static void psync_fsupload_thread() {
                               ARRAY_SIZE(requiredstatusesnooverquota));
     // it is better to sleep a bit to give a chance for events to accumulate
     if (waited)
-      psync_milisleep(100);
+      sys_sleep_milliseconds(100);
     psync_fsupload_check_tasks();
     pthread_mutex_lock(&upload_mutex);
     while (!upload_wakes) {

@@ -45,7 +45,7 @@
 #include "plibs.h"
 #include "plist.h"
 #include "pnetlibs.h"
-#include "psettings.h"
+#include "psys.h"
 #include "ppath.h"
 
 #include <stddef.h>
@@ -133,7 +133,7 @@ static psync_folderid_t wait_folder_id_in_db(psync_folderid_t folderid) {
     psync_sql_free_result(res);
     if (row)
       return folderid;
-    psync_milisleep(50);
+    sys_sleep_milliseconds(50);
   }
   return PSYNC_INVALID_FOLDERID;
 }

@@ -30,6 +30,7 @@
 #include "pfolder.h"
 #include "plibs.h"
 #include "pnetlibs.h"
+#include "psys.h"
 
 #include <stdio.h>
 
@@ -698,7 +699,7 @@ void psync_update_cryptostatus() {
       if (!crst)
         crstat = 1;
       else {
-        if (psync_time() > crexp)
+        if (sys_time_seconds() > crexp)
           crstat = 3;
         else
           crstat = 2;

@@ -69,6 +69,7 @@
 #include "psettings.h"
 #include "pssl.h"
 #include "psynclib.h"
+#include "psys.h"
 #include "ptimer.h"
 #include "ppath.h"
 
@@ -76,11 +77,6 @@ extern char **environ;
 
 #define PROXY_NONE 0
 #define PROXY_CONNECT 1
-
-static uid_t psync_uid;
-static gid_t psync_gid;
-static gid_t *psync_gids;
-static int psync_gids_cnt;
 
 static int proxy_type = PROXY_NONE;
 static int proxy_detected = 0;
@@ -103,89 +99,34 @@ const unsigned char psync_invalid_filename_chars[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-void psync_sys_init() {
-  struct rlimit limit;
-  limit.rlim_cur = limit.rlim_max = 2048;
-  if (setrlimit(RLIMIT_NOFILE, &limit))
-    debug(D_ERROR, "setrlimit failed errno=%d", errno);
-#if IS_DEBUG
-  if (getrlimit(RLIMIT_CORE, &limit))
-    debug(D_ERROR, "getrlimit failed errno=%d", errno);
-  else {
-    limit.rlim_cur = limit.rlim_max;
-    if (setrlimit(RLIMIT_CORE, &limit))
-      debug(D_ERROR, "setrlimit failed errno=%d", errno);
-  }
-#endif
-  signal(SIGPIPE, SIG_IGN);
-  psync_uid = getuid();
-  psync_gid = getgid();
-  psync_gids_cnt = getgroups(0, NULL);
-  psync_gids = psync_new_cnt(gid_t, psync_gids_cnt);
-  if (unlikely_log(getgroups(psync_gids_cnt, psync_gids) != psync_gids_cnt))
-    psync_gids_cnt = 0;
-  pmemlock_set_pagesize(sysconf(_SC_PAGESIZE));
-  debug(D_NOTICE, "detected page size %d", pmemlock_get_pagesize());
-}
-
 int psync_stat_mode_ok(struct stat *buf, unsigned int bits) {
   int i;
-  if (psync_uid == 0)
+  uid_t psync_uid;
+  gid_t *psync_gids;
+  int psync_gids_cnt;
+
+  psync_uid = psys_get_uid();
+  if (psync_uid == 0) {
     return 1;
+  }
   if (buf->st_uid == psync_uid) {
     bits <<= 6;
     return (buf->st_mode & bits) == bits;
   }
-  if (buf->st_gid == psync_gid) {
+  if (buf->st_gid == psys_get_gid()) {
     bits <<= 3;
     return (buf->st_mode & bits) == bits;
   }
-  for (i = 0; i < psync_gids_cnt; i++)
+
+  psync_gids = psys_get_gids();
+  psync_gids_cnt = psys_get_gids_cnt();
+  for (i = 0; i < psync_gids_cnt; i++) {
     if (buf->st_gid == psync_gids[i]) {
       bits <<= 3;
       return (buf->st_mode & bits) == bits;
     }
-  return (buf->st_mode & bits) == bits;
-}
-
-static void psync_check_no_sql_lock(uint64_t millisec) {
-#if IS_DEBUG
-  if (psync_sql_islocked()) {
-    debug(D_CRITICAL, "trying to sleep while holding sql lock, aborting");
-    psync_sql_dump_locks();
-    abort();
   }
-#endif
-}
-
-void psync_milisleep_nosqlcheck(uint64_t millisec) {
-  struct timespec tm;
-  tm.tv_sec = millisec / 1000;
-  tm.tv_nsec = (millisec % 1000) * 1000000;
-  nanosleep(&tm, NULL);
-}
-
-void psync_milisleep(uint64_t millisec) {
-  psync_check_no_sql_lock(millisec);
-  psync_milisleep_nosqlcheck(millisec);
-}
-
-time_t psync_time() {
-#if defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0
-  struct timespec ts;
-  if (likely_log(clock_gettime(CLOCK_REALTIME, &ts) == 0))
-    return ts.tv_sec;
-  else
-    return time(NULL);
-#else
-  return time(NULL);
-#endif
-}
-
-uint64_t psync_millitime() {
-  struct timespec tm;
-  clock_gettime(CLOCK_REALTIME, &tm);
-  return tm.tv_sec * 1000 + tm.tv_nsec / 1000000;
+  return (buf->st_mode & bits) == bits;
 }
 
 static void psync_add_file_to_seed(const char *fn, psync_lhash_ctx *hctx,
@@ -1976,7 +1917,7 @@ int psync_run_update_file(const char *path) {
     return -1;
   } else if (pid) {
     int status;
-    psync_milisleep(100);
+    sys_sleep_milliseconds(100);
     if (waitpid(pid, &status, WNOHANG) == 0)
       return 0;
     else
