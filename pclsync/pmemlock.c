@@ -37,9 +37,9 @@
 #include <pthread.h>
 
 #include "pcloudcrypto.h"
-#include "pcompat.h"
 #include "pintervaltree.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "pmemlock.h"
 #include "ptree.h"
 #include <stdint.h>
@@ -118,7 +118,7 @@ retry:
     // properly, an status "in progress" should be introduced for new elements
     // in the tree that mlock is yet not returned. This will complicate things a
     // lot.
-    if (unlikely(psync_mlock((void *)(pageid * page_size), page_size))) {
+    if (unlikely(pmem_mlock((void *)(pageid * page_size), page_size))) {
       if (!tryn) {
         tryn++;
         pthread_mutex_unlock(&page_mutex);
@@ -167,7 +167,7 @@ static int unlock_page(pageid_t pageid, int page_size) {
       psync_tree_del(&locked_pages, tr);
       psync_free(node);
       // do not move out of the mutex, will create race conditions
-      if (unlikely(psync_munlock((void *)(pageid * page_size), page_size)))
+      if (unlikely(pmem_munlock((void *)(pageid * page_size), page_size)))
         ret = PRINT_RETURN(-1);
       else {
         debug(D_NOTICE, "unlocked page %lx", (unsigned long)pageid * page_size);
@@ -291,7 +291,7 @@ void *pmemlock_malloc(size_t size) {
   intsize = (size + LM_RANGE_OVERHEAD + page_size - 1) / page_size * page_size;
   brange = psync_new(allocator_range);
   brange->freeintervals = NULL;
-  brange->mem = psync_mmap_anon_safe(intsize);
+  brange->mem = pmem_mmap_safe(intsize);
   brange->size = intsize;
   debug(D_NOTICE, "allocating new locked block of size %lu at %p",
         (unsigned long)intsize, brange->mem);
@@ -394,7 +394,7 @@ found:
           (unsigned long)range->size, range->mem);
     if (range->locked)
       pmemlock_unlock(range->mem, range->size);
-    psync_munmap_anon(range->mem, range->size);
+    pmem_munmap(range->mem, range->size);
     psync_free(range);
   }
 }

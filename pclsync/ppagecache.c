@@ -41,6 +41,7 @@
 #include "pfscrypto.h"
 #include "pfsupload.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "pnetlibs.h"
 #include "ppagecache.h"
 #include "prun.h"
@@ -1534,7 +1535,7 @@ static void psync_pagecache_flush_timer(psync_timer_t timer, void *ptr) {
   if (cache_pages_free == CACHE_PAGES && !cache_pages_reset) {
     cache_pages_reset = 1;
     debug(D_NOTICE, "resetting free pages");
-    psync_anon_reset(pages_base, CACHE_PAGES * PSYNC_FS_PAGE_SIZE);
+    pmem_reset(pages_base, CACHE_PAGES * PSYNC_FS_PAGE_SIZE);
   }
   pthread_mutex_unlock(&cache_mutex);
 }
@@ -3766,7 +3767,7 @@ void psync_pagecache_init() {
   pthread_mutex_init(&wait_page_mutex, NULL);
   psync_list_init(&free_pages);
   memset(cachepages_to_update, 0, sizeof(cachepages_to_update));
-  pages_base = (char *)psync_mmap_anon_safe(
+  pages_base = (char *)pmem_mmap_safe(
       CACHE_PAGES * (PSYNC_FS_PAGE_SIZE + sizeof(psync_cache_page_t)));
   page_data = pages_base;
   page = (psync_cache_page_t *)(page_data + CACHE_PAGES * PSYNC_FS_PAGE_SIZE);

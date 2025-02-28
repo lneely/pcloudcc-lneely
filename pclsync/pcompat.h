@@ -122,14 +122,6 @@ uint64_t psync_millitime();
 void psync_milisleep(uint64_t millisec);
 void psync_milisleep_nosqlcheck(uint64_t millisec);
 
-// Memory Management
-void *psync_mmap_anon(size_t size);
-void *psync_mmap_anon_safe(size_t size);
-int psync_munmap_anon(void *ptr, size_t size);
-int psync_mlock(void *ptr, size_t size);
-int psync_munlock(void *ptr, size_t size);
-void psync_anon_reset(void *ptr, size_t size);
-
 // Entropy
 void psync_get_random_seed(unsigned char *seed, const void *addent, size_t aelen, int fast);
 

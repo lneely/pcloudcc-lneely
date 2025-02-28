@@ -47,7 +47,6 @@
 #include <utime.h>
 
 #include <sys/ioctl.h>
-#include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
@@ -2004,69 +2003,3 @@ int psync_invalidate_os_cache_needed() { return 0; }
 extern int overlays_running;
 
 int psync_invalidate_os_cache(const char *path) { return 0; }
-
-void *psync_mmap_anon(size_t size) {
-#if defined(MAP_ANONYMOUS)
-  return mmap(NULL, size, PROT_READ | PROT_WRITE,
-              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-#else
-  return malloc(size);
-#endif
-}
-
-PSYNC_NOINLINE static void *psync_mmap_anon_emergency(size_t size) {
-  void *ret;
-  debug(D_WARNING, "could not allocate %lu bytes", size);
-  psync_try_free_memory();
-  ret = psync_mmap_anon(size);
-  if (likely(ret))
-    return ret;
-  else {
-    debug(
-        D_CRITICAL,
-        "could not allocate %lu bytes even after freeing some memory, aborting",
-        size);
-    abort();
-    return NULL;
-  }
-}
-
-void *psync_mmap_anon_safe(size_t size) {
-  void *ret;
-  ret = psync_mmap_anon(size);
-  if (likely(ret))
-    return ret;
-  else
-    return psync_mmap_anon_emergency(size);
-}
-
-int psync_munmap_anon(void *ptr, size_t size) {
-#if defined(MAP_ANONYMOUS)
-  return munmap(ptr, size);
-#else
-  free(ptr);
-  return 0;
-#endif
-}
-
-void psync_anon_reset(void *ptr, size_t size) {
-#if defined(MAP_ANONYMOUS) && defined(MADV_DONTNEED)
-  madvise(ptr, size, MADV_DONTNEED);
-#endif
-}
-
-int psync_mlock(void *ptr, size_t size) {
-#if defined(_POSIX_MEMLOCK_RANGE)
-  return mlock(ptr, size);
-#else
-  return -1;
-#endif
-}
-
-int psync_munlock(void *ptr, size_t size) {
-#if defined(_POSIX_MEMLOCK_RANGE)
-  return munlock(ptr, size);
-#else
-  return -1;
-#endif
-}
