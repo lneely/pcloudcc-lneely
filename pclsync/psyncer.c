@@ -39,6 +39,7 @@
 
 #include "pcallbacks.h"
 #include "pdownload.h"
+#include "pfile.h"
 #include "pfolder.h"
 #include "plibs.h"
 #include "plocalnotify.h"

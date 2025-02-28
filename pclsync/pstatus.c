@@ -29,6 +29,7 @@
    DAMAGE.
 */
 
+#include "pfile.h"
 #include "pstatus.h"
 #include "pcallbacks.h"
 #include "pfstasks.h"

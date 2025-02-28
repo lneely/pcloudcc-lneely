@@ -285,20 +285,20 @@ psync_pagecache_get_free_page(int runflushcacheinside) {
 static int psync_api_send_read_request(psock_t *api, psync_fileid_t fileid,
                                        uint64_t hash, uint64_t offset,
                                        uint64_t length) {
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("fileid", fileid),
-                       P_NUM("hash", hash), P_NUM("offset", offset),
-                       P_NUM("count", length)};
-  return send_command_no_res(api, "readfile", params) == PTR_OK ? 0 : -1;
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("fileid", fileid),
+                       PAPI_NUM("hash", hash), PAPI_NUM("offset", offset),
+                       PAPI_NUM("count", length)};
+  return papi_send_no_res(api, "readfile", params) == PTR_OK ? 0 : -1;
 }
 
 static int psync_api_send_read_request_thread(psock_t *api,
                                               psync_fileid_t fileid,
                                               uint64_t hash, uint64_t offset,
                                               uint64_t length) {
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("fileid", fileid),
-                       P_NUM("hash", hash), P_NUM("offset", offset),
-                       P_NUM("count", length)};
-  return send_command_no_res_thread(api, "readfile", params) == PTR_OK ? 0 : -1;
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("fileid", fileid),
+                       PAPI_NUM("hash", hash), PAPI_NUM("offset", offset),
+                       PAPI_NUM("count", length)};
+  return papi_send_no_res_thread(api, "readfile", params) == PTR_OK ? 0 : -1;
 }
 
 static void psync_pagecache_send_page_wait_page(psync_page_wait_t *pw,
@@ -346,17 +346,17 @@ static int psync_pagecache_read_range_from_api(psync_request_t *request,
   int rb;
   first_page_id = range->offset / PSYNC_FS_PAGE_SIZE;
   len = range->length / PSYNC_FS_PAGE_SIZE;
-  res = get_result_thread(api);
+  res = papi_result_thread(api);
   if (unlikely_log(!res))
     return -2;
-  dlen = psync_find_result(res, "result", PARAM_NUM)->num;
+  dlen = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(dlen)) {
     psync_free(res);
     debug(D_WARNING, "readfile returned error %lu", (long unsigned)dlen);
     psync_process_api_error(dlen);
     return -2;
   }
-  dlen = psync_find_result(res, "data", PARAM_DATA)->num;
+  dlen = papi_find_result2(res, "data", PARAM_DATA)->num;
   psync_free(res);
   for (i = 0; i < len; i++) {
     page = psync_pagecache_get_free_page(0);
@@ -522,17 +522,17 @@ static void psync_pagecache_set_bad_encoder(psync_openfile_t *of) {
 }
 
 static int send_key_request(psock_t *api, psync_request_t *request) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("fileid", request->fileid)};
-  return send_command_no_res(api, "crypto_getfilekey", params) != PTR_OK ? -1
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("fileid", request->fileid)};
+  return papi_send_no_res(api, "crypto_getfilekey", params) != PTR_OK ? -1
                                                                          : 0;
 }
 
 static int get_urls(psync_request_t *request, psync_urls_t *urls) {
   binparam params[] = {
-      P_STR("auth", psync_my_auth), P_NUM("fileid", request->fileid),
-      P_NUM("hash", request->hash), P_STR("timeformat", "timestamp"),
-      P_BOOL("skipfilename", 1)};
+      PAPI_STR("auth", psync_my_auth), PAPI_NUM("fileid", request->fileid),
+      PAPI_NUM("hash", request->hash), PAPI_STR("timeformat", "timestamp"),
+      PAPI_BOOL("skipfilename", 1)};
   psock_t *api;
   binresult *ret;
   psync_request_range_t *range;
@@ -551,7 +551,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
     if (unlikely_log(!api))
       continue;
     psock_set_write_buffered(api);
-    if (unlikely(send_command_no_res(api, "getfilelink", params) != PTR_OK))
+    if (unlikely(papi_send_no_res(api, "getfilelink", params) != PTR_OK))
       goto err1;
     if (request->needkey && send_key_request(api, request))
       goto err1;
@@ -567,12 +567,12 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
       totalreqlen += range->length;
     }
     mark_api_shared(api);
-    ret = get_result_thread(api);
+    ret = papi_result_thread(api);
     if (unlikely_log(!ret)) {
       mark_shared_api_bad(api);
       goto err1;
     }
-    result = psync_find_result(ret, "result", PARAM_NUM)->num;
+    result = papi_find_result2(ret, "result", PARAM_NUM)->num;
     if (unlikely(result != 0)) {
       debug(D_WARNING, "getfilelink returned error %lu", result);
       psync_free(ret);
@@ -581,7 +581,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
       psync_process_api_error(result);
       break;
     }
-    hosts = psync_find_result(ret, "hosts", PARAM_ARRAY);
+    hosts = papi_find_result2(ret, "hosts", PARAM_ARRAY);
     debug(D_NOTICE, "got file URLs of fileid %lu, hash %lu",
           (unsigned long)request->fileid, (unsigned long)request->hash);
     if (likely_log(hosts->length && hosts->array[0]->type == PARAM_STR) &&
@@ -590,10 +590,10 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
     set_urls(urls, ret);
     if (request->needkey) {
       psync_crypto_aes256_sector_encoder_decoder_t enc;
-      ret = get_result_thread(api);
+      ret = papi_result_thread(api);
       if (unlikely_log(!ret))
         goto err3;
-      result = psync_find_result(ret, "result", PARAM_NUM)->num;
+      result = papi_find_result2(ret, "result", PARAM_NUM)->num;
       if (unlikely(result != 0)) {
         debug(D_WARNING, "crypto_getfilekey returned error %lu", result);
         psync_process_api_error(result);
@@ -715,7 +715,7 @@ static void release_urls(psync_urls_t *urls) {
       time_t ctime, etime;
       psync_tree_del(&url_cache_tree, &urls->tree);
       ctime = psync_timer_time();
-      etime = psync_find_result(urls->urls, "expires", PARAM_NUM)->num;
+      etime = papi_find_result2(urls->urls, "expires", PARAM_NUM)->num;
       if (etime > ctime + 3600) {
         psync_get_string_id(buff, "URLS", urls->hash);
         psync_cache_add(buff, urls->urls, etime - ctime - 3600, psync_free, 2);
@@ -2034,7 +2034,7 @@ char *psync_http_construct_range_next_header(psync_request_t *request,
   buff[off--] = 0;
   buff[off--] = '\012';
   buff[off--] = '\015';
-  dwltag = psync_find_result(urls->urls, "dwltag", PARAM_STR);
+  dwltag = papi_find_result2(urls->urls, "dwltag", PARAM_STR);
   if (dwltag->length <= 40 && dwltag->length > 0) {
     off -= dwltag->length - 1;
     memcpy(buff + off, dwltag->str, dwltag->length);
@@ -2112,9 +2112,9 @@ retry:
     psync_pagecache_free_request(request);
     return;
   }
-  hosts = psync_find_result(urls->urls, "hosts", PARAM_ARRAY);
+  hosts = papi_find_result2(urls->urls, "hosts", PARAM_ARRAY);
   psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
-                 psync_find_result(urls->urls, "dwltag", PARAM_STR)->str);
+                 papi_find_result2(urls->urls, "dwltag", PARAM_STR)->str);
   sock = psync_http_connect_multihost_from_cache(hosts, &host);
   if (!sock) {
     if ((api = psync_apipool_get_from_cache())) {
@@ -2204,7 +2204,7 @@ retry:
   if (unlikely_log(!sock))
     goto err0;
   //  debug(D_NOTICE, "connected to %s", host);
-  path = psync_find_result(urls->urls, "path", PARAM_STR)->str;
+  path = papi_find_result2(urls->urls, "path", PARAM_STR)->str;
   psock_set_write_buffered(sock->sock);
   psync_list_for_each_element(range, &request->ranges, psync_request_range_t,
                               list) {

@@ -4,6 +4,7 @@
 #include <sys/statvfs.h>
 
 #include "pcompiler.h"
+#include "pfile.h"
 #include "plibs.h"
 #include "ppath.h"
 #include "psettings.h"

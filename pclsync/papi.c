@@ -100,7 +100,7 @@ static const binresult NUM_SMALL[VSMALL_NUMBER_NUM] = {
 
 static uint32_t connfailures = 0;
 
-psock_t *psync_api_connect(const char *hostname, int usessl) {
+psock_t *papi_connect(const char *hostname, int usessl) {
   static time_t notuntil = 0;
   psock_t *ret;
   const char *userapi = psync_setting_get_string(_PS(api_server));
@@ -125,9 +125,9 @@ psock_t *psync_api_connect(const char *hostname, int usessl) {
       userapi, usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT, usessl);
 }
 
-void psync_api_conn_fail_inc() { connfailures++; }
+void papi_conn_fail_inc() { connfailures++; }
 
-void psync_api_conn_fail_reset() {
+void papi_conn_fail_reset() {
   if (connfailures % 5 == 4)
     connfailures = 4;
   else
@@ -385,7 +385,7 @@ static binresult *parse_result(unsigned char *data, size_t datalen) {
   return res;
 }
 
-binresult *get_result(psock_t *sock) {
+binresult *papi_result(psock_t *sock) {
   unsigned char *data;
   binresult *res;
   uint32_t ressize;
@@ -408,7 +408,7 @@ binresult *get_result(psock_t *sock) {
   return res;
 }
 
-binresult *get_result_thread(psock_t *sock) {
+binresult *papi_result_thread(psock_t *sock) {
   unsigned char *data;
   binresult *res;
   uint32_t ressize;
@@ -426,19 +426,19 @@ binresult *get_result_thread(psock_t *sock) {
   return res;
 }
 
-void async_result_reader_init(async_result_reader *reader) {
+void papi_rdr_alloc(async_result_reader *reader) {
   reader->state = 0;
   reader->bytesread = 0;
   reader->bytestoread = sizeof(uint32_t);
   reader->data = (unsigned char *)&reader->respsize;
 }
 
-void async_result_reader_destroy(async_result_reader *reader) {
+void papi_rdr_free(async_result_reader *reader) {
   if (reader->state == 1)
     psync_free(reader->data);
 }
 
-int get_result_async(psock_t *sock, async_result_reader *reader) {
+int papi_result_async(psock_t *sock, async_result_reader *reader) {
   int rd;
 again:
   rd = psock_read_noblock(sock, reader->data + reader->bytesread,
@@ -448,7 +448,7 @@ again:
   else if (rd == PSYNC_SOCKET_ERROR || rd == 0) {
     if (reader->state == 1)
       psync_free(reader->data);
-    async_result_reader_init(reader);
+    papi_rdr_alloc(reader);
     reader->result = NULL;
     return ASYNC_RES_READY;
   }
@@ -464,14 +464,14 @@ again:
       assert(reader->state == 1);
       reader->result = parse_result(reader->data, reader->respsize);
       psync_free(reader->data);
-      async_result_reader_init(reader);
+      papi_rdr_alloc(reader);
       return ASYNC_RES_READY;
     }
   } else
     return ASYNC_RES_NEEDMORE;
 }
 
-unsigned char *do_prepare_command(const char *command, size_t cmdlen,
+unsigned char *papi_prepare(const char *command, size_t cmdlen,
                                   const binparam *params, size_t paramcnt,
                                   int64_t datalen, size_t additionalalloc,
                                   size_t *retlen) {
@@ -528,14 +528,14 @@ unsigned char *do_prepare_command(const char *command, size_t cmdlen,
   return sdata;
 }
 
-binresult *do_send_command(psock_t *sock, const char *command,
+binresult *papi_send(psock_t *sock, const char *command,
                            size_t cmdlen, const binparam *params,
                            size_t paramcnt, int64_t datalen, int readres) {
   unsigned char *sdata;
   size_t plen;
 
   sdata =
-      do_prepare_command(command, cmdlen, params, paramcnt, datalen, 0, &plen);
+      papi_prepare(command, cmdlen, params, paramcnt, datalen, 0, &plen);
 
   if (!sdata) {
     return NULL;
@@ -554,13 +554,13 @@ binresult *do_send_command(psock_t *sock, const char *command,
   }
   psync_free(sdata);
   if (readres & 1) {
-    return get_result(sock);
+    return papi_result(sock);
   } else {
     return PTR_OK;
   }
 }
 
-void psync_do_dump_binresult(const binresult *res, const char *file,
+void papi_dump(const binresult *res, const char *file,
                              const char *function, int unsigned line) {
   uint32_t i;
   psync_debug(file, function, line, D_NOTICE,
@@ -598,7 +598,7 @@ void psync_do_dump_binresult(const binresult *res, const char *file,
     }
 }
 
-const binresult *psync_do_find_result(const binresult *res, const char *name,
+const binresult *papi_find_result(const binresult *res, const char *name,
                                       uint32_t type, const char *file,
                                       const char *function, int unsigned line) {
   uint32_t i;
@@ -629,12 +629,12 @@ const binresult *psync_do_find_result(const binresult *res, const char *name,
     psync_debug(file, function, line, D_CRITICAL, "could not find key %s",
                 name);
 #if IS_DEBUG
-  psync_do_dump_binresult(res, file, function, line);
+  papi_dump(res, file, function, line);
 #endif
   return empty_types[type];
 }
 
-const binresult *psync_do_check_result(const binresult *res, const char *name,
+const binresult *papi_check_result(const binresult *res, const char *name,
                                        uint32_t type, const char *file,
                                        const char *function,
                                        int unsigned line) {
@@ -664,7 +664,7 @@ const binresult *psync_do_check_result(const binresult *res, const char *name,
   return NULL;
 }
 
-const binresult *psync_do_get_result(const binresult *res, const char *name,
+const binresult *papi_get_result(const binresult *res, const char *name,
                                      const char *file, const char *function,
                                      int unsigned line) {
   uint32_t i;

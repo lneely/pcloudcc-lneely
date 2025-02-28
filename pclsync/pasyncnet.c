@@ -715,7 +715,7 @@ static int psync_async_start_thread_locked() {
    * the place to pass any needed parameters. The assumption will be that server
    * supports everything and clients inform the server what they support.
    */
-  binparam params[] = {P_STR("auth", psync_my_auth), P_STR("checksum", "sha1")};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_STR("checksum", "sha1")};
   async_thread_params_t *tparams;
   psync_deflate_t *enc, *dec;
   binresult *res;
@@ -729,7 +729,7 @@ static int psync_async_start_thread_locked() {
       debug(D_NOTICE, "could not connect to API, failing");
       goto err0;
     }
-    res = send_command(api, "asynctransfer", params);
+    res = papi_send2(api, "asynctransfer", params);
     if (likely(res))
       break;
     psync_apipool_release_bad(api);
@@ -739,11 +739,11 @@ static int psync_async_start_thread_locked() {
       goto err0;
     }
   }
-  if (psync_find_result(res, "result", PARAM_NUM)->num) {
+  if (papi_find_result2(res, "result", PARAM_NUM)->num) {
     debug(D_WARNING, "asynctransfer returned error %d: %s",
-          (int)psync_find_result(res, "result", PARAM_NUM)->num,
-          psync_find_result(res, "error", PARAM_STR)->str);
-    psync_process_api_error(psync_find_result(res, "result", PARAM_NUM)->num);
+          (int)papi_find_result2(res, "result", PARAM_NUM)->num,
+          papi_find_result2(res, "error", PARAM_STR)->str);
+    psync_process_api_error(papi_find_result2(res, "result", PARAM_NUM)->num);
     psync_free(res);
     psync_apipool_release(api);
     goto err0;

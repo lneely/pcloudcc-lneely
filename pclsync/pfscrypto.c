@@ -40,6 +40,7 @@
 #include <mbedtls/ssl.h>
 
 #include "pcloudcrypto.h"
+#include "pfile.h"
 #include "pfscrypto.h"
 #include "plibs.h"
 #include "ppagecache.h"

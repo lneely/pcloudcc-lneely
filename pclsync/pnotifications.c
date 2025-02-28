@@ -76,7 +76,7 @@ static void psync_notifications_download_thumb(const binresult *thumb,
   int fd;
   int rd;
   rd = -1;
-  path = psync_find_result(thumb, "path", PARAM_STR)->str;
+  path = papi_find_result2(thumb, "path", PARAM_STR)->str;
   filename = strrchr(path, '/');
   if (unlikely_log(!filename++))
     return;
@@ -92,11 +92,11 @@ static void psync_notifications_download_thumb(const binresult *thumb,
                    INVALID_HANDLE_VALUE))
     goto err1;
   sock = psync_http_connect_multihost(
-      psync_find_result(thumb, "hosts", PARAM_ARRAY), &host);
+      papi_find_result2(thumb, "hosts", PARAM_ARRAY), &host);
   if (unlikely_log(!sock))
     goto err2;
   psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
-                 psync_find_result(thumb, "dwltag", PARAM_STR)->str);
+                 papi_find_result2(thumb, "dwltag", PARAM_STR)->str);
   if (unlikely_log(psync_http_request(sock, host, path, 0, 0, cookie)))
     goto err3;
   if (unlikely_log(psync_http_next_request(sock)))
@@ -130,14 +130,14 @@ static void psync_notifications_set_current_list(binresult *res,
   const binresult *notifications, *thumb;
   pnotification_callback_t cb;
   uint32_t cntnew, cnttotal, i;
-  notifications = psync_find_result(res, "notifications", PARAM_ARRAY);
+  notifications = papi_find_result2(res, "notifications", PARAM_ARRAY);
   cnttotal = notifications->length;
   debug(D_NOTICE, "got list with %u notifications", (unsigned)cnttotal);
   cntnew = 0;
   for (i = 0; i < cnttotal; i++) {
-    if (psync_find_result(notifications->array[i], "isnew", PARAM_BOOL)->num)
+    if (papi_find_result2(notifications->array[i], "isnew", PARAM_BOOL)->num)
       cntnew++;
-    thumb = psync_check_result(notifications->array[i], "thumb", PARAM_HASH);
+    thumb = papi_check_result2(notifications->array[i], "thumb", PARAM_HASH);
     if (thumb && thumbpath)
       psync_notifications_download_thumb(thumb, thumbpath);
   }
@@ -203,18 +203,18 @@ void psync_notifications_set_callback(
 static void fill_actionid(const binresult *ntf, psync_notification_t *pntf,
                           psync_list_builder_t *builder) {
   const char *action;
-  action = psync_find_result(ntf, "action", PARAM_STR)->str;
+  action = papi_find_result2(ntf, "action", PARAM_STR)->str;
   if (!strcmp(action, "gotofolder")) {
     pntf->actionid = PNOTIFICATION_ACTION_GO_TO_FOLDER;
     pntf->actiondata.folderid =
-        psync_find_result(ntf, "folderid", PARAM_NUM)->num;
+        papi_find_result2(ntf, "folderid", PARAM_NUM)->num;
   } else if (!strcmp(action, "opensharerequest")) {
     pntf->actionid = PNOTIFICATION_ACTION_SHARE_REQUEST;
     pntf->actiondata.sharerequestid =
-        psync_find_result(ntf, "sharerequestid", PARAM_NUM)->num;
+        papi_find_result2(ntf, "sharerequestid", PARAM_NUM)->num;
   } else if (!strcmp(action, "openurl")) {
     pntf->actionid = PNOTIFICATION_ACTION_GO_TO_URL;
-    pntf->actiondata.url = psync_find_result(ntf, "url", PARAM_STR)->str;
+    pntf->actiondata.url = papi_find_result2(ntf, "url", PARAM_STR)->str;
     psync_list_add_string_offset(
         builder, offsetof(psync_notification_t, actiondata.url));
   } else
@@ -311,19 +311,19 @@ psync_notification_list_t *psync_notifications_get() {
   } else
     ntf_res = NULL;
   if (ntf_res) {
-    notifications = psync_find_result(ntf_res, "notifications", PARAM_ARRAY);
+    notifications = papi_find_result2(ntf_res, "notifications", PARAM_ARRAY);
     cnttotal = notifications->length;
     for (i = 0; i < cnttotal; i++) {
       ntf = notifications->array[i];
       pntf = (psync_notification_t *)psync_list_bulder_add_element(builder);
-      br = psync_find_result(ntf, "notification", PARAM_STR);
+      br = papi_find_result2(ntf, "notification", PARAM_STR);
       pntf->text = br->str;
       psync_list_add_lstring_offset(
           builder, offsetof(psync_notification_t, text), br->length);
       pntf->thumb = NULL;
-      br = psync_check_result(ntf, "thumb", PARAM_HASH);
+      br = papi_check_result2(ntf, "thumb", PARAM_HASH);
       if (br && thumbpath) {
-        filename = strrchr(psync_find_result(br, "path", PARAM_STR)->str, '/');
+        filename = strrchr(papi_find_result2(br, "path", PARAM_STR)->str, '/');
         if (filename++) {
           psync_notification_remove_from_list(&thumbs, filename);
           filepath = psync_strcat(thumbpath, "/",
@@ -339,13 +339,13 @@ psync_notification_list_t *psync_notifications_get() {
           psync_free(filepath);
         }
       }
-      pntf->mtime = psync_find_result(ntf, "mtime", PARAM_NUM)->num;
+      pntf->mtime = papi_find_result2(ntf, "mtime", PARAM_NUM)->num;
       pntf->notificationid =
-          psync_find_result(ntf, "notificationid", PARAM_NUM)->num;
-      pntf->isnew = psync_find_result(ntf, "isnew", PARAM_BOOL)->num;
+          papi_find_result2(ntf, "notificationid", PARAM_NUM)->num;
+      pntf->isnew = papi_find_result2(ntf, "isnew", PARAM_BOOL)->num;
       if (pntf->isnew)
         cntnew++;
-      pntf->iconid = psync_find_result(ntf, "iconid", PARAM_NUM)->num;
+      pntf->iconid = papi_find_result2(ntf, "iconid", PARAM_NUM)->num;
       fill_actionid(ntf, pntf, builder);
     }
   }

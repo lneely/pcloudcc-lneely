@@ -2127,7 +2127,7 @@ psync_task_run_tasks(psync_task_callback_t const *callbacks,
   return ret;
 }
 
-void *psync_task_get_result(psync_task_manager_t tm, int id) {
+void *psync_task_papi_result(psync_task_manager_t tm, int id) {
   void *ret;
   pthread_mutex_lock(&tm->mutex);
   if (tm->tasks[id].status == PSYNC_TASK_STATUS_RUNNING) {

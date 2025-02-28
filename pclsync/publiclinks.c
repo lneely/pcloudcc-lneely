@@ -71,15 +71,15 @@ static void modify_screenshot_public_link(void *par) {
   uint64_t time =
       psync_timer_time() + ((linkidp->delay) ? linkidp->delay : 2592000);
   time = time - time % 3600;
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("linkid", linkidp->linkid), P_NUM("expire", time)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("linkid", linkidp->linkid), PAPI_NUM("expire", time)};
   api = psync_apipool_get();
   if (unlikely(!api)) {
     debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
     return;
   }
 
-  bres = send_command(api, "changepublink", params);
+  bres = papi_send2(api, "changepublink", params);
 
   if (likely(bres))
     psync_apipool_release(api);
@@ -89,9 +89,9 @@ static void modify_screenshot_public_link(void *par) {
     return;
   }
 
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     debug(
         D_WARNING,
         "command changepublink for link [%lld] returned error code %u msg [%s]",
@@ -136,7 +136,7 @@ int64_t do_psync_file_public_link(const char *path, int64_t *plinkid,
   *err = 0;
   *link = 0;
   if (!expire && !maxdownloads && !maxtraffic) {
-    binparam params[] = {P_STR("auth", psync_my_auth), P_STR("path", path)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_STR("path", path)};
     api = psync_apipool_get();
     if (unlikely(!api)) {
       debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
@@ -144,7 +144,7 @@ int64_t do_psync_file_public_link(const char *path, int64_t *plinkid,
       return 2;
     }
 
-    bres = send_command(api, "getfilepublink", params);
+    bres = papi_send2(api, "getfilepublink", params);
   } else {
     binparam *t;
     int numparam = 2 + !!expire + !!maxdownloads + !!maxtraffic;
@@ -166,7 +166,7 @@ int64_t do_psync_file_public_link(const char *path, int64_t *plinkid,
       psync_free(t);
       return 1;
     }
-    bres = do_send_command(api, "getfilepublink", sizeof("getfilepublink") - 1,
+    bres = papi_send(api, "getfilepublink", sizeof("getfilepublink") - 1,
                            t, pind, -1, 1);
     psync_free(t);
   }
@@ -179,9 +179,9 @@ int64_t do_psync_file_public_link(const char *path, int64_t *plinkid,
     *err = psync_strndup("Connection error.", 17);
     return 2;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING, "command getfilepublink returned error code %u",
           (unsigned)result);
@@ -190,9 +190,9 @@ int64_t do_psync_file_public_link(const char *path, int64_t *plinkid,
     goto free_ret;
   }
 
-  rescode = psync_find_result(bres, "link", PARAM_STR)->str;
+  rescode = papi_find_result2(bres, "link", PARAM_STR)->str;
   *link = psync_strndup(rescode, strlen(rescode));
-  linkid = psync_find_result(bres, "linkid", PARAM_NUM)->num;
+  linkid = papi_find_result2(bres, "linkid", PARAM_NUM)->num;
   if (plinkid)
     *plinkid = linkid;
 
@@ -214,14 +214,14 @@ int64_t do_psync_folder_public_link(const char *path, char **link /*OUT*/,
   *link = 0;
 
   if (!expire && !maxdownloads && !maxtraffic) {
-    binparam params[] = {P_STR("auth", psync_my_auth), P_STR("path", path)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_STR("path", path)};
     api = psync_apipool_get();
     if (unlikely(!api)) {
       debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
       *err = psync_strndup("Connection error.", 17);
       return -2;
     }
-    bres = send_command(api, "getfolderpublink", params);
+    bres = papi_send2(api, "getfolderpublink", params);
   } else {
     binparam *t;
     int numparam = 2 + !!expire + !!maxdownloads + !!maxtraffic;
@@ -242,7 +242,7 @@ int64_t do_psync_folder_public_link(const char *path, char **link /*OUT*/,
       *err = psync_strndup("Connection error.", 17);
       return -2;
     }
-    bres = do_send_command(api, "getfolderpublink",
+    bres = papi_send(api, "getfolderpublink",
                            sizeof("getfolderpublink") - 1, t, pind, -1, 1);
     psync_free(t);
   }
@@ -253,9 +253,9 @@ int64_t do_psync_folder_public_link(const char *path, char **link /*OUT*/,
     debug(D_WARNING, "Send command returned in valid result.\n");
     return -2;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING, "command getfilepublink returned error code %u",
           (unsigned)result);
@@ -267,9 +267,9 @@ int64_t do_psync_folder_public_link(const char *path, char **link /*OUT*/,
       return -1;
     }
   }
-  rescode = psync_find_result(bres, "link", PARAM_STR)->str;
+  rescode = papi_find_result2(bres, "link", PARAM_STR)->str;
   *link = psync_strndup(rescode, strlen(rescode));
-  result = psync_find_result(bres, "linkid", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "linkid", PARAM_NUM)->num;
 
   psync_free(bres);
 
@@ -288,14 +288,14 @@ int64_t do_psync_folder_public_link_full(const char *path, char **link /*OUT*/,
   *err = 0;
   *link = 0;
   if (!expire && !maxdownloads && !maxtraffic) {
-    binparam params[] = {P_STR("auth", psync_my_auth), P_STR("path", path)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_STR("path", path)};
     api = psync_apipool_get();
     if (unlikely(!api)) {
       debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
       *err = psync_strndup("Connection error.", 17);
       return -2;
     }
-    bres = send_command(api, "getfolderpublink", params);
+    bres = papi_send2(api, "getfolderpublink", params);
   } else {
     binparam *t;
     int numparam = 2 + !!expire + !!maxdownloads + !!maxtraffic + !!password;
@@ -318,7 +318,7 @@ int64_t do_psync_folder_public_link_full(const char *path, char **link /*OUT*/,
       *err = psync_strndup("Connection error.", 17);
       return -2;
     }
-    bres = do_send_command(api, "getfolderpublink",
+    bres = papi_send(api, "getfolderpublink",
                            sizeof("getfolderpublink") - 1, t, pind, -1, 1);
     psync_free(t);
   }
@@ -330,9 +330,9 @@ int64_t do_psync_folder_public_link_full(const char *path, char **link /*OUT*/,
     debug(D_WARNING, "Send command returned in valid result.\n");
     return -2;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING, "command getfilepublink returned error code %u",
           (unsigned)result);
@@ -345,9 +345,9 @@ int64_t do_psync_folder_public_link_full(const char *path, char **link /*OUT*/,
     }
   }
 
-  rescode = psync_find_result(bres, "link", PARAM_STR)->str;
+  rescode = papi_find_result2(bres, "link", PARAM_STR)->str;
   *link = psync_strndup(rescode, strlen(rescode));
-  result = psync_find_result(bres, "linkid", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "linkid", PARAM_NUM)->num;
 
   psync_free(bres);
 
@@ -361,9 +361,9 @@ int64_t do_psync_folder_updownlink_link(int canupload,
   binresult *bres;
   uint64_t result;
   const char *errorret;
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("folderid", folderid), P_STR("mail", mail),
-                       P_NUM("canupload", canupload)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("folderid", folderid), PAPI_STR("mail", mail),
+                       PAPI_NUM("canupload", canupload)};
   *err = 0;
   api = psync_apipool_get();
   if (unlikely(!api)) {
@@ -371,7 +371,7 @@ int64_t do_psync_folder_updownlink_link(int canupload,
     *err = psync_strndup("Connection error.", 17);
     return -2;
   }
-  bres = send_command(api, "publink/createfolderlinkandsend", params);
+  bres = papi_send2(api, "publink/createfolderlinkandsend", params);
 
   if (likely(bres))
     psync_apipool_release(api);
@@ -380,9 +380,9 @@ int64_t do_psync_folder_updownlink_link(int canupload,
     debug(D_WARNING, "Send command returned invalid result.\n");
     return -2;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING,
           "command createfolderlinkwithuploadandsend returned error code %u",
@@ -508,7 +508,7 @@ int64_t do_psync_tree_public_link(const char *linkname, const char *root,
     return -2;
   }
 
-  bres = do_send_command(api, "gettreepublink", sizeof("gettreepublink") - 1, t,
+  bres = papi_send(api, "gettreepublink", sizeof("gettreepublink") - 1, t,
                          pind, -1, 1);
 
   if (likely(bres))
@@ -519,9 +519,9 @@ int64_t do_psync_tree_public_link(const char *linkname, const char *root,
     *err = psync_strndup("Connection error.", 17);
     return -2;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING, "command gettreepublink returned error code %u",
           (unsigned)result);
@@ -534,10 +534,10 @@ int64_t do_psync_tree_public_link(const char *linkname, const char *root,
     }
   }
 
-  rescode = psync_find_result(bres, "link", PARAM_STR)->str;
+  rescode = papi_find_result2(bres, "link", PARAM_STR)->str;
   *link = psync_strndup(rescode, strlen(rescode));
 
-  result = psync_find_result(bres, "linkid", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "linkid", PARAM_NUM)->num;
 
   if (ids)
     psync_free(ids);
@@ -566,9 +566,9 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
   psync_sql_run_free(q);
 
   if (psync_my_auth[0]) {
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_STR("timeformat", "timestamp"),
-                         P_STR("iconformat", "id")};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_STR("timeformat", "timestamp"),
+                         PAPI_STR("iconformat", "id")};
     api = psync_apipool_get();
     if (unlikely(!api)) {
       debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
@@ -576,12 +576,12 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
       snprintf(err, err_size, "Connection error.");
       return -2;
     }
-    bres = send_command(api, "listpublinks", params);
+    bres = papi_send2(api, "listpublinks", params);
   } else if (psync_my_user && psync_my_pass) {
 
     binparam params[] = {
-        P_STR("username", psync_my_user), P_STR("password", psync_my_pass),
-        P_STR("timeformat", "timestamp"), P_STR("iconformat", "id")};
+        PAPI_STR("username", psync_my_user), PAPI_STR("password", psync_my_pass),
+        PAPI_STR("timeformat", "timestamp"), PAPI_STR("iconformat", "id")};
     api = psync_apipool_get();
     if (unlikely(!api)) {
       debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
@@ -589,7 +589,7 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
       snprintf(err, err_size, "Connection error.");
       return -2;
     }
-    bres = send_command(api, "listpublinks", params);
+    bres = papi_send2(api, "listpublinks", params);
   } else {
     return -1;
   }
@@ -604,9 +604,9 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
     psync_free(bres);
     return 0;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     //*err = psync_strndup(errorret, strlen(errorret));
     snprintf(err, err_size, "%s", errorret);
     debug(D_WARNING, "command listpublinks returned error code %u",
@@ -621,7 +621,7 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
       return 0;
     }
   }
-  publinks = psync_find_result(bres, "publinks", PARAM_ARRAY);
+  publinks = papi_find_result2(bres, "publinks", PARAM_ARRAY);
   linkscnt = publinks->length;
   if (!linkscnt) {
     psync_free(bres);
@@ -644,39 +644,39 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
       return -1;
     }
     psync_sql_bind_uint(q, 1,
-                        psync_find_result(link, "linkid", PARAM_NUM)->num);
+                        papi_find_result2(link, "linkid", PARAM_NUM)->num);
     psync_sql_bind_string(q, 2,
-                          psync_find_result(link, "code", PARAM_STR)->str);
+                          papi_find_result2(link, "code", PARAM_STR)->str);
     psync_sql_bind_uint(q, 3, 0);
     psync_sql_bind_uint(q, 4,
-                        psync_find_result(link, "traffic", PARAM_NUM)->num);
+                        papi_find_result2(link, "traffic", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 5, 0);
     psync_sql_bind_uint(q, 6,
-                        psync_find_result(link, "downloads", PARAM_NUM)->num);
+                        papi_find_result2(link, "downloads", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 7,
-                        psync_find_result(link, "created", PARAM_NUM)->num);
+                        papi_find_result2(link, "created", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 8,
-                        psync_find_result(link, "modified", PARAM_NUM)->num);
-    meta = psync_find_result(link, "metadata", PARAM_HASH);
+                        papi_find_result2(link, "modified", PARAM_NUM)->num);
+    meta = papi_find_result2(link, "metadata", PARAM_HASH);
     psync_sql_bind_string(q, 9,
-                          psync_find_result(meta, "name", PARAM_STR)->str);
-    if (psync_find_result(meta, "isfolder", PARAM_BOOL)->num) {
+                          papi_find_result2(meta, "name", PARAM_STR)->str);
+    if (papi_find_result2(meta, "isfolder", PARAM_BOOL)->num) {
       psync_sql_bind_uint(q, 10, 1);
       psync_sql_bind_uint(q, 11,
-                          psync_find_result(meta, "folderid", PARAM_NUM)->num);
+                          papi_find_result2(meta, "folderid", PARAM_NUM)->num);
       psync_sql_bind_uint(q, 12, 0);
-      if (psync_check_result(link, "enableduploadforchosenusers", PARAM_BOOL)) {
+      if (papi_check_result2(link, "enableduploadforchosenusers", PARAM_BOOL)) {
         psync_sql_bind_uint(
             q, 20,
-            psync_find_result(link, "enableduploadforchosenusers", PARAM_BOOL)
+            papi_find_result2(link, "enableduploadforchosenusers", PARAM_BOOL)
                 ->num);
       } else {
         psync_sql_bind_uint(q, 20, 0);
       }
-      if (psync_check_result(link, "enableduploadforeveryone", PARAM_BOOL)) {
+      if (papi_check_result2(link, "enableduploadforeveryone", PARAM_BOOL)) {
         psync_sql_bind_uint(
             q, 21,
-            psync_find_result(link, "enableduploadforeveryone", PARAM_BOOL)
+            papi_find_result2(link, "enableduploadforeveryone", PARAM_BOOL)
                 ->num);
       } else {
         psync_sql_bind_uint(q, 21, 0);
@@ -685,23 +685,23 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
       psync_sql_bind_uint(q, 10, 0);
       psync_sql_bind_uint(q, 11, 0);
       psync_sql_bind_uint(q, 12,
-                          psync_find_result(meta, "fileid", PARAM_NUM)->num);
+                          papi_find_result2(meta, "fileid", PARAM_NUM)->num);
       psync_sql_bind_uint(q, 20, 0);
       psync_sql_bind_uint(q, 21, 0);
     }
-    psync_sql_bind_uint(q, 13, psync_find_result(meta, "icon", PARAM_NUM)->num);
+    psync_sql_bind_uint(q, 13, papi_find_result2(meta, "icon", PARAM_NUM)->num);
     psync_sql_bind_string(q, 14,
-                          psync_find_result(link, "link", PARAM_STR)->str);
+                          papi_find_result2(link, "link", PARAM_STR)->str);
     psync_sql_bind_uint(
-        q, 15, psync_find_result(meta, "parentfolderid", PARAM_NUM)->num);
+        q, 15, papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num);
     psync_sql_bind_uint(
-        q, 16, psync_find_result(link, "haspassword", PARAM_BOOL)->num);
+        q, 16, papi_find_result2(link, "haspassword", PARAM_BOOL)->num);
     psync_sql_bind_uint(q, 17,
-                        psync_find_result(link, "views", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 18, psync_find_result(link, "type", PARAM_NUM)->num);
-    if (psync_check_result(link, "expires", PARAM_NUM))
+                        papi_find_result2(link, "views", PARAM_NUM)->num);
+    psync_sql_bind_uint(q, 18, papi_find_result2(link, "type", PARAM_NUM)->num);
+    if (papi_check_result2(link, "expires", PARAM_NUM))
       psync_sql_bind_uint(q, 19,
-                          psync_find_result(link, "expires", PARAM_NUM)->num);
+                          papi_find_result2(link, "expires", PARAM_NUM)->num);
     else
       psync_sql_bind_uint(q, 19, 0);
 
@@ -718,14 +718,14 @@ int do_psync_delete_link(int64_t linkid, char **err /*OUT*/) {
   uint64_t result;
   const char *errorret;
   *err = 0;
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("linkid", linkid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("linkid", linkid)};
   api = psync_apipool_get();
   if (unlikely(!api)) {
     debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
     *err = psync_strndup("Connection error.", 17);
     return -2;
   }
-  bres = send_command(api, "deletepublink", params);
+  bres = papi_send2(api, "deletepublink", params);
 
   if (likely(bres))
     psync_apipool_release(api);
@@ -735,9 +735,9 @@ int do_psync_delete_link(int64_t linkid, char **err /*OUT*/) {
     *err = psync_strndup("Connection error.", 17);
     return -2;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING, "command deletepublink returned error code %u",
           (unsigned)result);
@@ -765,9 +765,9 @@ int process_bres(const char *cmd, binresult *bres, psock_t *api,
     *err = psync_strndup("Connection error.", 17);
     return -2;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING, "command %s returned error code %u", cmd,
           (unsigned)result);
@@ -827,7 +827,7 @@ int do_psync_change_link(unsigned long long linkid, unsigned long long expire,
     *err = psync_strndup("Connection error.", 17);
     return -2;
   }
-  bres = do_send_command(api, "changepublink", sizeof("changepublink") - 1, t,
+  bres = papi_send(api, "changepublink", sizeof("changepublink") - 1, t,
                          pind, -1, 1);
   psync_free(t);
   result = process_bres("deletepublink", bres, api, err);
@@ -849,13 +849,13 @@ int do_change_link_expire(unsigned long long linkid, unsigned long long expire,
   }
 
   if (expire) {
-    binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("linkid", linkid),
-                         P_NUM("expire", expire)};
-    bres = send_command(api, "changepublink", params);
+    binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("linkid", linkid),
+                         PAPI_NUM("expire", expire)};
+    bres = papi_send2(api, "changepublink", params);
   } else {
-    binparam paramsd[] = {P_STR("auth", psync_my_auth), P_NUM("linkid", linkid),
-                          P_NUM("deleteexpire", 1)};
-    bres = send_command(api, "changepublink", paramsd);
+    binparam paramsd[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("linkid", linkid),
+                          PAPI_NUM("deleteexpire", 1)};
+    bres = papi_send2(api, "changepublink", paramsd);
   }
 
   result = process_bres("changepublink", bres, api, err);
@@ -879,13 +879,13 @@ int do_change_link_password(unsigned long long linkid, const char *password,
   }
 
   if (password) {
-    binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("linkid", linkid),
-                         P_STR("linkpassword", password)};
-    bres = send_command(api, "changepublink", params);
+    binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("linkid", linkid),
+                         PAPI_STR("linkpassword", password)};
+    bres = papi_send2(api, "changepublink", params);
   } else {
-    binparam paramsd[] = {P_STR("auth", psync_my_auth), P_NUM("linkid", linkid),
-                          P_NUM("deletepassword", 1)};
-    bres = send_command(api, "changepublink", paramsd);
+    binparam paramsd[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("linkid", linkid),
+                          PAPI_NUM("deletepassword", 1)};
+    bres = papi_send2(api, "changepublink", paramsd);
   }
   result = process_bres("changepublink", bres, api, err);
   psync_free(bres);
@@ -908,14 +908,14 @@ int do_change_link_enable_upload(unsigned long long linkid,
   }
   if (enableuploadforeveryone || enableuploadforchosenusers) {
     binparam params[] = {
-        P_STR("auth", psync_my_auth), P_NUM("linkid", linkid),
-        P_NUM("enableuploadforeveryone", enableuploadforeveryone),
-        P_NUM("enableuploadforchosenusers", enableuploadforchosenusers)};
-    bres = send_command(api, "changepublink", params);
+        PAPI_STR("auth", psync_my_auth), PAPI_NUM("linkid", linkid),
+        PAPI_NUM("enableuploadforeveryone", enableuploadforeveryone),
+        PAPI_NUM("enableuploadforchosenusers", enableuploadforchosenusers)};
+    bres = papi_send2(api, "changepublink", params);
   } else {
-    binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("linkid", linkid),
-                         P_NUM("disableupload", 1)};
-    bres = send_command(api, "changepublink", params);
+    binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("linkid", linkid),
+                         PAPI_NUM("disableupload", 1)};
+    bres = papi_send2(api, "changepublink", params);
   }
 
   result = process_bres("changepublink", bres, api, err);
@@ -937,8 +937,8 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
   *link = 0;
 
   if (!expire && !maxspace && !maxfiles) {
-    binparam params[] = {P_STR("auth", psync_my_auth), P_STR("path", path),
-                         P_STR("comment", comment)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_STR("path", path),
+                         PAPI_STR("comment", comment)};
     api = psync_apipool_get();
     if (unlikely(!api)) {
       debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
@@ -946,7 +946,7 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
       return -2;
     }
 
-    bres = send_command(api, "createuploadlink", params);
+    bres = papi_send2(api, "createuploadlink", params);
 
   } else {
     binparam *t;
@@ -969,7 +969,7 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
       *err = psync_strndup("Connection error.", 17);
       return -2;
     }
-    bres = do_send_command(api, "createuploadlink",
+    bres = papi_send(api, "createuploadlink",
                            sizeof("createuploadlink") - 1, t, pind, -1, 1);
     psync_free(t);
   }
@@ -982,9 +982,9 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
     *err = psync_strndup("Connection error.", 17);
     return -2;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING, "command createuploadlink returned error code %u",
           (unsigned)result);
@@ -997,10 +997,10 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
     }
   }
 
-  rescode = psync_find_result(bres, "link", PARAM_STR)->str;
+  rescode = papi_find_result2(bres, "link", PARAM_STR)->str;
   *link = psync_strndup(rescode, strlen(rescode));
 
-  result = psync_find_result(bres, "uploadlinkid", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "uploadlinkid", PARAM_NUM)->num;
 
   psync_free(bres);
 
@@ -1014,8 +1014,8 @@ int do_psync_delete_upload_link(int64_t uploadlinkid, char **err /*OUT*/) {
 
   *err = 0;
 
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("uploadlinkid", uploadlinkid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("uploadlinkid", uploadlinkid)};
   api = psync_apipool_get();
   if (unlikely(!api)) {
     debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
@@ -1023,7 +1023,7 @@ int do_psync_delete_upload_link(int64_t uploadlinkid, char **err /*OUT*/) {
     return -2;
   }
 
-  bres = send_command(api, "deleteuploadlink", params);
+  bres = papi_send2(api, "deleteuploadlink", params);
   result = process_bres("deletepublink", bres, api, err);
   psync_free(bres);
 
@@ -1117,9 +1117,9 @@ plink_contents_t *do_show_link(const char *code, char **err /*OUT*/) {
   plink_contents_t *ret = 0;
   *err = 0;
 
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_STR("timeformat", "timestamp"),
-                       P_STR("iconformat", "id"), P_STR("code", code)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_STR("timeformat", "timestamp"),
+                       PAPI_STR("iconformat", "id"), PAPI_STR("code", code)};
   api = psync_apipool_get();
   if (unlikely(!api)) {
     debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
@@ -1127,7 +1127,7 @@ plink_contents_t *do_show_link(const char *code, char **err /*OUT*/) {
     return NULL;
   }
 
-  bres = send_command(api, "showpublink", params);
+  bres = papi_send2(api, "showpublink", params);
 
   if (likely(bres))
     psync_apipool_release(api);
@@ -1138,9 +1138,9 @@ plink_contents_t *do_show_link(const char *code, char **err /*OUT*/) {
     return NULL;
   }
 
-  meta = psync_check_result(bres, "metadata", PARAM_HASH);
+  meta = papi_check_result2(bres, "metadata", PARAM_HASH);
   if (meta) {
-    contents = psync_check_result(meta, "contents", PARAM_ARRAY);
+    contents = papi_check_result2(meta, "contents", PARAM_ARRAY);
     if (!contents) {
       psync_free(bres);
       return 0;
@@ -1155,20 +1155,20 @@ plink_contents_t *do_show_link(const char *code, char **err /*OUT*/) {
     for (i = 0; i < concnt; ++i) {
       link = contents->array[i];
       pcont = (link_cont_t *)psync_list_bulder_add_element(builder);
-      br = psync_find_result(link, "name", PARAM_STR);
+      br = papi_find_result2(link, "name", PARAM_STR);
       pcont->name = br->str;
       psync_list_add_lstring_offset(builder, offsetof(link_cont_t, name),
                                     br->length);
-      pcont->created = psync_find_result(link, "created", PARAM_NUM)->num;
-      pcont->modified = psync_find_result(link, "modified", PARAM_NUM)->num;
-      if (psync_find_result(link, "isfolder", PARAM_BOOL)->num) {
+      pcont->created = papi_find_result2(link, "created", PARAM_NUM)->num;
+      pcont->modified = papi_find_result2(link, "modified", PARAM_NUM)->num;
+      if (papi_find_result2(link, "isfolder", PARAM_BOOL)->num) {
         pcont->isfolder = 1;
-        pcont->itemid = psync_find_result(link, "folderid", PARAM_NUM)->num;
+        pcont->itemid = papi_find_result2(link, "folderid", PARAM_NUM)->num;
       } else {
         pcont->isfolder = 0;
-        pcont->itemid = psync_find_result(link, "fileid", PARAM_NUM)->num;
+        pcont->itemid = papi_find_result2(link, "fileid", PARAM_NUM)->num;
       }
-      pcont->icon = psync_find_result(link, "icon", PARAM_NUM)->num;
+      pcont->icon = papi_find_result2(link, "icon", PARAM_NUM)->num;
     }
     ret = (plink_contents_t *)psync_list_builder_finalize(builder);
     psync_free(bres);
@@ -1195,27 +1195,27 @@ int cache_upload_links(char **err /*OUT*/) {
   psync_sql_run_free(q);
 
   if (psync_my_auth[0]) {
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_STR("timeformat", "timestamp"),
-                         P_STR("iconformat", "id")};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_STR("timeformat", "timestamp"),
+                         PAPI_STR("iconformat", "id")};
     api = psync_apipool_get();
     if (unlikely(!api)) {
       debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
       *err = psync_strndup("Connection error.", 17);
       return -2;
     }
-    bres = send_command(api, "listuploadlinks", params);
+    bres = papi_send2(api, "listuploadlinks", params);
   } else if (psync_my_user && psync_my_pass) {
     binparam params[] = {
-        P_STR("username", psync_my_user), P_STR("password", psync_my_pass),
-        P_STR("timeformat", "timestamp"), P_STR("iconformat", "id")};
+        PAPI_STR("username", psync_my_user), PAPI_STR("password", psync_my_pass),
+        PAPI_STR("timeformat", "timestamp"), PAPI_STR("iconformat", "id")};
     api = psync_apipool_get();
     if (unlikely(!api)) {
       debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
       *err = psync_strndup("Connection error.", 17);
       return -2;
     }
-    bres = send_command(api, "listuploadlinks", params);
+    bres = papi_send2(api, "listuploadlinks", params);
   } else
     return -1;
   if (likely(bres))
@@ -1226,9 +1226,9 @@ int cache_upload_links(char **err /*OUT*/) {
     *err = psync_strndup("Connection error.", 17);
     return -2;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING, "command listpublinks returned error code %u",
           (unsigned)result);
@@ -1241,7 +1241,7 @@ int cache_upload_links(char **err /*OUT*/) {
     }
   }
 
-  publinks = psync_find_result(bres, "uploadlinks", PARAM_ARRAY);
+  publinks = papi_find_result2(bres, "uploadlinks", PARAM_ARRAY);
 
   linkscnt = publinks->length;
   for (i = 0; i < linkscnt; ++i) {
@@ -1255,41 +1255,41 @@ int cache_upload_links(char **err /*OUT*/) {
         " parentfolderid, haspassword, views, type)"
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)");
     psync_sql_bind_uint(
-        q, 1, psync_find_result(link, "uploadlinkid", PARAM_NUM)->num);
+        q, 1, papi_find_result2(link, "uploadlinkid", PARAM_NUM)->num);
     psync_sql_bind_string(q, 2,
-                          psync_find_result(link, "code", PARAM_STR)->str);
+                          papi_find_result2(link, "code", PARAM_STR)->str);
     psync_sql_bind_string(q, 3,
-                          psync_find_result(link, "comment", PARAM_STR)->str);
-    psync_sql_bind_uint(q, 4, psync_find_result(link, "space", PARAM_NUM)->num);
-    if ((br = psync_check_result(link, "maxspace", PARAM_NUM)))
+                          papi_find_result2(link, "comment", PARAM_STR)->str);
+    psync_sql_bind_uint(q, 4, papi_find_result2(link, "space", PARAM_NUM)->num);
+    if ((br = papi_check_result2(link, "maxspace", PARAM_NUM)))
       psync_sql_bind_uint(q, 5, br->num);
     else
       psync_sql_bind_uint(q, 5, 0);
-    psync_sql_bind_uint(q, 6, psync_find_result(link, "files", PARAM_NUM)->num);
+    psync_sql_bind_uint(q, 6, papi_find_result2(link, "files", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 7,
-                        psync_find_result(link, "created", PARAM_NUM)->num);
+                        papi_find_result2(link, "created", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 8,
-                        psync_find_result(link, "modified", PARAM_NUM)->num);
+                        papi_find_result2(link, "modified", PARAM_NUM)->num);
 
-    meta = psync_find_result(link, "metadata", PARAM_HASH);
+    meta = papi_find_result2(link, "metadata", PARAM_HASH);
     psync_sql_bind_string(q, 9,
-                          psync_find_result(meta, "name", PARAM_STR)->str);
-    if (psync_find_result(meta, "isfolder", PARAM_BOOL)->num) {
+                          papi_find_result2(meta, "name", PARAM_STR)->str);
+    if (papi_find_result2(meta, "isfolder", PARAM_BOOL)->num) {
       psync_sql_bind_uint(q, 10, 1);
       psync_sql_bind_uint(q, 11,
-                          psync_find_result(meta, "folderid", PARAM_NUM)->num);
+                          papi_find_result2(meta, "folderid", PARAM_NUM)->num);
       psync_sql_bind_uint(q, 12, 0);
     } else {
       psync_sql_bind_uint(q, 10, 0);
       psync_sql_bind_uint(q, 11, 0);
       psync_sql_bind_uint(q, 12,
-                          psync_find_result(meta, "fileid", PARAM_NUM)->num);
+                          papi_find_result2(meta, "fileid", PARAM_NUM)->num);
     }
-    psync_sql_bind_uint(q, 13, psync_find_result(meta, "icon", PARAM_NUM)->num);
+    psync_sql_bind_uint(q, 13, papi_find_result2(meta, "icon", PARAM_NUM)->num);
     psync_sql_bind_string(q, 14,
-                          psync_find_result(link, "link", PARAM_STR)->str);
+                          papi_find_result2(link, "link", PARAM_STR)->str);
     psync_sql_bind_uint(
-        q, 15, psync_find_result(meta, "parentfolderid", PARAM_NUM)->num);
+        q, 15, papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 16, 0);
     psync_sql_bind_uint(q, 17, 0);
     psync_sql_bind_uint(q, 18, 0);
@@ -1408,14 +1408,14 @@ preciever_list_t *do_list_email_with_access(unsigned long long linkid,
   preciever_list_t *ret = 0;
   int i = 0, lcnt;
   *err = 0;
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("linkid", linkid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("linkid", linkid)};
   api = psync_apipool_get();
   if (unlikely(!api)) {
     debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
     *err = psync_strndup("Connection error.", 17);
     return NULL;
   }
-  bres = send_command(api, "publink/listemailswithaccess", params);
+  bres = papi_send2(api, "publink/listemailswithaccess", params);
   if (likely(bres))
     psync_apipool_release(api);
   else {
@@ -1424,9 +1424,9 @@ preciever_list_t *do_list_email_with_access(unsigned long long linkid,
     *err = psync_strndup("Connection error.", 17);
     return NULL;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING, "command listemailswithaccess returned error code %u",
           (unsigned)result);
@@ -1439,7 +1439,7 @@ preciever_list_t *do_list_email_with_access(unsigned long long linkid,
     }
   }
 
-  list = psync_find_result(bres, "list", PARAM_ARRAY);
+  list = papi_find_result2(bres, "list", PARAM_ARRAY);
   lcnt = list->length;
   builder = psync_list_builder_create(sizeof(reciever_info_t),
                                       offsetof(preciever_list_t, entries));
@@ -1452,14 +1452,14 @@ preciever_list_t *do_list_email_with_access(unsigned long long linkid,
   for (i = 0; i < lcnt; ++i) {
     reciever = list->array[i];
     pcont = (reciever_info_t *)psync_list_bulder_add_element(builder);
-    br = psync_find_result(reciever, "email", PARAM_STR);
+    br = papi_find_result2(reciever, "email", PARAM_STR);
     if (br) {
       pcont->mail = br->str;
       psync_list_add_lstring_offset(builder, offsetof(reciever_info_t, mail),
                                     br->length);
     }
     pcont->recieverid =
-        psync_find_result(reciever, "receiverid", PARAM_NUM)->num;
+        papi_find_result2(reciever, "receiverid", PARAM_NUM)->num;
   }
   ret = (preciever_list_t *)psync_list_builder_finalize(builder);
 
@@ -1476,8 +1476,8 @@ int do_link_add_access(unsigned long long linkid, const char *mail,
 
   *err = 0;
   // publink/addaccess
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("linkid", linkid),
-                       P_STR("mail", mail)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("linkid", linkid),
+                       PAPI_STR("mail", mail)};
   api = psync_apipool_get();
   if (unlikely(!api)) {
     debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
@@ -1485,7 +1485,7 @@ int do_link_add_access(unsigned long long linkid, const char *mail,
     return -2;
   }
 
-  bres = send_command(api, "publink/addaccess", params);
+  bres = papi_send2(api, "publink/addaccess", params);
   result = process_bres("publink/addaccess", bres, api, err);
   psync_free(bres);
 
@@ -1498,8 +1498,8 @@ int do_link_remove_access(unsigned long long linkid,
   binresult *bres;
   uint64_t result;
   *err = 0;
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("linkid", linkid),
-                       P_NUM("receiverid", receiverid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("linkid", linkid),
+                       PAPI_NUM("receiverid", receiverid)};
 
   api = psync_apipool_get();
   if (unlikely(!api)) {
@@ -1508,7 +1508,7 @@ int do_link_remove_access(unsigned long long linkid,
     return -2;
   }
 
-  bres = send_command(api, "publink/removeaccess", params);
+  bres = papi_send2(api, "publink/removeaccess", params);
   result = process_bres("publink/removeaccess", bres, api, err);
   psync_free(bres);
 
@@ -1526,8 +1526,8 @@ bookmarks_list_t *do_cache_bookmarks(char **err) {
   bookmarks_list_t *ret = 0;
   int i = 0, lcnt;
   *err = 0;
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_STR("timeformat", "timestamp")};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_STR("timeformat", "timestamp")};
   api = psync_apipool_get();
   if (unlikely(!api)) {
     debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
@@ -1535,7 +1535,7 @@ bookmarks_list_t *do_cache_bookmarks(char **err) {
     return NULL;
   }
 
-  bres = send_command(api, "publink/listpins", params);
+  bres = papi_send2(api, "publink/listpins", params);
 
   if (likely(bres))
     psync_apipool_release(api);
@@ -1545,9 +1545,9 @@ bookmarks_list_t *do_cache_bookmarks(char **err) {
     *err = psync_strndup("Connection error.", 17);
     return NULL;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING, "command deletepublink returned error code %u",
           (unsigned)result);
@@ -1560,7 +1560,7 @@ bookmarks_list_t *do_cache_bookmarks(char **err) {
     }
   }
 
-  list = psync_find_result(bres, "list", PARAM_ARRAY);
+  list = papi_find_result2(bres, "list", PARAM_ARRAY);
   lcnt = list->length;
   builder = psync_list_builder_create(sizeof(bookmark_info_t),
                                       offsetof(bookmarks_list_t, entries));
@@ -1573,19 +1573,19 @@ bookmarks_list_t *do_cache_bookmarks(char **err) {
   for (i = 0; i < lcnt; ++i) {
     bookmark = list->array[i];
     pcont = (bookmark_info_t *)psync_list_bulder_add_element(builder);
-    br = psync_find_result(bookmark, "link", PARAM_STR);
+    br = papi_find_result2(bookmark, "link", PARAM_STR);
     pcont->link = br->str;
     psync_list_add_lstring_offset(builder, offsetof(bookmark_info_t, link),
                                   br->length);
-    br = psync_find_result(bookmark, "name", PARAM_STR);
+    br = papi_find_result2(bookmark, "name", PARAM_STR);
     pcont->name = br->str;
     psync_list_add_lstring_offset(builder, offsetof(bookmark_info_t, name),
                                   br->length);
-    br = psync_find_result(bookmark, "code", PARAM_STR);
+    br = papi_find_result2(bookmark, "code", PARAM_STR);
     pcont->code = br->str;
     psync_list_add_lstring_offset(builder, offsetof(bookmark_info_t, code),
                                   br->length);
-    br = psync_check_result(bookmark, "description", PARAM_STR);
+    br = papi_check_result2(bookmark, "description", PARAM_STR);
     if (br) {
       pcont->description = br->str;
       psync_list_add_lstring_offset(
@@ -1593,9 +1593,9 @@ bookmarks_list_t *do_cache_bookmarks(char **err) {
     } else {
       pcont->description = "";
     }
-    pcont->created = psync_find_result(bookmark, "ctime", PARAM_NUM)->num;
+    pcont->created = papi_find_result2(bookmark, "ctime", PARAM_NUM)->num;
     pcont->locationid =
-        psync_find_result(bookmark, "locationid", PARAM_NUM)->num;
+        papi_find_result2(bookmark, "locationid", PARAM_NUM)->num;
   }
   ret = (bookmarks_list_t *)psync_list_builder_finalize(builder);
 
@@ -1610,8 +1610,8 @@ int do_remove_bookmark(const char *code, int locationid, char **err) {
   uint64_t result;
 
   *err = 0;
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("locationid", locationid), P_STR("code", code)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("locationid", locationid), PAPI_STR("code", code)};
   api = psync_apipool_get();
   if (unlikely(!api)) {
     debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
@@ -1619,7 +1619,7 @@ int do_remove_bookmark(const char *code, int locationid, char **err) {
     return -2;
   }
 
-  bres = send_command(api, "publink/unpin", params);
+  bres = papi_send2(api, "publink/unpin", params);
   result = process_bres("publink/unpin", bres, api, err);
   psync_free(bres);
 
@@ -1634,9 +1634,9 @@ int do_change_bookmark(const char *code, int locationid, const char *name,
 
   *err = 0;
   // publink/addaccess
-  binparam params[] = {P_STR("auth", psync_my_auth), P_STR("code", code),
-                       P_NUM("locationid", locationid), P_STR("name", name),
-                       P_STR("description", description)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_STR("code", code),
+                       PAPI_NUM("locationid", locationid), PAPI_STR("name", name),
+                       PAPI_STR("description", description)};
   api = psync_apipool_get();
   if (unlikely(!api)) {
     debug(D_WARNING, "Can't gat api from the pool. No pool ?\n");
@@ -1644,7 +1644,7 @@ int do_change_bookmark(const char *code, int locationid, const char *name,
     return -2;
   }
 
-  bres = send_command(api, "publink/changepin", params);
+  bres = papi_send2(api, "publink/changepin", params);
   result = process_bres("publink/changepin", bres, api, err);
   psync_free(bres);
 

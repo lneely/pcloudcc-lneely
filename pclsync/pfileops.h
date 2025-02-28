@@ -42,16 +42,16 @@
 
 static inline uint64_t psync_get_permissions(const binresult *meta) {
   const binresult *canmanage =
-      psync_check_result(meta, "canmanage", PARAM_BOOL);
-  return (psync_find_result(meta, "canread", PARAM_BOOL)->num ? PSYNC_PERM_READ
+      papi_check_result2(meta, "canmanage", PARAM_BOOL);
+  return (papi_find_result2(meta, "canread", PARAM_BOOL)->num ? PSYNC_PERM_READ
                                                               : 0) +
-         (psync_find_result(meta, "canmodify", PARAM_BOOL)->num
+         (papi_find_result2(meta, "canmodify", PARAM_BOOL)->num
               ? PSYNC_PERM_MODIFY
               : 0) +
-         (psync_find_result(meta, "candelete", PARAM_BOOL)->num
+         (papi_find_result2(meta, "candelete", PARAM_BOOL)->num
               ? PSYNC_PERM_DELETE
               : 0) +
-         (psync_find_result(meta, "cancreate", PARAM_BOOL)->num
+         (papi_find_result2(meta, "cancreate", PARAM_BOOL)->num
               ? PSYNC_PERM_CREATE
               : 0) +
          (canmanage && canmanage->num ? PSYNC_PERM_MANAGE : 0);

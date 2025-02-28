@@ -180,29 +180,29 @@ psync_folderid_t psync_get_folderid_by_path_or_create(const char *path) {
     if (row)
       cfolderid = row[0];
     else {
-      binparam params[] = {P_STR("auth", psync_my_auth),
-                           P_NUM("folderid", cfolderid),
-                           P_LSTR("name", path, len)};
+      binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                           PAPI_NUM("folderid", cfolderid),
+                           PAPI_LSTR("name", path, len)};
       psock_t *api;
       binresult *bres;
       uint64_t result;
       api = psync_apipool_get();
       if (unlikely(!api))
         goto errnet;
-      bres = send_command(api, "createfolderifnotexists", params);
+      bres = papi_send2(api, "createfolderifnotexists", params);
       if (bres)
         psync_apipool_release(api);
       else
         psync_apipool_release_bad(api);
       if (unlikely(!bres))
         goto errnet;
-      result = psync_find_result(bres, "result", PARAM_NUM)->num;
+      result = papi_find_result2(bres, "result", PARAM_NUM)->num;
       if (result == 0) {
         cfolderid =
-            psync_find_result(psync_find_result(bres, "metadata", PARAM_HASH),
+            papi_find_result2(papi_find_result2(bres, "metadata", PARAM_HASH),
                               "folderid", PARAM_NUM)
                 ->num;
-        if (psync_find_result(bres, "created", PARAM_BOOL)->num)
+        if (papi_find_result2(bres, "created", PARAM_BOOL)->num)
           psync_diff_wake();
         psync_free(bres);
       } else {

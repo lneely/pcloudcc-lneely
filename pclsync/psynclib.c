@@ -419,13 +419,13 @@ void psync_set_auth(const char *auth, int save) {
 }
 
 int psync_mark_notificaitons_read(uint32_t notificationid) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("notificationid", notificationid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("notificationid", notificationid)};
   return psync_run_command("readnotifications", params, NULL) ? -1 : 0;
 }
 
 static void psync_invalidate_auth(const char *auth) {
-  binparam params[] = {P_STR("auth", auth)};
+  binparam params[] = {PAPI_STR("auth", auth)};
   psync_run_command("logout", params, NULL);
 }
 
@@ -468,7 +468,7 @@ apiservers_list_t *psync_get_apiservers(char **err) {
   apiserver_info_t *plocation;
   uint64_t result;
   int i, locationscnt, usessl;
-  binparam params[] = {P_STR("timeformat", "timestamp")};
+  binparam params[] = {PAPI_STR("timeformat", "timestamp")};
   usessl = psync_setting_get_bool(_PS(usessl));
   api = psock_connect(
       PSYNC_API_HOST, usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT, usessl);
@@ -478,7 +478,7 @@ apiservers_list_t *psync_get_apiservers(char **err) {
     *err = psync_strndup("Can't get api from the pool.", 29);
     return NULL;
   }
-  bres = send_command(api, "getlocationapi", params);
+  bres = papi_send2(api, "getlocationapi", params);
   if (likely(bres))
     psync_apipool_release(api);
   else {
@@ -487,16 +487,16 @@ apiservers_list_t *psync_get_apiservers(char **err) {
     *err = psync_strndup("Connection error.", 17);
     return NULL;
   }
-  result = psync_find_result(bres, "result", PARAM_NUM)->num;
+  result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    errorret = psync_find_result(bres, "error", PARAM_STR)->str;
+    errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
     *err = psync_strndup(errorret, strlen(errorret));
     debug(D_WARNING, "command getlocationapi returned error code %u",
           (unsigned)result);
     return NULL;
   }
 
-  locations = psync_find_result(bres, "locations", PARAM_ARRAY);
+  locations = papi_find_result2(bres, "locations", PARAM_ARRAY);
   locationscnt = locations->length;
   if (!locationscnt) {
     psync_free(bres);
@@ -508,19 +508,19 @@ apiservers_list_t *psync_get_apiservers(char **err) {
   for (i = 0; i < locationscnt; ++i) {
     location = locations->array[i];
     plocation = (apiserver_info_t *)psync_list_bulder_add_element(builder);
-    br = psync_find_result(location, "label", PARAM_STR);
+    br = papi_find_result2(location, "label", PARAM_STR);
     plocation->label = br->str;
     psync_list_add_lstring_offset(builder, offsetof(apiserver_info_t, label),
                                   br->length);
-    br = psync_find_result(location, "api", PARAM_STR);
+    br = papi_find_result2(location, "api", PARAM_STR);
     plocation->api = br->str;
     psync_list_add_lstring_offset(builder, offsetof(apiserver_info_t, api),
                                   br->length);
-    br = psync_find_result(location, "binapi", PARAM_STR);
+    br = papi_find_result2(location, "binapi", PARAM_STR);
     plocation->binapi = br->str;
     psync_list_add_lstring_offset(builder, offsetof(apiserver_info_t, binapi),
                                   br->length);
-    plocation->locationid = psync_find_result(location, "id", PARAM_NUM)->num;
+    plocation->locationid = papi_find_result2(location, "id", PARAM_NUM)->num;
   }
   ret = (apiservers_list_t *)psync_list_builder_finalize(builder);
   ret->serverscnt = locationscnt;
@@ -652,22 +652,22 @@ int psync_tfa_send_sms(char **country_code, char **phone_number) {
   } else {
     binresult *res;
     uint64_t code;
-    binparam params[] = {P_STR("token", psync_my_2fa_token)};
+    binparam params[] = {PAPI_STR("token", psync_my_2fa_token)};
     res = psync_api_run_command("tfa_sendcodeviasms", params);
     if (!res)
       return -1;
-    code = psync_find_result(res, "result", PARAM_NUM)->num;
+    code = papi_find_result2(res, "result", PARAM_NUM)->num;
     if (code) {
       free(res);
       check_tfa_result(code);
       return code;
     }
     if (country_code || phone_number) {
-      const binresult *cres = psync_find_result(res, "phonedata", PARAM_HASH);
+      const binresult *cres = papi_find_result2(res, "phonedata", PARAM_HASH);
       if (country_code)
-        *country_code = binresult_to_str(psync_get_result(cres, "countrycode"));
+        *country_code = binresult_to_str(papi_get_result2(cres, "countrycode"));
       if (phone_number)
-        *phone_number = binresult_to_str(psync_get_result(cres, "msisdn"));
+        *phone_number = binresult_to_str(papi_get_result2(cres, "msisdn"));
     }
     free(res);
     return 0;
@@ -682,18 +682,18 @@ int psync_tfa_send_nofification(plogged_device_list_t **devices_list) {
   } else {
     binresult *res;
     uint64_t code;
-    binparam params[] = {P_STR("token", psync_my_2fa_token)};
+    binparam params[] = {PAPI_STR("token", psync_my_2fa_token)};
     res = psync_api_run_command("tfa_sendcodeviasysnotification", params);
     if (!res)
       return -1;
-    code = psync_find_result(res, "result", PARAM_NUM)->num;
+    code = papi_find_result2(res, "result", PARAM_NUM)->num;
     if (code) {
       free(res);
       check_tfa_result(code);
       return code;
     }
     if (devices_list) {
-      const binresult *cres = psync_find_result(res, "devices", PARAM_ARRAY);
+      const binresult *cres = papi_find_result2(res, "devices", PARAM_ARRAY);
       psync_list_builder_t *builder;
       uint32_t i;
       builder = psync_list_builder_create(
@@ -702,8 +702,8 @@ int psync_tfa_send_nofification(plogged_device_list_t **devices_list) {
         plogged_device_t *dev =
             (plogged_device_t *)psync_list_bulder_add_element(builder);
         const binresult *str =
-            psync_find_result(cres->array[i], "name", PARAM_STR);
-        dev->type = psync_find_result(cres->array[i], "type", PARAM_NUM)->num;
+            papi_find_result2(cres->array[i], "name", PARAM_STR);
+        dev->type = papi_find_result2(cres->array[i], "type", PARAM_NUM)->num;
         dev->name = str->str;
         psync_list_add_lstring_offset(builder, offsetof(plogged_device_t, name),
                                       str->length);
@@ -1143,18 +1143,18 @@ static int do_run_command_get_res(const char *cmd, size_t cmdlen,
   api = psync_apipool_get();
   if (unlikely(!api))
     goto neterr;
-  res = do_send_command(api, cmd, cmdlen, params, paramscnt, -1, 1);
+  res = papi_send(api, cmd, cmdlen, params, paramscnt, -1, 1);
   if (likely(res))
     psync_apipool_release(api);
   else {
     psync_apipool_release_bad(api);
     goto neterr;
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     debug(D_WARNING, "command %s returned code %u", cmd, (unsigned)result);
     if (err)
-      *err = psync_strdup(psync_find_result(res, "error", PARAM_STR)->str);
+      *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     psync_process_api_error(result);
   }
   if (result)
@@ -1173,9 +1173,9 @@ int psync_register(const char *email, const char *password, int termsaccepted,
   binresult *res;
   psock_t *sock;
   uint64_t result;
-  binparam params[] = {P_STR("mail", email), P_STR("password", password),
-                       P_STR("termsaccepted", termsaccepted ? "yes" : "0"),
-                       P_NUM("os", P_OS_ID)};
+  binparam params[] = {PAPI_STR("mail", email), PAPI_STR("password", password),
+                       PAPI_STR("termsaccepted", termsaccepted ? "yes" : "0"),
+                       PAPI_NUM("os", P_OS_ID)};
   if (binapi)
     psync_set_apiserver(binapi, locationid);
   else {
@@ -1184,14 +1184,14 @@ int psync_register(const char *email, const char *password, int termsaccepted,
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
     return -1;
   }
-  sock = psync_api_connect(binapi, psync_setting_get_bool(_PS(usessl)));
+  sock = papi_connect(binapi, psync_setting_get_bool(_PS(usessl)));
   if (unlikely_log(!sock)) {
     if (err)
       *err = psync_strdup("Could not connect to the server.");
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
     return -1;
   }
-  res = send_command(sock, "register", params);
+  res = papi_send2(sock, "register", params);
   if (unlikely_log(!res)) {
     psock_close(sock);
     if (err)
@@ -1199,11 +1199,11 @@ int psync_register(const char *email, const char *password, int termsaccepted,
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
     return -1;
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     debug(D_WARNING, "command register returned code %u", (unsigned)result);
     if (err)
-      *err = psync_strdup(psync_find_result(res, "error", PARAM_STR)->str);
+      *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   }
   psock_close(sock);
@@ -1212,17 +1212,17 @@ int psync_register(const char *email, const char *password, int termsaccepted,
 }
 
 int psync_verify_email(char **err) {
-  binparam params[] = {P_STR("auth", psync_my_auth)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth)};
   return psync_run_command("sendverificationemail", params, err);
 }
 
 int psync_verify_email_restricted(char **err) {
-  binparam params[] = {P_STR("verifytoken", psync_my_verify_token)};
+  binparam params[] = {PAPI_STR("verifytoken", psync_my_verify_token)};
   return psync_run_command("sendverificationemail", params, err);
 }
 
 int psync_lost_password(const char *email, char **err) {
-  binparam params[] = {P_STR("mail", email)};
+  binparam params[] = {PAPI_STR("mail", email)};
   return psync_run_command("lostpassword", params, err);
 }
 
@@ -1233,30 +1233,30 @@ int psync_change_password(const char *currentpass, const char *newpass,
   binresult *res;
   device = pdevice_id();
   {
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_STR("oldpassword", currentpass),
-                         P_STR("newpassword", newpass), P_STR("device", device),
-                         P_BOOL("regetauth", 1)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_STR("oldpassword", currentpass),
+                         PAPI_STR("newpassword", newpass), PAPI_STR("device", device),
+                         PAPI_BOOL("regetauth", 1)};
     ret = run_command_get_res("changepassword", params, err, &res);
   }
   psync_free(device);
   if (ret)
     return ret;
-  psync_strlcpy(psync_my_auth, psync_find_result(res, "auth", PARAM_STR)->str,
+  psync_strlcpy(psync_my_auth, papi_find_result2(res, "auth", PARAM_STR)->str,
                 sizeof(psync_my_auth));
   psync_free(res);
   return 0;
 }
 
 int psync_create_remote_folder_by_path(const char *path, char **err) {
-  binparam params[] = {P_STR("auth", psync_my_auth), P_STR("path", path),
-                       P_STR("timeformat", "timestamp")};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_STR("path", path),
+                       PAPI_STR("timeformat", "timestamp")};
   binresult *res;
   int ret;
   ret = run_command_get_res("createfolder", params, err, &res);
   if (ret)
     return ret;
-  psync_ops_create_folder_in_db(psync_find_result(res, "metadata", PARAM_HASH));
+  psync_ops_create_folder_in_db(papi_find_result2(res, "metadata", PARAM_HASH));
   psync_free(res);
   psync_diff_wake();
   return 0;
@@ -1264,15 +1264,15 @@ int psync_create_remote_folder_by_path(const char *path, char **err) {
 
 int psync_create_remote_folder(psync_folderid_t parentfolderid,
                                const char *name, char **err) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("folderid", parentfolderid), P_STR("name", name),
-                       P_STR("timeformat", "timestamp")};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("folderid", parentfolderid), PAPI_STR("name", name),
+                       PAPI_STR("timeformat", "timestamp")};
   binresult *res;
   int ret;
   ret = run_command_get_res("createfolder", params, err, &res);
   if (ret)
     return ret;
-  psync_ops_create_folder_in_db(psync_find_result(res, "metadata", PARAM_HASH));
+  psync_ops_create_folder_in_db(papi_find_result2(res, "metadata", PARAM_HASH));
   psync_free(res);
   psync_diff_wake();
   return 0;
@@ -1554,13 +1554,13 @@ static uint32_t convert_perms(uint32_t permissions) {
 int psync_share_folder(psync_folderid_t folderid, const char *name,
                        const char *mail, const char *message,
                        uint32_t permissions, char **err) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("folderid", folderid),
-                       P_STR("name", name),
-                       P_STR("mail", mail),
-                       P_STR("message", message),
-                       P_NUM("permissions", convert_perms(permissions)),
-                       P_NUM("strictmode", 1)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("folderid", folderid),
+                       PAPI_STR("name", name),
+                       PAPI_STR("mail", mail),
+                       PAPI_STR("message", message),
+                       PAPI_NUM("permissions", convert_perms(permissions)),
+                       PAPI_NUM("strictmode", 1)};
   return psync_run_command("sharefolder", params, err);
 }
 
@@ -1573,14 +1573,14 @@ int psync_crypto_share_folder(psync_folderid_t folderid, const char *name,
   int change_err;
 
   if (!temppass) {
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_NUM("folderid", folderid),
-                         P_STR("name", name),
-                         P_STR("mail", mail),
-                         P_STR("message", message),
-                         P_NUM("permissions", convert_perms(permissions)),
-                         P_STR("hint", hint),
-                         P_NUM("strictmode", 1)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_NUM("folderid", folderid),
+                         PAPI_STR("name", name),
+                         PAPI_STR("mail", mail),
+                         PAPI_STR("message", message),
+                         PAPI_NUM("permissions", convert_perms(permissions)),
+                         PAPI_STR("hint", hint),
+                         PAPI_NUM("strictmode", 1)};
     return psync_run_command("sharefolder", params, err);
   }
   if ((change_err = psync_crypto_change_passphrase_unlocked(
@@ -1588,16 +1588,16 @@ int psync_crypto_share_folder(psync_folderid_t folderid, const char *name,
     return change_err;
   }
   {
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_NUM("folderid", folderid),
-                         P_STR("name", name),
-                         P_STR("mail", mail),
-                         P_STR("message", message),
-                         P_NUM("permissions", convert_perms(permissions)),
-                         P_STR("hint", hint),
-                         P_STR("privatekey", priv_key),
-                         P_STR("signature", signature),
-                         P_NUM("strictmode", 1)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_NUM("folderid", folderid),
+                         PAPI_STR("name", name),
+                         PAPI_STR("mail", mail),
+                         PAPI_STR("message", message),
+                         PAPI_NUM("permissions", convert_perms(permissions)),
+                         PAPI_STR("hint", hint),
+                         PAPI_STR("privatekey", priv_key),
+                         PAPI_STR("signature", signature),
+                         PAPI_NUM("strictmode", 1)};
     return psync_run_command("sharefolder", params, err);
   }
 }
@@ -1605,12 +1605,12 @@ int psync_crypto_share_folder(psync_folderid_t folderid, const char *name,
 int psync_account_teamshare(psync_folderid_t folderid, const char *name,
                             psync_teamid_t teamid, const char *message,
                             uint32_t permissions, char **err) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("folderid", folderid),
-                       P_STR("name", name),
-                       P_NUM("teamid", teamid),
-                       P_STR("message", message),
-                       P_NUM("permissions", convert_perms(permissions))};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("folderid", folderid),
+                       PAPI_STR("name", name),
+                       PAPI_NUM("teamid", teamid),
+                       PAPI_STR("message", message),
+                       PAPI_NUM("permissions", convert_perms(permissions))};
   return psync_run_command("account_teamshare", params, err);
 }
 
@@ -1623,13 +1623,13 @@ int psync_crypto_account_teamshare(psync_folderid_t folderid, const char *name,
   int change_err;
 
   if (!temppass) {
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_NUM("folderid", folderid),
-                         P_STR("name", name),
-                         P_NUM("teamid", teamid),
-                         P_STR("message", message),
-                         P_NUM("permissions", convert_perms(permissions)),
-                         P_STR("hint", hint)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_NUM("folderid", folderid),
+                         PAPI_STR("name", name),
+                         PAPI_NUM("teamid", teamid),
+                         PAPI_STR("message", message),
+                         PAPI_NUM("permissions", convert_perms(permissions)),
+                         PAPI_STR("hint", hint)};
     return psync_run_command("account_teamshare", params, err);
   }
 
@@ -1639,28 +1639,28 @@ int psync_crypto_account_teamshare(psync_folderid_t folderid, const char *name,
   }
 
   {
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_NUM("folderid", folderid),
-                         P_STR("name", name),
-                         P_NUM("teamid", teamid),
-                         P_STR("message", message),
-                         P_NUM("permissions", convert_perms(permissions)),
-                         P_STR("hint", hint),
-                         P_STR("privatekey", priv_key),
-                         P_STR("signature", signature)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_NUM("folderid", folderid),
+                         PAPI_STR("name", name),
+                         PAPI_NUM("teamid", teamid),
+                         PAPI_STR("message", message),
+                         PAPI_NUM("permissions", convert_perms(permissions)),
+                         PAPI_STR("hint", hint),
+                         PAPI_STR("privatekey", priv_key),
+                         PAPI_STR("signature", signature)};
     return psync_run_command("account_teamshare", params, err);
   }
 }
 
 int psync_cancel_share_request(psync_sharerequestid_t requestid, char **err) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("sharerequestid", requestid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("sharerequestid", requestid)};
   return psync_run_command("cancelsharerequest", params, err);
 }
 
 int psync_decline_share_request(psync_sharerequestid_t requestid, char **err) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("sharerequestid", requestid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("sharerequestid", requestid)};
   return psync_run_command("declineshare", params, err);
 }
 
@@ -1668,14 +1668,14 @@ int psync_accept_share_request(psync_sharerequestid_t requestid,
                                psync_folderid_t tofolderid, const char *name,
                                char **err) {
   if (name) {
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_NUM("sharerequestid", requestid),
-                         P_NUM("folderid", tofolderid), P_STR("name", name)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_NUM("sharerequestid", requestid),
+                         PAPI_NUM("folderid", tofolderid), PAPI_STR("name", name)};
     return psync_run_command("acceptshare", params, err);
   } else {
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_NUM("sharerequestid", requestid),
-                         P_NUM("folderid", tofolderid)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_NUM("sharerequestid", requestid),
+                         PAPI_NUM("folderid", tofolderid)};
     return psync_run_command("acceptshare", params, err);
   }
 }
@@ -1690,7 +1690,7 @@ int psync_account_stopshare(psync_shareid_t shareid, char **err) {
 int psync_remove_share(psync_shareid_t shareid, char **err) {
   int result;
   char *err1 = NULL;
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("shareid", shareid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("shareid", shareid)};
   result = psync_run_command("removeshare", params, err);
   if (result == 2025) {
     result = psync_account_stopshare(shareid, &err1);
@@ -1720,8 +1720,8 @@ int psync_modify_share(psync_shareid_t shareid, uint32_t permissions,
                        char **err) {
   int result;
   char *err1 = NULL;
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("shareid", shareid),
-                       P_NUM("permissions", convert_perms(permissions))};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("shareid", shareid),
+                       PAPI_NUM("permissions", convert_perms(permissions))};
   result = psync_run_command("changeshare", params, err);
   if (result == 2025) {
     result =
@@ -1769,18 +1769,18 @@ static psync_new_version_t *psync_res_to_ver(const binresult *res,
   const binresult *cres, *pres, *hres;
   char *ptr;
   unsigned long usize;
-  cres = psync_find_result(res, "download", PARAM_HASH);
+  cres = papi_find_result2(res, "download", PARAM_HASH);
   lurl = sizeof("https://") - 1;
-  pres = psync_find_result(cres, "path", PARAM_STR);
+  pres = papi_find_result2(cres, "path", PARAM_STR);
   lurl += pres->length;
-  hres = psync_find_result(cres, "hosts", PARAM_ARRAY)->array[0];
+  hres = papi_find_result2(cres, "hosts", PARAM_ARRAY)->array[0];
   lurl += hres->length;
   lurl = (lurl + sizeof(void *)) / sizeof(void *) * sizeof(void *);
-  usize = psync_find_result(cres, "size", PARAM_NUM)->num;
-  cres = psync_find_result(res, "notes", PARAM_STR);
+  usize = papi_find_result2(cres, "size", PARAM_NUM)->num;
+  cres = papi_find_result2(res, "notes", PARAM_STR);
   notes = cres->str;
   lnotes = (cres->length + sizeof(void *)) / sizeof(void *) * sizeof(void *);
-  cres = psync_find_result(res, "versionstr", PARAM_STR);
+  cres = papi_find_result2(res, "versionstr", PARAM_STR);
   versionstr = cres->str;
   lversion = (cres->length + sizeof(void *)) / sizeof(void *) * sizeof(void *);
   if (localpath) {
@@ -1809,14 +1809,14 @@ static psync_new_version_t *psync_res_to_ver(const binresult *res,
     ver->localpath = ptr;
   } else
     ver->localpath = NULL;
-  ver->version = psync_find_result(res, "version", PARAM_NUM)->num;
+  ver->version = papi_find_result2(res, "version", PARAM_NUM)->num;
   ver->updatesize = usize;
   return ver;
 }
 
 int check_new_version_on_us_socket(binresult **pres, const char *os,
                                    unsigned long currentversion) {
-  binparam params[] = {P_STR("os", os), P_NUM("version", currentversion)};
+  binparam params[] = {PAPI_STR("os", os), PAPI_NUM("version", currentversion)};
   psock_t *api;
   binresult *res;
   int usessl;
@@ -1829,14 +1829,14 @@ int check_new_version_on_us_socket(binresult **pres, const char *os,
   if (unlikely(!api)) {
     return -1;
   }
-  res = send_command(api, "getlastversion", params);
+  res = papi_send2(api, "getlastversion", params);
   if (likely(res))
     psync_apipool_release(api);
   else {
     psync_apipool_release_bad(api);
     return -1;
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     debug(D_WARNING, "command %s returned code %u", "getlastversion",
           (unsigned)result);
@@ -1859,7 +1859,7 @@ psync_new_version_t *psync_check_new_version(const char *os,
     debug(D_WARNING, "getlastversion returned %d", ret);
     return NULL;
   }
-  if (!psync_find_result(res, "newversion", PARAM_BOOL)->num) {
+  if (!papi_find_result2(res, "newversion", PARAM_BOOL)->num) {
     psync_free(res);
     return NULL;
   }
@@ -1885,7 +1885,7 @@ static char *psync_filename_from_res(const binresult *res) {
   const char *nm;
   char *nmd, *path, *ret;
   const char *nmarr[2];
-  nm = strrchr(psync_find_result(res, "path", PARAM_STR)->str, '/');
+  nm = strrchr(papi_find_result2(res, "path", PARAM_STR)->str, '/');
   if (unlikely_log(!nm))
     return NULL;
   path = ppath_private_tmp();
@@ -1911,13 +1911,13 @@ static int psync_download_new_version(const binresult *res, char **lpath) {
   int rd;
   char cookie[128];
   sock = psync_http_connect_multihost(
-      psync_find_result(res, "hosts", PARAM_ARRAY), &host);
+      papi_find_result2(res, "hosts", PARAM_ARRAY), &host);
   if (unlikely_log(!sock))
     return -1;
   psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
-                 psync_find_result(res, "dwltag", PARAM_STR)->str);
+                 papi_find_result2(res, "dwltag", PARAM_STR)->str);
   if (unlikely_log(psync_http_request(
-          sock, host, psync_find_result(res, "path", PARAM_STR)->str, 0, 0,
+          sock, host, papi_find_result2(res, "path", PARAM_STR)->str, 0, 0,
           cookie))) {
     psync_http_close(sock);
     return -1;
@@ -1926,7 +1926,7 @@ static int psync_download_new_version(const binresult *res, char **lpath) {
     psync_http_close(sock);
     return 1;
   }
-  size = psync_find_result(res, "size", PARAM_NUM)->num;
+  size = papi_find_result2(res, "size", PARAM_NUM)->num;
   filename = psync_filename_from_res(res);
   if (unlikely_log(!filename)) {
     psync_http_close(sock);
@@ -1986,18 +1986,18 @@ psync_check_new_version_download(const char *os, unsigned long currentversion) {
     debug(D_WARNING, "getlastversion returned %d", ret);
     return NULL;
   }
-  if (!psync_find_result(res, "newversion", PARAM_BOOL)->num) {
+  if (!papi_find_result2(res, "newversion", PARAM_BOOL)->num) {
     psync_free(res);
     return NULL;
   }
   ret = psync_download_new_version(
-      psync_find_result(res, "download", PARAM_HASH), &lfilename);
+      papi_find_result2(res, "download", PARAM_HASH), &lfilename);
   if (unlikely(ret == -1))
     do {
       debug(D_WARNING, "could not download update, sleeping");
       psys_sleep_milliseconds(10000);
       ret = psync_download_new_version(
-          psync_find_result(res, "download", PARAM_HASH), &lfilename);
+          papi_find_result2(res, "download", PARAM_HASH), &lfilename);
     } while (ret == -1);
   if (unlikely_log(ret)) {
     psync_free(res);
@@ -2020,17 +2020,17 @@ void psync_run_new_version(psync_new_version_t *ver) {
 
 static int psync_upload_result(binresult *res, psync_fileid_t *fileid) {
   uint64_t result;
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (likely(!result)) {
     const binresult *meta =
-        psync_find_result(res, "metadata", PARAM_ARRAY)->array[0];
-    *fileid = psync_find_result(meta, "fileid", PARAM_NUM)->num;
+        papi_find_result2(res, "metadata", PARAM_ARRAY)->array[0];
+    *fileid = papi_find_result2(meta, "fileid", PARAM_NUM)->num;
     psync_free(res);
     psync_diff_wake();
     return 0;
   } else {
     debug(D_WARNING, "uploadfile returned error %u: %s", (unsigned)result,
-          psync_find_result(res, "error", PARAM_STR)->str);
+          papi_find_result2(res, "error", PARAM_STR)->str);
     psync_free(res);
     psync_process_api_error(result);
     return result;
@@ -2048,10 +2048,10 @@ static int psync_upload_params(binparam *params, size_t paramcnt,
     api = psync_apipool_get();
     if (unlikely(!api))
       break;
-    if (likely(do_send_command(api, "uploadfile", strlen("uploadfile"), params,
+    if (likely(papi_send(api, "uploadfile", strlen("uploadfile"), params,
                                paramcnt, length, 0))) {
       if (psock_writeall(api, data, length) == length) {
-        res = get_result(api);
+        res = papi_result(api);
         if (likely(res)) {
           psync_apipool_release(api);
           return psync_upload_result(res, fileid);
@@ -2067,17 +2067,17 @@ static int psync_upload_params(binparam *params, size_t paramcnt,
 int psync_upload_data(psync_folderid_t folderid, const char *remote_filename,
                       const void *data, size_t length, psync_fileid_t *fileid) {
   binparam params[] = {
-      P_STR("auth", psync_my_auth), P_NUM("folderid", folderid),
-      P_STR("filename", remote_filename), P_BOOL("nopartial", 1)};
+      PAPI_STR("auth", psync_my_auth), PAPI_NUM("folderid", folderid),
+      PAPI_STR("filename", remote_filename), PAPI_BOOL("nopartial", 1)};
   return psync_upload_params(params, ARRAY_SIZE(params), data, length, fileid);
 }
 
 int psync_upload_data_as(const char *remote_path, const char *remote_filename,
                          const void *data, size_t length,
                          psync_fileid_t *fileid) {
-  binparam params[] = {P_STR("auth", psync_my_auth), P_STR("path", remote_path),
-                       P_STR("filename", remote_filename),
-                       P_BOOL("nopartial", 1)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_STR("path", remote_path),
+                       PAPI_STR("filename", remote_filename),
+                       PAPI_BOOL("nopartial", 1)};
   return psync_upload_params(params, ARRAY_SIZE(params), data, length, fileid);
 }
 
@@ -2307,16 +2307,16 @@ int psync_crypto_change_crypto_pass(const char *oldpass, const char *newpass,
     return err;
   }
   {
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_STR("privatekey", priv_key),
-                         P_STR("signature", signature), P_STR("hint", hint),
-                         P_STR("code", code)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_STR("privatekey", priv_key),
+                         PAPI_STR("signature", signature), PAPI_STR("hint", hint),
+                         PAPI_STR("code", code)};
     debug(D_NOTICE, "uploading re-encoded private key");
     while (1) {
       api = psync_apipool_get();
       if (!api)
         return PRINT_RETURN_CONST(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
-      res = send_command(api, "crypto_changeuserprivate", params);
+      res = papi_send2(api, "crypto_changeuserprivate", params);
       if (unlikely_log(!res)) {
         psync_apipool_release_bad(api);
         if (++tries > 5)
@@ -2326,7 +2326,7 @@ int psync_crypto_change_crypto_pass(const char *oldpass, const char *newpass,
         break;
       }
     }
-    result = psync_find_result(res, "result", PARAM_NUM)->num;
+    result = papi_find_result2(res, "result", PARAM_NUM)->num;
     psync_free(res);
     if (result != 0)
       debug(D_WARNING, "crypto_changeuserprivate returned %u",
@@ -2354,16 +2354,16 @@ int psync_crypto_change_crypto_pass_unlocked(const char *newpass,
     return err;
   }
   {
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_STR("privatekey", priv_key),
-                         P_STR("signature", signature), P_STR("hint", hint),
-                         P_STR("code", code)};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_STR("privatekey", priv_key),
+                         PAPI_STR("signature", signature), PAPI_STR("hint", hint),
+                         PAPI_STR("code", code)};
     debug(D_NOTICE, "uploading re-encoded private key");
     while (1) {
       api = psync_apipool_get();
       if (!api)
         return PRINT_RETURN_CONST(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
-      res = send_command(api, "crypto_changeuserprivate", params);
+      res = papi_send2(api, "crypto_changeuserprivate", params);
       if (unlikely_log(!res)) {
         psync_apipool_release_bad(api);
         if (++tries > 5)
@@ -2373,7 +2373,7 @@ int psync_crypto_change_crypto_pass_unlocked(const char *newpass,
         break;
       }
     }
-    result = psync_find_result(res, "result", PARAM_NUM)->num;
+    result = papi_find_result2(res, "result", PARAM_NUM)->num;
     psync_free(res);
     if (result != 0)
       debug(D_WARNING, "crypto_changeuserprivate returned %u",
@@ -2390,19 +2390,19 @@ int psync_crypto_crypto_send_change_user_private() {
   psock_t *api;
   binresult *res;
   uint64_t result;
-  binparam params[] = {P_STR("auth", psync_my_auth)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth)};
   debug(D_NOTICE, "Requesting code for changing the private key password");
   api = psync_apipool_get();
   if (!api)
     return PRINT_RETURN_CONST(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
-  res = send_command(api, "crypto_sendchangeuserprivate", params);
+  res = papi_send2(api, "crypto_sendchangeuserprivate", params);
   if (unlikely_log(!res)) {
     psync_apipool_release_bad(api);
     return PRINT_RETURN_CONST(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
   } else {
     psync_apipool_release(api);
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   psync_free(res);
   if (result != 0)
     debug(D_WARNING, "crypto_sendchangeuserprivate returned %u",
@@ -2617,7 +2617,7 @@ void psync_get_folder_ownerid(psync_folderid_t folderid, psync_userid_t *ret) {
 }
 
 int psync_setlanguage(const char *language, char **err) {
-  binparam params[] = {P_STR("language", language)};
+  binparam params[] = {PAPI_STR("language", language)};
   return psync_run_command("setlanguage", params, err);
 }
 
@@ -2637,7 +2637,7 @@ char *psync_get_token() {
 int psync_get_promo(char **url, uint64_t *width, uint64_t *height) {
   uint64_t result;
   binresult *res;
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("os", P_OS_ID)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("os", P_OS_ID)};
   *url = 0;
 
   res = psync_api_run_command("getpromourl", params);
@@ -2646,7 +2646,7 @@ int psync_get_promo(char **url, uint64_t *width, uint64_t *height) {
     return -1;
   }
 
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
 
   if (result) {
     debug(D_WARNING, "getpromourl returned %d", (int)result);
@@ -2654,32 +2654,32 @@ int psync_get_promo(char **url, uint64_t *width, uint64_t *height) {
     return result;
   }
 
-  if (!psync_find_result(res, "haspromo", PARAM_BOOL)->num) {
+  if (!papi_find_result2(res, "haspromo", PARAM_BOOL)->num) {
     psync_free(res);
 
     return result;
   }
 
-  *url = psync_strdup(psync_find_result(res, "url", PARAM_STR)->str);
+  *url = psync_strdup(papi_find_result2(res, "url", PARAM_STR)->str);
 
-  if (!psync_find_result(res, "width", PARAM_NUM)->num) {
+  if (!papi_find_result2(res, "width", PARAM_NUM)->num) {
     debug(D_NOTICE, "Parameter width not found.");
 
     psync_free(res);
     return result;
   }
 
-  *width = psync_find_result(res, "width", PARAM_NUM)->num;
+  *width = papi_find_result2(res, "width", PARAM_NUM)->num;
   debug(D_NOTICE, "Promo window Width: [%lu]", *width);
 
-  if (!psync_find_result(res, "height", PARAM_NUM)->num) {
+  if (!papi_find_result2(res, "height", PARAM_NUM)->num) {
     debug(D_NOTICE, "Parameter height not found.");
 
     psync_free(res);
     return result;
   }
 
-  *height = psync_find_result(res, "height", PARAM_NUM)->num;
+  *height = papi_find_result2(res, "height", PARAM_NUM)->num;
   debug(D_NOTICE, "Promo window Height: [%lu]", *height);
 
   psync_free(res);
@@ -2736,9 +2736,9 @@ void set_tfa_flag(int value) {
 
 int psync_send_publink(const char *code, const char *mail, const char *message,
                        char **err) {
-  binparam params[] = {P_STR("auth", psync_my_auth), P_STR("code", code),
-                       P_STR("mails", mail), P_STR("message", message),
-                       P_NUM("source", 1)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_STR("code", code),
+                       PAPI_STR("mails", mail), PAPI_STR("message", message),
+                       PAPI_NUM("source", 1)};
   return psync_run_command("sendpublink", params, err);
 }
 
@@ -2839,9 +2839,9 @@ psync_folderid_t create_bup_mach_folder(char **msgErr) {
   free(tmpBuff);
 
   eventParams requiredParams = {3, // Number of parameters we are passing below.
-                                {P_STR("auth", psync_my_auth),
-                                 P_STR("name", bRootFoName),
-                                 P_NUM("os", P_OS_ID)}};
+                                {PAPI_STR("auth", psync_my_auth),
+                                 PAPI_STR("name", bRootFoName),
+                                 PAPI_NUM("os", P_OS_ID)}};
 
   eventParams optionalParams = {0};
 
@@ -2851,7 +2851,7 @@ psync_folderid_t create_bup_mach_folder(char **msgErr) {
 
   if (res == 0) {
     rootFolIdObj =
-        (binresult *)psync_find_result(retData, "folderid", PARAM_NUM);
+        (binresult *)papi_find_result2(retData, "folderid", PARAM_NUM);
 
     // Store the root folder id in the local DB
     sql = psync_sql_prep_statement(
@@ -2914,12 +2914,12 @@ int psync_create_backup(char *path, char **errMsg) {
   }
 
   eventParams reqPar = {4, // Number of parameters we are passing below.
-                        {P_STR("auth", psync_my_auth),
-                         P_STR("name", folders.folders[folders.cnt - 1]),
-                         P_NUM("folderid", bFId),
-                         P_STR("timeformat", "timestamp")}};
+                        {PAPI_STR("auth", psync_my_auth),
+                         PAPI_STR("name", folders.folders[folders.cnt - 1]),
+                         PAPI_NUM("folderid", bFId),
+                         PAPI_STR("timeformat", "timestamp")}};
 
-  eventParams optPar = {oParCnt, {P_STR(PARENT_FOLDER_NAME, optFolName)}};
+  eventParams optPar = {oParCnt, {PAPI_STR(PARENT_FOLDER_NAME, optFolName)}};
 
   debug(D_NOTICE, "Call backend [backup/createbackup].");
 
@@ -2929,7 +2929,7 @@ int psync_create_backup(char *path, char **errMsg) {
   if (res == 0) {
     psync_diff_update_folder(retData);
 
-    folId = (binresult *)psync_find_result(retData, FOLDER_ID, PARAM_NUM);
+    folId = (binresult *)papi_find_result2(retData, FOLDER_ID, PARAM_NUM);
 
     syncFId = psync_add_sync_by_folderid(path, folId->num, PSYNC_BACKUPS);
 
@@ -2985,7 +2985,7 @@ int psync_delete_backup(psync_syncid_t syncId, char **errMsg) {
   if (res == 0) {
     eventParams reqPar = {
         2, // Number of parameters we are passing below.
-        {P_STR("auth", psync_my_auth), P_NUM("folderid", folderId)}};
+        {PAPI_STR("auth", psync_my_auth), PAPI_NUM("folderid", folderId)}};
 
     eventParams optPar = {0};
 
@@ -3019,7 +3019,7 @@ void psync_stop_device(psync_folderid_t folderId, char **errMsg) {
   if (bFId > 0) {
     eventParams reqPar = {
         2, // Number of parameters we are passing below.
-        {P_STR("auth", psync_my_auth), P_NUM("folderid", bFId)}};
+        {PAPI_STR("auth", psync_my_auth), PAPI_NUM("folderid", bFId)}};
 
     eventParams optPar = {0};
 
@@ -3140,27 +3140,27 @@ userinfo_t *psync_get_userinfo() {
     binresult *res;
     uint64_t err;
     userinfo_t *info;
-    binparam params[] = {P_STR("auth", psync_my_auth),
-                         P_STR("timeformat", "timestamp")};
+    binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                         PAPI_STR("timeformat", "timestamp")};
     res = psync_api_run_command("userinfo", params);
     if (!res) {
       psync_free(res);
       return NULL;
     }
-    err = psync_find_result(res, "result", PARAM_NUM)->num;
+    err = papi_find_result2(res, "result", PARAM_NUM)->num;
     if (err) {
       psync_free(res);
       return NULL;
     }
 
-    cres = psync_find_result(res, "email", PARAM_STR);
+    cres = papi_find_result2(res, "email", PARAM_STR);
     email = cres->str;
     lemail = (cres->length + sizeof(void *)) / sizeof(void *) * sizeof(void *);
-    cres = psync_find_result(res, "currency", PARAM_STR);
+    cres = papi_find_result2(res, "currency", PARAM_STR);
     currency = cres->str;
     lcurrency =
         (cres->length + sizeof(void *)) / sizeof(void *) * sizeof(void *);
-    cres = psync_find_result(res, "language", PARAM_STR);
+    cres = papi_find_result2(res, "language", PARAM_STR);
     language = cres->str;
     llanguage =
         (cres->length + sizeof(void *)) / sizeof(void *) * sizeof(void *);
@@ -3176,42 +3176,42 @@ userinfo_t *psync_get_userinfo() {
     memcpy(ptr, language, llanguage);
     info->language = ptr;
 
-    info->cryptosetup = psync_find_result(res, "cryptosetup", PARAM_BOOL)->num;
+    info->cryptosetup = papi_find_result2(res, "cryptosetup", PARAM_BOOL)->num;
     info->cryptosubscription =
-        psync_find_result(res, "cryptosubscription", PARAM_BOOL)->num;
+        papi_find_result2(res, "cryptosubscription", PARAM_BOOL)->num;
     info->cryptolifetime =
-        psync_find_result(res, "cryptolifetime", PARAM_BOOL)->num;
+        papi_find_result2(res, "cryptolifetime", PARAM_BOOL)->num;
     info->emailverified =
-        psync_find_result(res, "emailverified", PARAM_BOOL)->num;
+        papi_find_result2(res, "emailverified", PARAM_BOOL)->num;
     info->usedpublinkbranding =
-        psync_find_result(res, "usedpublinkbranding", PARAM_BOOL)->num;
-    info->haspassword = psync_find_result(res, "haspassword", PARAM_BOOL)->num;
-    info->premium = psync_find_result(res, "premium", PARAM_BOOL)->num;
+        papi_find_result2(res, "usedpublinkbranding", PARAM_BOOL)->num;
+    info->haspassword = papi_find_result2(res, "haspassword", PARAM_BOOL)->num;
+    info->premium = papi_find_result2(res, "premium", PARAM_BOOL)->num;
     info->premiumlifetime =
-        psync_find_result(res, "premiumlifetime", PARAM_BOOL)->num;
-    info->business = psync_find_result(res, "business", PARAM_BOOL)->num;
+        papi_find_result2(res, "premiumlifetime", PARAM_BOOL)->num;
+    info->business = papi_find_result2(res, "business", PARAM_BOOL)->num;
     info->haspaidrelocation =
-        psync_find_result(res, "haspaidrelocation", PARAM_BOOL)->num;
-    cres = psync_check_result(res, "efh", PARAM_BOOL);
+        papi_find_result2(res, "haspaidrelocation", PARAM_BOOL)->num;
+    cres = papi_check_result2(res, "efh", PARAM_BOOL);
     if (cres)
       info->efh = cres->num;
     else
       info->efh = 0;
-    cres = psync_check_result(res, "premiumexpires", PARAM_NUM);
+    cres = papi_check_result2(res, "premiumexpires", PARAM_NUM);
     if (cres)
       info->premiumexpires = cres->num;
     else
       info->premiumexpires = 0;
     info->trashrevretentiondays =
-        psync_find_result(res, "trashrevretentiondays", PARAM_NUM)->num;
-    info->plan = psync_find_result(res, "plan", PARAM_NUM)->num;
+        papi_find_result2(res, "trashrevretentiondays", PARAM_NUM)->num;
+    info->plan = papi_find_result2(res, "plan", PARAM_NUM)->num;
     info->publiclinkquota =
-        psync_find_result(res, "publiclinkquota", PARAM_NUM)->num;
-    info->userid = psync_find_result(res, "userid", PARAM_NUM)->num;
-    info->quota = psync_find_result(res, "quota", PARAM_NUM)->num;
-    info->usedquota = psync_find_result(res, "usedquota", PARAM_NUM)->num;
-    info->freequota = psync_find_result(res, "freequota", PARAM_NUM)->num;
-    info->registered = psync_find_result(res, "registered", PARAM_NUM)->num;
+        papi_find_result2(res, "publiclinkquota", PARAM_NUM)->num;
+    info->userid = papi_find_result2(res, "userid", PARAM_NUM)->num;
+    info->quota = papi_find_result2(res, "quota", PARAM_NUM)->num;
+    info->usedquota = papi_find_result2(res, "usedquota", PARAM_NUM)->num;
+    info->freequota = papi_find_result2(res, "freequota", PARAM_NUM)->num;
+    info->registered = papi_find_result2(res, "registered", PARAM_NUM)->num;
     psync_free(res);
     return info;
   }

@@ -148,10 +148,10 @@ static int psync_cloud_crypto_setup_do_upload(const unsigned char *rsapriv,
                                               size_t rsapublen,
                                               const char *hint,
                                               time_t *cryptoexpires) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_LSTR("privatekey", rsapriv, rsaprivlen),
-                       P_LSTR("publickey", rsapub, rsapublen),
-                       P_STR("hint", hint), P_STR("timeformat", "timestamp")};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_LSTR("privatekey", rsapriv, rsaprivlen),
+                       PAPI_LSTR("publickey", rsapub, rsapublen),
+                       PAPI_STR("hint", hint), PAPI_STR("timeformat", "timestamp")};
   psock_t *api;
   binresult *res;
   uint64_t result;
@@ -162,7 +162,7 @@ static int psync_cloud_crypto_setup_do_upload(const unsigned char *rsapriv,
     api = psync_apipool_get();
     if (!api)
       return PRINT_RETURN_CONST(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
-    res = send_command(api, "crypto_setuserkeys", params);
+    res = papi_send2(api, "crypto_setuserkeys", params);
     if (unlikely_log(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
@@ -172,9 +172,9 @@ static int psync_cloud_crypto_setup_do_upload(const unsigned char *rsapriv,
       break;
     }
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (!result)
-    *cryptoexpires = psync_find_result(res, "cryptoexpires", PARAM_NUM)->num;
+    *cryptoexpires = papi_find_result2(res, "cryptoexpires", PARAM_NUM)->num;
   psync_free(res);
   if (result != 0)
     debug(D_WARNING, "crypto_setuserkeys returned %u", (unsigned)result);
@@ -206,7 +206,7 @@ static int psync_cloud_crypto_download_keys(
     unsigned char **rsapriv, size_t *rsaprivlen, unsigned char **rsapub,
     size_t *rsapublen, unsigned char **salt, size_t *saltlen,
     size_t *iterations, char *publicsha1, char *privatesha1, uint32_t *flags) {
-  binparam params[] = {P_STR("auth", psync_my_auth)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth)};
   psock_t *api;
   binresult *res;
   const binresult *data;
@@ -220,7 +220,7 @@ static int psync_cloud_crypto_download_keys(
     api = psync_apipool_get();
     if (!api)
       return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_CANT_CONNECT);
-    res = send_command(api, "crypto_getuserkeys", params);
+    res = papi_send2(api, "crypto_getuserkeys", params);
     if (unlikely_log(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
@@ -230,7 +230,7 @@ static int psync_cloud_crypto_download_keys(
       break;
     }
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     psync_free(res);
     psync_process_api_error(result);
@@ -244,10 +244,10 @@ static int psync_cloud_crypto_download_keys(
     }
     return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_UNKNOWN_ERROR);
   }
-  data = psync_find_result(res, "privatekey", PARAM_STR);
+  data = papi_find_result2(res, "privatekey", PARAM_STR);
   rsaprivstruct = psync_base64_decode((const unsigned char *)data->str,
                                       data->length, &rsaprivstructlen);
-  data = psync_find_result(res, "publickey", PARAM_STR);
+  data = papi_find_result2(res, "publickey", PARAM_STR);
   rsapubstruct = psync_base64_decode((const unsigned char *)data->str,
                                      data->length, &rsapubstructlen);
   psync_free(res);
@@ -295,13 +295,13 @@ static int psync_cloud_crypto_download_keys(
 }
 
 static binresult *psync_get_keys_bin_auth(const char *auth) {
-  binparam params[] = {P_STR("auth", auth)};
+  binparam params[] = {PAPI_STR("auth", auth)};
   psock_t *api;
   binresult *res;
   api = psync_apipool_get();
   if (!api)
     return NULL;
-  res = send_command(api, "crypto_getuserkeys", params);
+  res = papi_send2(api, "crypto_getuserkeys", params);
   if (unlikely_log(!res)) {
     psync_apipool_release_bad(api);
   } else {
@@ -446,7 +446,7 @@ int psync_cloud_crypto_setup(const char *password, const char *hint) {
 }
 
 int psync_cloud_crypto_get_hint(char **hint) {
-  binparam params[] = {P_STR("auth", psync_my_auth)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth)};
   psock_t *api;
   binresult *res;
   uint64_t result;
@@ -457,7 +457,7 @@ int psync_cloud_crypto_get_hint(char **hint) {
     api = psync_apipool_get();
     if (!api)
       return PRINT_RETURN_CONST(PSYNC_CRYPTO_HINT_CANT_CONNECT);
-    res = send_command(api, "crypto_getuserhint", params);
+    res = papi_send2(api, "crypto_getuserhint", params);
     if (unlikely_log(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
@@ -467,7 +467,7 @@ int psync_cloud_crypto_get_hint(char **hint) {
       break;
     }
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     psync_free(res);
     psync_process_api_error(result);
@@ -481,7 +481,7 @@ int psync_cloud_crypto_get_hint(char **hint) {
     }
     return PRINT_RETURN_CONST(PSYNC_CRYPTO_HINT_UNKNOWN_ERROR);
   }
-  *hint = psync_strdup(psync_find_result(res, "hint", PARAM_STR)->str);
+  *hint = psync_strdup(papi_find_result2(res, "hint", PARAM_STR)->str);
   psync_free(res);
   return PSYNC_CRYPTO_HINT_SUCCESS;
 }
@@ -692,7 +692,7 @@ int psync_cloud_crypto_isstarted() {
 }
 
 int psync_cloud_crypto_reset() {
-  binparam params[] = {P_STR("auth", psync_my_auth)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth)};
   psock_t *api;
   binresult *res;
   uint32_t result;
@@ -705,7 +705,7 @@ int psync_cloud_crypto_reset() {
     api = psync_apipool_get();
     if (!api)
       return PRINT_RETURN_CONST(PSYNC_CRYPTO_RESET_CANT_CONNECT);
-    res = send_command(api, "crypto_reset", params);
+    res = papi_send2(api, "crypto_reset", params);
     if (unlikely_log(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
@@ -715,7 +715,7 @@ int psync_cloud_crypto_reset() {
       break;
     }
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   psync_free(res);
   if (result)
     debug(D_WARNING, "crypto_reset returned error %u", (unsigned)result);
@@ -737,7 +737,7 @@ static void *err_to_ptr(int err) { return (void *)(uintptr_t)(-err); }
 static void set_crypto_err_msg(const binresult *res) {
   const binresult *msg;
   size_t l;
-  msg = psync_find_result(res, "error", PARAM_STR);
+  msg = papi_find_result2(res, "error", PARAM_STR);
   l = msg->length + 1;
   if (l >= sizeof(crypto_api_err))
     l = sizeof(crypto_api_err) - 1;
@@ -805,8 +805,8 @@ static void save_file_key_to_db(psync_fileid_t fileid, uint64_t hash,
 
 static psync_encrypted_symmetric_key_t
 psync_crypto_download_folder_enc_key(psync_folderid_t folderid) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("folderid", folderid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("folderid", folderid)};
   psock_t *api;
   binresult *res;
   const binresult *b64key;
@@ -822,7 +822,7 @@ psync_crypto_download_folder_enc_key(psync_folderid_t folderid) {
     if (!api)
       return (psync_encrypted_symmetric_key_t)err_to_ptr(
           PRINT_RETURN_CONST(PSYNC_CRYPTO_CANT_CONNECT));
-    res = send_command(api, "crypto_getfolderkey", params);
+    res = papi_send2(api, "crypto_getfolderkey", params);
     if (unlikely_log(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
@@ -833,7 +833,7 @@ psync_crypto_download_folder_enc_key(psync_folderid_t folderid) {
       break;
     }
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     debug(D_NOTICE, "got error %lu from crypto_getfolderkey",
           (unsigned long)result);
@@ -844,7 +844,7 @@ psync_crypto_download_folder_enc_key(psync_folderid_t folderid) {
     return (psync_encrypted_symmetric_key_t)err_to_ptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_API_ERR_INTERNAL));
   }
-  b64key = psync_find_result(res, "key", PARAM_STR);
+  b64key = papi_find_result2(res, "key", PARAM_STR);
   key = psync_base64_decode((const unsigned char *)b64key->str, b64key->length,
                             &keylen);
   psync_free(res);
@@ -860,7 +860,7 @@ psync_crypto_download_folder_enc_key(psync_folderid_t folderid) {
 
 static psync_encrypted_symmetric_key_t
 psync_crypto_download_file_enc_key(psync_fileid_t fileid) {
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("fileid", fileid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("fileid", fileid)};
   psock_t *api;
   binresult *res;
   const binresult *b64key;
@@ -876,7 +876,7 @@ psync_crypto_download_file_enc_key(psync_fileid_t fileid) {
     if (!api)
       return (psync_encrypted_symmetric_key_t)err_to_ptr(
           PRINT_RETURN_CONST(PSYNC_CRYPTO_CANT_CONNECT));
-    res = send_command(api, "crypto_getfilekey", params);
+    res = papi_send2(api, "crypto_getfilekey", params);
     if (unlikely_log(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
@@ -887,7 +887,7 @@ psync_crypto_download_file_enc_key(psync_fileid_t fileid) {
       break;
     }
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     debug(D_NOTICE, "got error %lu from crypto_getfilekey",
           (unsigned long)result);
@@ -897,8 +897,8 @@ psync_crypto_download_file_enc_key(psync_fileid_t fileid) {
     return (psync_encrypted_symmetric_key_t)err_to_ptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_API_ERR_INTERNAL));
   }
-  result = psync_find_result(res, "hash", PARAM_NUM)->num;
-  b64key = psync_find_result(res, "key", PARAM_STR);
+  result = papi_find_result2(res, "hash", PARAM_NUM)->num;
+  b64key = papi_find_result2(res, "key", PARAM_STR);
   key = psync_base64_decode((const unsigned char *)b64key->str, b64key->length,
                             &keylen);
   psync_free(res);
@@ -1524,7 +1524,7 @@ psync_cloud_crypto_get_file_encoder_from_binresult(psync_fileid_t fileid,
   psync_crypto_aes256_sector_encoder_decoder_t enc;
   uint64_t hash;
   size_t keylen;
-  b64key = psync_find_result(res, "key", PARAM_STR);
+  b64key = papi_find_result2(res, "key", PARAM_STR);
   key = psync_base64_decode((const unsigned char *)b64key->str, b64key->length,
                             &keylen);
   if (!key)
@@ -1533,7 +1533,7 @@ psync_cloud_crypto_get_file_encoder_from_binresult(psync_fileid_t fileid,
   esym = psync_ssl_alloc_encrypted_symmetric_key(keylen);
   memcpy(esym->data, key, keylen);
   psync_free(key);
-  hash = psync_find_result(res, "hash", PARAM_NUM)->num;
+  hash = papi_find_result2(res, "hash", PARAM_NUM)->num;
   save_file_key_to_db(fileid, hash, esym);
   pthread_rwlock_rdlock(&crypto_lock);
   if (!crypto_started_l)
@@ -1644,12 +1644,12 @@ int psync_cloud_crypto_send_mkdir(psync_folderid_t folderid, const char *name,
                                   size_t b64keylen,
                                   psync_encrypted_symmetric_key_t encsym,
                                   psync_folderid_t *newfolderid) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("folderid", folderid),
-                       P_STR("name", name),
-                       P_BOOL("encrypted", 1),
-                       P_LSTR("key", b64key, b64keylen),
-                       P_STR("timeformat", "timestamp")};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("folderid", folderid),
+                       PAPI_STR("name", name),
+                       PAPI_BOOL("encrypted", 1),
+                       PAPI_LSTR("key", b64key, b64keylen),
+                       PAPI_STR("timeformat", "timestamp")};
   psock_t *api;
   binresult *res;
   const binresult *meta;
@@ -1660,7 +1660,7 @@ int psync_cloud_crypto_send_mkdir(psync_folderid_t folderid, const char *name,
     api = psync_apipool_get();
     if (!api)
       return set_err(PRINT_RETURN_CONST(PSYNC_CRYPTO_CANT_CONNECT), err);
-    res = send_command(api, "createfolder", params);
+    res = papi_send2(api, "createfolder", params);
     if (unlikely_log(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
@@ -1670,7 +1670,7 @@ int psync_cloud_crypto_send_mkdir(psync_folderid_t folderid, const char *name,
       break;
     }
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     set_crypto_err_msg(res);
     debug(D_NOTICE, "createfolder returned error %lu %s", (unsigned long)result,
@@ -1680,12 +1680,12 @@ int psync_cloud_crypto_send_mkdir(psync_folderid_t folderid, const char *name,
     psync_process_api_error(result);
     return result;
   }
-  meta = psync_find_result(res, "metadata", PARAM_HASH);
+  meta = papi_find_result2(res, "metadata", PARAM_HASH);
   if (newfolderid)
-    *newfolderid = psync_find_result(meta, "folderid", PARAM_NUM)->num;
+    *newfolderid = papi_find_result2(meta, "folderid", PARAM_NUM)->num;
   psync_sql_start_transaction();
   psync_ops_create_folder_in_db(meta);
-  save_folder_key_to_db(psync_find_result(meta, "folderid", PARAM_NUM)->num,
+  save_folder_key_to_db(papi_find_result2(meta, "folderid", PARAM_NUM)->num,
                         encsym);
   psync_sql_commit_transaction();
   psync_free(res);
@@ -2077,22 +2077,22 @@ retry:
       cres = PERROR_NET_ERROR;
       goto ex;
     }
-    result = psync_find_result(bres, "result", PARAM_NUM)->num;
+    result = papi_find_result2(bres, "result", PARAM_NUM)->num;
     if (unlikely(result)) {
       debug(D_WARNING, "crypto_getuserkeys returned error %d: %s", (int)result,
-            psync_find_result(bres, "error", PARAM_STR)->str);
+            papi_find_result2(bres, "error", PARAM_STR)->str);
       psync_free(bres);
       cres = (int)result;
       goto ex;
     }
     debug(D_NOTICE, "downloaded user keys");
-    data = psync_find_result(bres, "privatekey", PARAM_STR);
+    data = papi_find_result2(bres, "privatekey", PARAM_STR);
     privkey = psync_base64_decode((const unsigned char *)data->str,
                                   data->length, &privkeylen);
-    data = psync_find_result(bres, "publickey", PARAM_STR);
+    data = papi_find_result2(bres, "publickey", PARAM_STR);
     pubkey = psync_base64_decode((const unsigned char *)data->str, data->length,
                                  &pubkeylen);
-    data = psync_find_result(bres, "salt", PARAM_STR);
+    data = papi_find_result2(bres, "salt", PARAM_STR);
     salt = psync_base64_decode((const unsigned char *)data->str, data->length,
                                &saltlen);
     psync_free(bres);

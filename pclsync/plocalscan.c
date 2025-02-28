@@ -38,6 +38,7 @@
 #include <pthread.h>
 
 #include "pdevice.h"
+#include "pfile.h"
 #include "pfolder.h"
 #include "plibs.h"
 #include "prun.h"

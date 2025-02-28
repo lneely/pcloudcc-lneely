@@ -303,21 +303,21 @@ static int socket_read_all(int sock, void *buff, size_t len) {
 static int check_token(char *token, uint32_t tlen, unsigned char *key,
                        uint32_t keylen, unsigned char *hashhex) {
   binparam params[] = {
-      P_LSTR(PSYNC_CHECKSUM, hashhex, PSYNC_HASH_DIGEST_HEXLEN),
-      P_LSTR("keydata", key, keylen), P_LSTR("token", token, tlen)};
+      PAPI_LSTR(PSYNC_CHECKSUM, hashhex, PSYNC_HASH_DIGEST_HEXLEN),
+      PAPI_LSTR("keydata", key, keylen), PAPI_LSTR("token", token, tlen)};
   psock_t *api;
   binresult *res;
   uint64_t result;
   api = psync_apipool_get();
   if (unlikely_log(!api))
     return 0;
-  res = send_command(api, "checkfileownershiptoken", params);
+  res = papi_send2(api, "checkfileownershiptoken", params);
   if (unlikely_log(!res)) {
     psync_apipool_release_bad(api);
     return 0;
   }
   psync_apipool_release(api);
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   psync_free(res);
   return result ? 0 : 1;
 }
@@ -621,10 +621,10 @@ static int psync_p2p_get_download_token(psync_fileid_t fileid,
                                         uint64_t fsize, unsigned char **token,
                                         size_t *tlen) {
   binparam params[] = {
-      P_STR("auth", psync_my_auth), P_NUM("fileid", fileid),
-      P_NUM("filesize", fsize),
-      P_LSTR(PSYNC_CHECKSUM, filehashhex, PSYNC_HASH_DIGEST_HEXLEN),
-      P_LSTR("keydata", psync_rsa_public_bin->data,
+      PAPI_STR("auth", psync_my_auth), PAPI_NUM("fileid", fileid),
+      PAPI_NUM("filesize", fsize),
+      PAPI_LSTR(PSYNC_CHECKSUM, filehashhex, PSYNC_HASH_DIGEST_HEXLEN),
+      PAPI_LSTR("keydata", psync_rsa_public_bin->data,
              psync_rsa_public_bin->datalen)};
   psock_t *api;
   binresult *res;
@@ -634,17 +634,17 @@ static int psync_p2p_get_download_token(psync_fileid_t fileid,
   api = psync_apipool_get();
   if (unlikely_log(!api))
     return PSYNC_NET_TEMPFAIL;
-  res = send_command(api, "getfileownershiptoken", params);
+  res = papi_send2(api, "getfileownershiptoken", params);
   if (unlikely_log(!res)) {
     psync_apipool_release_bad(api);
     return PSYNC_NET_TEMPFAIL;
   }
   psync_apipool_release(api);
-  if (unlikely_log(psync_find_result(res, "result", PARAM_NUM)->num != 0)) {
+  if (unlikely_log(papi_find_result2(res, "result", PARAM_NUM)->num != 0)) {
     psync_free(res);
     return PSYNC_NET_PERMFAIL;
   }
-  ctoken = psync_find_result(res, "token", PARAM_STR);
+  ctoken = papi_find_result2(res, "token", PARAM_STR);
   *token = psync_malloc(ctoken->length + 1);
   memcpy(*token, ctoken->str, ctoken->length + 1);
   *tlen = ctoken->length;

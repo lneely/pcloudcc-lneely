@@ -570,8 +570,8 @@ static int rename_and_create_local(download_task_t *dt, unsigned char *checksum,
 }
 
 static int task_download_file(download_task_t *dt) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("fileid", dt->dwllist.fileid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("fileid", dt->dwllist.fileid)};
   struct stat st;
   psync_list ranges;
   psync_range_list_t *range;
@@ -706,7 +706,7 @@ static int task_download_file(download_task_t *dt) {
   res = psync_api_run_command("getfilelink", params);
   if (unlikely_log(!res))
     return -1;
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
     debug(D_WARNING, "got error %lu from getfilelink", (long unsigned)result);
     psync_process_api_error(result);
@@ -747,10 +747,10 @@ static int task_download_file(download_task_t *dt) {
   if (rt == PSYNC_NET_TEMPFAIL)
     goto err1;
 
-  hosts = psync_find_result(res, "hosts", PARAM_ARRAY);
-  requestpath = psync_find_result(res, "path", PARAM_STR)->str;
+  hosts = papi_find_result2(res, "hosts", PARAM_ARRAY);
+  requestpath = papi_find_result2(res, "path", PARAM_STR)->str;
   psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
-                 psync_find_result(res, "dwltag", PARAM_STR)->str);
+                 papi_find_result2(res, "dwltag", PARAM_STR)->str);
   buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
   http = NULL;
   psync_hash_init(&hashctx);
