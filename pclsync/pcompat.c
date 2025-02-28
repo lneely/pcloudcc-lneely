@@ -38,7 +38,6 @@
 #include <netinet/tcp.h>
 #include <pthread.h>
 #include <pwd.h>
-#include <signal.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -64,14 +63,12 @@
 #include "pcompat.h"
 #include "pdevice.h"
 #include "plibs.h"
-#include "pmemlock.h"
 #include "prun.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "psynclib.h"
 #include "psys.h"
 #include "ptimer.h"
-#include "ppath.h"
 
 extern char **environ;
 
@@ -127,207 +124,6 @@ int psync_stat_mode_ok(struct stat *buf, unsigned int bits) {
     }
   }
   return (buf->st_mode & bits) == bits;
-}
-
-static void psync_add_file_to_seed(const char *fn, psync_lhash_ctx *hctx,
-                                   size_t max) {
-  char buff[4096];
-  ssize_t rd;
-  int fd, mode;
-  mode = O_RDONLY;
-#if defined(O_NONBLOCK)
-  mode += O_NONBLOCK;
-#elif defined(O_NDELAY)
-  mode += O_NDELAY;
-#endif
-  fd = open(fn, mode);
-  if (fd != -1) {
-    if (!max || max > sizeof(buff))
-      max = sizeof(buff);
-    rd = read(fd, buff, max);
-    if (rd > 0)
-      psync_lhash_update(hctx, buff, rd);
-    close(fd);
-  }
-}
-
-static void psync_get_random_seed_linux(psync_lhash_ctx *hctx) {
-  struct sysinfo si;
-  if (likely_log(!sysinfo(&si)))
-    psync_lhash_update(hctx, &si, sizeof(si));
-  psync_add_file_to_seed("/proc/stat", hctx, 0);
-  psync_add_file_to_seed("/proc/vmstat", hctx, 0);
-  psync_add_file_to_seed("/proc/meminfo", hctx, 0);
-  psync_add_file_to_seed("/proc/modules", hctx, 0);
-  psync_add_file_to_seed("/proc/mounts", hctx, 0);
-  psync_add_file_to_seed("/proc/diskstats", hctx, 0);
-  psync_add_file_to_seed("/proc/interrupts", hctx, 0);
-  psync_add_file_to_seed("/proc/net/dev", hctx, 0);
-  psync_add_file_to_seed("/proc/net/arp", hctx, 0);
-}
-
-static void psync_get_random_seed_from_query(psync_lhash_ctx *hctx,
-                                             psync_sql_res *res) {
-  psync_variant_row row;
-  struct timespec tm;
-  int i;
-  while ((row = psync_sql_fetch_row(res))) {
-    for (i = 0; i < res->column_count; i++)
-      if (row[i].type == PSYNC_TSTRING)
-        psync_lhash_update(hctx, row[i].str, row[i].length);
-    psync_lhash_update(hctx, row, sizeof(psync_variant) * res->column_count);
-  }
-  psync_sql_free_result(res);
-  clock_gettime(CLOCK_REALTIME, &tm);
-  psync_lhash_update(hctx, &tm, sizeof(&tm));
-}
-
-static void psync_get_random_seed_from_db(psync_lhash_ctx *hctx) {
-  psync_sql_res *res;
-  struct timespec tm;
-  unsigned char rnd[PSYNC_LHASH_DIGEST_LEN];
-  clock_gettime(CLOCK_REALTIME, &tm);
-  psync_lhash_update(hctx, &tm, sizeof(&tm));
-  res = psync_sql_query_rdlock("SELECT * FROM setting ORDER BY RANDOM()");
-  psync_get_random_seed_from_query(hctx, res);
-  res = psync_sql_query_rdlock(
-      "SELECT * FROM resolver ORDER BY RANDOM() LIMIT 50");
-  psync_get_random_seed_from_query(hctx, res);
-  psync_sql_statement(
-      "REPLACE INTO setting (id, value) VALUES ('random', RANDOM())");
-  clock_gettime(CLOCK_REALTIME, &tm);
-  psync_lhash_update(hctx, &tm, sizeof(&tm));
-  psync_sql_sync();
-  clock_gettime(CLOCK_REALTIME, &tm);
-  psync_lhash_update(hctx, &tm, sizeof(&tm));
-  sqlite3_randomness(sizeof(rnd), rnd);
-  psync_lhash_update(hctx, rnd, sizeof(rnd));
-}
-
-static void psync_rehash_cnt(unsigned char *hashbin, unsigned long cnt) {
-  psync_lhash_ctx hctx;
-  unsigned long i;
-  struct timespec tm;
-  for (i = 0; i < cnt; i++) {
-    psync_lhash_init(&hctx);
-    if ((i & 511) == 0) {
-      clock_gettime(CLOCK_REALTIME, &tm);
-      psync_lhash_update(&hctx, &tm, sizeof(&tm));
-    } else
-      psync_lhash_update(&hctx, &i, sizeof(i));
-    psync_lhash_update(&hctx, hashbin, PSYNC_LHASH_DIGEST_LEN);
-    psync_lhash_final(hashbin, &hctx);
-  }
-}
-
-static void psync_store_seed_in_db(const unsigned char *seed) {
-  psync_sql_res *res;
-  unsigned char hashbin[PSYNC_LHASH_DIGEST_LEN];
-  char hashhex[PSYNC_LHASH_DIGEST_HEXLEN], nm[16];
-  memcpy(hashbin, seed, PSYNC_LHASH_DIGEST_LEN);
-  psync_rehash_cnt(hashbin, 2000);
-  psync_binhex(hashhex, hashbin, PSYNC_LHASH_DIGEST_LEN);
-  res = psync_sql_prep_statement(
-      "REPLACE INTO setting (id, value) VALUES ('randomhash', ?)");
-  psync_sql_bind_lstring(res, 1, hashhex, PSYNC_LHASH_DIGEST_HEXLEN);
-  psync_sql_run_free(res);
-  psync_rehash_cnt(hashbin, 2000);
-  psync_binhex(hashhex, hashbin, PSYNC_LHASH_DIGEST_LEN);
-  memcpy(nm, "randomhash", 10);
-  nm[10] = hashhex[0];
-  nm[11] = 0;
-  res = psync_sql_prep_statement(
-      "REPLACE INTO setting (id, value) VALUES (?, ?)");
-  psync_sql_bind_lstring(res, 1, nm, 11);
-  psync_sql_bind_lstring(res, 2, hashhex, PSYNC_LHASH_DIGEST_HEXLEN);
-  psync_sql_run_free(res);
-}
-
-void psync_get_random_seed(unsigned char *seed, const void *addent,
-                           size_t aelen, int fast) {
-  static unsigned char lastseed[PSYNC_LHASH_DIGEST_LEN];
-  psync_lhash_ctx hctx;
-  struct timespec tm;
-  struct stat st;
-  char *home;
-  void *ptr;
-  unsigned long i, j;
-  int64_t i64;
-  pthread_t threadid;
-  unsigned char lsc[64][PSYNC_LHASH_DIGEST_LEN];
-  debug(D_NOTICE, "in");
-  struct utsname un;
-  struct statvfs stfs;
-  char **env;
-  pid_t pid;
-  clock_gettime(CLOCK_REALTIME, &tm);
-  psync_lhash_init(&hctx);
-  psync_lhash_update(&hctx, &tm, sizeof(tm));
-  if (likely_log(!uname(&un)))
-    psync_lhash_update(&hctx, &un, sizeof(un));
-  pid = getpid();
-  psync_lhash_update(&hctx, &pid, sizeof(pid));
-  if (!statvfs("/", &stfs))
-    psync_lhash_update(&hctx, &stfs, sizeof(stfs));
-  for (env = environ; *env != NULL; env++)
-    psync_lhash_update(&hctx, *env, strlen(*env));
-#if defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0 &&                             \
-    defined(_POSIX_MONOTONIC_CLOCK)
-  if (likely_log(!clock_gettime(CLOCK_MONOTONIC, &tm)))
-    psync_lhash_update(&hctx, &tm, sizeof(tm));
-#endif
-
-  psync_add_file_to_seed("/dev/urandom", &hctx, PSYNC_HASH_DIGEST_LEN);
-  psync_get_random_seed_linux(&hctx);
-
-  threadid = pthread_self();
-  psync_lhash_update(&hctx, &threadid, sizeof(threadid));
-  ptr = (void *)&ptr;
-  psync_lhash_update(&hctx, &ptr, sizeof(ptr));
-  ptr = (void *)psync_get_random_seed;
-  psync_lhash_update(&hctx, &ptr, sizeof(ptr));
-  ptr = (void *)pthread_self;
-  psync_lhash_update(&hctx, &ptr, sizeof(ptr));
-  ptr = (void *)malloc;
-  psync_lhash_update(&hctx, &ptr, sizeof(ptr));
-  ptr = (void *)&lastseed;
-  psync_lhash_update(&hctx, &ptr, sizeof(ptr));
-  home = ppath_home();
-  if (home) {
-    i64 = ppath_free_space(home);
-    psync_lhash_update(&hctx, &i64, sizeof(i64));
-    psync_lhash_update(&hctx, home, strlen(home));
-    if (likely_log(!stat(home, &st)))
-      psync_lhash_update(&hctx, &st, sizeof(st));
-    psync_free(home);
-  }
-  if (!fast) {
-    debug(D_NOTICE, "db in");
-    psync_get_random_seed_from_db(&hctx);
-    debug(D_NOTICE, "db out");
-  }
-  if (aelen)
-    psync_lhash_update(&hctx, addent, aelen);
-  debug(D_NOTICE, "adding bulk data");
-  for (i = 0; i < ARRAY_SIZE(lsc); i++) {
-    memcpy(&lsc[i], lastseed, PSYNC_LHASH_DIGEST_LEN);
-    for (j = 0; j < PSYNC_LHASH_DIGEST_LEN; j++)
-      lsc[i][j] ^= (unsigned char)i;
-  }
-  for (j = fast ? 3 : 0; j < 5; j++) {
-    for (i = 0; i < 100; i++) {
-      psync_lhash_update(&hctx, &i, sizeof(i));
-      psync_lhash_update(&hctx, &j, sizeof(j));
-      psync_lhash_update(&hctx, lsc, sizeof(lsc));
-    }
-    clock_gettime(CLOCK_REALTIME, &tm);
-    psync_lhash_update(&hctx, &tm, sizeof(&tm));
-  }
-  psync_lhash_final(seed, &hctx);
-  memcpy(lastseed, seed, PSYNC_LHASH_DIGEST_LEN);
-  debug(D_NOTICE, "storing in db");
-  psync_store_seed_in_db(seed);
-  debug(D_NOTICE, "out");
 }
 
 static int psync_wait_socket_writable_microsec(int sock, long sec,

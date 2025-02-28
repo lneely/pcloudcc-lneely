@@ -51,6 +51,7 @@
 #include "pcache.h"
 #include "plibs.h"
 #include "pmemlock.h"
+#include "prand.h"
 #include "psettings.h"
 #include "psslcerts.h"
 #include "psynclib.h"
@@ -291,7 +292,7 @@ int psync_ssl_init() {
     return PRINT_RETURN(-1);
 
   mbedtls_entropy_init(&psync_mbed_entropy);
-  psync_get_random_seed(seed, seed, sizeof(seed), 0);
+  prand_seed(seed, seed, sizeof(seed), 0);
   mbedtls_entropy_update_manual(&psync_mbed_entropy, seed, sizeof(seed));
 
   mbedtls_ctr_drbg_init(&psync_mbed_rng.rnd);

@@ -113,9 +113,6 @@ typedef struct {
 #define psync_def_var_arr(name, type, size) type name[size]
 #define psync_stat_fast_isfolder(a) ((a)->isfolder)
 
-// Entropy
-void psync_get_random_seed(unsigned char *seed, const void *addent, size_t aelen, int fast);
-
 // File Operations
 int psync_file_open(const char *path, int access, int flags);
 int psync_file_close(int fd);
@@ -175,6 +172,5 @@ int psync_wait_socket_read_timeout(int sock);
 int psync_wait_socket_write_timeout(int sock);
 int psync_select_in(int *sockets, int cnt, int64_t timeoutmillisec);
 psync_interface_list_t *psync_list_ip_adapters();
-
 
 #endif
