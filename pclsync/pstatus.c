@@ -209,7 +209,7 @@ void psync_status_recalc_to_upload() {
         psync_strcat(fscpath, "/", fileidhex, NULL);
     if (!stat(filename, &st)) {
       filestou++;
-      bytestou += psync_stat_size(&st);
+      bytestou += pfile_stat_size(&st);
     }
     psync_free(filename);
   }

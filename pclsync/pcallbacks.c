@@ -28,7 +28,7 @@
 */
 
 #include "pcallbacks.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "pfolder.h"
 #include "plibs.h"
 #include "plist.h"

@@ -696,21 +696,21 @@ pfolder_list_t *psync_list_remote_folder(psync_folderid_t folderid,
 static void add_to_folderlist(void *ptr, ppath_stat *stat) {
   flist_ltype *ft = (flist_ltype *)ptr;
   pentry_t entry;
-  int isfolder = psync_stat_isfolder(&stat->stat);
+  int isfolder = pfile_stat_isfolder(&stat->stat);
   if (((ft->listtype & PLIST_FOLDERS) && isfolder) ||
       ((ft->listtype & PLIST_FILES) && !isfolder)) {
     entry.name = stat->name;
     entry.namelen = strlen(stat->name);
     if (isfolder) {
       entry.isfolder = 1;
-      entry.folder.folderid = psync_stat_inode(&stat->stat);
-      entry.folder.cansyncup = psync_stat_mode_ok(&stat->stat, 5);
-      entry.folder.cansyncdown = psync_stat_mode_ok(&stat->stat, 7);
+      entry.folder.folderid = pfile_stat_inode(&stat->stat);
+      entry.folder.cansyncup = pfile_stat_mode_ok(&stat->stat, 5);
+      entry.folder.cansyncdown = pfile_stat_mode_ok(&stat->stat, 7);
       entry.folder.isencrypted = 0;
     } else {
       entry.isfolder = 0;
-      entry.file.fileid = psync_stat_inode(&stat->stat);
-      entry.file.size = psync_stat_size(&stat->stat);
+      entry.file.fileid = pfile_stat_inode(&stat->stat);
+      entry.file.size = pfile_stat_size(&stat->stat);
     }
     folder_list_add(ft->folderlist, &entry);
   }

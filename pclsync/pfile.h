@@ -28,11 +28,8 @@
    DAMAGE.
 */
 
-#ifndef _PSYNC_COMPAT_H
-#define _PSYNC_COMPAT_H
-
-// required for pcloud api; 7=>linux
-#define P_OS_ID 7 
+#ifndef __PFILE_H
+#define __PFILE_H
 
 #include <fcntl.h>
 #include <inttypes.h>
@@ -57,51 +54,49 @@ extern const unsigned char psync_invalid_filename_chars[];
 
 
 // macros
-#define psync_stat_isfolder(s) S_ISDIR((s)->st_mode)
-#define psync_stat_size(s) ((s)->st_size)
-#define psync_stat_birthtime(s) ((s)->st_mtime)
-#define psync_stat_ctime(s) ((s)->st_ctime)
-#define psync_stat_mtime(s) ((s)->st_mtime)
+#define pfile_stat_isfolder(s) S_ISDIR((s)->st_mode)
+#define pfile_stat_size(s) ((s)->st_size)
+#define pfile_stat_birthtime(s) ((s)->st_mtime)
+#define pfile_stat_ctime(s) ((s)->st_ctime)
+#define pfile_stat_mtime(s) ((s)->st_mtime)
 #if defined(st_mtimensec)
-#define psync_stat_mtime_native(s)                                             \
+#define pfile_stat_mtime_native(s)                                             \
   ((s)->st_mtime * 1000000ULL + (s)->st_mtimensec / 1000)
 #else
-#define psync_stat_mtime_native(s)                                             \
+#define pfile_stat_mtime_native(s)                                             \
   ((s)->st_mtime * 1000000ULL +                                                \
    ((struct timespec *)(&(s)->st_mtime))->tv_nsec / 1000)
 #endif
-#define psync_stat_inode(s) ((s)->st_ino)
-#define psync_stat_device(s) ((s)->st_dev)
-#define psync_stat_device_full(s) ((s)->st_dev)
-#define pdevice_id_short(deviceid) (deviceid)
-#define psync_def_var_arr(name, type, size) type name[size]
-#define psync_stat_fast_isfolder(a) ((a)->isfolder)
+#define pfile_stat_inode(s) ((s)->st_ino)
+#define pfile_stat_device(s) ((s)->st_dev)
+#define pfile_stat_device_full(s) ((s)->st_dev)
+#define pfile_stat_fast_isfolder(a) ((a)->isfolder)
 
 // File Operations
-int psync_file_open(const char *path, int access, int flags);
-int psync_file_close(int fd);
-int psync_file_dup(int fd);
-ssize_t psync_file_read(int fd, void *buf, size_t count);
-ssize_t psync_file_write(int fd, const void *buf, size_t count);
-ssize_t psync_file_pread(int fd, void *buf, size_t count, uint64_t offset);
-ssize_t psync_file_pwrite(int fd, const void *buf, size_t count, uint64_t offset);
-int64_t psync_file_seek(int fd, uint64_t offset, int whence);
-int64_t psync_file_size(int fd);
-int psync_file_sync(int fd);
-int psync_file_schedulesync(int fd);
-int psync_file_readahead(int fd, uint64_t offset, size_t count);
-int psync_file_preread(int fd, uint64_t offset, size_t count);
-int psync_file_delete(const char *path);
-int psync_file_rename(const char *oldpath, const char *newpath);
-int psync_file_rename_overwrite(const char *oldpath, const char *newpath);
-int psync_file_set_creation(int fd, time_t ctime);
-int intruncate(int fd);
-int psync_folder_sync(const char *path);
-int psync_run_update_file(const char *path);
-int psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime);
-int psync_set_crtime_mtime_by_fd(int fd, const char *path, time_t crtime, time_t mtime);
-int psync_invalidate_os_cache(const char *path);
-int psync_invalidate_os_cache_needed();
-int psync_stat_mode_ok(struct stat *buf, unsigned int bits) PSYNC_PURE;
+int pfile_open(const char *path, int access, int flags);
+int pfile_close(int fd);
+int pfile_dup(int fd);
+ssize_t pfile_read(int fd, void *buf, size_t count);
+ssize_t pfile_write(int fd, const void *buf, size_t count);
+ssize_t pfile_pread(int fd, void *buf, size_t count, uint64_t offset);
+ssize_t pfile_pwrite(int fd, const void *buf, size_t count, uint64_t offset);
+int64_t pfile_seek(int fd, uint64_t offset, int whence);
+int64_t pfile_size(int fd);
+int pfile_sync(int fd);
+int pfile_schedulesync(int fd);
+int pfile_readahead(int fd, uint64_t offset, size_t count);
+int pfile_preread(int fd, uint64_t offset, size_t count);
+int pfile_delete(const char *path);
+int pfile_rename(const char *oldpath, const char *newpath);
+int pfile_rename_overwrite(const char *oldpath, const char *newpath);
+int pfile_set_creation(int fd, time_t ctime);
+int pfile_truncate(int fd);
+int pfile_folder_sync(const char *path);
+int pfile_run_update(const char *path);
+int pfile_set_crtime_mtime(const char *path, time_t crtime, time_t mtime);
+int pfile_set_crtime_mtime_by_fd(int fd, const char *path, time_t crtime, time_t mtime);
+int pfile_invalidate_os_cache(const char *path);
+int pfile_invalidate_os_cache_needed();
+int pfile_stat_mode_ok(struct stat *buf, unsigned int bits) PSYNC_PURE;
 
 #endif

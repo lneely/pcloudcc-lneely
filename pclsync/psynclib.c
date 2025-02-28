@@ -45,7 +45,7 @@
 #include "pcache.h"
 #include "pcallbacks.h"
 #include "pcloudcrypto.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcontacts.h"
 #include "pdevice.h"
 #include "pdevice_monitor.h"
@@ -563,7 +563,7 @@ void psync_unlink() {
   debug(D_NOTICE, "clearing database, locked");
   psync_cache_clean_all();
   ret = psync_sql_close();
-  psync_file_delete(psync_database);
+  pfile_delete(psync_database);
   if (ret) {
     psync_free(deviceid);
     debug(D_ERROR, "failed to close database, exiting");
@@ -758,13 +758,13 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
                    synctype > PSYNC_SYNCTYPE_MAX))
     return_isyncid(PERROR_INVALID_SYNCTYPE);
   if (unlikely_log(stat(localpath, &st)) ||
-      unlikely_log(!psync_stat_isfolder(&st)))
+      unlikely_log(!pfile_stat_isfolder(&st)))
     return_isyncid(PERROR_LOCAL_FOLDER_NOT_FOUND);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
-  if (unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md)))
+  if (unlikely_log(!pfile_stat_mode_ok(&st, mbedtls_md)))
     return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
   syncmp = psync_fs_getmountpoint();
   if (syncmp) {
@@ -816,8 +816,8 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   psync_sql_bind_uint(res, 1, folderid);
   psync_sql_bind_string(res, 2, localpath);
   psync_sql_bind_uint(res, 3, synctype);
-  psync_sql_bind_uint(res, 4, psync_stat_inode(&st));
-  psync_sql_bind_uint(res, 5, psync_stat_device(&st));
+  psync_sql_bind_uint(res, 4, pfile_stat_inode(&st));
+  psync_sql_bind_uint(res, 5, pfile_stat_device(&st));
   psync_sql_run(res);
   if (likely_log(psync_sql_affected_rows()))
     ret = psync_sql_insertid();
@@ -842,13 +842,13 @@ int psync_add_sync_by_path_delayed(const char *localpath,
                    synctype > PSYNC_SYNCTYPE_MAX))
     return_error(PERROR_INVALID_SYNCTYPE);
   if (unlikely_log(stat(localpath, &st)) ||
-      unlikely_log(!psync_stat_isfolder(&st)))
+      unlikely_log(!pfile_stat_isfolder(&st)))
     return_error(PERROR_LOCAL_FOLDER_NOT_FOUND);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
-  if (unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md)))
+  if (unlikely_log(!pfile_stat_mode_ok(&st, mbedtls_md)))
     return_error(PERROR_LOCAL_FOLDER_ACC_DENIED);
   res = psync_sql_prep_statement("INSERT INTO syncfolderdelayed (localpath, "
                                  "remotepath, synctype) VALUES (?, ?, ?)");
@@ -892,7 +892,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
     return 0;
   }
   if (unlikely_log(stat(psync_get_string(row[1]), &st)) ||
-      unlikely_log(!psync_stat_isfolder(&st))) {
+      unlikely_log(!pfile_stat_isfolder(&st))) {
     psync_sql_free_result(res);
     psync_sql_rollback_transaction();
     return_isyncid(PERROR_LOCAL_FOLDER_NOT_FOUND);
@@ -902,7 +902,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
-  if (unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md))) {
+  if (unlikely_log(!pfile_stat_mode_ok(&st, mbedtls_md))) {
     psync_sql_rollback_transaction();
     return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
   }
@@ -1870,11 +1870,11 @@ static void psync_del_all_except(void *ptr, ppath_fast_stat *st) {
   const char **nmarr;
   char *fp;
   nmarr = (const char **)ptr;
-  if (!strcmp(st->name, nmarr[1]) || psync_stat_fast_isfolder(st))
+  if (!strcmp(st->name, nmarr[1]) || pfile_stat_fast_isfolder(st))
     return;
   fp = psync_strcat(nmarr[0], "/", st->name, NULL);
   debug(D_NOTICE, "deleting old update file %s", fp);
-  if (psync_file_delete(fp))
+  if (pfile_delete(fp))
     debug(D_WARNING, "could not delete %s", fp);
   psync_free(fp);
 }
@@ -1930,13 +1930,13 @@ static int psync_download_new_version(const binresult *res, char **lpath) {
     psync_http_close(sock);
     return 1;
   }
-  if (!stat(filename, &st) && psync_stat_size(&st) == size) {
+  if (!stat(filename, &st) && pfile_stat_size(&st) == size) {
     *lpath = filename;
     psync_http_close(sock);
     return 0;
   }
   if (unlikely_log(
-          (fd = psync_file_open(filename, O_WRONLY, O_CREAT | O_TRUNC)) ==
+          (fd = pfile_open(filename, O_WRONLY, O_CREAT | O_TRUNC)) ==
           INVALID_HANDLE_VALUE)) {
     psync_free(filename);
     psync_http_close(sock);
@@ -1945,12 +1945,12 @@ static int psync_download_new_version(const binresult *res, char **lpath) {
   buff = (char *)psync_malloc(PSYNC_COPY_BUFFER_SIZE);
   while (size) {
     rd = psync_http_request_readall(sock, buff, PSYNC_COPY_BUFFER_SIZE);
-    if (unlikely_log(rd <= 0 || psync_file_write(fd, buff, rd) != rd))
+    if (unlikely_log(rd <= 0 || pfile_write(fd, buff, rd) != rd))
       break;
     size -= rd;
   }
   psync_free(buff);
-  psync_file_close(fd);
+  pfile_close(fd);
   psync_http_close(sock);
   if (unlikely_log(size)) {
     psync_free(filename);
@@ -2010,7 +2010,7 @@ psync_check_new_version_download(const char *os, unsigned long currentversion) {
 
 void psync_run_new_version(psync_new_version_t *ver) {
   debug(D_NOTICE, "running %s", ver->localpath);
-  if (psync_run_update_file(ver->localpath))
+  if (pfile_run_update(ver->localpath))
     return;
   psync_destroy();
   exit(0);
@@ -2088,26 +2088,26 @@ static int psync_load_file(const char *local_path, char **data,
   ssize_t rd;
   int tries;
   for (tries = 0; tries < 15; tries++) {
-    fd = psync_file_open(local_path, O_RDONLY, 0);
+    fd = pfile_open(local_path, O_RDONLY, 0);
     if (fd == INVALID_HANDLE_VALUE)
       goto err0;
     if (fstat(fd, &st1))
       goto err1;
-    len = psync_stat_size(&st1);
+    len = pfile_stat_size(&st1);
     buff = psync_malloc(len);
     if (!buff)
       goto err1;
     off = 0;
     while (off < len) {
-      rd = psync_file_pread(fd, buff + off, len - off, off);
+      rd = pfile_pread(fd, buff + off, len - off, off);
       if (rd < 0)
         break;
       off += rd;
     }
-    psync_file_close(fd);
+    pfile_close(fd);
     if (off == len && !stat(local_path, &st2) &&
-        psync_stat_size(&st2) == len &&
-        psync_stat_mtime_native(&st1) == psync_stat_mtime_native(&st2)) {
+        pfile_stat_size(&st2) == len &&
+        pfile_stat_mtime_native(&st1) == pfile_stat_mtime_native(&st2)) {
       *data = buff;
       *length = len;
       return 0;
@@ -2116,7 +2116,7 @@ static int psync_load_file(const char *local_path, char **data,
   }
   return -1;
 err1:
-  psync_file_close(fd);
+  pfile_close(fd);
 err0:
   return -1;
 }

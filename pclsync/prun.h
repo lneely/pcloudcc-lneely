@@ -1,10 +1,6 @@
 #ifndef __PRUN_H
 #define __PRUN_H
 
-#include "pcompiler.h"
-
-extern PSYNC_THREAD const char *psync_thread_name;
-
 typedef void (*thread0_run)();
 typedef void (*thread1_run)(void *ptr);
 

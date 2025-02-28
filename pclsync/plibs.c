@@ -43,6 +43,9 @@
 #include <stdio.h>
 #include <string.h>
 
+// required by psync_debug
+extern PSYNC_THREAD const char *psync_thread_name; 
+
 #define return_error(err)                                                      \
   do {                                                                         \
     psync_error = err;                                                         \
@@ -1065,7 +1068,7 @@ char **psync_sql_rowstr(const char *sql) {
   if (code == SQLITE_ROW) {
     char **arr, *nstr, *str;
     size_t l, ln;
-    psync_def_var_arr(lens, size_t, cnt);
+    VAR_ARRAY(lens, size_t, cnt);
     int i;
     ln = 0;
     for (i = 0; i < cnt; i++) {
@@ -1123,9 +1126,9 @@ psync_variant *psync_sql_row(const char *sql) {
     psync_variant *arr;
     char *nstr, *str;
     size_t l, ln;
-    psync_def_var_arr(lens, size_t, cnt);
+    VAR_ARRAY(lens, size_t, cnt);
     int i, t;
-    psync_def_var_arr(types, int, cnt);
+    VAR_ARRAY(types, int, cnt);
     ln = sizeof(psync_variant) * cnt;
     for (i = 0; i < cnt; i++) {
       t = sqlite3_column_type(stmt, i);
@@ -1739,7 +1742,7 @@ int psync_rename_conflicted_file(const char *path) {
     memcpy(npath + dotidx + l, path + dotidx, plen - dotidx + 1);
     if (stat(npath, &st)) {
       debug(D_NOTICE, "renaming conflict %s to %s", path, npath);
-      l = psync_file_rename(path, npath);
+      l = pfile_rename(path, npath);
       psync_free(npath);
       return l;
     }

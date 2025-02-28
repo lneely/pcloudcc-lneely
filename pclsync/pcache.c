@@ -28,6 +28,7 @@
   DAMAGE.
 */
 
+
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
@@ -36,15 +37,15 @@
 #include <pthread.h>
 
 #include "pcache.h"
-#include "pcompat.h"
 #include "plibs.h"
 #include "plist.h"
-#include "prun.h"
-#include "pssl.h"
 #include "psynclib.h"
 #include "psys.h"
 #include "ptimer.h"
 #include <string.h>
+
+// required by psync_cache_get
+extern PSYNC_THREAD const char *psync_thread_name; 
 
 #define CACHE_HASH_SIZE 2048
 #define CACHE_LOCKS 8
@@ -269,7 +270,7 @@ void psync_cache_clean_starting_with_one_of(const char **prefixes, size_t cnt) {
   hash_element *he;
   unsigned long h;
   size_t i;
-  psync_def_var_arr(lens, size_t, cnt);
+  VAR_ARRAY(lens, size_t, cnt);
   for (i = 0; i < cnt; i++)
     lens[i] = strlen(prefixes[i]);
   for (h = 0; h < CACHE_HASH_SIZE; h++) {

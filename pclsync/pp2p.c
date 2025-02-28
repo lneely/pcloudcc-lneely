@@ -39,7 +39,7 @@
 #include <pthread.h>
 
 #include "papi.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcrypto.h"
 #include "pdownload.h"
 #include "pfolder.h"
@@ -374,7 +374,7 @@ static void psync_p2p_tcphandler(void *ptr) {
   localpath = psync_local_path_for_local_file(localfileid, NULL);
   if (unlikely_log(!localpath))
     goto err0;
-  fd = psync_file_open(localpath, O_RDONLY, 0);
+  fd = pfile_open(localpath, O_RDONLY, 0);
   debug(D_NOTICE, "sending file %s to peer", localpath);
   psync_free(localpath);
   if (fd == INVALID_HANDLE_VALUE) {
@@ -398,7 +398,7 @@ static void psync_p2p_tcphandler(void *ptr) {
       psync_free(encaeskey);
     if (encoder != PSYNC_CRYPTO_INVALID_ENCODER)
       psync_crypto_aes256_ctr_encoder_decoder_free(encoder);
-    psync_file_close(fd);
+    pfile_close(fd);
     goto err0;
   }
   psync_free(encaeskey);
@@ -408,7 +408,7 @@ static void psync_p2p_tcphandler(void *ptr) {
       rd = packet.filesize - off;
     else
       rd = sizeof(buff);
-    if (unlikely_log(psync_file_read(fd, buff, rd) != rd))
+    if (unlikely_log(pfile_read(fd, buff, rd) != rd))
       break;
     psync_crypto_aes256_ctr_encode_decode_inplace(encoder, buff, rd, off);
     if (unlikely_log(socket_write_all(sock, buff, rd)))
@@ -416,7 +416,7 @@ static void psync_p2p_tcphandler(void *ptr) {
     off += rd;
   }
   psync_crypto_aes256_ctr_encoder_decoder_free(encoder);
-  psync_file_close(fd);
+  pfile_close(fd);
   debug(D_NOTICE, "file sent successfuly");
 err0:
   close(sock);
@@ -692,7 +692,7 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
   psync_ssl_free_symmetric_key(key);
   if (decoder == PSYNC_CRYPTO_INVALID_ENCODER)
     return PSYNC_NET_PERMFAIL;
-  fd = psync_file_open(filename, O_WRONLY, O_CREAT | O_TRUNC);
+  fd = pfile_open(filename, O_WRONLY, O_CREAT | O_TRUNC);
   if (unlikely(fd == INVALID_HANDLE_VALUE)) {
     psync_crypto_aes256_ctr_encoder_decoder_free(decoder);
     debug(D_ERROR, "could not open %s", filename);
@@ -708,13 +708,13 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
     if (unlikely_log(socket_read_all(sock, buff, rd)))
       goto err0;
     psync_crypto_aes256_ctr_encode_decode_inplace(decoder, buff, rd, off);
-    if (unlikely_log(psync_file_write(fd, buff, rd) != rd))
+    if (unlikely_log(pfile_write(fd, buff, rd) != rd))
       goto err0;
     psync_hash_update(&hashctx, buff, rd);
     off += rd;
   }
   psync_crypto_aes256_ctr_encoder_decoder_free(decoder);
-  psync_file_close(fd);
+  pfile_close(fd);
   psync_hash_final(hashbin, &hashctx);
   psync_binhex(hashhex, hashbin, PSYNC_HASH_DIGEST_LEN);
   debug(D_NOTICE, "downloaded file %s from peer", filename);
@@ -727,7 +727,7 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
     return PSYNC_NET_OK;
 err0:
   psync_crypto_aes256_ctr_encoder_decoder_free(decoder);
-  psync_file_close(fd);
+  pfile_close(fd);
   psync_hash_final(hashbin, &hashctx);
   return PSYNC_NET_TEMPFAIL;
 }

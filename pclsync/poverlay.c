@@ -43,7 +43,7 @@
 #include <sys/un.h>
 #include <time.h>
 
-#include "pcompat.h"
+#include "pfile.h"
 #include "poverlay_protocol.h"
 
 #include "poverlay.h"

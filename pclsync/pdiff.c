@@ -44,7 +44,7 @@
 #include "pbusinessaccount.h"
 #include "pcache.h"
 #include "pcallbacks.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcontacts.h"
 #include "pdevice.h"
 #include "pdiff.h"
@@ -968,7 +968,7 @@ static void process_createfolder(const binresult *entry) {
 static void group_results_by_col(psync_full_result_int *restrict r1,
                                  psync_full_result_int *restrict r2,
                                  uint32_t col) {
-  psync_def_var_arr(buff, uint64_t, r1->cols);
+  VAR_ARRAY(buff, uint64_t, r1->cols);
   size_t rowsize;
   uint32_t i, j, l;
   l = 0;

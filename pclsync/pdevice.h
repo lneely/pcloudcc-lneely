@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#define pdevice_id_short(deviceid) (deviceid)
+
 char *pdevice_id();
 char *pdevice_name();
 

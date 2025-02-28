@@ -213,7 +213,7 @@ int psync_fs_crypto_init_log(psync_openfile_t *of) {
   ssize_t wrt;
   assert(sizeof(psync_crypto_master_record) <= PSYNC_CRYPTO_SECTOR_SIZE);
   memset(buff, 0xff, sizeof(buff));
-  wrt = psync_file_pwrite(of->logfile, buff, PSYNC_CRYPTO_SECTOR_SIZE, 0);
+  wrt = pfile_pwrite(of->logfile, buff, PSYNC_CRYPTO_SECTOR_SIZE, 0);
   if (unlikely(wrt != PSYNC_CRYPTO_SECTOR_SIZE)) {
     debug(D_ERROR, "write to log of %u bytes returned %d",
           (unsigned)PSYNC_CRYPTO_SECTOR_SIZE, (int)wrt);
@@ -229,7 +229,7 @@ static int psync_fs_crypto_read_newfile_full_sector_from_log(
   unsigned char buff[PSYNC_CRYPTO_SECTOR_SIZE];
   psync_crypto_log_header hdr;
   ssize_t rd;
-  rd = psync_file_pread(of->logfile, &hdr, sizeof(hdr), se->logoffset);
+  rd = pfile_pread(of->logfile, &hdr, sizeof(hdr), se->logoffset);
   if (unlikely(rd != sizeof(hdr))) {
     debug(D_ERROR, "read from log of %u bytes returned %d",
           (unsigned)sizeof(hdr), (int)rd);
@@ -243,7 +243,7 @@ static int psync_fs_crypto_read_newfile_full_sector_from_log(
          (uint64_t)psync_fs_crypto_data_sectorid_by_sectorid(se->sectorid) *
              PSYNC_CRYPTO_SECTOR_SIZE);
   assert(hdr.length <= PSYNC_CRYPTO_SECTOR_SIZE);
-  rd = psync_file_pread(of->logfile, buff, hdr.length,
+  rd = pfile_pread(of->logfile, buff, hdr.length,
                         se->logoffset + sizeof(hdr));
   if (unlikely(rd != hdr.length)) {
     debug(D_ERROR, "read from log of %u bytes returned %d",
@@ -299,7 +299,7 @@ psync_fs_crypto_do_local_tree_check(psync_openfile_t *of,
   }
   //  debug(D_NOTICE, "reading first sector from offset %lu, size %u", (unsigned
   //  long)off, (unsigned)ssize);
-  rd = psync_file_pread(of->datafile, buff, ssize, off);
+  rd = pfile_pread(of->datafile, buff, ssize, off);
   if (unlikely_log(rd != ssize))
     return -1;
   psync_crypto_sign_auth_sector(of->encoder, buff, ssize, auth);
@@ -317,7 +317,7 @@ psync_fs_crypto_do_local_tree_check(psync_openfile_t *of,
       off = psync_fs_crypto_auth_offset(level, sectorid);
       ssize = PSYNC_CRYPTO_SECTOR_SIZE;
     }
-    rd = psync_file_pread(of->datafile, buff, ssize, off);
+    rd = pfile_pread(of->datafile, buff, ssize, off);
     if (unlikely_log(rd != ssize))
       return -1;
     if (unlikely(memcmp(buff + authoff, auth, sizeof(auth)))) {
@@ -394,7 +394,7 @@ static int psync_fs_crypto_read_newfile_full_sector_from_datafile(
   ssize_t rd;
   uint32_t ssize;
   //  debug(D_NOTICE, "reading sector %u", sectorid);
-  fs = psync_file_size(of->datafile);
+  fs = pfile_size(of->datafile);
   if (unlikely_log(fs == -1))
     return -EIO;
   psync_fs_crypto_offsets_by_cryptosize(fs, &offsets);
@@ -407,7 +407,7 @@ static int psync_fs_crypto_read_newfile_full_sector_from_datafile(
     ssize = PSYNC_CRYPTO_SECTOR_SIZE;
   off = psync_fs_crypto_data_offset_by_sectorid(sectorid);
   //  debug(D_NOTICE, "data offset=%lu", off);
-  rd = psync_file_pread(of->datafile, buff, ssize, off);
+  rd = pfile_pread(of->datafile, buff, ssize, off);
   if (unlikely_log(rd != ssize))
     return -EIO;
   if (sectorid / PSYNC_CRYPTO_HASH_TREE_SECTORS ==
@@ -419,7 +419,7 @@ static int psync_fs_crypto_read_newfile_full_sector_from_datafile(
                                              PSYNC_CRYPTO_HASH_TREE_SECTORS);
   off += (sectorid % PSYNC_CRYPTO_HASH_TREE_SECTORS) * PSYNC_CRYPTO_AUTH_SIZE;
   //  debug(D_NOTICE, "auth offset=%lu", off);
-  rd = psync_file_pread(of->datafile, auth, sizeof(auth), off);
+  rd = pfile_pread(of->datafile, auth, sizeof(auth), off);
   if (unlikely_log(rd != sizeof(auth)))
     return -EIO;
   if (unlikely_log(psync_crypto_aes256_decode_sector(
@@ -617,14 +617,14 @@ static int psync_fs_crypto_switch_sectors(psync_openfile_t *of,
       psync_crypto_sign_auth_sector(of->encoder,
                                     (unsigned char *)&autharr[level], sz,
                                     autharr[level + 1][oldsecn]);
-      wrt = psync_file_pwrite(of->logfile, &hdr, sizeof(hdr), of->logoffset);
+      wrt = pfile_pwrite(of->logfile, &hdr, sizeof(hdr), of->logoffset);
       if (unlikely(wrt != sizeof(hdr))) {
         debug(D_ERROR, "write to log of %u bytes returned %d",
               (unsigned)sizeof(hdr), (int)wrt);
         return -EIO;
       }
       psync_fast_hash256_update(&of->loghashctx, &hdr, sizeof(hdr));
-      wrt = psync_file_pwrite(of->logfile, &autharr[level], sz,
+      wrt = pfile_pwrite(of->logfile, &autharr[level], sz,
                               of->logoffset + sizeof(hdr));
       if (unlikely(wrt != sz)) {
         debug(D_ERROR, "write to log of %u bytes returned %d", (unsigned)sz,
@@ -643,7 +643,7 @@ static int psync_fs_crypto_switch_sectors(psync_openfile_t *of,
     } while (oldsecd != newsecd && level < offsets->treelevels);
   }
   if (newsectorid != PSYNC_CRYPTO_INVALID_SECTORID) {
-    filesize = psync_file_size(of->datafile);
+    filesize = pfile_size(of->datafile);
     if (unlikely_log(filesize == -1))
       return -EIO;
     if (filesize > PSYNC_CRYPTO_AUTH_SIZE) {
@@ -663,7 +663,7 @@ static int psync_fs_crypto_switch_sectors(psync_openfile_t *of,
             off = psync_fs_crypto_auth_offset(level, newsecd);
             sz = PSYNC_CRYPTO_SECTOR_SIZE;
           }
-          wrt = psync_file_pread(of->datafile, &autharr[level], sz, off);
+          wrt = pfile_pread(of->datafile, &autharr[level], sz, off);
           if (unlikely(wrt != sz)) {
             debug(D_ERROR,
                   "read from datafile of %u bytes returned %d at offset %u",
@@ -705,7 +705,7 @@ psync_fs_crypto_write_master_auth(psync_openfile_t *of,
   data.hdr.type = PSYNC_CRYPTO_LOG_DATA;
   data.hdr.length = PSYNC_CRYPTO_AUTH_SIZE;
   data.hdr.offset = offsets->masterauthoff;
-  wrt = psync_file_pwrite(of->logfile, &data, sizeof(data), of->logoffset);
+  wrt = pfile_pwrite(of->logfile, &data, sizeof(data), of->logoffset);
   if (unlikely(wrt != sizeof(data))) {
     debug(D_ERROR, "write to log of %u bytes returned %d",
           (unsigned)sizeof(data), (int)wrt);
@@ -726,7 +726,7 @@ static int psync_fs_write_auth_tree_to_log(psync_openfile_t *of,
   psync_sector_inlog_t *sect;
   psync_crypto_sectorid_t lastsect;
   int ret;
-  psync_def_var_arr(authsect, psync_crypto_auth_sector_t,
+  VAR_ARRAY(authsect, psync_crypto_auth_sector_t,
                     offsets->treelevels + 1);
   lastsect = PSYNC_CRYPTO_INVALID_SECTORID;
   sect = psync_tree_element(psync_tree_get_first(of->sectorsinlog),
@@ -771,7 +771,7 @@ psync_fs_crypto_check_log_hash(int lfd,
   }
   psync_fast_hash256_init(&ctx);
   off = PSYNC_CRYPTO_SECTOR_SIZE;
-  while ((rd = psync_file_pread(lfd, buff, PSYNC_CRYPTO_SECTOR_SIZE, off)) !=
+  while ((rd = pfile_pread(lfd, buff, PSYNC_CRYPTO_SECTOR_SIZE, off)) !=
          0) {
     if (unlikely(rd == -1)) {
       debug(D_WARNING, "got error %d while reading from log",
@@ -809,7 +809,7 @@ static int psync_fs_crypto_process_log(int lfd, int dfd,
   ssize_t rd;
   uint32_t recid;
   mr = (psync_crypto_master_record *)buff;
-  rd = psync_file_pread(lfd, mr, sizeof(psync_crypto_master_record), 0);
+  rd = pfile_pread(lfd, mr, sizeof(psync_crypto_master_record), 0);
   if (unlikely(rd != sizeof(psync_crypto_master_record))) {
     debug(D_WARNING, "error reading from log file, expected to read %u got %d",
           (unsigned)sizeof(psync_crypto_master_record), (int)rd);
@@ -819,10 +819,10 @@ static int psync_fs_crypto_process_log(int lfd, int dfd,
     debug(D_WARNING, "got log file that is not finalized, skipping");
     return -1;
   }
-  if (unlikely(mr->logsize != psync_file_size(lfd))) {
+  if (unlikely(mr->logsize != pfile_size(lfd))) {
     debug(D_WARNING,
           "got log file that does not match in size, expected %u, got %d",
-          (unsigned)mr->logsize, (int)psync_file_size(lfd));
+          (unsigned)mr->logsize, (int)pfile_size(lfd));
     return -1;
   }
   if (unlikely(mr->crc !=
@@ -841,19 +841,19 @@ static int psync_fs_crypto_process_log(int lfd, int dfd,
   }
   size = mr->filesize;
   off = PSYNC_CRYPTO_SECTOR_SIZE;
-  if (unlikely_log(psync_file_seek(dfd, size, SEEK_SET) != size ||
-                   intruncate(dfd)))
+  if (unlikely_log(pfile_seek(dfd, size, SEEK_SET) != size ||
+                   pfile_truncate(dfd)))
     return -1;
   if (ifd != INVALID_HANDLE_VALUE &&
       unlikely_log(
-          psync_file_seek(ifd, sizeof(psync_fs_index_header), SEEK_SET) !=
+          pfile_seek(ifd, sizeof(psync_fs_index_header), SEEK_SET) !=
               sizeof(psync_fs_index_header) ||
-          intruncate(ifd)))
+          pfile_truncate(ifd)))
     return -1;
   records = (psync_fs_index_record *)buff;
   recid = 0;
   ioff = 0;
-  while ((rd = psync_file_pread(lfd, &hdr, sizeof(hdr), off)) != 0) {
+  while ((rd = pfile_pread(lfd, &hdr, sizeof(hdr), off)) != 0) {
     if (unlikely_log(rd != sizeof(hdr)))
       return -1;
     off += sizeof(hdr);
@@ -867,7 +867,7 @@ static int psync_fs_crypto_process_log(int lfd, int dfd,
         off += hdr.length;
         continue;
       }
-      rd = psync_file_pread(lfd, buff, hdr.length, off);
+      rd = pfile_pread(lfd, buff, hdr.length, off);
       if (unlikely(rd != hdr.length)) {
         debug(D_ERROR,
               "error reading from log file, expected to read %u got %d",
@@ -875,7 +875,7 @@ static int psync_fs_crypto_process_log(int lfd, int dfd,
         return -1;
       }
       off += hdr.length;
-      rd = psync_file_pwrite(dfd, buff, hdr.length, hdr.offset);
+      rd = pfile_pwrite(dfd, buff, hdr.length, hdr.offset);
       if (unlikely(rd != hdr.length)) {
         debug(D_ERROR,
               "error writing to data file, expected to write %u got %d",
@@ -888,7 +888,7 @@ static int psync_fs_crypto_process_log(int lfd, int dfd,
       records[recid].length =
           hdr.longlengthlo + ((uint64_t)hdr.longlengthhi << 32);
       if (++recid >= PSYNC_CRYPTO_SECTOR_SIZE / sizeof(psync_fs_index_record)) {
-        rd = psync_file_pwrite(ifd, records,
+        rd = pfile_pwrite(ifd, records,
                                sizeof(psync_fs_index_record) * recid,
                                sizeof(psync_fs_index_record) * ioff +
                                    sizeof(psync_fs_index_header));
@@ -907,7 +907,7 @@ static int psync_fs_crypto_process_log(int lfd, int dfd,
     }
   }
   if (recid) {
-    rd = psync_file_pwrite(ifd, records, sizeof(psync_fs_index_record) * recid,
+    rd = pfile_pwrite(ifd, records, sizeof(psync_fs_index_record) * recid,
                            sizeof(psync_fs_index_record) * ioff +
                                sizeof(psync_fs_index_header));
     if (rd != sizeof(psync_fs_index_record) * recid) {
@@ -916,8 +916,8 @@ static int psync_fs_crypto_process_log(int lfd, int dfd,
       return -1;
     }
   }
-  if (unlikely_log(psync_file_seek(dfd, size, SEEK_SET) != size ||
-                   intruncate(dfd)))
+  if (unlikely_log(pfile_seek(dfd, size, SEEK_SET) != size ||
+                   pfile_truncate(dfd)))
     return -1;
   return 0;
 }
@@ -933,7 +933,7 @@ static void wait_before_flush(psync_openfile_t *of, uint32_t millisec) {
   int ret;
   path=psync_setting_get_string(_PS(fscachepath));
   debug(D_NOTICE, "flushing directory %s", path);
-  ret=psync_folder_sync(path);
+  ret=pfile_folder_sync(path);
   if (!ret)
     debug(D_NOTICE, "flushed directory %s", path);
   return ret;
@@ -944,7 +944,7 @@ static int psync_fs_crypto_mark_log_finalized(psync_openfile_t *of,
   psync_crypto_master_record mr;
   int64_t lsize;
   ssize_t wrt;
-  lsize = psync_file_size(of->logfile);
+  lsize = pfile_size(of->logfile);
   if (unlikely_log(lsize == -1))
     return -EIO;
   assert(lsize == of->loghashctx.length + PSYNC_CRYPTO_SECTOR_SIZE);
@@ -955,7 +955,7 @@ static int psync_fs_crypto_mark_log_finalized(psync_openfile_t *of,
   psync_fast_hash256_final(&mr.hash, &of->loghashctx);
   mr.crc = psync_crc32c(PSYNC_CRC_INITIAL, &mr,
                         offsetof(psync_crypto_master_record, crc));
-  wrt = psync_file_pwrite(of->logfile, &mr, sizeof(mr), 0);
+  wrt = pfile_pwrite(of->logfile, &mr, sizeof(mr), 0);
   if (unlikely_log(wrt != sizeof(mr)))
     return -EIO;
   else
@@ -966,13 +966,13 @@ static int psync_fs_crypto_log_flush_and_process(psync_openfile_t *of,
                                                  const char *filename,
                                                  int dowaits, int locked) {
   int fd;
-  fd = psync_file_open(filename, O_RDWR, 0);
+  fd = pfile_open(filename, O_RDWR, 0);
   if (unlikely_log(fd == INVALID_HANDLE_VALUE))
     return -EIO;
   if (dowaits && !locked)
     wait_before_flush(of, 2000);
   debug(D_NOTICE, "flushing log data %s", filename);
-  if (unlikely_log(psync_file_sync(fd)))
+  if (unlikely_log(pfile_sync(fd)))
     goto err_eio;
   debug(D_NOTICE, "flushed log data %s", filename);
   /* flushing directory does not seem to work on either Windows on Mac, disable
@@ -984,22 +984,22 @@ static int psync_fs_crypto_log_flush_and_process(psync_openfile_t *of,
   if (unlikely_log(
           psync_fs_crypto_process_log(fd, of->datafile, of->indexfile, 0)))
     goto err_eio;
-  psync_file_close(fd);
+  pfile_close(fd);
   if (dowaits && !locked)
     wait_before_flush(of, 2000);
   debug(D_NOTICE, "flushing data of %s", of->currentname);
-  if (unlikely_log(psync_file_sync(of->datafile)))
+  if (unlikely_log(pfile_sync(of->datafile)))
     return -EIO;
   debug(D_NOTICE, "flushed data of %s", of->currentname);
   if (!of->newfile) {
     debug(D_NOTICE, "flushing index of %s", of->currentname);
-    if (unlikely_log(psync_file_sync(of->indexfile)))
+    if (unlikely_log(pfile_sync(of->indexfile)))
       return -EIO;
     debug(D_NOTICE, "flushed index of %s", of->currentname);
   }
   return 0;
 err_eio:
-  psync_file_close(fd);
+  pfile_close(fd);
   return -EIO;
 }
 
@@ -1013,7 +1013,7 @@ static int psync_fs_write_interval_tree_to_log(psync_openfile_t *of) {
   itr = psync_interval_tree_get_first(of->writeintervals);
   while (itr) {
     if (last == ARRAY_SIZE(logs)) {
-      wrt = psync_file_pwrite(of->logfile, logs, sizeof(logs), of->logoffset);
+      wrt = pfile_pwrite(of->logfile, logs, sizeof(logs), of->logoffset);
       if (wrt != sizeof(logs)) {
         debug(D_ERROR, "write to log of %u bytes returned %d",
               (unsigned)sizeof(logs), (int)wrt);
@@ -1034,7 +1034,7 @@ static int psync_fs_write_interval_tree_to_log(psync_openfile_t *of) {
   }
   if (last) {
     last *= sizeof(psync_crypto_log_header);
-    wrt = psync_file_pwrite(of->logfile, logs, last, of->logoffset);
+    wrt = pfile_pwrite(of->logfile, logs, last, of->logoffset);
     if (wrt != last) {
       debug(D_ERROR, "write to log of %u bytes returned %d",
             (unsigned)(sizeof(psync_crypto_log_header) * last), (int)wrt);
@@ -1057,7 +1057,7 @@ static int psync_fs_crypto_do_finalize_log(psync_openfile_t *of, int fullsync) {
   if (of->logoffset == PSYNC_CRYPTO_SECTOR_SIZE &&
       offsets.masterauthoff +
               (offsets.needmasterauth ? PSYNC_CRYPTO_AUTH_SIZE : 0) ==
-          psync_file_size(of->datafile)) {
+          pfile_size(of->datafile)) {
     debug(D_NOTICE, "skipping finalize of %s", of->currentname);
     return 0;
   }
@@ -1080,8 +1080,8 @@ static int psync_fs_crypto_do_finalize_log(psync_openfile_t *of, int fullsync) {
               (offsets.needmasterauth ? PSYNC_CRYPTO_AUTH_SIZE : 0));
   if (unlikely_log(ret))
     return ret;
-  psync_file_schedulesync(of->logfile);
-  ret = psync_file_close(of->logfile);
+  pfile_schedulesync(of->logfile);
+  ret = pfile_close(of->logfile);
   of->logfile = INVALID_HANDLE_VALUE;
   if (unlikely_log(ret))
     return -EIO;
@@ -1094,8 +1094,8 @@ static int psync_fs_crypto_do_finalize_log(psync_openfile_t *of, int fullsync) {
   olog = psync_strcat(cachepath, "/", fileidhex, NULL);
   fileidhex[sizeof(psync_fsfileid_t)] = 'f';
   flog = psync_strcat(cachepath, "/", fileidhex, NULL);
-  if (unlikely_log(psync_file_rename_overwrite(olog, flog)) ||
-      unlikely_log((of->logfile = psync_file_open(olog, O_RDWR,
+  if (unlikely_log(pfile_rename_overwrite(olog, flog)) ||
+      unlikely_log((of->logfile = pfile_open(olog, O_RDWR,
                                                   O_CREAT | O_TRUNC)) ==
                    INVALID_HANDLE_VALUE) ||
       unlikely_log(psync_fs_crypto_init_log(of))) {
@@ -1107,7 +1107,7 @@ static int psync_fs_crypto_do_finalize_log(psync_openfile_t *of, int fullsync) {
                                         tree, psync_free);
   of->sectorsinlog = PSYNC_TREE_EMPTY;
   ret = psync_fs_crypto_log_flush_and_process(of, flog, 0, 1);
-  psync_file_delete(flog);
+  pfile_delete(flog);
   psync_free(olog);
   psync_free(flog);
   return PRINT_NEG_RETURN(ret);
@@ -1136,18 +1136,18 @@ static void psync_fs_crypt_add_sector_to_interval_tree(
 PSYNC_NOINLINE static void
 psync_fs_crypto_reset_log_to_off(psync_openfile_t *of, uint32_t off) {
   int64_t sz;
-  sz = psync_file_size(of->logfile);
+  sz = pfile_size(of->logfile);
   if (sz != off)
     debug(D_NOTICE, "need to reset log from size %d to %u", (int)sz,
           (unsigned)off);
   if (sz == -1 || sz < off ||
-      (sz > off && (psync_file_seek(of->logfile, off, SEEK_SET) != off ||
-                    intruncate(of->logfile)))) {
+      (sz > off && (pfile_seek(of->logfile, off, SEEK_SET) != off ||
+                    pfile_truncate(of->logfile)))) {
     const char *cachepath;
     char *log;
     psync_fsfileid_t fileid;
     char fileidhex[sizeof(psync_fsfileid_t) * 2 + 2];
-    sz = psync_file_size(of->datafile);
+    sz = pfile_size(of->datafile);
     if (sz == -1) {
       debug(D_ERROR, "can not stat data file of %s, can't do anything",
             of->currentname);
@@ -1155,16 +1155,16 @@ psync_fs_crypto_reset_log_to_off(psync_openfile_t *of, uint32_t off) {
     }
     of->currentsize = psync_fs_crypto_plain_size(sz);
     debug(D_WARNING, "emptying log");
-    psync_file_close(of->logfile);
+    pfile_close(of->logfile);
     cachepath = psync_setting_get_string(_PS(fscachepath));
     fileid = -of->fileid;
     psync_binhex(fileidhex, &fileid, sizeof(psync_fsfileid_t));
     fileidhex[sizeof(psync_fsfileid_t)] = 'l';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     log = psync_strcat(cachepath, "/", fileidhex, NULL);
-    if (psync_file_delete(log))
+    if (pfile_delete(log))
       debug(D_NOTICE, "could not delete old log file %s", log);
-    of->logfile = psync_file_open(log, O_RDWR, O_CREAT | O_TRUNC);
+    of->logfile = pfile_open(log, O_RDWR, O_CREAT | O_TRUNC);
     if (of->logfile == INVALID_HANDLE_VALUE)
       debug(D_WARNING, "could not create new file %s", log);
     else if (psync_fs_crypto_init_log(of))
@@ -1192,7 +1192,7 @@ psync_fs_crypto_write_newfile_full_sector(psync_openfile_t *of, const char *buf,
   rec.header.length = size;
   rec.header.offset = psync_fs_crypto_data_offset_by_sectorid(sectorid);
   len = offsetof(psync_crypto_log_data_record, data) + size;
-  wrt = psync_file_pwrite(of->logfile, &rec, len, of->logoffset);
+  wrt = pfile_pwrite(of->logfile, &rec, len, of->logoffset);
   if (unlikely(wrt != len)) {
     debug(D_ERROR, "write to log of %u bytes returned %d", (unsigned)len,
           (int)wrt);
@@ -1651,7 +1651,7 @@ retry:
         }
         debug(D_NOTICE, "wrote %u bytes to offset %lu",
               (unsigned)ranges[l].size, (unsigned long)ranges[l].offset);
-        bw = psync_file_pwrite(of->datafile, ranges[l].buf, ranges[l].size,
+        bw = pfile_pwrite(of->datafile, ranges[l].buf, ranges[l].size,
                                ranges[l].offset);
         if (bw != ranges[l].size) {
           debug(D_ERROR, "write to datafile of %u bytes returned %d",
@@ -1687,8 +1687,8 @@ static int psync_fs_crypto_ftruncate_to_zero(psync_openfile_t *of) {
   int ret;
   debug(D_NOTICE, "truncating file %s from %lu to zero", of->currentname,
         (unsigned long)of->currentsize);
-  if (psync_file_seek(of->logfile, 0, SEEK_SET) != 0 ||
-      intruncate(of->logfile)) {
+  if (pfile_seek(of->logfile, 0, SEEK_SET) != 0 ||
+      pfile_truncate(of->logfile)) {
     debug(D_WARNING, "failed to truncate log file of %s", of->currentname);
     return -EIO;
   }
@@ -2004,7 +2004,7 @@ void psync_fs_crypto_get_auth_sector_off(psync_crypto_sectorid_t sectorid,
 
 static void psync_fs_crypto_del_log(const char *path) {
   debug(D_NOTICE, "deleting not finalized log file %s", path);
-  if (psync_file_delete(path))
+  if (pfile_delete(path))
     debug(D_WARNING, "failed to delete %s", path);
 }
 
@@ -2038,7 +2038,7 @@ static void psync_fs_crypto_check_log(char *path, const char *fn) {
   size_t plen;
   int ret;
   char och;
-  lfd = psync_file_open(path, O_RDONLY, 0);
+  lfd = pfile_open(path, O_RDONLY, 0);
   if (unlikely(lfd == INVALID_HANDLE_VALUE)) {
     debug(D_WARNING, "could not open %s for reading, errno=%d", path,
           (int)errno);
@@ -2049,31 +2049,31 @@ static void psync_fs_crypto_check_log(char *path, const char *fn) {
   plen = strlen(path) - 1;
   och = path[plen];
   path[plen] = 'd';
-  dfd = psync_file_open(path, O_RDWR, 0);
+  dfd = pfile_open(path, O_RDWR, 0);
   if (unlikely(dfd == INVALID_HANDLE_VALUE)) {
     debug(D_WARNING, "could not open data file %s, errno=%d", path,
           (int)errno);
-    psync_file_close(lfd);
+    pfile_close(lfd);
     path[plen] = och;
     psync_fs_crypto_del_log(path);
     return;
   }
   path[plen] = 'i';
-  ifd = psync_file_open(path, O_RDWR, 0);
-  ret = psync_fs_crypto_process_log(lfd, dfd, ifd, 1) || psync_file_sync(dfd);
-  psync_file_close(lfd);
-  psync_file_close(dfd);
+  ifd = pfile_open(path, O_RDWR, 0);
+  ret = psync_fs_crypto_process_log(lfd, dfd, ifd, 1) || pfile_sync(dfd);
+  pfile_close(lfd);
+  pfile_close(dfd);
   if (ifd != INVALID_HANDLE_VALUE) {
-    if (psync_file_sync(ifd))
+    if (pfile_sync(ifd))
       ret = -1;
-    psync_file_close(ifd);
+    pfile_close(ifd);
   }
   path[plen] = och;
   if (unlikely(ret)) {
     debug(D_WARNING, "failed to process log file %s", path);
     psync_fs_crypto_del_log(path);
   } else {
-    psync_file_delete(path);
+    pfile_delete(path);
     debug(D_NOTICE, "processed log file %s", path);
   }
 }
@@ -2082,7 +2082,7 @@ static void psync_fs_crypto_check_file(void *ptr, ppath_fast_stat *st) {
   size_t len;
   char *path;
   char ch;
-  if (psync_stat_fast_isfolder(st))
+  if (pfile_stat_fast_isfolder(st))
     return;
   len = strlen(st->name);
   if (!len)

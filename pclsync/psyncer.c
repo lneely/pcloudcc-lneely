@@ -436,8 +436,8 @@ re:
     else
       mbedtls_md = 5;
     if (unlikely_log(stat(localpath, &st)) ||
-        unlikely_log(!psync_stat_isfolder(&st)) ||
-        unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md))) {
+        unlikely_log(!pfile_stat_isfolder(&st)) ||
+        unlikely_log(!pfile_stat_mode_ok(&st, mbedtls_md))) {
       debug(D_WARNING,
             "ignoring delayed sync id %" PRIu64 " for local path %s", id,
             localpath);
@@ -498,8 +498,8 @@ re:
     psync_sql_bind_uint(stmt, 1, folderid);
     psync_sql_bind_string(stmt, 2, localpath);
     psync_sql_bind_uint(stmt, 3, synctype);
-    psync_sql_bind_uint(stmt, 4, psync_stat_inode(&st));
-    psync_sql_bind_uint(stmt, 5, psync_stat_device(&st));
+    psync_sql_bind_uint(stmt, 4, pfile_stat_inode(&st));
+    psync_sql_bind_uint(stmt, 5, pfile_stat_device(&st));
     psync_sql_run(stmt);
     if (likely_log(psync_sql_affected_rows()))
       syncid = psync_sql_insertid();

@@ -33,7 +33,7 @@
 #define _PSYNC_NETLIBS_H
 
 #include "papi.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "plist.h"
 #include "psynclib.h"
 

@@ -29,7 +29,7 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "pcompat.h"
+#include "pfile.h"
 #include "pexternalstatus.h"
 #include "pfolder.h"
 #include "pfsfolder.h"
@@ -468,7 +468,7 @@ external_status do_psync_external_status(char *path) {
   }
   do_normalize_path(pcpath);
   if (!stat(path, &st)) {
-    if (!psync_stat_isfolder(&st)) {
+    if (!pfile_stat_isfolder(&st)) {
       result = do_psync_external_status_file(pcpath);
       if (syncid && (result == INVSYNC))
         result = NOSYNC;

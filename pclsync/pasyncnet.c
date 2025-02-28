@@ -39,7 +39,7 @@
 
 #include "papi.h"
 #include "pasyncnet.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcompression.h"
 #include "plibs.h"
 #include "pnetlibs.h"
@@ -272,9 +272,9 @@ static void file_download_free(stream_t *s, uint32_t error) {
   file_download_add_t *fda;
   fda = (file_download_add_t *)(s + 1);
   if (fda->fd != INVALID_HANDLE_VALUE) {
-    psync_file_close(fda->fd);
+    pfile_close(fda->fd);
     if (error)
-      psync_file_delete(fda->localpath);
+      pfile_delete(fda->localpath);
   }
 }
 
@@ -330,7 +330,7 @@ static int process_file_download_data(stream_t *s, async_thread_params_t *prms,
   psync_account_downloaded_bytes(datalen);
   psync_sha1_update(&fda->sha1ctx, buff, datalen);
   while (datalen) {
-    wr = psync_file_write(fda->fd, buff, datalen);
+    wr = pfile_write(fda->fd, buff, datalen);
     if (wr == -1) {
       err = (int)errno;
       debug(D_WARNING, "writing to file %s failed, errno %d", fda->localpath,
@@ -408,7 +408,7 @@ static int process_file_download_headers(stream_t *s,
   } else
     psync_sql_run_free(res);
   psync_sql_commit_transaction();
-  fda->fd = psync_file_open(fda->localpath, O_WRONLY, O_CREAT | O_TRUNC);
+  fda->fd = pfile_open(fda->localpath, O_WRONLY, O_CREAT | O_TRUNC);
   if (fda->fd == INVALID_HANDLE_VALUE) {
     debug(D_WARNING, "could not open file %s, errno %d", fda->localpath,
           (int)errno);

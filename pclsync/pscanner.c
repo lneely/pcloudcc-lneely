@@ -30,7 +30,7 @@
 */
 
 #include "pscanner.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "plibs.h"
 #include "plist.h"
 #include "pscanexts.h"
@@ -109,7 +109,7 @@ static void dir_scan(void *ptr, ppath_fast_stat *st) {
     if (psync_match_pattern(st->name, ignore_patters[i].str,
                             ignore_patters[i].len))
       return;
-  if (psync_stat_fast_isfolder(st)) {
+  if (pfile_stat_fast_isfolder(st)) {
     scan_folder *nf;
     char *path;
     size_t l, o;

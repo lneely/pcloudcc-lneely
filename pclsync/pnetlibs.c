@@ -57,6 +57,9 @@
 #include "psys.h"
 #include "ptree.h"
 
+// required by psync_send_debug
+extern PSYNC_THREAD const char *psync_thread_name; 
+
 struct time_bytes {
   time_t tm;
   unsigned long bytes;
@@ -260,7 +263,7 @@ binresult *psync_do_api_run_command(const char *command, size_t cmdlen,
 #if IS_DEBUG
 
 void pident(int ident) {
-  psync_def_var_arr(b, char, ident + 1);
+  VAR_ARRAY(b, char, ident + 1);
   memset(b, '\t', ident);
   b[ident] = 0;
   fputs(b, stdout);
@@ -345,11 +348,11 @@ void psync_apipool_release_bad(psock_t *api) { psync_ret_api(api); }
 static void rm_all(void *vpath, ppath_stat *st) {
   char *path;
   path = psync_strcat((char *)vpath, "/", st->name, NULL);
-  if (psync_stat_isfolder(&st->stat)) {
+  if (pfile_stat_isfolder(&st->stat)) {
     ppath_ls(path, rm_all, path);
     rmdir(path);
   } else
-    psync_file_delete(path);
+    pfile_delete(path);
   psync_free(path);
 }
 
@@ -358,14 +361,14 @@ static void rm_ign(void *vpath, ppath_stat *st) {
   int ign;
   ign = psync_is_name_to_ignore(st->name);
   path = psync_strcat((char *)vpath, "/", st->name, NULL);
-  if (psync_stat_isfolder(&st->stat)) {
+  if (pfile_stat_isfolder(&st->stat)) {
     if (ign)
       ppath_ls(path, rm_all, path);
     else
       ppath_ls(path, rm_ign, path);
     rmdir(path);
   } else if (ign)
-    psync_file_delete(path);
+    pfile_delete(path);
   psync_free(path);
 }
 
@@ -464,8 +467,8 @@ int psync_get_remote_file_checksum(psync_fileid_t fileid, unsigned char *hexsum,
 }
 
 static int file_changed(struct stat *st1, struct stat *st2) {
-  return psync_stat_size(st1) != psync_stat_size(st2) ||
-         psync_stat_mtime_native(st1) != psync_stat_mtime_native(st2);
+  return pfile_stat_size(st1) != pfile_stat_size(st2) ||
+         pfile_stat_mtime_native(st1) != pfile_stat_mtime_native(st2);
 }
 
 int psync_get_local_file_checksum(const char *restrict filename,
@@ -480,7 +483,7 @@ int psync_get_local_file_checksum(const char *restrict filename,
   unsigned long cnt;
   int fd;
   unsigned char hashbin[PSYNC_HASH_DIGEST_LEN];
-  fd = psync_file_open(filename, O_RDONLY, 0);
+  fd = pfile_open(filename, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE)
     return PSYNC_NET_PERMFAIL;
   buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
@@ -488,14 +491,14 @@ retry:
   if (unlikely_log(fstat(fd, &st)))
     goto err1;
   psync_hash_init(&hctx);
-  rsz = psync_stat_size(&st);
+  rsz = pfile_stat_size(&st);
   cnt = 0;
   while (rsz) {
     if (rsz > PSYNC_COPY_BUFFER_SIZE)
       rs = PSYNC_COPY_BUFFER_SIZE;
     else
       rs = rsz;
-    rrs = psync_file_read(fd, buff, rs);
+    rrs = pfile_read(fd, buff, rs);
     if (unlikely(rrs <= 0)) {
       if (rrs == 0 && !fstat(fd, &st2) && file_changed(&st, &st2)) {
         debug(D_NOTICE,
@@ -503,7 +506,7 @@ retry:
               filename);
         psync_hash_final(hashbin, &hctx);
         psys_sleep_milliseconds(PSYNC_SLEEP_FILE_CHANGE);
-        psync_file_seek(fd, 0, SEEK_SET);
+        pfile_seek(fd, 0, SEEK_SET);
         goto retry;
       }
       goto err1;
@@ -520,19 +523,19 @@ retry:
           filename);
     psync_hash_final(hashbin, &hctx);
     psys_sleep_milliseconds(PSYNC_SLEEP_FILE_CHANGE);
-    psync_file_seek(fd, 0, SEEK_SET);
+    pfile_seek(fd, 0, SEEK_SET);
     goto retry;
   }
   psync_free(buff);
-  psync_file_close(fd);
+  pfile_close(fd);
   psync_hash_final(hashbin, &hctx);
   psync_binhex(hexsum, hashbin, PSYNC_HASH_DIGEST_LEN);
   if (fsize)
-    *fsize = psync_stat_size(&st);
+    *fsize = pfile_stat_size(&st);
   return PSYNC_NET_OK;
 err1:
   psync_free(buff);
-  psync_file_close(fd);
+  pfile_close(fd);
   return PSYNC_NET_PERMFAIL;
 }
 
@@ -550,7 +553,7 @@ int psync_get_local_file_checksum_part(const char *restrict filename,
   unsigned long cnt;
   int fd;
   unsigned char hashbin[PSYNC_HASH_DIGEST_LEN];
-  fd = psync_file_open(filename, O_RDONLY, 0);
+  fd = pfile_open(filename, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE)
     return PSYNC_NET_PERMFAIL;
   if (unlikely_log(fstat(fd, &st)))
@@ -558,14 +561,14 @@ int psync_get_local_file_checksum_part(const char *restrict filename,
   buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
   psync_hash_init(&hctx);
   psync_hash_init(&hctxp);
-  rsz = psync_stat_size(&st);
+  rsz = pfile_stat_size(&st);
   cnt = 0;
   while (rsz) {
     if (rsz > PSYNC_COPY_BUFFER_SIZE)
       rs = PSYNC_COPY_BUFFER_SIZE;
     else
       rs = rsz;
-    rrs = psync_file_read(fd, buff, rs);
+    rrs = pfile_read(fd, buff, rs);
     if (rrs <= 0)
       goto err2;
     psync_hash_update(&hctx, buff, rrs);
@@ -583,18 +586,18 @@ int psync_get_local_file_checksum_part(const char *restrict filename,
       psys_sleep_milliseconds(5);
   }
   psync_free(buff);
-  psync_file_close(fd);
+  pfile_close(fd);
   psync_hash_final(hashbin, &hctx);
   psync_binhex(hexsum, hashbin, PSYNC_HASH_DIGEST_LEN);
   psync_hash_final(hashbin, &hctxp);
   psync_binhex(phexsum, hashbin, PSYNC_HASH_DIGEST_LEN);
   if (fsize)
-    *fsize = psync_stat_size(&st);
+    *fsize = pfile_stat_size(&st);
   return PSYNC_NET_OK;
 err2:
   psync_free(buff);
 err1:
-  psync_file_close(fd);
+  pfile_close(fd);
   return PSYNC_NET_PERMFAIL;
 }
 
@@ -602,7 +605,7 @@ int psync_file_writeall_checkoverquota(int fd, const void *buf,
                                        size_t count) {
   ssize_t wr;
   while (count) {
-    wr = psync_file_write(fd, buf, count);
+    wr = pfile_write(fd, buf, count);
     if (wr == count) {
       psync_set_local_full(0);
       return 0;
@@ -630,12 +633,12 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
   ssize_t rd;
   unsigned char hashbin[PSYNC_HASH_DIGEST_LEN];
   char hashhex[PSYNC_HASH_DIGEST_HEXLEN];
-  sfd = psync_file_open(source, O_RDONLY, 0);
+  sfd = pfile_open(source, O_RDONLY, 0);
   if (unlikely_log(sfd == INVALID_HANDLE_VALUE))
     goto err0;
-  if (unlikely_log(psync_file_size(sfd) != fsize))
+  if (unlikely_log(pfile_size(sfd) != fsize))
     goto err1;
-  dfd = psync_file_open(destination, O_WRONLY, O_CREAT | O_TRUNC);
+  dfd = pfile_open(destination, O_WRONLY, O_CREAT | O_TRUNC);
   if (unlikely_log(dfd == INVALID_HANDLE_VALUE))
     goto err1;
   psync_hash_init(&hctx);
@@ -645,7 +648,7 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
       rrd = PSYNC_COPY_BUFFER_SIZE;
     else
       rrd = fsize;
-    rd = psync_file_read(sfd, buff, rrd);
+    rd = pfile_read(sfd, buff, rrd);
     if (unlikely_log(rd <= 0))
       goto err2;
     if (unlikely_log(psync_file_writeall_checkoverquota(dfd, buff, rd)))
@@ -657,19 +660,19 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
   psync_hash_final(hashbin, &hctx);
   psync_binhex(hashhex, hashbin, PSYNC_HASH_DIGEST_LEN);
   if (unlikely_log(memcmp(hexsum, hashhex, PSYNC_HASH_DIGEST_HEXLEN)) ||
-      unlikely_log(psync_file_sync(dfd)))
+      unlikely_log(pfile_sync(dfd)))
     goto err2;
   psync_free(buff);
-  if (unlikely_log(psync_file_close(dfd)))
+  if (unlikely_log(pfile_close(dfd)))
     goto err1;
-  psync_file_close(sfd);
+  pfile_close(sfd);
   return PSYNC_NET_OK;
 err2:
   psync_free(buff);
-  psync_file_close(dfd);
-  psync_file_delete(destination);
+  pfile_close(dfd);
+  pfile_delete(destination);
 err1:
-  psync_file_close(sfd);
+  pfile_close(sfd);
 err0:
   return PSYNC_NET_PERMFAIL;
 }
@@ -1992,7 +1995,7 @@ static void psync_net_check_file_for_blocks(
   psync_sha1_ctx ctx;
   unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
   debug(D_NOTICE, "scanning file %s for blocks", name);
-  fd = psync_file_open(name, O_RDONLY, 0);
+  fd = pfile_open(name, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE)
     return;
   if (checksums->blocksize * 2 > PSYNC_COPY_BUFFER_SIZE)
@@ -2001,11 +2004,11 @@ static void psync_net_check_file_for_blocks(
     buffersize = PSYNC_COPY_BUFFER_SIZE;
   hbuffersize = buffersize / 2;
   buff = psync_malloc(buffersize);
-  rd = psync_file_read(fd, buff, hbuffersize);
+  rd = pfile_read(fd, buff, hbuffersize);
   if (unlikely(rd < (ssize_t)hbuffersize)) {
     if (rd < (ssize_t)checksums->blocksize) {
       psync_free(buff);
-      psync_file_close(fd);
+      pfile_close(fd);
       return;
     }
     bufferlen = (rd + checksums->blocksize - 1) / checksums->blocksize *
@@ -2043,7 +2046,7 @@ static void psync_net_check_file_for_blocks(
         if (bufferlen != buffersize)
           break;
         inbyteoff = 0;
-        rd = psync_file_read(fd, buff, hbuffersize);
+        rd = pfile_read(fd, buff, hbuffersize);
         if (unlikely(rd != hbuffersize)) {
           if (rd <= 0)
             break;
@@ -2054,7 +2057,7 @@ static void psync_net_check_file_for_blocks(
           }
         }
       } else if (inbyteoff == hbuffersize) {
-        rd = psync_file_read(fd, buff + hbuffersize, hbuffersize);
+        rd = pfile_read(fd, buff + hbuffersize, hbuffersize);
         if (unlikely(rd != hbuffersize)) {
           if (rd <= 0)
             break;
@@ -2071,7 +2074,7 @@ static void psync_net_check_file_for_blocks(
                          checksums->blocksize);
   }
   psync_free(buff);
-  psync_file_close(fd);
+  pfile_close(fd);
 }
 
 int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
@@ -2158,7 +2161,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
   int32_t skipbytes;
   psync_sha1_ctx ctx;
   unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
-  if (unlikely_log(psync_file_seek(fd, off, SEEK_SET) == -1))
+  if (unlikely_log(pfile_seek(fd, off, SEEK_SET) == -1))
     return PSYNC_NET_TEMPFAIL;
   debug(D_NOTICE, "scanning in range starting %lu, length %lu, blocksize %u",
         (unsigned long)off, (unsigned long)len, (unsigned)checksums->blocksize);
@@ -2169,7 +2172,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
     buffersize = PSYNC_COPY_BUFFER_SIZE;
   hbuffersize = buffersize / 2;
   buff = psync_malloc(buffersize);
-  rd = psync_file_read(fd, buff, hbuffersize);
+  rd = pfile_read(fd, buff, hbuffersize);
   if (unlikely(rd < (ssize_t)hbuffersize)) {
     psync_free(buff);
     return PSYNC_NET_OK;
@@ -2233,7 +2236,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
         if (bufferlen != buffersize)
           break;
         inbyteoff = 0;
-        rd = psync_file_read(fd, buff, hbuffersize);
+        rd = pfile_read(fd, buff, hbuffersize);
         if (unlikely(rd != hbuffersize)) {
           if (rd <= 0)
             break;
@@ -2245,7 +2248,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
           }
         }
       } else if (inbyteoff == hbuffersize) {
-        rd = psync_file_read(fd, buff + hbuffersize, hbuffersize);
+        rd = pfile_read(fd, buff + hbuffersize, hbuffersize);
         if (unlikely(rd != hbuffersize)) {
           if (rd <= 0)
             break;

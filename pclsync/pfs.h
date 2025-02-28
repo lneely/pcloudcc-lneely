@@ -34,9 +34,6 @@
 
 #include <pthread.h>
 
-#include "papi.h"
-#include "pcompat.h"
-#include "prun.h"
 #include "pcrc32c.h"
 #include "pcrypto.h"
 #include "pfsfolder.h"
@@ -141,6 +138,9 @@ typedef struct {
 #if IS_DEBUG
 #define psync_fs_lock_file(of) psync_fs_do_lock_file(of, __FILE__, __LINE__)
 
+
+// FIXME: wtf... 
+extern PSYNC_THREAD const char *psync_thread_name; 
 static inline void psync_fs_do_lock_file(psync_openfile_t *of, const char *file,
                                          unsigned long line) {
   if (unlikely(pthread_mutex_trylock(&of->mutex))) {

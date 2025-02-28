@@ -37,6 +37,7 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 
+#include "pdevice.h"
 #include "pfolder.h"
 #include "plibs.h"
 #include "prun.h"
@@ -165,8 +166,8 @@ static void scanner_set_syncs_to_list(psync_list *lst,
     }
     deviceid = psync_get_number(row[4]);
     inodeid = psync_get_number(row[5]);
-    if (unlikely(deviceid != psync_stat_device(&st) &&
-                 inodeid != psync_stat_inode(&st))) {
+    if (unlikely(deviceid != pfile_stat_device(&st) &&
+                 inodeid != pfile_stat_inode(&st))) {
       debug(D_WARNING, "folder %s deviceid is different, ignoring", lp);
       continue;
     }
@@ -180,7 +181,7 @@ static void scanner_set_syncs_to_list(psync_list *lst,
     l_full_deviceid =
         (sync_list *)psync_malloc(offsetof(sync_list, localpath) + lplen + 1);
     l_full_deviceid->folderid = psync_get_number(row[1]);
-    l_full_deviceid->deviceid = psync_stat_device_full(&st);
+    l_full_deviceid->deviceid = pfile_stat_device_full(&st);
     l_full_deviceid->syncid = psync_get_number(row[0]);
     l_full_deviceid->synctype = psync_get_number(row[3]);
     memcpy(l_full_deviceid->localpath, lp, lplen + 1);
@@ -203,8 +204,8 @@ static void add_ignored_dir(const char *path) {
     ignored_paths = (device_inode_t *)psync_realloc(
         ignored_paths, sizeof(device_inode_t) * ign_paths_alloc);
   }
-  ignored_paths[ign_paths_cnt].deviceid = psync_stat_device_full(&st);
-  ignored_paths[ign_paths_cnt].inode = psync_stat_inode(&st);
+  ignored_paths[ign_paths_cnt].deviceid = pfile_stat_device_full(&st);
+  ignored_paths[ign_paths_cnt].inode = pfile_stat_inode(&st);
   ign_paths_cnt++;
 }
 
@@ -288,8 +289,8 @@ static void scanner_local_entry_to_list(void *ptr, ppath_stat *st) {
   sync_folderlist *e;
   size_t l;
 
-  if (is_path_to_ignore(psync_stat_device_full(&st->stat),
-                        psync_stat_inode(&st->stat))) {
+  if (is_path_to_ignore(pfile_stat_device_full(&st->stat),
+                        pfile_stat_inode(&st->stat))) {
     return;
   }
 
@@ -298,11 +299,11 @@ static void scanner_local_entry_to_list(void *ptr, ppath_stat *st) {
   e = (sync_folderlist *)psync_malloc(offsetof(sync_folderlist, name) + l);
   e->localid = 0;
   e->remoteid = 0;
-  e->inode = psync_stat_inode(&st->stat);
-  e->deviceid = psync_stat_device_full(&st->stat);
-  e->mtimenat = psync_stat_mtime_native(&st->stat);
-  e->size = psync_stat_size(&st->stat);
-  e->isfolder = psync_stat_isfolder(&st->stat);
+  e->inode = pfile_stat_inode(&st->stat);
+  e->deviceid = pfile_stat_device_full(&st->stat);
+  e->mtimenat = pfile_stat_mtime_native(&st->stat);
+  e->size = pfile_stat_size(&st->stat);
+  e->isfolder = pfile_stat_isfolder(&st->stat);
   memcpy(e->name, st->name, l);
   psync_list_add_tail(lst, &e->list);
 }
@@ -1008,13 +1009,13 @@ restart:
             l->localpath);
       continue;
     }
-    if (is_path_to_ignore(psync_stat_device_full(&st), psync_stat_inode(&st))) {
+    if (is_path_to_ignore(pfile_stat_device_full(&st), pfile_stat_inode(&st))) {
       debug(D_NOTICE, "not syncing folder %s as it is in ignore list",
             l->localpath);
       continue;
     }
     scanner_scan_folder(l->localpath, l->folderid, 0, l->syncid, l->synctype,
-                        psync_stat_device_full(&st));
+                        pfile_stat_device_full(&st));
   }
 
   psync_list_for_each_element(l, &slist_full_deviceid, sync_list, list) {
@@ -1029,7 +1030,7 @@ restart:
       psync_restart_localscan();
       break;
     } else {
-      deviceid = psync_stat_device_full(&st);
+      deviceid = pfile_stat_device_full(&st);
     }
     if (l->deviceid != deviceid) {
       debug(D_NOTICE,
@@ -1279,8 +1280,8 @@ void psync_restat_sync_folders_add(psync_syncid_t syncid,
     l->inode = 0;
     l->deviceid = 0;
   } else {
-    l->inode = psync_stat_inode(&st);
-    l->deviceid = psync_stat_device_full(&st);
+    l->inode = pfile_stat_inode(&st);
+    l->deviceid = pfile_stat_device_full(&st);
   }
   pthread_mutex_lock(&restat_mutex);
   psync_list_add_tail(&scan_folders_list, &l->list);
@@ -1318,8 +1319,8 @@ void psync_restat_sync_folders() {
       deviceid = 0;
       inode = 0;
     } else {
-      deviceid = psync_stat_device_full(&st);
-      inode = psync_stat_inode(&st);
+      deviceid = pfile_stat_device_full(&st);
+      inode = pfile_stat_inode(&st);
     }
     if (l->deviceid != deviceid || l->inode != inode) {
       l->deviceid = deviceid;

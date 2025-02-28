@@ -87,7 +87,7 @@ static void psync_notifications_download_thumb(const binresult *thumb,
   }
   tmpfilepath = psync_strcat(filepath, ".part", NULL);
   debug(D_NOTICE, "downloading thumbnail %s", filename);
-  if (unlikely_log((fd = psync_file_open(tmpfilepath, O_WRONLY,
+  if (unlikely_log((fd = pfile_open(tmpfilepath, O_WRONLY,
                                          O_CREAT | O_TRUNC)) ==
                    INVALID_HANDLE_VALUE))
     goto err1;
@@ -106,16 +106,16 @@ static void psync_notifications_download_thumb(const binresult *thumb,
     rd = psync_http_request_readall(sock, buff, PSYNC_COPY_BUFFER_SIZE);
     if (rd <= 0)
       break;
-    if (psync_file_write(fd, buff, rd) != rd)
+    if (pfile_write(fd, buff, rd) != rd)
       break;
   }
   psync_free(buff);
 err3:
   psync_http_close(sock);
 err2:
-  psync_file_close(fd);
+  pfile_close(fd);
 err1:
-  if (rd == 0 && !psync_file_rename_overwrite(tmpfilepath, filepath))
+  if (rd == 0 && !pfile_rename_overwrite(tmpfilepath, filepath))
     debug(D_NOTICE, "downloaded thumbnail %s", filename);
   else
     debug(D_WARNING, "downloading of thumbnail %s failed", filename);
@@ -227,7 +227,7 @@ static void psync_notifications_thumb_dir_list(void *ptr,
   psync_thumb_list_t *tl;
   size_t len;
   int cmp;
-  if (psync_stat_fast_isfolder(st))
+  if (pfile_stat_fast_isfolder(st))
     return;
   tree = (psync_tree **)ptr;
   tr = *tree;
@@ -358,7 +358,7 @@ psync_notification_list_t *psync_notifications_get() {
     filepath = psync_strcat(
         thumbpath, "/",
         psync_tree_element(thumbs, psync_thumb_list_t, tree)->name, NULL);
-    psync_file_delete(filepath);
+    pfile_delete(filepath);
     psync_free(filepath);
     psync_free(psync_tree_element(thumbs, psync_thumb_list_t, tree));
     thumbs = nx;
@@ -370,10 +370,10 @@ psync_notification_list_t *psync_notifications_get() {
 }
 
 static void psync_notifications_del_thumb(void *ptr, ppath_stat *st) {
-  if (psync_stat_isfolder(&st->stat))
+  if (pfile_stat_isfolder(&st->stat))
     return;
   debug(D_NOTICE, "deleting thumb %s", st->path);
-  psync_file_delete(st->path);
+  pfile_delete(st->path);
 }
 
 void psync_notifications_clean() {

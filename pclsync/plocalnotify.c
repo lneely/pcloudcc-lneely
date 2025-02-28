@@ -39,7 +39,7 @@
 #include <unistd.h>
 
 #include "plocalnotify.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "plibs.h"
 #include "prun.h"
 #include "plist.h"

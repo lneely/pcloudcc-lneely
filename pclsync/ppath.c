@@ -32,7 +32,7 @@ char *ppath_default_db() {
             psync_free(dbp);
             return oldp;
           } else {
-            psync_file_rename(oldp, dbp);
+            pfile_rename(oldp, dbp);
           }
         }
         psync_free(oldp);
@@ -56,13 +56,13 @@ char *ppath_home() {
   const char *dir;
   dir = getenv("HOME");
   if (unlikely_log(!dir) || unlikely_log(stat(dir, &st)) ||
-      unlikely_log(!psync_stat_mode_ok(&st, 7))) {
+      unlikely_log(!pfile_stat_mode_ok(&st, 7))) {
     struct passwd pwd;
     struct passwd *result;
     char buff[4096];
     if (unlikely_log(getpwuid_r(getuid(), &pwd, buff, sizeof(buff), &result)) ||
         unlikely_log(stat(result->pw_dir, &st)) ||
-        unlikely_log(!psync_stat_mode_ok(&st, 7)))
+        unlikely_log(!pfile_stat_mode_ok(&st, 7)))
       return NULL;
     dir = result->pw_dir;
   }

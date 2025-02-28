@@ -36,9 +36,11 @@
 #include <pthread.h>
 #include <stdatomic.h>
 
+#include "pcompiler.h"
 #include "pcloudcrypto.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "pfolder.h"
+
 #include "pfs.h"
 #include "pfscrypto.h"
 #include "pfsfolder.h"
@@ -46,6 +48,7 @@
 #include "pfstasks.h"
 #include "pfsupload.h"
 #include "pfsxattr.h"
+
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "ppagecache.h"
@@ -134,12 +137,12 @@ static void delete_log_files(psync_openfile_t *of) {
   fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
   filename =
       psync_strcat(cachepath, "/", fileidhex, NULL);
-  psync_file_delete(filename);
+  pfile_delete(filename);
   psync_free(filename);
   fileidhex[sizeof(psync_fsfileid_t)] = 'f';
   filename =
       psync_strcat(cachepath, "/", fileidhex, NULL);
-  psync_file_delete(filename);
+  pfile_delete(filename);
   psync_free(filename);
 }
 
@@ -168,7 +171,7 @@ int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
       if (fl->writeid == writeid) {
         if (fl->encrypted) {
           if (fl->logfile) {
-            psync_file_close(fl->logfile);
+            pfile_close(fl->logfile);
             fl->logfile = INVALID_HANDLE_VALUE;
           }
           delete_log_files(fl);
@@ -191,11 +194,11 @@ int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
         fl->releasedforupload = 0;
         fl->origctime = ctime;
         if (fl->datafile != INVALID_HANDLE_VALUE) {
-          psync_file_close(fl->datafile);
+          pfile_close(fl->datafile);
           fl->datafile = INVALID_HANDLE_VALUE;
         }
         if (fl->indexfile != INVALID_HANDLE_VALUE) {
-          psync_file_close(fl->indexfile);
+          pfile_close(fl->indexfile);
           fl->indexfile = INVALID_HANDLE_VALUE;
         }
         psync_tree_del(&openfiles, &fl->tree);
@@ -553,7 +556,7 @@ static int fill_stat_from_open_file(psync_fsfileid_t fileid,
       debug(D_NOTICE, "found open file with size %lu",
             (unsigned long)fl->currentsize);
       if (!fstat(fl->logfile, &st))
-        stbuf->st_mtime = psync_stat_mtime(&st);
+        stbuf->st_mtime = pfile_stat_mtime(&st);
       pthread_mutex_unlock(&fl->mutex);
       psync_sql_rdunlock();
       return 1;
@@ -625,19 +628,19 @@ static int psync_creat_local_to_file_stat(psync_fstask_creat_t *cr,
     else{
       fileidhex[sizeof(psync_fsfileid_t)]='i';
       filename=psync_strcat(cachepath, "/", fileidhex,
-    NULL); fd=psync_file_open(filename, O_RDONLY, 0); psync_free(filename); if
-    (fd==INVALID_HANDLE_VALUE) return -EIO; stret=psync_file_pread(fd, &osize,
+    NULL); fd=pfile_open(filename, O_RDONLY, 0); psync_free(filename); if
+    (fd==INVALID_HANDLE_VALUE) return -EIO; stret=pfile_pread(fd, &osize,
     sizeof(osize), offsetof(index_header, copyfromoriginal));
-      psync_file_close(fd);
+      pfile_close(fd);
       if (stret!=sizeof(osize))
         return -EIO;
     }*/
   memset(stbuf, 0, sizeof(struct FUSE_STAT));
   stbuf->st_ino = taskid_to_inode(fileid);
 #ifdef FUSE_STAT_HAS_BIRTHTIME
-  stbuf->st_birthtime = psync_stat_birthtime(&st);
+  stbuf->st_birthtime = pfile_stat_birthtime(&st);
 #endif
-  stbuf->st_mtime = psync_stat_mtime(&st);
+  stbuf->st_mtime = pfile_stat_mtime(&st);
   stbuf->st_ctime = stbuf->st_mtime;
   stbuf->st_atime = stbuf->st_mtime;
   stbuf->st_mode = S_IFREG | 0644;
@@ -646,11 +649,11 @@ static int psync_creat_local_to_file_stat(psync_fstask_creat_t *cr,
     if (fill_stat_from_open_file(cr->fileid, stbuf))
       size = stbuf->st_size;
     else {
-      size = psync_fs_crypto_plain_size(psync_stat_size(&st));
+      size = psync_fs_crypto_plain_size(pfile_stat_size(&st));
       stbuf->st_size = size;
     }
   } else {
-    size = psync_stat_size(&st);
+    size = pfile_stat_size(&st);
     stbuf->st_size = size;
   }
   stbuf->st_blocks = (size + 511) / 512;
@@ -1066,7 +1069,7 @@ int64_t psync_fs_load_interval_tree(int fd, uint64_t size,
   debug(D_NOTICE, "loading %lu intervals", (unsigned long)cnt);
   for (i = 0; i < cnt; i += ARRAY_SIZE(records)) {
     rd = ARRAY_SIZE(records) > cnt - i ? cnt - i : ARRAY_SIZE(records);
-    rrd = psync_file_pread(fd, records, rd * sizeof(psync_fs_index_record),
+    rrd = pfile_pread(fd, records, rd * sizeof(psync_fs_index_record),
                            i * sizeof(psync_fs_index_record) +
                                sizeof(psync_fs_index_header));
     if (unlikely_log(rrd != rd * sizeof(psync_fs_index_record)))
@@ -1096,12 +1099,12 @@ int64_t psync_fs_load_interval_tree(int fd, uint64_t size,
 static int load_interval_tree(psync_openfile_t *of) {
   psync_fs_index_header hdr;
   int64_t ifs;
-  ifs = psync_file_size(of->indexfile);
+  ifs = pfile_size(of->indexfile);
   if (unlikely_log(ifs == -1))
     return -1;
   if (ifs < sizeof(psync_fs_index_header)) {
     assertw(ifs == 0);
-    if (psync_file_pwrite(of->indexfile, &hdr, sizeof(psync_fs_index_header),
+    if (pfile_pwrite(of->indexfile, &hdr, sizeof(psync_fs_index_header),
                           0) != sizeof(psync_fs_index_header))
       return -1;
     else
@@ -1133,7 +1136,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
   if (of->datafile == INVALID_HANDLE_VALUE) {
     filename =
         psync_strcat(cachepath, "/", fileidhex, NULL);
-    of->datafile = psync_file_open(filename, O_RDWR,
+    of->datafile = pfile_open(filename, O_RDWR,
                                    O_CREAT | (trunc ? O_TRUNC : 0));
     psync_free(filename);
     if (of->datafile == INVALID_HANDLE_VALUE) {
@@ -1141,7 +1144,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
             (long)of->fileid);
       return -EIO;
     }
-    fs = psync_file_size(of->datafile);
+    fs = pfile_size(of->datafile);
     if (unlikely_log(fs == -1))
       return -EIO;
     if (of->encrypted)
@@ -1159,7 +1162,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
     fileidhex[sizeof(psync_fsfileid_t)] = 'i';
     filename =
         psync_strcat(cachepath, "/", fileidhex, NULL);
-    of->indexfile = psync_file_open(filename, O_RDWR,
+    of->indexfile = pfile_open(filename, O_RDWR,
                                     O_CREAT | (trunc ? O_TRUNC : 0));
     psync_free(filename);
     if (of->indexfile == INVALID_HANDLE_VALUE) {
@@ -1179,7 +1182,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
       fileidhex[sizeof(psync_fsfileid_t)] = 'l';
       filename =
           psync_strcat(cachepath, "/", fileidhex, NULL);
-      of->logfile = psync_file_open(filename, O_RDWR, O_CREAT | O_TRUNC);
+      of->logfile = pfile_open(filename, O_RDWR, O_CREAT | O_TRUNC);
       psync_free(filename);
       if (of->logfile == INVALID_HANDLE_VALUE) {
         debug(D_ERROR, "could not open log file for fileid %ld",
@@ -1678,7 +1681,7 @@ void psync_fs_inc_of_refcnt(psync_openfile_t *of) {
 
 static void close_if_valid(int fd) {
   if (fd != INVALID_HANDLE_VALUE)
-    psync_file_close(fd);
+    pfile_close(fd);
 }
 
 static void psync_fs_free_openfile(psync_openfile_t *of) {
@@ -1935,8 +1938,8 @@ static int psync_fs_fsync(const char *path, int datasync,
       return ret;
     }
   }
-  if (unlikely_log(psync_file_sync(of->datafile)) ||
-      unlikely_log(!of->newfile && psync_file_sync(of->indexfile))) {
+  if (unlikely_log(pfile_sync(of->datafile)) ||
+      unlikely_log(!of->newfile && pfile_sync(of->indexfile))) {
     pthread_mutex_unlock(&of->mutex);
     return -EIO;
   }
@@ -1958,7 +1961,7 @@ static int psync_fs_fsyncdir(const char *path, int datasync,
 
 static int psync_read_newfile(psync_openfile_t *of, char *buf, uint64_t size,
                               uint64_t offset) {
-  ssize_t br = psync_file_pread(of->datafile, buf, size, offset);
+  ssize_t br = pfile_pread(of->datafile, buf, size, offset);
   pthread_mutex_unlock(&of->mutex);
   if (br == -1) {
     debug(D_NOTICE,
@@ -2060,8 +2063,8 @@ static int psync_fs_modfile_check_size_ok(psync_openfile_t *of, uint64_t size) {
   if (unlikely(of->currentsize < size)) {
     debug(D_NOTICE, "extending file %s from %lu to %lu bytes", of->currentname,
           (unsigned long)of->currentsize, (unsigned long)size);
-    if (psync_file_seek(of->datafile, size, SEEK_SET) == -1 ||
-        intruncate(of->datafile))
+    if (pfile_seek(of->datafile, size, SEEK_SET) == -1 ||
+        pfile_truncate(of->datafile))
       return -1;
     if (of->newfile)
       return 0;
@@ -2072,7 +2075,7 @@ static int psync_fs_modfile_check_size_ok(psync_openfile_t *of, uint64_t size) {
       ioff = of->indexoff++;
       rec.offset = of->currentsize;
       rec.length = size - of->currentsize;
-      if (unlikely_log(psync_file_pwrite(of->indexfile, &rec, sizeof(rec),
+      if (unlikely_log(pfile_pwrite(of->indexfile, &rec, sizeof(rec),
                                          sizeof(rec) * ioff +
                                              sizeof(psync_fs_index_header)) !=
                        sizeof(rec)))
@@ -2165,7 +2168,7 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
       return ret;
     }
     if (of->origctime)
-      psync_file_set_creation(of->datafile, of->origctime);
+      pfile_set_creation(of->datafile, of->origctime);
     if (size) {
       ret = psync_pagecache_copy_all_pages_from_cache_to_file_locked(
           of, of->hash, size);
@@ -2190,14 +2193,14 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
   psync_sql_unlock();
   ret = open_write_files(of, 0);
   if (unlikely_log(ret) ||
-      psync_file_seek(of->datafile, size, SEEK_SET) == -1 ||
-      intruncate(of->datafile)) {
+      pfile_seek(of->datafile, size, SEEK_SET) == -1 ||
+      pfile_truncate(of->datafile)) {
     if (!ret)
       ret = -EIO;
     return ret;
   }
   if (of->origctime)
-    psync_file_set_creation(of->datafile, of->origctime);
+    pfile_set_creation(of->datafile, of->origctime);
   of->modified = 1;
   of->indexoff = 0;
   of->currentsize = of->initialsize;
@@ -2253,7 +2256,7 @@ psync_fs_reopen_static_file_for_writing(psync_openfile_t *of) {
   ret = open_write_files(of, 1);
   if (unlikely_log(ret))
     return ret;
-  if (psync_file_pwrite(of->datafile, of->staticdata, of->currentsize, 0) !=
+  if (pfile_pwrite(of->datafile, of->staticdata, of->currentsize, 0) !=
       of->currentsize)
     ret = -PRINT_RETURN_CONST(EIO);
   else
@@ -2416,12 +2419,12 @@ static int psync_fs_write_modified(psync_openfile_t *of, const char *buf,
   if (unlikely_log(psync_fs_modfile_check_size_ok(of, offset)))
     return -EIO;
   ioff = of->indexoff++;
-  bw = psync_file_pwrite(of->datafile, buf, size, offset);
+  bw = pfile_pwrite(of->datafile, buf, size, offset);
   if (unlikely_log(bw == -1))
     return -EIO;
   rec.offset = offset;
   rec.length = bw;
-  if (unlikely_log(psync_file_pwrite(of->indexfile, &rec, sizeof(rec),
+  if (unlikely_log(pfile_pwrite(of->indexfile, &rec, sizeof(rec),
                                      sizeof(rec) * ioff +
                                          sizeof(psync_fs_index_header)) !=
                    sizeof(rec)))
@@ -2435,7 +2438,7 @@ static int psync_fs_write_modified(psync_openfile_t *of, const char *buf,
 static int psync_fs_write_newfile(psync_openfile_t *of, const char *buf,
                                   size_t size, fuse_off_t offset) {
   ssize_t bw;
-  bw = psync_file_pwrite(of->datafile, buf, size, offset);
+  bw = pfile_pwrite(of->datafile, buf, size, offset);
   if (of->currentsize < offset + size && bw != -1)
     of->currentsize = offset + size;
   return bw;
@@ -3065,15 +3068,15 @@ static int psync_fs_set_filetime_locked(psync_fsfileid_t fileid,
       debug(D_NOTICE, "found open file for file id %ld", (long)fl->fileid);
       if (crtime)
         ret =
-            psync_set_crtime_mtime_by_fd(fl->datafile, filename, tv->tv_sec, 0);
+            pfile_set_crtime_mtime_by_fd(fl->datafile, filename, tv->tv_sec, 0);
       else
         ret =
-            psync_set_crtime_mtime_by_fd(fl->datafile, filename, 0, tv->tv_sec);
+            pfile_set_crtime_mtime_by_fd(fl->datafile, filename, 0, tv->tv_sec);
     } else {
       if (crtime)
-        ret = psync_set_crtime_mtime(filename, tv->tv_sec, 0);
+        ret = pfile_set_crtime_mtime(filename, tv->tv_sec, 0);
       else
-        ret = psync_set_crtime_mtime(filename, 0, tv->tv_sec);
+        ret = pfile_set_crtime_mtime(filename, 0, tv->tv_sec);
     }
     debug(D_NOTICE, "setting %s time of %s to %lu=%d",
           crtime ? "creation" : "modification", filename,
@@ -3217,8 +3220,8 @@ retry:
     if (psync_fs_modfile_check_size_ok(of, size))
       ret = -PRINT_RETURN_CONST(EIO);
     else if (of->currentsize != size &&
-             (psync_file_seek(of->datafile, size, SEEK_SET) == -1 ||
-              intruncate(of->datafile)))
+             (pfile_seek(of->datafile, size, SEEK_SET) == -1 ||
+              pfile_truncate(of->datafile)))
       ret = -PRINT_RETURN_CONST(EIO);
     else {
       ret = 0;
@@ -3295,7 +3298,7 @@ static void psync_invalidate_os_cache_noret() {
     path = NULL;
   pthread_mutex_unlock(&start_mutex);
   if (path) {
-    psync_invalidate_os_cache(path);
+    pfile_invalidate_os_cache(path);
     psync_free(path);
   }
 }
@@ -3315,7 +3318,7 @@ static void psync_fs_refresh_timer(psync_timer_t timer, void *ptr) {
 void psync_fs_refresh() {
   time_t ct;
   int todo;
-  if (!psync_invalidate_os_cache_needed())
+  if (!pfile_invalidate_os_cache_needed())
     return;
   ct = psync_timer_time();
   todo = 0;
@@ -3361,7 +3364,7 @@ void psync_fs_refresh_folder(psync_folderid_t folderid) {
   rndhex[2 * sizeof(rndbuff)] = 0;
   pthread_mutex_lock(&start_mutex);
   if (started == 1) {
-    if (psync_invalidate_os_cache_needed())
+    if (pfile_invalidate_os_cache_needed())
       fpath = psync_strcat(psync_current_mountpoint, path, NULL);
     else
       fpath = psync_strcat(psync_current_mountpoint, path, "/",
@@ -3372,14 +3375,14 @@ void psync_fs_refresh_folder(psync_folderid_t folderid) {
   psync_free(path);
   if (!fpath)
     return;
-  if (psync_invalidate_os_cache_needed())
-    psync_invalidate_os_cache(fpath);
+  if (pfile_invalidate_os_cache_needed())
+    pfile_invalidate_os_cache(fpath);
   else {
     debug(D_NOTICE, "creating fake file %s", fpath);
-    fd = psync_file_open(fpath, O_WRONLY, O_CREAT);
+    fd = pfile_open(fpath, O_WRONLY, O_CREAT);
     if (fd != INVALID_HANDLE_VALUE) {
-      psync_file_close(fd);
-      psync_file_delete(fpath);
+      pfile_close(fd);
+      pfile_delete(fpath);
     }
   }
   psync_free(fpath);

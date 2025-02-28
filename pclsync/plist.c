@@ -30,7 +30,7 @@
 */
 
 #include "plist.h"
-#include "pcompat.h"
+#include "pfile.h"
 
 /* Fairly simple in-place merge sort with constant storage requirements.
  *

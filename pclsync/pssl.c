@@ -45,7 +45,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcompiler.h"
 
 #include "pcache.h"

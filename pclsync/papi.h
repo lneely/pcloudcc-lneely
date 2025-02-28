@@ -30,7 +30,7 @@
 #ifndef _PSYNC_API_H
 #define _PSYNC_API_H
 
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcompiler.h"
 #include "psock.h"
 #include <stdint.h>

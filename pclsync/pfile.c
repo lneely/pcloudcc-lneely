@@ -54,7 +54,7 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
-#include "pcompat.h"
+#include "pfile.h"
 #include "plibs.h"
 #include "prun.h"
 #include "psettings.h"
@@ -78,7 +78,7 @@ const unsigned char psync_invalid_filename_chars[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-int psync_stat_mode_ok(struct stat *buf, unsigned int bits) {
+int pfile_stat_mode_ok(struct stat *buf, unsigned int bits) {
   int i;
   uid_t psync_uid;
   gid_t *psync_gids;
@@ -108,19 +108,19 @@ int psync_stat_mode_ok(struct stat *buf, unsigned int bits) {
   return (buf->st_mode & bits) == bits;
 }
 
-int psync_file_rename(const char *oldpath, const char *newpath) {
+int pfile_rename(const char *oldpath, const char *newpath) {
   return rename(oldpath, newpath);
 }
 
-int psync_file_rename_overwrite(const char *oldpath, const char *newpath) {
+int pfile_rename_overwrite(const char *oldpath, const char *newpath) {
   if (!strcmp(oldpath, newpath))
     return 0;
   return rename(oldpath, newpath);
 }
 
-int psync_file_delete(const char *path) { return unlink(path); }
+int pfile_delete(const char *path) { return unlink(path); }
 
-int psync_file_open(const char *path, int access, int flags) {
+int pfile_open(const char *path, int access, int flags) {
   int fd;
 #if defined(O_CLOEXEC)
   flags |= O_CLOEXEC;
@@ -140,9 +140,9 @@ int psync_file_open(const char *path, int access, int flags) {
   return fd;
 }
 
-int psync_file_close(int fd) { return close(fd); }
+int pfile_close(int fd) { return close(fd); }
 
-int psync_file_sync(int fd) {
+int pfile_sync(int fd) {
 #if defined(F_FULLFSYNC)
   if (unlikely(fcntl(fd, F_FULLFSYNC))) {
     while (errno == EINTR) {
@@ -179,7 +179,7 @@ int psync_file_sync(int fd) {
 #endif
 }
 
-int psync_file_schedulesync(int fd) {
+int pfile_schedulesync(int fd) {
 #if defined(SYNC_FILE_RANGE_WRITE)
   return sync_file_range(fd, 0, 0, SYNC_FILE_RANGE_WRITE);
 #elif _POSIX_MAPPED_FILES > 0 && _POSIX_SYNCHRONIZED_IO > 0
@@ -205,14 +205,14 @@ int psync_file_schedulesync(int fd) {
 #endif
 }
 
-int psync_folder_sync(const char *path) {
+int pfile_folder_sync(const char *path) {
   int fd, ret;
   fd = open(path, O_RDONLY);
   if (fd == -1) {
     debug(D_NOTICE, "could not open folder %s, error %d", path, errno);
     return -1;
   }
-  if (unlikely(psync_file_sync(fd))) {
+  if (unlikely(pfile_sync(fd))) {
     debug(D_NOTICE, "could not fsync folder %s, error %d", path, errno);
     ret = -1;
   } else
@@ -221,11 +221,11 @@ int psync_folder_sync(const char *path) {
   return ret;
 }
 
-int psync_file_dup(int fd) { return dup(fd); }
+int pfile_dup(int fd) { return dup(fd); }
 
-int psync_file_set_creation(int fd, time_t ctime) { return -1; }
+int pfile_set_creation(int fd, time_t ctime) { return -1; }
 
-int psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime) {
+int pfile_set_crtime_mtime(const char *path, time_t crtime, time_t mtime) {
   if (mtime) {
     struct timeval tm[2];
     tm[0].tv_sec = mtime;
@@ -243,9 +243,9 @@ int psync_set_crtime_mtime(const char *path, time_t crtime, time_t mtime) {
     return 0;
 }
 
-int psync_set_crtime_mtime_by_fd(int fd, const char *path,
+int pfile_set_crtime_mtime_by_fd(int fd, const char *path,
                                  time_t crtime, time_t mtime) {
-  return psync_set_crtime_mtime(path, crtime, mtime);
+  return pfile_set_crtime_mtime(path, crtime, mtime);
 }
 
 typedef struct {
@@ -260,7 +260,7 @@ static void psync_file_preread_thread(void *ptr) {
   ssize_t rd;
   pr = (psync_file_preread_t *)ptr;
   while (pr->count) {
-    rd = psync_file_pread(pr->fd, buff,
+    rd = pfile_pread(pr->fd, buff,
                           pr->count > sizeof(buff) ? sizeof(buff) : pr->count,
                           pr->offset);
     if (rd <= 0)
@@ -268,14 +268,14 @@ static void psync_file_preread_thread(void *ptr) {
     pr->offset += rd;
     pr->count -= rd;
   }
-  psync_file_close(pr->fd);
+  pfile_close(pr->fd);
   psync_free(pr);
 }
 
-int psync_file_preread(int fd, uint64_t offset, size_t count) {
+int pfile_preread(int fd, uint64_t offset, size_t count) {
   psync_file_preread_t *pr;
   int cfd;
-  cfd = psync_file_dup(fd);
+  cfd = pfile_dup(fd);
   if (cfd == INVALID_HANDLE_VALUE)
     return -1;
   pr = psync_new(psync_file_preread_t);
@@ -287,7 +287,7 @@ int psync_file_preread(int fd, uint64_t offset, size_t count) {
   return 0;
 }
 
-int psync_file_readahead(int fd, uint64_t offset, size_t count) {
+int pfile_readahead(int fd, uint64_t offset, size_t count) {
 #if defined(POSIX_FADV_WILLNEED)
   return posix_fadvise(fd, offset, count, POSIX_FADV_WILLNEED);
 #elif defined(F_RDADVISE)
@@ -298,7 +298,7 @@ int psync_file_readahead(int fd, uint64_t offset, size_t count) {
 #endif
 }
 
-ssize_t psync_file_read(int fd, void *buf, size_t count) {
+ssize_t pfile_read(int fd, void *buf, size_t count) {
   ssize_t ret;
   ret = read(fd, buf, count);
   if (unlikely(ret == -1)) {
@@ -313,7 +313,7 @@ ssize_t psync_file_read(int fd, void *buf, size_t count) {
   return ret;
 }
 
-ssize_t psync_file_pread(int fd, void *buf, size_t count,
+ssize_t pfile_pread(int fd, void *buf, size_t count,
                          uint64_t offset) {
   ssize_t ret;
   ret = pread(fd, buf, count, offset);
@@ -329,7 +329,7 @@ ssize_t psync_file_pread(int fd, void *buf, size_t count,
   return ret;
 }
 
-ssize_t psync_file_write(int fd, const void *buf, size_t count) {
+ssize_t pfile_write(int fd, const void *buf, size_t count) {
   ssize_t ret;
   ret = write(fd, buf, count);
   if (unlikely(ret == -1)) {
@@ -344,7 +344,7 @@ ssize_t psync_file_write(int fd, const void *buf, size_t count) {
   return ret;
 }
 
-ssize_t psync_file_pwrite(int fd, const void *buf, size_t count,
+ssize_t pfile_pwrite(int fd, const void *buf, size_t count,
                           uint64_t offset) {
   ssize_t ret;
   ret = pwrite(fd, buf, count, offset);
@@ -360,11 +360,11 @@ ssize_t psync_file_pwrite(int fd, const void *buf, size_t count,
   return ret;
 }
 
-int64_t psync_file_seek(int fd, uint64_t offset, int whence) {
+int64_t pfile_seek(int fd, uint64_t offset, int whence) {
   return lseek(fd, offset, whence);
 }
 
-int intruncate(int fd) {
+int pfile_truncate(int fd) {
   off_t off;
   off = lseek(fd, 0, SEEK_CUR);
   if (likely_log(off != (off_t)-1)) {
@@ -382,7 +382,7 @@ int intruncate(int fd) {
     return -1;
 }
 
-int64_t psync_file_size(int fd) {
+int64_t pfile_size(int fd) {
   struct stat st;
   if (unlikely_log(fstat(fd, &st)))
     return -1;
@@ -392,7 +392,7 @@ int64_t psync_file_size(int fd) {
 
 #define PSYNC_RUN_CMD "xdg-open" // XXX: verify this...
 
-int psync_run_update_file(const char *path) {
+int pfile_run_update(const char *path) {
   pid_t pid;
   debug(D_NOTICE, "running %s with " PSYNC_RUN_CMD, path);
   pid = fork();
@@ -423,8 +423,8 @@ int psync_run_update_file(const char *path) {
   }
 }
 
-int psync_invalidate_os_cache_needed() { return 0; }
+int pfile_invalidate_os_cache_needed() { return 0; }
 
 extern int overlays_running;
 
-int psync_invalidate_os_cache(const char *path) { return 0; }
+int pfile_invalidate_os_cache(const char *path) { return 0; }

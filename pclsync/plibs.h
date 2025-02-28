@@ -46,6 +46,9 @@
 #define D_WARNING 40
 #define D_NOTICE 50
 
+// required for pcloud api; 7=>linux
+#define P_OS_ID 7 
+
 #define DEBUG_LEVELS                                                           \
   {                                                                            \
     {D_BUG, "BUG"}, {D_CRITICAL, "CRITICAL ERROR"}, {D_ERROR, "ERROR"},        \

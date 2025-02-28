@@ -34,12 +34,14 @@
 #include "pfsxattr.h"
 #include "pfsfolder.h"
 #include "pfstasks.h"
-#include "prun.h"
 
 #include "plibs.h"
 #include <errno.h>
 #include <fuse.h>
 #include <string.h>
+
+// needed by psync_fs_set_thread_name
+extern PSYNC_THREAD const char *psync_thread_name; 
 
 #if IS_DEBUG
 #define psync_fs_set_thread_name()                                             \
