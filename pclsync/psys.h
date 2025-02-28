@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <time.h>
 
+#define psys_native_to_mtime(n) ((n) / 1000000ULL)
+
 uid_t psys_get_uid();
 gid_t psys_get_gid();
 gid_t *psys_get_gids();

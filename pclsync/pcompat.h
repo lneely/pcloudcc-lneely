@@ -70,7 +70,6 @@ extern const unsigned char psync_invalid_filename_chars[];
   ((s)->st_mtime * 1000000ULL +                                                \
    ((struct timespec *)(&(s)->st_mtime))->tv_nsec / 1000)
 #endif
-#define psync_mtime_native_to_mtime(n) ((n) / 1000000ULL)
 #define psync_stat_inode(s) ((s)->st_ino)
 #define psync_stat_device(s) ((s)->st_dev)
 #define psync_stat_device_full(s) ((s)->st_dev)
