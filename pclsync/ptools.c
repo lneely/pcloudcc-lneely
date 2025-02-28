@@ -86,7 +86,7 @@ int create_backend_event(const char *binapi, const char *category,
                          const char *auth, int os, time_t etime,
                          eventParams *params, char **err) {
   binresult *res;
-  psync_socket *sock;
+  psync_socket_t *sock;
   uint64_t result;
   binparam *paramsLocal;
   int i;
@@ -184,7 +184,7 @@ int create_backend_event(const char *binapi, const char *category,
   free(paramsLocal);
 
   if (unlikely_log(!res)) {
-    psync_socket_close(sock);
+    psock_close(sock);
 
     if (err) {
       *err = psync_strdup("Could not connect to the server.");
@@ -195,7 +195,7 @@ int create_backend_event(const char *binapi, const char *category,
 
   result = psync_find_result(res, "result", PARAM_NUM)->num;
 
-  psync_socket_close(sock);
+  psock_close(sock);
 
   if (result) {
     if (err) {
@@ -219,7 +219,7 @@ int backend_call(const char *binapi, const char *wsPath,
   binparam *localParams;
   binresult *res;
   binresult *payload;
-  psync_socket *sock;
+  psync_socket_t *sock;
   uint64_t result;
 
   if (totalParCnt > 0) {
@@ -308,7 +308,7 @@ int backend_call(const char *binapi, const char *wsPath,
   free(localParams);
 
   if (unlikely_log(!res)) {
-    psync_socket_close(sock);
+    psock_close(sock);
 
     if (err) {
       *err = psync_strdup("Could not connect to the server.");
@@ -319,7 +319,7 @@ int backend_call(const char *binapi, const char *wsPath,
 
   result = psync_find_result(res, "result", PARAM_NUM)->num;
 
-  psync_socket_close(sock);
+  psock_close(sock);
 
   if (result) {
     if (err) {

@@ -670,7 +670,7 @@ static int upload_file(const char *localpath, const unsigned char *hashhex,
      pr.opts,
      pr.paramname,
      {pr.num}} /* specially for Visual Studio compiler */ };
-  psync_socket *api;
+  psync_socket_t *api;
   void *buff;
   binresult *res;
   const binresult *meta;
@@ -790,7 +790,7 @@ err00:
   return -1;
 }
 
-static int upload_range(psync_socket *api, psync_upload_range_list_t *r,
+static int upload_range(psync_socket_t *api, psync_upload_range_list_t *r,
                         upload_list_t *upload, psync_uploadid_t uploadid,
                         int fd) {
   binparam params[] = {P_STR("auth", psync_my_auth),
@@ -833,7 +833,7 @@ err0:
   return PSYNC_NET_TEMPFAIL;
 }
 
-static int upload_from_file(psync_socket *api, psync_upload_range_list_t *r,
+static int upload_from_file(psync_socket_t *api, psync_upload_range_list_t *r,
                             psync_uploadid_t uploadid, upload_list_t *upload) {
   binparam params[] = {P_STR("auth", psync_my_auth),
                        P_NUM("uploadoffset", r->uploadoffset),
@@ -852,7 +852,7 @@ static int upload_from_file(psync_socket *api, psync_upload_range_list_t *r,
   }
 }
 
-static int upload_from_upload(psync_socket *api, psync_upload_range_list_t *r,
+static int upload_from_upload(psync_socket_t *api, psync_upload_range_list_t *r,
                               psync_uploadid_t uploadid,
                               upload_list_t *upload) {
   binparam params[] = {P_STR("auth", psync_my_auth),
@@ -871,7 +871,7 @@ static int upload_from_upload(psync_socket *api, psync_upload_range_list_t *r,
   }
 }
 
-static int upload_get_checksum(psync_socket *api, psync_uploadid_t uploadid,
+static int upload_get_checksum(psync_socket_t *api, psync_uploadid_t uploadid,
                                uint32_t id) {
   binparam params[] = {P_STR("auth", psync_my_auth),
                        P_NUM("uploadid", uploadid), P_NUM("id", id)};
@@ -881,7 +881,7 @@ static int upload_get_checksum(psync_socket *api, psync_uploadid_t uploadid,
     return PSYNC_NET_OK;
 }
 
-static int upload_save(psync_socket *api, psync_fileid_t localfileid,
+static int upload_save(psync_socket_t *api, psync_fileid_t localfileid,
                        const char *localpath, const unsigned char *hashhex,
                        uint64_t size, psync_uploadid_t uploadid,
                        psync_folderid_t folderid, const char *name,
@@ -953,7 +953,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
                            psync_syncid_t syncid, upload_list_t *upload,
                            psync_uploadid_t uploadid, uint64_t uploadoffset,
                            struct stat *st, binparam pr) {
-  psync_socket *api;
+  psync_socket_t *api;
   binresult *res;
   psync_sql_res *sql;
   psync_uint_row row;
@@ -1139,8 +1139,8 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
         respwait++;
     }
     while (respwait &&
-           (le->type == PSYNC_URANGE_LAST || psync_socket_pendingdata(api) ||
-            psync_select_in(&api->sock, 1,
+           (le->type == PSYNC_URANGE_LAST || psock_pendingdata(api) ||
+            psock_select_in(&api->sock, 1,
                             respwait >= PSYNC_MAX_PENDING_UPLOAD_REQS
                                 ? PSYNC_SOCK_READ_TIMEOUT * 1000
                                 : 0) != SOCKET_ERROR)) {

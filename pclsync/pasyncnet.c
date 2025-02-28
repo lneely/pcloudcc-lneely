@@ -100,7 +100,7 @@ typedef struct {
 typedef struct _async_thread_params_t {
   psync_deflate_t *enc;
   psync_deflate_t *dec;
-  psync_socket *api;
+  psync_socket_t *api;
   psync_tree *streams;
   uint64_t datapendingsince;
   int (*process_buf)(struct _async_thread_params_t *);
@@ -154,7 +154,7 @@ static int send_pending_data(async_thread_params_t *prms) {
     if (ret == PSYNC_DEFLATE_NODATA || ret == PSYNC_DEFLATE_EOF)
       return 0;
     if (ret > 0) {
-      if (psync_socket_writeall(prms->api, buff, ret) != ret) {
+      if (psock_writeall(prms->api, buff, ret) != ret) {
         debug(D_WARNING, "write of %d bytes to socket failed", ret);
         return -1;
       } else
@@ -180,7 +180,7 @@ static int flush_pending_data(async_thread_params_t *prms) {
 static int socket_t_readall(int sock, void *buff, size_t len) {
   ssize_t rd;
   while (len) {
-    if (psync_wait_socket_read_timeout(sock))
+    if (psock_wait_read_timeout(sock))
       return -1;
     rd = read(sock, buff, len);
     if (rd > 0) {
@@ -203,7 +203,7 @@ static int socket_t_writeall(int sock, const void *buff,
                              size_t len) {
   ssize_t wr;
   while (len) {
-    if (psync_wait_socket_write_timeout(sock))
+    if (psock_wait_write_timeout(sock))
       return -1;
     wr = write(sock, buff, len);
     if (wr > 0) {
@@ -576,7 +576,7 @@ static int handle_incoming_data(async_thread_params_t *prms) {
   char *ptr;
   int rdsock, wrdecomp;
   while (1) {
-    rdsock = psync_socket_read_noblock(prms->api, buff, sizeof(buff));
+    rdsock = psock_read_noblock(prms->api, buff, sizeof(buff));
     if (rdsock == PSYNC_SOCKET_WOULDBLOCK)
       return 0;
     else if (rdsock <= 0) {
@@ -673,14 +673,14 @@ static void psync_async_thread(void *ptr) {
                psys_time_milliseconds()) &&
           flush_pending_data(prms))
         break;
-      ret = psync_select_in(sel, 2, PSYNC_ASYNC_GROUP_REQUESTS_FOR / 4);
+      ret = psock_select_in(sel, 2, PSYNC_ASYNC_GROUP_REQUESTS_FOR / 4);
       if (ret == -1)
         continue;
     } else {
-      if (psync_socket_pendingdata(prms->api))
+      if (psock_pendingdata(prms->api))
         ret = 0;
       else
-        ret = psync_select_in(sel, 2, PSYNC_ASYNC_THREAD_TIMEOUT);
+        ret = psock_select_in(sel, 2, PSYNC_ASYNC_THREAD_TIMEOUT);
     }
     if (ret == 0) {
       if (handle_incoming_data(prms))
@@ -719,7 +719,7 @@ static int psync_async_start_thread_locked() {
   async_thread_params_t *tparams;
   psync_deflate_t *enc, *dec;
   binresult *res;
-  psync_socket *api;
+  psync_socket_t *api;
   int pair[2];
   int tries;
   tries = 0;

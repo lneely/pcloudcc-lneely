@@ -304,7 +304,7 @@ static int check_token(char *token, uint32_t tlen, unsigned char *key,
   binparam params[] = {
       P_LSTR(PSYNC_CHECKSUM, hashhex, PSYNC_HASH_DIGEST_HEXLEN),
       P_LSTR("keydata", key, keylen), P_LSTR("token", token, tlen)};
-  psync_socket *api;
+  psync_socket_t *api;
   binresult *res;
   uint64_t result;
   api = psync_apipool_get();
@@ -431,9 +431,9 @@ static void psync_p2p_thread() {
   int sret;
   psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
   tcpsock = INVALID_SOCKET;
-  /*  udpsock=psync_create_socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+  /*  udpsock=psock_create(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
     if (unlikely_log(udpsock==INVALID_SOCKET)){*/
-  udpsock = psync_create_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  udpsock = psock_create(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (unlikely_log(udpsock == INVALID_SOCKET))
     goto ex;
   setsockopt(udpsock, SOL_SOCKET, SO_REUSEADDR, (const char *)&on, sizeof(on));
@@ -453,9 +453,9 @@ static void psync_p2p_thread() {
       if (unlikely_log(bind(udpsock, (struct sockaddr *)&addr,
     sizeof(addr))==SOCKET_ERROR)) goto ex;
     }
-    tcpsock=psync_create_socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+    tcpsock=psock_create(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
     if (unlikely_log(tcpsock==INVALID_SOCKET)){*/
-  tcpsock = psync_create_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  tcpsock = psock_create(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (unlikely_log(tcpsock == INVALID_SOCKET))
     goto ex;
   setsockopt(tcpsock, SOL_SOCKET, SO_REUSEADDR, (const char *)&on, sizeof(on));
@@ -499,7 +499,7 @@ static void psync_p2p_thread() {
       pthread_mutex_unlock(&p2pmutex);
     }
     psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
-    sret = psync_select_in(socks, 2, -1);
+    sret = psock_select_in(socks, 2, -1);
     if (unlikely_log(sret == -1)) {
       psys_sleep_milliseconds(1);
       continue;
@@ -540,7 +540,7 @@ static void psync_p2p_wake() {
   int sock;
   struct sockaddr_in addr;
   packet_type_t pack;
-  sock = psync_create_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  sock = psock_create(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (unlikely_log(sock == INVALID_SOCKET))
     return;
   memset(&addr, 0, sizeof(addr));
@@ -625,7 +625,7 @@ static int psync_p2p_get_download_token(psync_fileid_t fileid,
       P_LSTR(PSYNC_CHECKSUM, filehashhex, PSYNC_HASH_DIGEST_HEXLEN),
       P_LSTR("keydata", psync_rsa_public_bin->data,
              psync_rsa_public_bin->datalen)};
-  psync_socket *api;
+  psync_socket_t *api;
   binresult *res;
   const binresult *ctoken;
   *token = NULL; /* especially for gcc */
@@ -740,7 +740,7 @@ int psync_p2p_check_download(psync_fileid_t fileid,
   packet_get pct2;
   packet_check_resp resp;
   struct timeval tv;
-  psync_interface_list_t *il;
+  psock_interface_list_t *il;
   int *sockets;
   size_t i, tlen;
   int sock, msock;
@@ -765,13 +765,13 @@ int psync_p2p_check_download(psync_fileid_t fileid,
   psync_hash(hashsource, PSYNC_HASH_BLOCK_SIZE, hashbin);
   psync_binhex(pct1.genhash, hashbin, PSYNC_HASH_DIGEST_LEN);
   memcpy(pct1.computername, computername, PSYNC_HASH_DIGEST_HEXLEN);
-  il = psync_list_ip_adapters();
+  il = psock_list_adapters();
   sockets = psync_new_cnt(int, il->interfacecnt);
   FD_ZERO(&rfds);
   msock = 0;
   for (i = 0; i < il->interfacecnt; i++) {
     sockets[i] = INVALID_SOCKET;
-    sock = psync_create_socket(il->interfaces[i].address.ss_family, SOCK_DGRAM,
+    sock = psock_create(il->interfaces[i].address.ss_family, SOCK_DGRAM,
                                IPPROTO_UDP);
     if (unlikely(sock == INVALID_SOCKET)) {
       debug(D_NOTICE, "could not create a socket for address family %u",
@@ -863,10 +863,10 @@ int psync_p2p_check_download(psync_fileid_t fileid,
       goto err_perm2;
   }
   if (addr.sin6_family == AF_INET6) {
-    sock = psync_create_socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+    sock = psock_create(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
     addr.sin6_port = htons(resp.port);
   } else if (addr.sin6_family == AF_INET) {
-    sock = psync_create_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    sock = psock_create(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     ((struct sockaddr_in *)&addr)->sin_port = htons(resp.port);
   } else {
     debug(D_ERROR, "unknown address family %u", (unsigned)addr.sin6_family);

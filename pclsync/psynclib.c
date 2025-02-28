@@ -456,7 +456,7 @@ void psync_logout2(uint32_t auth_status, int doinvauth) {
 void psync_logout() { psync_logout2(PSTATUS_AUTH_REQUIRED, 1); }
 
 apiservers_list_t *psync_get_apiservers(char **err) {
-  psync_socket *api;
+  psync_socket_t *api;
   binresult *bres;
   psync_list_builder_t *builder;
   const binresult *locations = 0, *location, *br;
@@ -467,7 +467,7 @@ apiservers_list_t *psync_get_apiservers(char **err) {
   int i, locationscnt, usessl;
   binparam params[] = {P_STR("timeformat", "timestamp")};
   usessl = psync_setting_get_bool(_PS(usessl));
-  api = psync_socket_connect(
+  api = psock_connect(
       PSYNC_API_HOST, usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT, usessl);
 
   if (unlikely(!api)) {
@@ -1134,7 +1134,7 @@ void psync_run_localscan() { psync_wake_localscan(); }
 static int do_run_command_get_res(const char *cmd, size_t cmdlen,
                                   const binparam *params, size_t paramscnt,
                                   char **err, binresult **pres) {
-  psync_socket *api;
+  psync_socket_t *api;
   binresult *res;
   uint64_t result;
   api = psync_apipool_get();
@@ -1168,7 +1168,7 @@ neterr:
 int psync_register(const char *email, const char *password, int termsaccepted,
                    const char *binapi, unsigned int locationid, char **err) {
   binresult *res;
-  psync_socket *sock;
+  psync_socket_t *sock;
   uint64_t result;
   binparam params[] = {P_STR("mail", email), P_STR("password", password),
                        P_STR("termsaccepted", termsaccepted ? "yes" : "0"),
@@ -1190,7 +1190,7 @@ int psync_register(const char *email, const char *password, int termsaccepted,
   }
   res = send_command(sock, "register", params);
   if (unlikely_log(!res)) {
-    psync_socket_close(sock);
+    psock_close(sock);
     if (err)
       *err = psync_strdup("Could not connect to the server.");
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
@@ -1203,7 +1203,7 @@ int psync_register(const char *email, const char *password, int termsaccepted,
       *err = psync_strdup(psync_find_result(res, "error", PARAM_STR)->str);
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   }
-  psync_socket_close(sock);
+  psock_close(sock);
   psync_free(res);
   return result;
 }
@@ -1814,13 +1814,13 @@ static psync_new_version_t *psync_res_to_ver(const binresult *res,
 int check_new_version_on_us_socket(binresult **pres, const char *os,
                                    unsigned long currentversion) {
   binparam params[] = {P_STR("os", os), P_NUM("version", currentversion)};
-  psync_socket *api;
+  psync_socket_t *api;
   binresult *res;
   int usessl;
   uint64_t result;
 
   usessl = psync_setting_get_bool(_PS(usessl));
-  api = psync_socket_connect("binapi.pcloud.com",
+  api = psock_connect("binapi.pcloud.com",
                              usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT,
                              usessl);
   if (unlikely(!api)) {
@@ -2037,7 +2037,7 @@ static int psync_upload_result(binresult *res, psync_fileid_t *fileid) {
 static int psync_upload_params(binparam *params, size_t paramcnt,
                                const void *data, size_t length,
                                psync_fileid_t *fileid) {
-  psync_socket *api;
+  psync_socket_t *api;
   binresult *res;
   int tries;
   tries = 0;
@@ -2047,7 +2047,7 @@ static int psync_upload_params(binparam *params, size_t paramcnt,
       break;
     if (likely(do_send_command(api, "uploadfile", strlen("uploadfile"), params,
                                paramcnt, length, 0))) {
-      if (psync_socket_writeall(api, data, length) == length) {
+      if (psock_writeall(api, data, length) == length) {
         res = get_result(api);
         if (likely(res)) {
           psync_apipool_release(api);
@@ -2292,7 +2292,7 @@ psync_folderid_t *psync_crypto_folderids() {
 
 int psync_crypto_change_crypto_pass(const char *oldpass, const char *newpass,
                                     const char *hint, const char *code) {
-  psync_socket *api;
+  psync_socket_t *api;
   binresult *res;
   uint64_t result;
   int tries = 0, err;
@@ -2339,7 +2339,7 @@ int psync_crypto_change_crypto_pass(const char *oldpass, const char *newpass,
 int psync_crypto_change_crypto_pass_unlocked(const char *newpass,
                                              const char *hint,
                                              const char *code) {
-  psync_socket *api;
+  psync_socket_t *api;
   binresult *res;
   uint64_t result;
   int tries = 0, err;
@@ -2384,7 +2384,7 @@ int psync_crypto_change_crypto_pass_unlocked(const char *newpass,
 }
 
 int psync_crypto_crypto_send_change_user_private() {
-  psync_socket *api;
+  psync_socket_t *api;
   binresult *res;
   uint64_t result;
   binparam params[] = {P_STR("auth", psync_my_auth)};

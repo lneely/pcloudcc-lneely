@@ -281,7 +281,7 @@ psync_pagecache_get_free_page(int runflushcacheinside) {
   return page;
 }
 
-static int psync_api_send_read_request(psync_socket *api, psync_fileid_t fileid,
+static int psync_api_send_read_request(psync_socket_t *api, psync_fileid_t fileid,
                                        uint64_t hash, uint64_t offset,
                                        uint64_t length) {
   binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("fileid", fileid),
@@ -290,7 +290,7 @@ static int psync_api_send_read_request(psync_socket *api, psync_fileid_t fileid,
   return send_command_no_res(api, "readfile", params) == PTR_OK ? 0 : -1;
 }
 
-static int psync_api_send_read_request_thread(psync_socket *api,
+static int psync_api_send_read_request_thread(psync_socket_t *api,
                                               psync_fileid_t fileid,
                                               uint64_t hash, uint64_t offset,
                                               uint64_t length) {
@@ -336,7 +336,7 @@ static void psync_pagecache_return_free_page(psync_cache_page_t *page) {
 
 static int psync_pagecache_read_range_from_api(psync_request_t *request,
                                                psync_request_range_t *range,
-                                               psync_socket *api) {
+                                               psync_socket_t *api) {
   uint64_t first_page_id, dlen;
   psync_page_wait_t *pw;
   psync_cache_page_t *page;
@@ -396,14 +396,14 @@ static int psync_pagecache_read_range_from_api(psync_request_t *request,
 typedef struct {
   psync_list list;
   pthread_cond_t cond;
-  psync_socket *api;
+  psync_socket_t *api;
 } shared_api_waiter_t;
 
 static pthread_mutex_t sharedapi_mutex = PTHREAD_MUTEX_INITIALIZER;
-static psync_socket *sharedapi = NULL;
+static psync_socket_t *sharedapi = NULL;
 static psync_list sharedapiwaiters = PSYNC_LIST_STATIC_INIT(sharedapiwaiters);
 
-static void mark_api_shared(psync_socket *api) {
+static void mark_api_shared(psync_socket_t *api) {
   pthread_mutex_lock(&sharedapi_mutex);
   if (!sharedapi)
     sharedapi = api;
@@ -415,12 +415,12 @@ static void signal_all_waiters() {
   while (!psync_list_isempty(&sharedapiwaiters)) {
     waiter = psync_list_remove_head_element(&sharedapiwaiters,
                                             shared_api_waiter_t, list);
-    waiter->api = (psync_socket *)-1;
+    waiter->api = (psync_socket_t *)-1;
     pthread_cond_signal(&waiter->cond);
   }
 }
 
-static void mark_shared_api_bad(psync_socket *api) {
+static void mark_shared_api_bad(psync_socket_t *api) {
   pthread_mutex_lock(&sharedapi_mutex);
   if (sharedapi == api) {
     sharedapi = NULL;
@@ -429,7 +429,7 @@ static void mark_shared_api_bad(psync_socket *api) {
   pthread_mutex_unlock(&sharedapi_mutex);
 }
 
-static int pass_shared_api(psync_socket *api) {
+static int pass_shared_api(psync_socket_t *api) {
   shared_api_waiter_t *waiter;
   int ret;
   pthread_mutex_lock(&sharedapi_mutex);
@@ -450,7 +450,7 @@ static int pass_shared_api(psync_socket *api) {
   return ret;
 }
 
-static psync_socket *get_shared_api() {
+static psync_socket_t *get_shared_api() {
   pthread_mutex_lock(&sharedapi_mutex);
   if (sharedapi)
     return sharedapi; // not supposed to unlock, it will happen in
@@ -459,7 +459,7 @@ static psync_socket *get_shared_api() {
   return NULL;
 }
 
-static void release_bad_shared_api(psync_socket *api) {
+static void release_bad_shared_api(psync_socket_t *api) {
   if (sharedapi == api) {
     sharedapi = NULL;
     signal_all_waiters();
@@ -469,7 +469,7 @@ static void release_bad_shared_api(psync_socket *api) {
 
 static int wait_shared_api() {
   shared_api_waiter_t *waiter;
-  psync_socket *capi;
+  psync_socket_t *capi;
   int ret;
   capi = sharedapi;
   waiter = psync_new(shared_api_waiter_t);
@@ -481,7 +481,7 @@ static int wait_shared_api() {
     pthread_cond_wait(&waiter->cond, &sharedapi_mutex);
   } while (!waiter->api);
   if (waiter->api != capi) {
-    assertw(waiter->api == (psync_socket *)-1);
+    assertw(waiter->api == (psync_socket_t *)-1);
     ret = -1;
   } else {
     debug(D_NOTICE, "waited for shared API connection");
@@ -520,7 +520,7 @@ static void psync_pagecache_set_bad_encoder(psync_openfile_t *of) {
   pthread_mutex_unlock(&of->mutex);
 }
 
-static int send_key_request(psync_socket *api, psync_request_t *request) {
+static int send_key_request(psync_socket_t *api, psync_request_t *request) {
   binparam params[] = {P_STR("auth", psync_my_auth),
                        P_NUM("fileid", request->fileid)};
   return send_command_no_res(api, "crypto_getfilekey", params) != PTR_OK ? -1
@@ -532,7 +532,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
       P_STR("auth", psync_my_auth), P_NUM("fileid", request->fileid),
       P_NUM("hash", request->hash), P_STR("timeformat", "timestamp"),
       P_BOOL("skipfilename", 1)};
-  psync_socket *api;
+  psync_socket_t *api;
   binresult *ret;
   psync_request_range_t *range;
   psync_list *l1, *l2;
@@ -549,7 +549,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
     api = psync_apipool_get();
     if (unlikely_log(!api))
       continue;
-    psync_socket_set_write_buffered(api);
+    psock_set_write_buffered(api);
     if (unlikely(send_command_no_res(api, "getfilelink", params) != PTR_OK))
       goto err1;
     if (request->needkey && send_key_request(api, request))
@@ -2064,7 +2064,7 @@ char *psync_http_construct_range_next_header(psync_request_t *request,
 static void psync_pagecache_read_unmodified_thread(void *ptr) {
   psync_request_t *request;
   psync_http_socket *sock;
-  psync_socket *api;
+  psync_socket_t *api;
   const char *host;
   const char *path;
   char cookie[128];
@@ -2121,7 +2121,7 @@ retry:
                       "connection, serving request from API");
       if (likely_log(hosts->length && hosts->array[0]->type == PARAM_STR))
         psync_http_connect_and_cache_host(hosts->array[0]->str);
-      psync_socket_set_write_buffered(api);
+      psock_set_write_buffered(api);
       psync_list_for_each_element(range, &request->ranges,
                                   psync_request_range_t, list) {
         debug(D_NOTICE, "sending request for offset %lu, size %lu to API",
@@ -2144,18 +2144,18 @@ retry:
         }
       }
       if (pass_shared_api(api)) {
-        psync_socket_clear_write_buffered(api);
+        psock_clear_write_buffered(api);
         psync_apipool_release(api);
       }
       debug(D_NOTICE, "request from API finished");
       goto ok1;
     err_api1:
-      psync_socket_clear_write_buffered_thread(api);
+      psock_clear_write_buffered_thread(api);
       psync_apipool_release_bad(api);
       debug(D_WARNING,
             "error reading range from API, trying from content servers");
     } else if ((api = get_shared_api())) {
-      psync_socket_set_write_buffered_thread(api);
+      psock_set_write_buffered_thread(api);
       debug(D_NOTICE,
             "no cached server connections, no cached API servers, but got "
             "shared API connection sending request to shared API");
@@ -2169,7 +2169,7 @@ retry:
                                                range->length))
           goto err_api2;
       }
-      intry_write_buffer_thread(api);
+      psync_socket_try_write_buffer_thread(api);
       if (wait_shared_api())
         goto err_api0;
       psync_list_for_each_element(
@@ -2185,13 +2185,13 @@ retry:
         }
       }
       if (pass_shared_api(api)) {
-        psync_socket_clear_write_buffered(api);
+        psock_clear_write_buffered(api);
         psync_apipool_release(api);
       }
       debug(D_NOTICE, "request from shared API finished");
       goto ok1;
     err_api2:
-      psync_socket_clear_write_buffered_thread(api);
+      psock_clear_write_buffered_thread(api);
       release_bad_shared_api(api);
     err_api0:
       debug(D_WARNING,
@@ -2204,7 +2204,7 @@ retry:
     goto err0;
   //  debug(D_NOTICE, "connected to %s", host);
   path = psync_find_result(urls->urls, "path", PARAM_STR)->str;
-  psync_socket_set_write_buffered(sock->sock);
+  psock_set_write_buffered(sock->sock);
   psync_list_for_each_element(range, &request->ranges, psync_request_range_t,
                               list) {
     debug(D_NOTICE, "sending request for offset %lu, size %lu",
@@ -2239,7 +2239,7 @@ retry:
     } else
       goto err1;
   }
-  psync_socket_clear_write_buffered(sock->sock);
+  psock_clear_write_buffered(sock->sock);
   psync_http_close(sock);
   debug(D_NOTICE, "request from %s finished", host);
 ok1:

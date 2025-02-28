@@ -176,7 +176,7 @@ static void psync_notify_cache_change(psync_changetype_t event) {
 }
 
 static binresult *
-get_userinfo_user_digest(psync_socket *sock, const char *username,
+get_userinfo_user_digest(psync_socket_t *sock, const char *username,
                          size_t userlen, const char *pwddig, const char *digest,
                          uint32_t diglen, const char *osversion,
                          const char *appversion, const char *deviceid,
@@ -199,7 +199,7 @@ get_userinfo_user_digest(psync_socket *sock, const char *username,
 }
 
 static binresult *
-get_userinfo_user_pass(psync_socket *sock, const char *username,
+get_userinfo_user_pass(psync_socket_t *sock, const char *username,
                        const char *password, const char *osversion,
                        const char *appversion, const char *deviceid,
                        const char *devicestring) {
@@ -266,7 +266,7 @@ static int check_active_subscribtion(const binresult *res) {
   return 0;
 }
 
-static int check_user_relocated(uint64_t luserid, psync_socket *sock) {
+static int check_user_relocated(uint64_t luserid, psync_socket_t *sock) {
   binresult *res;
   const binresult *userids;
   uint64_t result, userid;
@@ -307,11 +307,11 @@ static int check_user_relocated(uint64_t luserid, psync_socket *sock) {
   return 0;
 }
 
-static psync_socket *get_connected_socket() {
+static psync_socket_t *get_connected_socket() {
   char *auth, *user, *pass, *deviceid, *osversion, *devicestring, *binapi,
       *chrUserid;
   const char *appversion;
-  psync_socket *sock;
+  psync_socket_t *sock;
   binresult *res;
   const binresult *cres;
   psync_sql_res *q;
@@ -450,7 +450,7 @@ static psync_socket *get_connected_socket() {
     psync_free(osversion);
 
     if (unlikely_log(!res)) {
-      psync_socket_close(sock);
+      psock_close(sock);
       psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       psync_api_conn_fail_inc();
@@ -475,7 +475,7 @@ static psync_socket *get_connected_socket() {
         psync_my_2fa_code[0] = 0;
         psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_TFAREQ);
         psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
-        psync_socket_close(sock);
+        psock_close(sock);
         psync_free(res);
         continue;
       }
@@ -486,7 +486,7 @@ static psync_socket *get_connected_socket() {
             psync_strdup(psync_find_result(res, "verifytoken", PARAM_STR)->str);
         psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_VERIFYREQ);
         psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
-        psync_socket_close(sock);
+        psock_close(sock);
         psync_free(res);
         continue;
       }
@@ -501,7 +501,7 @@ static psync_socket *get_connected_socket() {
           psync_set_apiserver(binapi, locationid);
         }
 
-        psync_socket_close(sock);
+        psock_close(sock);
         psync_free(res);
         continue;
       }
@@ -510,12 +510,12 @@ static psync_socket *get_connected_socket() {
         psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
         psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATING);
         psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
-        psync_socket_close(sock);
+        psock_close(sock);
         psync_free(res);
         continue;
       }
 
-      psync_socket_close(sock);
+      psock_close(sock);
       psync_free(res);
 
       if (result == 2000 || result == 2012 || result == 2064 ||
@@ -584,7 +584,7 @@ static psync_socket *get_connected_socket() {
           psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_MISMATCH);
         }
         psync_sql_rollback_transaction();
-        psync_socket_close(sock);
+        psock_close(sock);
         psync_free(res);
         psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         continue;
@@ -674,7 +674,7 @@ static psync_socket *get_connected_socket() {
     }
     if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED) {
       psync_sql_rollback_transaction();
-      psync_socket_close(sock);
+      psock_close(sock);
       psync_free(res);
       psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       continue;
@@ -791,7 +791,7 @@ static psync_socket *get_connected_socket() {
                            P_STR("auth", psync_my_auth)};
       res = send_command(sock, "account_info", params);
       if (unlikely_log(!res)) {
-        psync_socket_close(sock);
+        psock_close(sock);
         continue;
       }
       result = psync_find_result(res, "result", PARAM_NUM)->num;
@@ -2547,7 +2547,7 @@ static int setup_exeptions() {
   return pfds[0];
 }
 
-static int send_diff_command(psync_socket *sock, subscribed_ids ids) {
+static int send_diff_command(psync_socket_t *sock, subscribed_ids ids) {
   if (psync_notifications_running()) {
     const char *ts = psync_notifications_get_thumb_size();
     if (ts) {
@@ -2627,15 +2627,15 @@ static int send_diff_command(psync_socket *sock, subscribed_ids ids) {
   }
 }
 
-static void handle_exception(psync_socket **sock, subscribed_ids *ids,
+static void handle_exception(psync_socket_t **sock, subscribed_ids *ids,
                              char ex) {
   if (ex == 'c') {
     if (last_event >= psync_timer_time() - 1)
       return;
-    if (psync_select_in(&(*sock)->sock, 1, 1000) != 0) {
+    if (psock_select_in(&(*sock)->sock, 1, 1000) != 0) {
       debug(D_NOTICE, "got a psync_diff_wake() but no diff events in one "
                       "second, closing socket");
-      psync_socket_close(*sock);
+      psock_close(*sock);
       if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
         ids->notificationid = 0;
       debug(D_NOTICE, "waiting for new socket");
@@ -2652,8 +2652,8 @@ static void handle_exception(psync_socket **sock, subscribed_ids *ids,
   debug(D_NOTICE, "exception handler %c", ex);
   if (ex == 'r' || psync_status_get(PSTATUS_TYPE_RUN) == PSTATUS_RUN_STOP ||
       psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED ||
-      psync_setting_get_bool(_PS(usessl)) != psync_socket_isssl(*sock)) {
-    psync_socket_close(*sock);
+      psync_setting_get_bool(_PS(usessl)) != psock_is_ssl(*sock)) {
+    psock_close(*sock);
     if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
       ids->notificationid = 0;
     debug(D_NOTICE, "waiting for new socket");
@@ -2667,11 +2667,11 @@ static void handle_exception(psync_socket **sock, subscribed_ids *ids,
   } else if (ex == 'e') {
     binparam diffparams[] = {P_STR("id", "ignore")};
     if (!send_command_no_res(*sock, "nop", diffparams) ||
-        psync_select_in(&(*sock)->sock, 1,
+        psock_select_in(&(*sock)->sock, 1,
                         PSYNC_SOCK_TIMEOUT_ON_EXCEPTION * 1000) != 0) {
       const char *prefixes[] = {"API:", "HTTP"};
       debug(D_NOTICE, "reconnecting diff");
-      psync_socket_close_bad(*sock);
+      psock_close_bad(*sock);
       psync_cache_clean_starting_with_one_of(prefixes, ARRAY_SIZE(prefixes));
       *sock = get_connected_socket();
       psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
@@ -2812,7 +2812,7 @@ static void psync_run_analyze_if_needed() {
   }
 }
 
-static int psync_diff_check_quota(psync_socket *sock) {
+static int psync_diff_check_quota(psync_socket_t *sock) {
   binparam diffparams[] = {P_STR("timeformat", "timestamp"),
                            P_BOOL("getapiserver", 1)};
   binresult *res;
@@ -2847,8 +2847,8 @@ static int psync_diff_check_quota(psync_socket *sock) {
 
 static void psync_diff_adapter_hash(void *out) {
   psync_fast_hash256_ctx ctx;
-  psync_interface_list_t *list;
-  list = psync_list_ip_adapters();
+  psock_interface_list_t *list;
+  list = psock_list_adapters();
   psync_fast_hash256_init(&ctx);
   psync_fast_hash256_update(&ctx, list->interfaces,
                             list->interfacecnt * sizeof(psync_interface_t));
@@ -2867,7 +2867,7 @@ static void psync_diff_adapter_timer(psync_timer_t timer, void *ptr) {
 }
 
 static void psync_diff_thread() {
-  psync_socket *sock;
+  psync_socket_t *sock;
   binresult *res = NULL;
   const binresult *entries;
   uint64_t newdiffid, result;
@@ -2902,14 +2902,14 @@ restart:
     res = send_command(sock, "diff", diffparams);
     should_free_res = 1;
     if (!res) {
-      psync_socket_close(sock);
+      psock_close(sock);
       goto restart;
     }
     result = psync_find_result(res, "result", PARAM_NUM)->num;
     if (unlikely(result)) {
       debug(D_ERROR, "diff returned error %u: %s", (unsigned int)result,
             psync_find_result(res, "error", PARAM_STR)->str);
-      psync_socket_close(sock);
+      psock_close(sock);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       goto restart;
     }
@@ -2933,7 +2933,7 @@ restart:
   psync_fs_refresh_folder(0);
   debug(D_NOTICE, "initial sync finished");
   if (psync_diff_check_quota(sock)) {
-    psync_socket_close(sock);
+    psock_close(sock);
     psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
     goto restart;
   }
@@ -2945,7 +2945,7 @@ restart:
   exceptionsock = setup_exeptions();
   if (unlikely(exceptionsock == INVALID_SOCKET)) {
     debug(D_ERROR, "could not create pipe");
-    psync_socket_close(sock);
+    psock_close(sock);
     goto cleanup;
   }
   socks[0] = exceptionsock;
@@ -2974,17 +2974,17 @@ restart:
       psync_notify_cache_change(PACCOUNT_CHANGE_ALL);
       psync_recache_contacts = 0;
     }
-    if (psync_socket_pendingdata(sock))
+    if (psock_pendingdata(sock))
       sel = 1;
     else
-      sel = psync_select_in(socks, 2, -1);
+      sel = psock_select_in(socks, 2, -1);
     if (sel == 0) {
       if (!psync_do_run)
         break;
       if (read(exceptionsock, &ex, 1) != 1)
         continue;
       handle_exception(&sock, &ids, ex);
-      while (psync_select_in(socks, 1, 0) == 0 &&
+      while (psock_select_in(socks, 1, 0) == 0 &&
              read(exceptionsock, &ex, 1) == 1)
         ;
       socks[1] = sock->sock;
@@ -3080,7 +3080,7 @@ cleanup:
   if (should_free_res && res) {
     psync_free(res);
   }
-  psync_socket_close(sock);
+  psock_close(sock);
   close(exceptionsock);
   close(exceptionsockwrite);
 }

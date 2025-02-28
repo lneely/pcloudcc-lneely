@@ -52,34 +52,6 @@
 
 extern const unsigned char psync_invalid_filename_chars[];
 
-typedef struct _psync_socket_buffer {
-  struct _psync_socket_buffer *next;
-  uint32_t size;
-  uint32_t woffset;
-  uint32_t roffset;
-  char buff[];
-} psync_socket_buffer;
-
-typedef struct {
-  void *ssl;
-  psync_socket_buffer *buffer;
-  int sock;
-  int pending;
-  uint32_t misc;
-} psync_socket;
-
-typedef struct {
-  struct sockaddr_storage address;
-  struct sockaddr_storage broadcast;
-  struct sockaddr_storage netmask;
-  int addrsize;
-} psync_interface_t;
-
-typedef struct {
-  size_t interfacecnt;
-  psync_interface_t interfaces[];
-} psync_interface_list_t;
-
 // constants
 #define INVALID_HANDLE_VALUE -1
 #define INVALID_SOCKET -1
@@ -139,38 +111,5 @@ int psync_set_crtime_mtime_by_fd(int fd, const char *path, time_t crtime, time_t
 int psync_invalidate_os_cache(const char *path);
 int psync_invalidate_os_cache_needed();
 int psync_stat_mode_ok(struct stat *buf, unsigned int bits) PSYNC_PURE;
-
-// Socket and Network Operations
-int psync_create_socket(int domain, int type, int protocol);
-psync_socket *psync_socket_connect(const char *host, int unsigned port, int ssl);
-void psync_socket_close(psync_socket *sock);
-void psync_socket_close_bad(psync_socket *sock);
-int psync_socket_read(psync_socket *sock, void *buff, int num);
-int psync_socket_write(psync_socket *sock, const void *buff, int num);
-int psync_socket_readall(psync_socket *sock, void *buff, int num);
-int psync_socket_writeall(psync_socket *sock, const void *buff, int num);
-int psync_socket_read_noblock(psync_socket *sock, void *buff, int num);
-int psync_socket_read_thread(psync_socket *sock, void *buff, int num);
-int psync_socket_readall_thread(psync_socket *sock, void *buff, int num);
-int psync_socket_writeall_thread(psync_socket *sock, const void *buff, int num);
-int psync_socket_isssl(psync_socket *sock) PSYNC_PURE;
-int psync_socket_is_broken(int sock);
-int psync_socket_readable(psync_socket *sock);
-int psync_socket_writable(psync_socket *sock);
-int psync_socket_pendingdata(psync_socket *sock);
-int psync_socket_pendingdata_buf(psync_socket *sock);
-int psync_socket_pendingdata_buf_thread(psync_socket *sock);
-int psync_socket_set_recvbuf(psync_socket *sock, int bufsize);
-int psync_socket_set_sendbuf(psync_socket *sock, int bufsize);
-void psync_socket_set_write_buffered(psync_socket *sock);
-void psync_socket_clear_write_buffered(psync_socket *sock);
-void psync_socket_set_write_buffered_thread(psync_socket *sock);
-void psync_socket_clear_write_buffered_thread(psync_socket *sock);
-int intry_write_buffer(psync_socket *sock);
-int intry_write_buffer_thread(psync_socket *sock);
-int psync_wait_socket_read_timeout(int sock);
-int psync_wait_socket_write_timeout(int sock);
-int psync_select_in(int *sockets, int cnt, int64_t timeoutmillisec);
-psync_interface_list_t *psync_list_ip_adapters();
 
 #endif
