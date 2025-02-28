@@ -53,6 +53,7 @@
 #include "ptimer.h"
 #include "pupload.h"
 #include "ppath.h"
+#include "putil.h"
 
 #include <ctype.h>
 #include <string.h>

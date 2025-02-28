@@ -43,7 +43,7 @@
 
 #include "pcache.h"
 #include "pcloudcrypto.h"
-#include "pcompat.h"
+#include "putil.h"
 #include "pfolder.h"
 #include "pfs.h"
 #include "pfstasks.h"

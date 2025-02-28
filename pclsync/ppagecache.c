@@ -48,6 +48,7 @@
 #include "psettings.h"
 #include "ppath.h"
 #include "psys.h"
+#include "putil.h"
 
 #include "pstatus.h"
 #include "ptimer.h"

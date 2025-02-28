@@ -34,7 +34,7 @@
 
 #include <sqlite3.h>
 
-#include "pcompat.h"
+#include "putil.h"
 
 #if defined(SQLITE_VERSION_NUMBER) && SQLITE_VERSION_NUMBER >= 3008002
 #define P_SQL_WOWROWID "WITHOUT ROWID"

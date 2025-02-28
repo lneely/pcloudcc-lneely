@@ -36,6 +36,7 @@
 #include "prunratelimit.h"
 #include "psettings.h"
 #include "ptasks.h"
+#include "putil.h"
 #include <stdarg.h>
 #include <string.h>
 

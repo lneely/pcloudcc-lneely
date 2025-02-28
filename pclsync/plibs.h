@@ -32,7 +32,7 @@
 #ifndef _PSYNC_LIBS_H
 #define _PSYNC_LIBS_H
 
-#include "pcompat.h"
+#include "putil.h"
 #include "pcompiler.h"
 #include "psynclib.h"
 

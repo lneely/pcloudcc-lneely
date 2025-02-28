@@ -63,6 +63,7 @@
 #include "pmemlock.h"
 #include "pnetlibs.h"
 #include "pnotifications.h"
+#include "putil.h"
 
 #include "poverlay.h"
 #include "pp2p.h"

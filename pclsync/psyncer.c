@@ -49,6 +49,7 @@
 #include "psyncer.h"
 #include "ptasks.h"
 #include "ptree.h"
+#include "putil.h"
 #include <string.h>
 
 typedef struct {

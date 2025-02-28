@@ -52,6 +52,7 @@
 #include "pstatus.h"
 #include "psys.h"
 #include "ptimer.h"
+#include "putil.h"
 #include <string.h>
 
 #define P2P_ENCTYPE_RSA_AES 0

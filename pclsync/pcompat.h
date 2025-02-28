@@ -60,10 +60,6 @@ extern const unsigned char psync_invalid_filename_chars[];
 #define SOCKET_ERROR -1
 
 // macros
-#define psync_32to64(hi, lo) ((((uint64_t)(hi)) << 32) + (lo))
-#define psync_bool_to_zero(x) (((int)(!!(x))) - 1)
-#define NTO_STR(s) TO_STR(s)
-#define TO_STR(s) #s
 #define psync_stat_isfolder(s) S_ISDIR((s)->st_mode)
 #define psync_stat_size(s) ((s)->st_size)
 #define psync_stat_birthtime(s) ((s)->st_mtime)
