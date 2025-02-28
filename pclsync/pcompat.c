@@ -426,9 +426,9 @@ void psync_get_random_seed(unsigned char *seed, const void *addent,
   psync_lhash_update(&hctx, &ptr, sizeof(ptr));
   ptr = (void *)&lastseed;
   psync_lhash_update(&hctx, &ptr, sizeof(ptr));
-  home = psync_get_home_dir();
+  home = ppath_home();
   if (home) {
-    i64 = psync_get_free_space_by_path(home);
+    i64 = ppath_free_space(home);
     psync_lhash_update(&hctx, &i64, sizeof(i64));
     psync_lhash_update(&hctx, home, strlen(home));
     if (likely_log(!stat(home, &st)))

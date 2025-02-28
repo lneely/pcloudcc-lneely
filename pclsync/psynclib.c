@@ -264,7 +264,7 @@ int psync_init() {
   psync_sys_init();
 
   if (!psync_database) {
-    psync_database = psync_get_default_database_path();
+    psync_database = ppath_default_db();
     if (unlikely_log(!psync_database)) {
       if (IS_DEBUG)
         pthread_mutex_unlock(&psync_libstate_mutex);
@@ -1021,7 +1021,7 @@ psync_folder_list_t *psync_get_sync_list() {
 psuggested_folders_t *psync_get_sync_suggestions() {
   char *home;
   psuggested_folders_t *ret;
-  home = psync_get_home_dir();
+  home = ppath_home();
   if (likely_log(home)) {
     ret = psync_scanner_scan_folder(home);
     psync_free(home);
@@ -1887,13 +1887,13 @@ static char *psync_filename_from_res(const binresult *res) {
   nm = strrchr(psync_find_result(res, "path", PARAM_STR)->str, '/');
   if (unlikely_log(!nm))
     return NULL;
-  path = psync_get_private_tmp_dir();
+  path = ppath_private_tmp();
   if (unlikely_log(!path))
     return NULL;
   nmd = psync_url_decode(nm + 1);
   nmarr[0] = path;
   nmarr[1] = nmd;
-  psync_list_dir_fast(path, psync_del_all_except, (void *)nmarr);
+  ppath_ls_fast(path, psync_del_all_except, (void *)nmarr);
   ret = psync_strcat(path, "/", nmd, NULL);
   psync_free(nmd);
   psync_free(path);

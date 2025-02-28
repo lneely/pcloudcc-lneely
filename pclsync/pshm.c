@@ -15,7 +15,7 @@ key_t pshm_get_key() {
     char path[PATH_MAX];
     char *home;
     
-    home = psync_get_home_dir();
+    home = ppath_home();
     if(!home) {
         debug(D_ERROR, "HOME environment variable is not set");
         return (key_t)-1;

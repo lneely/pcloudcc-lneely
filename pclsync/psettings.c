@@ -120,11 +120,11 @@ static psync_setting_t settings[] = {
 void psync_settings_reset() {
   char *home, *defaultfs, *defaultcache;
   psync_settingid_t i;
-  home = psync_get_home_dir();
+  home = ppath_home();
   defaultfs = psync_strcat(home, "/",
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
   psync_free(home);
-  home = psync_get_pcloud_path();
+  home = ppath_pcloud();
   defaultcache = psync_strcat(home, "/",
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
   psync_free(home);
@@ -175,11 +175,11 @@ void psync_settings_init() {
   const char *name;
   char *home, *defaultfs, *defaultcache;
   psync_settingid_t i;
-  home = psync_get_home_dir();
+  home = ppath_home();
   defaultfs = psync_strcat(home, "/",
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
   psync_free(home);
-  home = psync_get_pcloud_path();
+  home = ppath_pcloud();
   defaultcache = psync_strcat(home, "/",
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
   psync_free(home);

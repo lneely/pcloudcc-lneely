@@ -160,7 +160,7 @@ static void psync_notifications_set_current_list(binresult *res,
 static void psync_notifications_thread() {
   char *thumbpath;
   binresult *res;
-  thumbpath = psync_get_private_dir(PSYNC_DEFAULT_NTF_THUMB_DIR);
+  thumbpath = ppath_private(PSYNC_DEFAULT_NTF_THUMB_DIR);
   while (psync_do_run) {
     pthread_mutex_lock(&ntf_mutex);
     if (unlikely(!ntf_callback)) {
@@ -293,10 +293,10 @@ psync_notification_list_t *psync_notifications_get() {
   struct stat st;
   uint32_t cntnew, cnttotal, i;
   cntnew = 0;
-  thumbpath = psync_get_private_dir(PSYNC_DEFAULT_NTF_THUMB_DIR);
+  thumbpath = ppath_private(PSYNC_DEFAULT_NTF_THUMB_DIR);
   thumbs = PSYNC_TREE_EMPTY;
   if (likely(thumbpath))
-    psync_list_dir_fast(thumbpath, psync_notifications_thumb_dir_list, &thumbs);
+    ppath_ls_fast(thumbpath, psync_notifications_thumb_dir_list, &thumbs);
   builder = psync_list_builder_create(
       sizeof(psync_notification_t),
       offsetof(psync_notification_list_t, notifications));
@@ -377,9 +377,9 @@ static void psync_notifications_del_thumb(void *ptr, psync_pstat *st) {
 void psync_notifications_clean() {
   char *thumbpath;
   pthread_mutex_lock(&ntf_mutex);
-  thumbpath = psync_get_private_dir(PSYNC_DEFAULT_NTF_THUMB_DIR);
+  thumbpath = ppath_private(PSYNC_DEFAULT_NTF_THUMB_DIR);
   if (thumbpath) {
-    psync_list_dir(thumbpath, psync_notifications_del_thumb, NULL);
+    ppath_ls(thumbpath, psync_notifications_del_thumb, NULL);
     psync_free(thumbpath);
   }
   if (ntf_processed_result) {

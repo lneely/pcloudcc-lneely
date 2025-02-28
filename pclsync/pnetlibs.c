@@ -344,7 +344,7 @@ static void rm_all(void *vpath, psync_pstat *st) {
   char *path;
   path = psync_strcat((char *)vpath, "/", st->name, NULL);
   if (psync_stat_isfolder(&st->stat)) {
-    psync_list_dir(path, rm_all, path);
+    ppath_ls(path, rm_all, path);
     rmdir(path);
   } else
     psync_file_delete(path);
@@ -358,9 +358,9 @@ static void rm_ign(void *vpath, psync_pstat *st) {
   path = psync_strcat((char *)vpath, "/", st->name, NULL);
   if (psync_stat_isfolder(&st->stat)) {
     if (ign)
-      psync_list_dir(path, rm_all, path);
+      ppath_ls(path, rm_all, path);
     else
-      psync_list_dir(path, rm_ign, path);
+      ppath_ls(path, rm_ign, path);
     rmdir(path);
   } else if (ign)
     psync_file_delete(path);
@@ -372,13 +372,13 @@ int psync_rmdir_with_trashes(const char *path) {
     return 0;
   if (errno != ENOTEMPTY && errno != EEXIST)
     return -1;
-  if (psync_list_dir(path, rm_ign, (void *)path))
+  if (ppath_ls(path, rm_ign, (void *)path))
     return -1;
   return rmdir(path);
 }
 
 int psync_rmdir_recursive(const char *path) {
-  if (psync_list_dir(path, rm_all, (void *)path))
+  if (ppath_ls(path, rm_all, (void *)path))
     return -1;
   return rmdir(path);
 }

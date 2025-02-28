@@ -48,7 +48,7 @@ static char *psync_get_default_database_path_old() {
 }
 
 
-int psync_list_dir(const char *path, psync_list_dir_callback callback,
+int ppath_ls(const char *path, psync_list_dir_callback callback,
                    void *ptr) {
   psync_pstat pst;
   DIR *dh;
@@ -97,7 +97,7 @@ err1:
   return -1;
 }
 
-int psync_list_dir_fast(const char *path, psync_list_dir_callback_fast callback,
+int ppath_ls_fast(const char *path, psync_list_dir_callback_fast callback,
                         void *ptr) {
   psync_pstat_fast pst;
   struct stat st;
@@ -162,7 +162,7 @@ err1:
   return -1;
 }
 
-char *psync_get_home_dir() {
+char *ppath_home() {
   struct stat st;
   const char *dir;
   dir = getenv("HOME");
@@ -181,7 +181,7 @@ char *psync_get_home_dir() {
 }
 
 
-int64_t psync_get_free_space_by_path(const char *path) {
+int64_t ppath_free_space(const char *path) {
   struct statvfs buf;
   if (unlikely_log(statvfs(path, &buf)))
     return -1;
@@ -189,7 +189,7 @@ int64_t psync_get_free_space_by_path(const char *path) {
     return (int64_t)buf.f_bavail * (int64_t)buf.f_frsize;
 }
 
-char *psync_get_pcloud_path() {
+char *ppath_pcloud() {
   char *path;
   struct stat st;
   path = psync_get_pcloud_path_nc();
@@ -202,10 +202,10 @@ char *psync_get_pcloud_path() {
   return path;
 }
 
-char *psync_get_private_dir(char *name) {
+char *ppath_private(char *name) {
   char *path, *rpath;
   struct stat st;
-  path = psync_get_pcloud_path();
+  path = ppath_pcloud();
   if (!path)
     return NULL;
   rpath = psync_strcat(path, "/", name, NULL);
@@ -217,14 +217,14 @@ char *psync_get_private_dir(char *name) {
   return rpath;
 }
 
-char *psync_get_private_tmp_dir() {
-  return psync_get_private_dir(PSYNC_DEFAULT_TMP_DIR);
+char *ppath_private_tmp() {
+  return ppath_private(PSYNC_DEFAULT_TMP_DIR);
 }
 
-char *psync_get_default_database_path() {
+char *ppath_default_db() {
   char *dirpath, *path;
   struct stat st;
-  dirpath = psync_get_pcloud_path();
+  dirpath = ppath_pcloud();
   if (!dirpath)
     return NULL;
   path = psync_strcat(dirpath, "/", PSYNC_DEFAULT_DB_NAME,

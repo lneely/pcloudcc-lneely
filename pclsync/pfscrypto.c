@@ -2098,7 +2098,7 @@ void psync_fs_crypto_check_logs() {
   const char *cachepath;
   cachepath = psync_setting_get_string(_PS(fscachepath));
   debug(D_NOTICE, "checking for unprocessed log files in %s", cachepath);
-  if (psync_list_dir_fast(cachepath, psync_fs_crypto_check_file,
+  if (ppath_ls_fast(cachepath, psync_fs_crypto_check_file,
                           (char *)cachepath))
     debug(D_WARNING, "list of %s failed", cachepath);
   debug(D_NOTICE, "log check finished");

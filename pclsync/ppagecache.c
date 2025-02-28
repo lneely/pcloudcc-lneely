@@ -1211,7 +1211,7 @@ static int check_disk_full() {
   if (unlikely_log(filesize == -1))
     return 0;
   freespace =
-      psync_get_free_space_by_path(psync_setting_get_string(_PS(fscachepath)));
+      ppath_free_space(psync_setting_get_string(_PS(fscachepath)));
   minlocal = psync_setting_get_uint(_PS(minlocalfreespace));
   if (unlikely_log(freespace == -1))
     return 0;
@@ -3478,7 +3478,7 @@ static void psync_pagecache_check_free_space() {
   int64_t freespc;
   cachepath = psync_setting_get_string(_PS(fscachepath));
   minlocal = psync_setting_get_uint(_PS(minlocalfreespace));
-  freespc = psync_get_free_space_by_path(cachepath);
+  freespc = ppath_free_space(cachepath);
   if (unlikely(freespc == -1)) {
     debug(D_WARNING, "could not get free space of path %s", cachepath);
     return;
@@ -3852,7 +3852,7 @@ void psync_pagecache_clean_cache() {
     psync_file_close(readcache);
     readcache = INVALID_HANDLE_VALUE;
   }
-  psync_list_dir(cache_dir, clean_cache_del, (void *)1);
+  ppath_ls(cache_dir, clean_cache_del, (void *)1);
 }
 
 void psync_pagecache_reopen_read_cache() {
@@ -3977,7 +3977,7 @@ int psync_pagecache_move_cache(const char *path) {
   pthread_mutex_unlock(&clean_cache_mutex);
   debug(D_NOTICE, "released locks");
   psync_file_close(ordcache);
-  psync_list_dir(opath, clean_cache_del, (void *)1);
+  ppath_ls(opath, clean_cache_del, (void *)1);
   psync_free(opath);
   psync_free(rdpath);
   debug(D_NOTICE, "end");

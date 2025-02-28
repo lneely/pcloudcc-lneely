@@ -175,7 +175,7 @@ static int move_folder_contents(const char *oldpath, const char *newpath) {
   const char *arr[2];
   arr[0] = oldpath;
   arr[1] = newpath;
-  psync_list_dir(oldpath, do_move, (void *)arr);
+  ppath_ls(oldpath, do_move, (void *)arr);
   return psync_rmdir_with_trashes(oldpath);
 }
 
@@ -1277,7 +1277,7 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
     return ret;
   }
   minfree = psync_setting_get_uint(_PS(minlocalfreespace));
-  freespace = psync_get_free_space_by_path(localpath);
+  freespace = ppath_free_space(localpath);
   debug(D_NOTICE, "free space is %llu, needed %llu+%llu",
         (unsigned long long)freespace, (unsigned long long)minfree,
         (unsigned long long)size);

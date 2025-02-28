@@ -134,7 +134,7 @@ static void dir_scan(void *ptr, psync_pstat_fast *st) {
 static void scan_folder_by_ptr(scan_folder *f) {
   psync_list *e;
   //  debug(D_NOTICE, "scanning directory %s", f->path);
-  psync_list_dir_fast(f->path, dir_scan, f);
+  ppath_ls_fast(f->path, dir_scan, f);
   psync_list_for_each(e, &f->subfolders)
       scan_folder_by_ptr(psync_list_element(e, scan_folder, nextfolder));
 }

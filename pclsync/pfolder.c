@@ -721,7 +721,7 @@ pfolder_list_t *psync_list_local_folder(const char *path,
   flist_ltype ft;
   ft.folderlist = folder_list_init();
   ft.listtype = listtype;
-  if (psync_list_dir(path, add_to_folderlist, &ft)) {
+  if (ppath_ls(path, add_to_folderlist, &ft)) {
     folder_list_free(ft.folderlist);
     return NULL;
   } else

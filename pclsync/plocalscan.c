@@ -245,7 +245,7 @@ static void reload_ignored_folders() {
     dirlen = end - start;
     if (dirlen >= 5 && !memcmp(start, "$HOME", 5)) {
       if (!home) {
-        home = psync_get_home_dir();
+        home = ppath_home();
         if (home)
           homelen = strlen(home);
       }
@@ -309,7 +309,7 @@ static int scanner_local_folder_to_list(const char *localpath,
                                         psync_list *lst) {
   psync_list_init(lst);
 
-  return psync_list_dir(localpath, scanner_local_entry_to_list, lst);
+  return ppath_ls(localpath, scanner_local_entry_to_list, lst);
 }
 
 static void delete_local_folder_rec(psync_folderid_t localfolderid);

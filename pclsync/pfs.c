@@ -2323,7 +2323,7 @@ PSYNC_NOINLINE static int psync_fs_do_check_write_space(psync_openfile_t *of,
   int freed;
   cachepath = psync_setting_get_string(_PS(fscachepath));
   minlocal = psync_setting_get_uint(_PS(minlocalfreespace));
-  freespc = psync_get_free_space_by_path(cachepath);
+  freespc = ppath_free_space(cachepath);
   if (unlikely(freespc == -1)) {
     debug(D_WARNING, "could not get free space of path %s", cachepath);
     return 1;
