@@ -46,6 +46,8 @@
 #include "plist.h"
 #include "pnetlibs.h"
 #include "psettings.h"
+#include "ppath.h"
+
 #include <stddef.h>
 #include <string.h>
 #define INITIAL_NAME_BUFF 2000

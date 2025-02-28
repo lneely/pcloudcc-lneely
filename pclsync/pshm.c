@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <errno.h>
 
+#include "ppath.h"
 #include "plibs.h"
 #include "pshm.h"
 
@@ -14,13 +15,12 @@ key_t pshm_get_key() {
     char path[PATH_MAX];
     char *home;
     
-    home = getenv("HOME");
-    if (home == NULL) {
+    home = psync_get_home_dir();
+    if(!home) {
         debug(D_ERROR, "HOME environment variable is not set");
         return (key_t)-1;
     }
     snprintf(path, sizeof(path), "%s/.pcloud/data.db", home);
-
     return ftok(path, 'A');
 }
 

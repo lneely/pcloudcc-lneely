@@ -52,6 +52,7 @@
 #include "psettings.h"
 #include "pssl.h"
 #include "pstatus.h"
+#include "ppath.h"
 #include "ptimer.h"
 #include <errno.h>
 #include <fuse.h>

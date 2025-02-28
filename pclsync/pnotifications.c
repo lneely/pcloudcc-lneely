@@ -35,6 +35,7 @@
 #include "psettings.h"
 #include "ptimer.h"
 #include "ptree.h"
+#include "ppath.h"
 
 typedef struct {
   psync_tree tree;

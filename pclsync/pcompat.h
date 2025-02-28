@@ -70,17 +70,6 @@ typedef struct {
 } psync_socket;
 
 typedef struct {
-  const char *name;
-  const char *path;
-  struct stat stat;
-} psync_pstat;
-
-typedef struct {
-  const char *name;
-  uint8_t isfolder;
-} psync_pstat_fast;
-
-typedef struct {
   struct sockaddr_storage address;
   struct sockaddr_storage broadcast;
   struct sockaddr_storage netmask;
@@ -93,8 +82,6 @@ typedef struct {
 } psync_interface_list_t;
 
 // callback signatures
-typedef void (*psync_list_dir_callback)(void *, psync_pstat *);
-typedef void (*psync_list_dir_callback_fast)(void *, psync_pstat_fast *);
 typedef void (*psync_thread_start0)();
 typedef void (*psync_thread_start1)(void *);
 
@@ -180,16 +167,6 @@ int psync_set_crtime_mtime_by_fd(int fd, const char *path, time_t crtime, time_t
 int psync_invalidate_os_cache(const char *path);
 int psync_invalidate_os_cache_needed();
 int psync_stat_mode_ok(struct stat *buf, unsigned int bits) PSYNC_PURE;
-
-// Directory and Path Operations
-int psync_list_dir(const char *path, psync_list_dir_callback callback, void *ptr);
-int psync_list_dir_fast(const char *path, psync_list_dir_callback_fast callback, void *ptr);
-char *psync_get_home_dir();
-char *psync_get_pcloud_path();
-char *psync_get_private_dir(char *name);
-char *psync_get_private_tmp_dir();
-char *psync_get_default_database_path();
-int64_t psync_get_free_space_by_path(const char *path);
 
 // Socket and Network Operations
 int psync_create_socket(int domain, int type, int protocol);

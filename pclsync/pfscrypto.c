@@ -43,6 +43,7 @@
 #include "pfscrypto.h"
 #include "plibs.h"
 #include "ppagecache.h"
+#include "ppath.h"
 
 // this is only for debug, adds needless checks of tree for local files
 #if IS_DEBUG

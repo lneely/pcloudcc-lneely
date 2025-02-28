@@ -58,6 +58,7 @@
 #include "ptasks.h"
 #include "ptimer.h"
 #include "pupload.h"
+#include "ppath.h"
 
 typedef struct {
   psync_list list;

@@ -42,6 +42,7 @@
 #include "pp2p.h"
 #include "ppagecache.h"
 #include "psettings.h"
+#include "ppath.h"
 #include "ptimer.h"
 #include <ctype.h>
 #include <string.h>

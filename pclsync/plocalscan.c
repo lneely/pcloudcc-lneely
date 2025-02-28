@@ -51,6 +51,8 @@
 #include "ptasks.h"
 #include "ptimer.h"
 #include "pupload.h"
+#include "ppath.h"
+
 #include <ctype.h>
 #include <string.h>
 

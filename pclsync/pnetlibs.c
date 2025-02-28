@@ -52,6 +52,7 @@
 #include "pssl.h"
 #include "pstatus.h"
 #include "ptimer.h"
+#include "ppath.h"
 #include "ptree.h"
 
 struct time_bytes {

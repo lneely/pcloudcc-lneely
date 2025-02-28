@@ -44,6 +44,8 @@
 #include "pnetlibs.h"
 #include "ppagecache.h"
 #include "psettings.h"
+#include "ppath.h"
+
 #include "pstatus.h"
 #include "ptimer.h"
 #include <errno.h>

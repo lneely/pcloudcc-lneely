@@ -34,6 +34,7 @@
 #include "plibs.h"
 #include "plist.h"
 #include "pscanexts.h"
+#include "ppath.h"
 #include "psettings.h"
 #include <stdio.h>
 #include <string.h>

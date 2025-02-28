@@ -50,6 +50,7 @@
 #include "pdevice.h"
 #include "pdevice_monitor.h"
 #include "pdiff.h"
+#include "ppath.h"
 #include "pdownload.h"
 #include "pexternalstatus.h"
 #include "pfileops.h"
