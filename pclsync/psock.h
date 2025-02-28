@@ -6,6 +6,11 @@
 
 #include "pcompiler.h"
 
+#define INVALID_SOCKET -1
+#define PSYNC_SOCKET_ERROR -1
+#define PSYNC_SOCKET_WOULDBLOCK -2
+#define SOCKET_ERROR -1
+
 typedef struct _psock_buf_t {
   struct _psock_buf_t *next;
   uint32_t size;

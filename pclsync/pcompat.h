@@ -54,10 +54,7 @@ extern const unsigned char psync_invalid_filename_chars[];
 
 // constants
 #define INVALID_HANDLE_VALUE -1
-#define INVALID_SOCKET -1
-#define PSYNC_SOCKET_ERROR -1
-#define PSYNC_SOCKET_WOULDBLOCK -2
-#define SOCKET_ERROR -1
+
 
 // macros
 #define psync_stat_isfolder(s) S_ISDIR((s)->st_mode)
