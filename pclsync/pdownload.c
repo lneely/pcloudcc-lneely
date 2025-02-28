@@ -160,7 +160,7 @@ static int task_rmdir(const char *path) {
   return 0;
 }
 
-static void do_move(void *ptr, psync_pstat *st) {
+static void do_move(void *ptr, ppath_stat *st) {
   const char **arr;
   char *oldpath, *newpath;
   arr = (const char **)ptr;

@@ -693,7 +693,7 @@ pfolder_list_t *psync_list_remote_folder(psync_folderid_t folderid,
   return folder_list_finalize(list);
 }
 
-static void add_to_folderlist(void *ptr, psync_pstat *stat) {
+static void add_to_folderlist(void *ptr, ppath_stat *stat) {
   flist_ltype *ft = (flist_ltype *)ptr;
   pentry_t entry;
   int isfolder = psync_stat_isfolder(&stat->stat);

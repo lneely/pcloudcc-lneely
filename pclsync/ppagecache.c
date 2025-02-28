@@ -3835,7 +3835,7 @@ void psync_pagecache_init() {
                        NULL);
 }
 
-void clean_cache_del(void *delcache, psync_pstat *st) {
+void clean_cache_del(void *delcache, ppath_stat *st) {
   int ret;
   if (!psync_stat_isfolder(&st->stat) &&
       (delcache ||

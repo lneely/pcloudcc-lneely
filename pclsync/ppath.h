@@ -9,18 +9,18 @@ typedef struct {
   const char *name;
   const char *path;
   struct stat stat;
-} psync_pstat;
+} ppath_stat;
 
 typedef struct {
   const char *name;
   uint8_t isfolder;
-} psync_pstat_fast;
+} ppath_fast_stat;
 
-typedef void (*psync_list_dir_callback)(void *, psync_pstat *);
-typedef void (*psync_list_dir_callback_fast)(void *, psync_pstat_fast *);
+typedef void (*ppath_ls_cb)(void *, ppath_stat *);
+typedef void (*ppath_ls_fast_cb)(void *, ppath_fast_stat *);
 
-int ppath_ls(const char *path, psync_list_dir_callback callback, void *ptr);
-int ppath_ls_fast(const char *path, psync_list_dir_callback_fast callback, void *ptr);
+int ppath_ls(const char *path, ppath_ls_cb callback, void *ptr);
+int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback, void *ptr);
 char *ppath_home();
 char *ppath_pcloud();
 char *ppath_private(char *name);

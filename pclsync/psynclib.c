@@ -1867,7 +1867,7 @@ psync_new_version_t *psync_check_new_version(const char *os,
   return ver;
 }
 
-static void psync_del_all_except(void *ptr, psync_pstat_fast *st) {
+static void psync_del_all_except(void *ptr, ppath_fast_stat *st) {
   const char **nmarr;
   char *fp;
   nmarr = (const char **)ptr;

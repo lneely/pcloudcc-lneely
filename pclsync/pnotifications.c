@@ -220,7 +220,7 @@ static void fill_actionid(const binresult *ntf, psync_notification_t *pntf,
 }
 
 static void psync_notifications_thumb_dir_list(void *ptr,
-                                               psync_pstat_fast *st) {
+                                               ppath_fast_stat *st) {
   psync_tree **tree, **addto, *tr;
   psync_thumb_list_t *tl;
   size_t len;
@@ -367,7 +367,7 @@ psync_notification_list_t *psync_notifications_get() {
   return res;
 }
 
-static void psync_notifications_del_thumb(void *ptr, psync_pstat *st) {
+static void psync_notifications_del_thumb(void *ptr, ppath_stat *st) {
   if (psync_stat_isfolder(&st->stat))
     return;
   debug(D_NOTICE, "deleting thumb %s", st->path);

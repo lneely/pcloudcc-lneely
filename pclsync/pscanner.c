@@ -102,7 +102,7 @@ static uint32_t get_file_type(const char *name) {
     return 0;
 }
 
-static void dir_scan(void *ptr, psync_pstat_fast *st) {
+static void dir_scan(void *ptr, ppath_fast_stat *st) {
   scan_folder *f = (scan_folder *)ptr;
   unsigned long i;
   for (i = 0; i < ARRAY_SIZE(ignore_patters); i++)

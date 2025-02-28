@@ -340,7 +340,7 @@ void psync_apipool_release(psync_socket *api) {
 
 void psync_apipool_release_bad(psync_socket *api) { psync_ret_api(api); }
 
-static void rm_all(void *vpath, psync_pstat *st) {
+static void rm_all(void *vpath, ppath_stat *st) {
   char *path;
   path = psync_strcat((char *)vpath, "/", st->name, NULL);
   if (psync_stat_isfolder(&st->stat)) {
@@ -351,7 +351,7 @@ static void rm_all(void *vpath, psync_pstat *st) {
   psync_free(path);
 }
 
-static void rm_ign(void *vpath, psync_pstat *st) {
+static void rm_ign(void *vpath, ppath_stat *st) {
   char *path;
   int ign;
   ign = psync_is_name_to_ignore(st->name);

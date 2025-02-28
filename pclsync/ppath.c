@@ -48,9 +48,9 @@ static char *psync_get_default_database_path_old() {
 }
 
 
-int ppath_ls(const char *path, psync_list_dir_callback callback,
+int ppath_ls(const char *path, ppath_ls_cb callback,
                    void *ptr) {
-  psync_pstat pst;
+  ppath_stat pst;
   DIR *dh;
   char *cpath;
   size_t pl, entrylen;
@@ -97,9 +97,9 @@ err1:
   return -1;
 }
 
-int ppath_ls_fast(const char *path, psync_list_dir_callback_fast callback,
+int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback,
                         void *ptr) {
-  psync_pstat_fast pst;
+  ppath_fast_stat pst;
   struct stat st;
   DIR *dh;
   char *cpath;

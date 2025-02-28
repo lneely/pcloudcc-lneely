@@ -2076,7 +2076,7 @@ static void psync_fs_crypto_check_log(char *path, const char *fn) {
   }
 }
 
-static void psync_fs_crypto_check_file(void *ptr, psync_pstat_fast *st) {
+static void psync_fs_crypto_check_file(void *ptr, ppath_fast_stat *st) {
   size_t len;
   char *path;
   char ch;

@@ -281,7 +281,7 @@ static int is_path_to_ignore(uint64_t deviceid, uint64_t inode) {
   return 0;
 }
 
-static void scanner_local_entry_to_list(void *ptr, psync_pstat *st) {
+static void scanner_local_entry_to_list(void *ptr, ppath_stat *st) {
   psync_list *lst;
   sync_folderlist *e;
   size_t l;
