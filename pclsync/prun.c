@@ -6,43 +6,38 @@
 #include "prun.h"
 
 typedef struct {
-  thread0_run run;
-  const char *name;
-} thread0_data;
-
-typedef struct {
   thread1_run run;
   void *ptr;
   const char *name;
-} thread1_data;
+} thread_data;
 
 static void *thread_entry(void *data) {
-  thread0_run run;
-  run = ((thread0_data *)data)->run;
-  psync_thread_name = ((thread0_data *)data)->name;
+  thread_data *td = (thread_data *)data;
+  psync_thread_name = td->name;
+  
+  if (td->ptr) {
+    // For prun_thread1 calls
+    td->run(td->ptr);
+  } else {
+    // For prun_thread calls
+    ((thread0_run)td->run)();
+  }
+  
   psync_free(data);
-  run();
   return NULL;
 }
 
-static void *thread1_entry(void *data) {
-  thread1_run run;
-  void *ptr;
-  run = ((thread1_data *)data)->run;
-  ptr = ((thread1_data *)data)->ptr;
-  psync_thread_name = ((thread1_data *)data)->name;
-  psync_free(data);
-  run(ptr);
-  return NULL;
-}
-
-void prun_thread(const char *name, thread0_run run) {
-  thread0_data *data;
+// Common function for both thread types
+static void start_thread(const char *name, void *run, void *ptr) {
+  thread_data *data;
   pthread_t thread;
   pthread_attr_t attr;
-  data = psync_new(thread0_data);
+  
+  data = psync_new(thread_data);
   data->run = run;
+  data->ptr = ptr;
   data->name = name;
+  
   pthread_attr_init(&attr);
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
   pthread_attr_setstacksize(&attr, PSYNC_STACK_SIZE);
@@ -50,17 +45,10 @@ void prun_thread(const char *name, thread0_run run) {
   pthread_attr_destroy(&attr);
 }
 
+void prun_thread(const char *name, thread0_run run) {
+  start_thread(name, (thread1_run)run, NULL);
+}
+
 void prun_thread1(const char *name, thread1_run run, void *ptr) {
-  thread1_data *data;
-  pthread_t thread;
-  pthread_attr_t attr;
-  data = psync_new(thread1_data);
-  data->run = run;
-  data->ptr = ptr;
-  data->name = name;
-  pthread_attr_init(&attr);
-  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-  pthread_attr_setstacksize(&attr, PSYNC_STACK_SIZE);
-  pthread_create(&thread, &attr, thread1_entry, data);
-  pthread_attr_destroy(&attr);
+  start_thread(name, run, ptr);
 }
