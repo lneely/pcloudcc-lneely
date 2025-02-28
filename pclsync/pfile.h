@@ -47,11 +47,8 @@
 
 #include "pcompiler.h"
 
-extern const unsigned char psync_invalid_filename_chars[];
-
 // constants
 #define INVALID_HANDLE_VALUE -1
-
 
 // macros
 #define pfile_stat_isfolder(s) S_ISDIR((s)->st_mode)

@@ -8,7 +8,6 @@
 // required by thread_entry
 extern PSYNC_THREAD const char *psync_thread_name; 
 
-
 typedef struct {
   thread1_run run;
   void *ptr;

@@ -97,6 +97,8 @@ typedef struct {
   char str[];
 } string_list;
 
+PSYNC_THREAD const char *psync_thread_name = "no name";
+
 static psync_malloc_t psync_real_malloc = malloc;
 static psync_realloc_t psync_real_realloc = realloc;
 static psync_free_t psync_real_free = free;

@@ -58,6 +58,8 @@
 #include "pupload.h"
 #include "putil.h"
 
+extern const unsigned char pfile_invalid_chars[];
+
 typedef struct {
   psync_list list;
   psync_fileid_t localfileid;
@@ -1462,7 +1464,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
     if (srow && strcmp(srow[0], name)) {
       const char *s1 = srow[0], *s2 = name;
       while (*s1 && *s2 &&
-             (*s1 == *s2 || (psync_invalid_filename_chars[(unsigned char)*s1] &&
+             (*s1 == *s2 || (pfile_invalid_chars[(unsigned char)*s1] &&
                              *s2 == PSYNC_REPLACE_INV_CH_IN_FILENAMES))) {
         s1++;
         s2++;

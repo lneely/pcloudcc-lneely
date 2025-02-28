@@ -52,6 +52,8 @@
 #include "putil.h"
 #include <string.h>
 
+extern const unsigned char pfile_invalid_chars[];
+
 typedef struct {
   psync_tree tree;
   psync_folderid_t folderid;
@@ -192,7 +194,7 @@ psync_folderid_t psync_create_local_folder_in_db(
   vname = NULL;
   if (name)
     for (ptr = name; *ptr; ptr++)
-      if (psync_invalid_filename_chars[(unsigned char)*ptr]) {
+      if (pfile_invalid_chars[(unsigned char)*ptr]) {
         if (!vname)
           vname = psync_strdup(name);
         vname[ptr - name] = '_';

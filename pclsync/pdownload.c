@@ -62,6 +62,8 @@
 #include "putil.h"
 #include "ppath.h"
 
+extern const unsigned char pfile_invalid_chars[];
+
 typedef struct {
   psync_list list;
   psync_fileid_t fileid;
@@ -1426,7 +1428,7 @@ static int download_task(uint64_t taskid, uint32_t type, psync_syncid_t syncid,
   if (name && type != PSYNC_DELETE_LOCAL_FILE &&
       type != PSYNC_DELETE_LOCAL_FOLDER)
     for (ptr = name; *ptr; ptr++)
-      if (psync_invalid_filename_chars[(unsigned char)*ptr]) {
+      if (pfile_invalid_chars[(unsigned char)*ptr]) {
         if (!vname)
           vname = psync_strdup(name);
         vname[ptr - name] = PSYNC_REPLACE_INV_CH_IN_FILENAMES;

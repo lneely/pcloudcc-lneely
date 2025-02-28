@@ -28,7 +28,6 @@
    DAMAGE.
 */
 
-#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -63,9 +62,7 @@
 
 extern char **environ;
 
-PSYNC_THREAD const char *psync_thread_name = "no name";
-
-const unsigned char psync_invalid_filename_chars[256] = {
+const unsigned char pfile_invalid_chars[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
