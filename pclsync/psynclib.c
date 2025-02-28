@@ -357,7 +357,7 @@ void psync_destroy() {
   psync_timer_wake();
   psync_timer_notify_exception();
   psync_sql_sync();
-  sys_sleep_milliseconds(20);
+  psys_sleep_milliseconds(20);
   psync_sql_lock();
   psync_cache_clean_all();
   psync_sql_close();
@@ -551,7 +551,7 @@ void psync_unlink() {
   psync_invalidate_auth(psync_my_auth);
   psync_cloud_crypto_stop();
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
-  sys_sleep_milliseconds(20);
+  psys_sleep_milliseconds(20);
   psync_stop_localscan();
   psync_sql_checkpoint_lock();
   psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
@@ -1976,7 +1976,7 @@ psync_check_new_version_download(const char *os, unsigned long currentversion) {
   if (unlikely(ret == -1))
     do {
       debug(D_WARNING, "could not connect to server, sleeping");
-      sys_sleep_milliseconds(10000);
+      psys_sleep_milliseconds(10000);
       ret = check_new_version_on_us_socket(&res, os, currentversion);
     } while (ret == -1);
   if (ret) {
@@ -1992,7 +1992,7 @@ psync_check_new_version_download(const char *os, unsigned long currentversion) {
   if (unlikely(ret == -1))
     do {
       debug(D_WARNING, "could not download update, sleeping");
-      sys_sleep_milliseconds(10000);
+      psys_sleep_milliseconds(10000);
       ret = psync_download_new_version(
           psync_find_result(res, "download", PARAM_HASH), &lfilename);
     } while (ret == -1);
@@ -3056,7 +3056,7 @@ void psync_async_delete_sync(void *ptr) {
 
 void psync_async_ui_callback(void *ptr) {
   int eventId = *(int *)ptr;
-  time_t currTime = sys_time_seconds();
+  time_t currTime = psys_time_seconds();
 
   if (((currTime - lastBupDelEventTime) > bupNotifDelay) ||
       (lastBupDelEventTime == 0)) {
@@ -3114,7 +3114,7 @@ int psync_delete_backup_device(psync_folderid_t fId) {
 }
 
 void psync_send_backup_del_event(psync_fileorfolderid_t remoteFId) {
-  time_t currTime = sys_time_seconds();
+  time_t currTime = psys_time_seconds();
 
   if (((currTime - lastBupDelEventTime) > bupNotifDelay) ||
       (lastBupDelEventTime == 0)) {

@@ -265,7 +265,7 @@ static void status_change_thread(void *ptr) {
   pstatus_change_callback_t callback = (pstatus_change_callback_t)ptr;
   while (1) {
     // Maximum 2 updates/sec
-    sys_sleep_milliseconds(500);
+    psys_sleep_milliseconds(500);
     pthread_mutex_lock(&statusmutex);
     while (statuschanges <= 0) {
       statuschanges = -1;

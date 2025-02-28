@@ -563,7 +563,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
   }
   psync_list_for_each_element_call(&dblist, sync_folderlist, list, psync_free);
   if (localsleepperfolder) {
-    sys_sleep_milliseconds(localsleepperfolder);
+    psys_sleep_milliseconds(localsleepperfolder);
     if (psync_current_time - starttime >=
         PSYNC_LOCALSCAN_SLEEPSEC_PER_SCAN * 3 / 2)
       localsleepperfolder = 0;
@@ -942,7 +942,7 @@ retry:
       if (tries == 10)
         psync_timer_notify_exception();
       tries++;
-      sys_sleep_milliseconds(20 + tries * 20);
+      psys_sleep_milliseconds(20 + tries * 20);
       psync_sql_start_transaction();
       goto retry;
     }
@@ -957,7 +957,7 @@ retry:
     if (unlikely(++trn > 1000)) {                                              \
       trn = 0;                                                                 \
       psync_sql_commit_transaction();                                          \
-      sys_sleep_milliseconds(20);                                                     \
+      psys_sleep_milliseconds(20);                                                     \
       psync_sql_start_transaction();                                           \
     }                                                                          \
   } while (0)
@@ -1052,7 +1052,7 @@ restart:
       for (i = 0; i < SCAN_LIST_CNT; i++)
         psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list,
                                          psync_free);
-      sys_sleep_milliseconds(restartsleep);
+      psys_sleep_milliseconds(restartsleep);
       if (restartsleep < 16000)
         restartsleep *= 2;
       goto restart;
@@ -1114,7 +1114,7 @@ restart:
     for (i = 0; i < SCAN_LIST_CNT; i++)
       psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list,
                                        psync_free);
-    sys_sleep_milliseconds(restartsleep);
+    psys_sleep_milliseconds(restartsleep);
     if (restartsleep < 16000)
       restartsleep *= 2;
 
@@ -1199,7 +1199,7 @@ static int scanner_wait() {
 static void scanner_thread() {
   time_t lastscan;
   int w;
-  sys_sleep_milliseconds(1500);
+  psys_sleep_milliseconds(1500);
   psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
   psync_wait_status(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
   scanner_scan(1);
@@ -1210,7 +1210,7 @@ static void scanner_thread() {
   while (psync_do_run) {
     psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
     if (lastscan + 5 >= psync_current_time) {
-      sys_sleep_milliseconds(2000);
+      psys_sleep_milliseconds(2000);
       pthread_mutex_lock(&scan_mutex);
       scan_wakes = 0;
       pthread_mutex_unlock(&scan_mutex);

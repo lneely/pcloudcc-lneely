@@ -265,7 +265,7 @@ psync_pagecache_get_free_page(int runflushcacheinside) {
       while (unlikely(psync_list_isempty(&free_pages))) {
         pthread_mutex_unlock(&cache_mutex);
         debug(D_NOTICE, "no free pages after flush, sleeping");
-        sys_sleep_milliseconds(200);
+        psys_sleep_milliseconds(200);
         flush_pages(1);
         pthread_mutex_lock(&cache_mutex);
       }
@@ -1063,7 +1063,7 @@ static void clean_cache() {
     } while (row);
     psync_sql_free_result(res);
     if (free_db_pages)
-      sys_sleep_milliseconds(1);
+      psys_sleep_milliseconds(1);
   }
   ocnt = cnt = i;
   oentries = entries;
@@ -1154,7 +1154,7 @@ static void clean_cache() {
       psync_sql_free_result(res);
       psync_sql_commit_transaction();
       debug(D_NOTICE, "got waiters for sql lock, pausing for a while");
-      sys_sleep_milliseconds(5);
+      psys_sleep_milliseconds(5);
       psync_sql_start_transaction();
       res = psync_sql_prep_statement("UPDATE pagecache SET type=" NTO_STR(
           PAGE_TYPE_FREE) ", hash=NULL, pageid=NULL, crc=NULL WHERE id=?");
@@ -1362,7 +1362,7 @@ static int flush_pages(int nosleep) {
         pthread_mutex_lock(&cache_mutex);
         while (cache_pages_free >= CACHE_PAGES * 5 / 100 && i++ < 200) {
           pthread_mutex_unlock(&cache_mutex);
-          sys_sleep_milliseconds(10);
+          psys_sleep_milliseconds(10);
           pthread_mutex_lock(&cache_mutex);
         }
         pthread_mutex_unlock(&cache_mutex);
@@ -1394,7 +1394,7 @@ static int flush_pages(int nosleep) {
         psync_sql_free_result(res);
         psync_sql_commit_transaction();
         if (!nosleep && !free_page_waiters)
-          sys_sleep_milliseconds(1);
+          psys_sleep_milliseconds(1);
         psync_sql_start_transaction();
         pthread_mutex_lock(&cache_mutex);
         res = psync_sql_prep_statement(
@@ -1444,7 +1444,7 @@ static int flush_pages(int nosleep) {
         psync_sql_commit_transaction();
         if (!free_page_waiters) // it is ok if we read a stale value, because we
                                 // don't hold cache_mutex any more
-          sys_sleep_milliseconds(1);
+          psys_sleep_milliseconds(1);
         psync_sql_start_transaction();
         pthread_mutex_lock(&cache_mutex);
         res = psync_sql_prep_statement(
@@ -1479,7 +1479,7 @@ static int flush_pages(int nosleep) {
           psync_sql_free_result(res);
           psync_sql_commit_transaction();
           if (!free_page_waiters)
-            sys_sleep_milliseconds(1);
+            psys_sleep_milliseconds(1);
           psync_sql_start_transaction();
           pthread_mutex_lock(&cache_mutex);
           res = psync_sql_prep_statement(
@@ -3234,7 +3234,7 @@ static void psync_pagecache_new_upload_to_cache(uint64_t taskid, uint64_t hash,
     pageid++;
     if (pause && pageid % 64 == 0) {
       psync_check_clean_running();
-      sys_sleep_milliseconds(10);
+      psys_sleep_milliseconds(10);
     }
   }
   psync_file_close(fd);
@@ -3355,7 +3355,7 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
         if (++pageidcnt == ARRAY_SIZE(pageids)) {
           pageidcnt = 0;
           switch_pageids(hash, oldhash, pageids, ARRAY_SIZE(pageids));
-          sys_sleep_milliseconds(10);
+          psys_sleep_milliseconds(10);
           psync_check_clean_running();
         }
       }
@@ -3384,7 +3384,7 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
       psync_pagecache_add_page_if_not_exists(page, hash, pageid);
       if (pageid % 64 == 0) {
         psync_check_clean_running();
-        sys_sleep_milliseconds(10);
+        psys_sleep_milliseconds(10);
       }
     } else { // page with both old and new fragments
       // we covered full new page and full old page cases, so this interval
@@ -3459,7 +3459,7 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
       psync_pagecache_add_page_if_not_exists(page, hash, pageid);
       if (pageid % 64 == 0) {
         psync_check_clean_running();
-        sys_sleep_milliseconds(10);
+        psys_sleep_milliseconds(10);
       }
     }
   }

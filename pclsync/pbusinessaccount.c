@@ -699,7 +699,7 @@ void psync_update_cryptostatus() {
       if (!crst)
         crstat = 1;
       else {
-        if (sys_time_seconds() > crexp)
+        if (psys_time_seconds() > crexp)
           crstat = 3;
         else
           crstat = 2;

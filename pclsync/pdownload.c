@@ -128,7 +128,7 @@ static int task_mkdir(const char *path) {
     debug(D_WARNING, "mkdir of %s failed, errno=%d", path, (int)err);
     if (err == ENOSPC || err == EDQUOT) {
       psync_set_local_full(1);
-      sys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
+      psys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
     } else {
       psync_set_local_full(0);
       if (err == ENOENT)
@@ -188,7 +188,7 @@ static int task_renamedir(const char *oldpath, const char *newpath) {
     }
     if (errno == ENOSPC || errno == EDQUOT) {
       psync_set_local_full(1);
-      sys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
+      psys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
     } else {
       psync_set_local_full(0);
       if (errno == EBUSY || errno == EROFS)
@@ -552,7 +552,7 @@ static int rename_and_create_local(download_task_t *dt, unsigned char *checksum,
                       dt->localfolderid, dt->dwllist.syncid, dt->filename)) {
     psync_resume_localscan();
     debug(D_WARNING, "failed to rename %s to %s", dt->tmpname, dt->localname);
-    sys_sleep_milliseconds(1000);
+    psys_sleep_milliseconds(1000);
     return -1;
   }
   if (stat_and_create_local(dt->dwllist.syncid, dt->dwllist.fileid,
@@ -1140,7 +1140,7 @@ static void task_run_download_file_thread(void *ptr) {
   download_task_t *dt;
   dt = (download_task_t *)ptr;
   if (task_download_file(dt)) {
-    sys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
+    psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
     set_task_inprogress(dt->taskid, 0);
     psync_wake_download();
   } else {
@@ -1289,7 +1289,7 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
       free_download_task(dt);
       psync_set_local_full(1);
       debug(D_NOTICE, "disk is full, sleeping 10 seconds");
-      sys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
+      psys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
       return -1;
     }
   } else {
@@ -1298,14 +1298,14 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
           "sleeping a bit and failing task",
           localpath);
     free_download_task(dt);
-    sys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
+    psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
     return -1;
   }
   lock = psync_lock_file(localname);
   if (!lock) {
     debug(D_NOTICE, "file %s is currently locked, skipping for now", localname);
     free_download_task(dt);
-    sys_sleep_milliseconds(PSYNC_SLEEP_ON_LOCKED_FILE);
+    psys_sleep_milliseconds(PSYNC_SLEEP_ON_LOCKED_FILE);
     return -1;
   }
   dt->lock = lock;
@@ -1322,11 +1322,11 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
       debug(D_WARNING, "async download start failed for %s", dt->localname);
       free_download_task(dt);
       set_task_inprogress(taskid, 0);
-      sys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
+      psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
     }
   } else {
     prun_thread1("download file", task_run_download_file_thread, dt);
-    sys_sleep_milliseconds(25); // do not run downloads strictly in parallel so we
+    psys_sleep_milliseconds(25); // do not run downloads strictly in parallel so we
                          // reuse some API connections
   }
   return -1;
@@ -1505,7 +1505,7 @@ static void download_thread() {
               psync_get_number(row[2]), psync_get_number(row[4]));
         }
       } else if (type != PSYNC_DOWNLOAD_FILE)
-        sys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
+        psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
       psync_free(row);
       continue;
     }

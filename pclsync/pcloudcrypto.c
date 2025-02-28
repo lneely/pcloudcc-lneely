@@ -553,7 +553,7 @@ retry:
   iterations = 0;
   if (psync_sql_trylock()) {
     pthread_rwlock_unlock(&crypto_lock);
-    sys_sleep_milliseconds(1);
+    psys_sleep_milliseconds(1);
     goto retry;
   }
   res = psync_sql_query_nolock(
@@ -2025,7 +2025,7 @@ int psync_crypto_change_passphrase(const char *oldpassphrase,
     return PSYNC_CRYPTO_BAD_PASSPHRASE;
 retry:
   if (psync_sql_trylock()) {
-    sys_sleep_milliseconds(1);
+    psys_sleep_milliseconds(1);
     goto retry;
   }
   rowcnt = 0;

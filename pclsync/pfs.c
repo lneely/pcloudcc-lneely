@@ -1741,7 +1741,7 @@ retry:
     psync_fs_lock_file(of);
     if (psync_sql_trylock()) {
       pthread_mutex_unlock(&of->mutex);
-      sys_sleep_milliseconds(1);
+      psys_sleep_milliseconds(1);
       goto retry;
     }
   }
@@ -2309,7 +2309,7 @@ static void psync_fs_throttle(size_t size, uint64_t speed) {
         writtenthissec += size;
         pthread_mutex_unlock(&throttle_mutex);
         assert(size <= speed);
-        sys_sleep_milliseconds(size * 1000 / speed);
+        psys_sleep_milliseconds(size * 1000 / speed);
         return;
       }
     }
@@ -2351,7 +2351,7 @@ PSYNC_NOINLINE static int psync_fs_do_check_write_space(psync_openfile_t *of,
             "error",
             (unsigned long)freespc, (unsigned long)minlocal,
             (unsigned long)size);
-      sys_sleep_milliseconds(5000);
+      psys_sleep_milliseconds(5000);
       return -EINTR;
     } else {
       debug(D_NOTICE,

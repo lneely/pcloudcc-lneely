@@ -1917,7 +1917,7 @@ int psync_run_update_file(const char *path) {
     return -1;
   } else if (pid) {
     int status;
-    sys_sleep_milliseconds(100);
+    psys_sleep_milliseconds(100);
     if (waitpid(pid, &status, WNOHANG) == 0)
       return 0;
     else

@@ -502,7 +502,7 @@ retry:
               "file %s changed while calculating checksum, restarting",
               filename);
         psync_hash_final(hashbin, &hctx);
-        sys_sleep_milliseconds(PSYNC_SLEEP_FILE_CHANGE);
+        psys_sleep_milliseconds(PSYNC_SLEEP_FILE_CHANGE);
         psync_file_seek(fd, 0, SEEK_SET);
         goto retry;
       }
@@ -511,7 +511,7 @@ retry:
     psync_hash_update(&hctx, buff, rrs);
     rsz -= rrs;
     if (++cnt % 16 == 0)
-      sys_sleep_milliseconds(5);
+      psys_sleep_milliseconds(5);
   }
   if (unlikely_log(fstat(fd, &st2)))
     goto err1;
@@ -519,7 +519,7 @@ retry:
     debug(D_NOTICE, "file %s changed while calculating checksum, restarting",
           filename);
     psync_hash_final(hashbin, &hctx);
-    sys_sleep_milliseconds(PSYNC_SLEEP_FILE_CHANGE);
+    psys_sleep_milliseconds(PSYNC_SLEEP_FILE_CHANGE);
     psync_file_seek(fd, 0, SEEK_SET);
     goto retry;
   }
@@ -580,7 +580,7 @@ int psync_get_local_file_checksum_part(const char *restrict filename,
     }
     rsz -= rrs;
     if (++cnt % 16 == 0)
-      sys_sleep_milliseconds(5);
+      psys_sleep_milliseconds(5);
   }
   psync_free(buff);
   psync_file_close(fd);
@@ -609,7 +609,7 @@ int psync_file_writeall_checkoverquota(int fd, const void *buf,
     } else if (wr == -1) {
       if (errno == ENOSPC || errno == EDQUOT) {
         psync_set_local_full(1);
-        sys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
+        psys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
       }
       return -1;
     }
@@ -757,7 +757,7 @@ static int psync_socket_readall_download_th(psync_socket *sock, void *buff,
     else
       ds = 100;
     while (1) {
-      sys_sleep_milliseconds(PSYNC_SLEEP_AUTO_SHAPER * 100 / ds);
+      psys_sleep_milliseconds(PSYNC_SLEEP_AUTO_SHAPER * 100 / ds);
       if (th)
         pending = psync_socket_pendingdata_buf_thread(sock);
       else
@@ -872,7 +872,7 @@ long psync_socket_writeall_upload(psync_socket *sock, const void *buff,
         if (dyn_upload_speed < PSYNC_UPL_AUTO_SHAPER_MIN)
           dyn_upload_speed = PSYNC_UPL_AUTO_SHAPER_MIN;
         //        set_send_buf(sock);
-        sys_sleep_milliseconds(1000);
+        psys_sleep_milliseconds(1000);
       }
       wr = psync_socket_write(sock, buff, wwr);
       if (wr == -1)

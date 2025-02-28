@@ -236,9 +236,9 @@ static void psync_p2p_check(const packet_check *packet) {
             PSYNC_HASH_DIGEST_HEXLEN) "s",
         (unsigned int)resp.type, p2p_get_peer_address(), hashhex);
   if (files_serving)
-    sys_sleep_milliseconds(files_serving * 10);
+    psys_sleep_milliseconds(files_serving * 10);
   if (resp.type == P2P_RESP_WAIT)
-    sys_sleep_milliseconds(PSYNC_P2P_INITIAL_TIMEOUT / 4);
+    psys_sleep_milliseconds(PSYNC_P2P_INITIAL_TIMEOUT / 4);
   if (!sendto(udpsock, (const char *)&resp, sizeof(resp), 0,
               (const struct sockaddr *)&paddr, paddrlen))
     debug(D_WARNING, "sendto to %s failed", p2p_get_peer_address());
@@ -501,7 +501,7 @@ static void psync_p2p_thread() {
     psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
     sret = psync_select_in(socks, 2, -1);
     if (unlikely_log(sret == -1)) {
-      sys_sleep_milliseconds(1);
+      psys_sleep_milliseconds(1);
       continue;
     }
     if (sret == 0) {
@@ -511,7 +511,7 @@ static void psync_p2p_thread() {
       if (likely_log(ret != SOCKET_ERROR))
         psync_p2p_process_packet(buff, ret);
       else
-        sys_sleep_milliseconds(1);
+        psys_sleep_milliseconds(1);
     } else if (sret == 1) {
       inconn = psync_new(int);
       *inconn = accept(tcpsock, NULL, NULL);
@@ -848,7 +848,7 @@ int psync_p2p_check_download(psync_fileid_t fileid,
     uint32_t rnd;
     psync_ssl_rand_weak((unsigned char *)&rnd, sizeof(rnd));
     rnd &= 0x7ff;
-    sys_sleep_milliseconds(PSYNC_P2P_SLEEP_WAIT_DOWNLOAD + rnd);
+    psys_sleep_milliseconds(PSYNC_P2P_SLEEP_WAIT_DOWNLOAD + rnd);
     goto err_temp2;
   }
   if (psync_p2p_check_rsa())

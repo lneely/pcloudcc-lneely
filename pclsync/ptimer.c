@@ -150,8 +150,8 @@ static void timer_thread() {
   lt = psync_current_time;
   while (psync_do_run) {
     psync_list_init(&timers);
-    sys_sleep_milliseconds(1000);
-    psync_current_time = sys_time_seconds();
+    psys_sleep_milliseconds(1000);
+    psync_current_time = psys_time_seconds();
     pthread_mutex_lock(&timer_mutex);
     timer_prepare_timers(lt, psync_current_time, &timers);
     if (nextsecwaiters)
@@ -164,7 +164,7 @@ static void timer_thread() {
     else if (unlikely_log(psync_current_time == lt)) {
       if (!psync_do_run)
         break;
-      sys_sleep_milliseconds(1000);
+      psys_sleep_milliseconds(1000);
     }
     lt = psync_current_time;
   }
@@ -175,7 +175,7 @@ void psync_timer_init() {
   for (i = 0; i < TIMER_LEVELS; i++)
     for (j = 0; j < TIMER_ARRAY_SIZE; j++)
       psync_list_init(&timerlists[i][j]);
-  psync_current_time = sys_time_seconds();
+  psync_current_time = psys_time_seconds();
   prun_thread("timer", timer_thread);
   timer_running = 1;
 }
@@ -184,7 +184,7 @@ time_t psync_timer_time() {
   if (timer_running)
     return psync_current_time;
   else
-    return sys_time_seconds();
+    return psys_time_seconds();
 }
 
 void psync_timer_wake() { pthread_cond_signal(&timer_cond); }

@@ -133,7 +133,7 @@ static psync_folderid_t wait_folder_id_in_db(psync_folderid_t folderid) {
     psync_sql_free_result(res);
     if (row)
       return folderid;
-    sys_sleep_milliseconds(50);
+    psys_sleep_milliseconds(50);
   }
   return PSYNC_INVALID_FOLDERID;
 }

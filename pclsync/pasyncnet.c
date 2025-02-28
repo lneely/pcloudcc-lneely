@@ -254,7 +254,7 @@ static int send_data(async_thread_params_t *prms, const void *data, int len) {
       return -1;
   }
   if (!prms->pendingrequests)
-    prms->datapendingsince = sys_time_milliseconds();
+    prms->datapendingsince = psys_time_milliseconds();
   prms->pendingrequests++;
   return 0;
 }
@@ -670,7 +670,7 @@ static void psync_async_thread(void *ptr) {
     if (prms->pendingrequests) {
       if ((prms->pendingrequests >= PSYNC_ASYNC_MAX_GROUPED_REQUESTS ||
            prms->datapendingsince + PSYNC_ASYNC_GROUP_REQUESTS_FOR <
-               sys_time_milliseconds()) &&
+               psys_time_milliseconds()) &&
           flush_pending_data(prms))
         break;
       ret = psync_select_in(sel, 2, PSYNC_ASYNC_GROUP_REQUESTS_FOR / 4);
