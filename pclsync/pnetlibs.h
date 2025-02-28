@@ -73,7 +73,7 @@
 typedef uint64_t psync_uploadid_t;
 
 typedef struct {
-  psync_socket_t *sock;
+  psock_t *sock;
   char *readbuff;
   int64_t contentlength;
   uint64_t readbytes;
@@ -126,11 +126,11 @@ void psync_netlibs_init();
 void psync_apipool_set_server(const char *binapi);
 void psync_apiserver_init();
 
-psync_socket_t *psync_apipool_get();
-psync_socket_t *psync_apipool_get_from_cache();
+psock_t *psync_apipool_get();
+psock_t *psync_apipool_get_from_cache();
 void psync_apipool_prepare();
-void psync_apipool_release(psync_socket_t *api);
-void psync_apipool_release_bad(psync_socket_t *api);
+void psync_apipool_release(psock_t *api);
+void psync_apipool_release_bad(psock_t *api);
 binresult *psync_do_api_run_command(const char *command, size_t cmdlen,
                                     const binparam *params, size_t paramcnt);
 
@@ -156,12 +156,12 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
 int psync_file_writeall_checkoverquota(int fd, const void *buf,
                                        size_t count);
 
-int psync_set_default_sendbuf(psync_socket_t *sock);
+int psync_set_default_sendbuf(psock_t *sock);
 void psync_account_downloaded_bytes(int unsigned bytes);
-int psync_socket_readall_download(psync_socket_t *sock, void *buff, int num);
-int psync_socket_readall_download_thread(psync_socket_t *sock, void *buff,
+int psync_socket_readall_download(psock_t *sock, void *buff, int num);
+int psync_socket_readall_download_thread(psock_t *sock, void *buff,
                                          int num);
-long psync_socket_writeall_upload(psync_socket_t *sock, const void *buff,
+long psync_socket_writeall_upload(psock_t *sock, const void *buff,
                                          int num);
 
 psync_http_socket *psync_http_connect(const char *host, const char *path,
@@ -190,10 +190,10 @@ char *psync_url_decode(const char *s);
 int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
                               uint64_t filehash, uint64_t filesize,
                               char *const *files, uint32_t filecnt);
-int psync_net_scan_file_for_blocks(psync_socket_t *api, psync_list *rlist,
+int psync_net_scan_file_for_blocks(psock_t *api, psync_list *rlist,
                                    psync_fileid_t fileid, uint64_t filehash,
                                    int fd);
-int psync_net_scan_upload_for_blocks(psync_socket_t *api, psync_list *rlist,
+int psync_net_scan_upload_for_blocks(psock_t *api, psync_list *rlist,
                                      psync_uploadid_t uploadid,
                                      int fd);
 

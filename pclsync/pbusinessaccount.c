@@ -87,7 +87,7 @@ static int handle_result(const binresult *bres, uint64_t result, char **err) {
 int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
                                psync_shareid_t teamshareids[], int nteamshareid,
                                char **err) {
-  psync_socket_t *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result, userresult, teamresult;
   char *ids1 = NULL;
@@ -190,7 +190,7 @@ int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
 int do_psync_account_modifyshare(psync_shareid_t usrshrids[], uint32_t uperms[],
                                  int nushid, psync_shareid_t tmshrids[],
                                  uint32_t tperms[], int ntmshid, char **err) {
-  psync_socket_t *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result, userresult, teamresult;
   char *ids1 = NULL;

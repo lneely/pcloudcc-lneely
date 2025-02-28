@@ -127,8 +127,8 @@ static uint32_t hash_func(const char *key) {
   return hash;
 }
 
-static psync_socket_t *psync_get_api() {
-  psync_socket_t *sock;
+static psock_t *psync_get_api() {
+  psock_t *sock;
   sem_wait(&api_pool_sem);
   debug(D_NOTICE, "connecting to %s", apiserver);
   sock = psync_api_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
@@ -140,11 +140,11 @@ static psync_socket_t *psync_get_api() {
 static void psync_ret_api(void *ptr) {
   sem_post(&api_pool_sem);
   debug(D_NOTICE, "closing connection to api");
-  psock_close((psync_socket_t *)ptr);
+  psock_close((psock_t *)ptr);
   debug(D_NOTICE, "closed connection to api");
 }
 
-static int api_sock_is_broken(psync_socket_t *ret) {
+static int api_sock_is_broken(psock_t *ret) {
   if (unlikely_log(psock_is_broken(ret->sock) ||
                    psock_is_ssl(ret) !=
                        psync_setting_get_bool(_PS(usessl)))) {
@@ -187,10 +187,10 @@ void psync_apipool_set_server(const char *binapi) {
   }
 }
 
-psync_socket_t *psync_apipool_get() {
-  psync_socket_t *ret;
+psock_t *psync_apipool_get() {
+  psock_t *ret;
   while (1) {
-    ret = (psync_socket_t *)psync_cache_get(apikey);
+    ret = (psock_t *)psync_cache_get(apikey);
     if (!ret)
       break;
     if (!api_sock_is_broken(ret))
@@ -202,10 +202,10 @@ psync_socket_t *psync_apipool_get() {
   return ret;
 }
 
-psync_socket_t *psync_apipool_get_from_cache() {
-  psync_socket_t *ret;
+psock_t *psync_apipool_get_from_cache() {
+  psock_t *ret;
   while (1) {
-    ret = (psync_socket_t *)psync_cache_get(apikey);
+    ret = (psock_t *)psync_cache_get(apikey);
     if (!ret)
       break;
     if (!api_sock_is_broken(ret))
@@ -218,7 +218,7 @@ void psync_apipool_prepare() {
   if (psync_cache_has(apikey))
     return;
   else {
-    psync_socket_t *ret;
+    psock_t *ret;
     ret = psync_get_api();
     if (unlikely_log(!ret))
       psync_timer_notify_exception();
@@ -231,7 +231,7 @@ void psync_apipool_prepare() {
 
 binresult *psync_do_api_run_command(const char *command, size_t cmdlen,
                                     const binparam *params, size_t paramcnt) {
-  psync_socket_t *api;
+  psock_t *api;
   binresult *ret;
   int tries;
   tries = 0;
@@ -309,7 +309,7 @@ static void print_tree(const binresult *tree, int ident) {
   }
 }
 
-PSYNC_NOINLINE static void psync_apipool_dump_socket(psync_socket_t *api) {
+PSYNC_NOINLINE static void psync_apipool_dump_socket(psock_t *api) {
   binresult *res;
   res = get_result(api);
   psync_apipool_release_bad(api);
@@ -325,7 +325,7 @@ PSYNC_NOINLINE static void psync_apipool_dump_socket(psync_socket_t *api) {
 
 #endif
 
-void psync_apipool_release(psync_socket_t *api) {
+void psync_apipool_release(psock_t *api) {
 #if IS_DEBUG
   if (unlikely(psock_readable(api))) {
     debug(D_WARNING, "released socket with pending data to read");
@@ -340,7 +340,7 @@ void psync_apipool_release(psync_socket_t *api) {
     psync_ret_api(api);
 }
 
-void psync_apipool_release_bad(psync_socket_t *api) { psync_ret_api(api); }
+void psync_apipool_release_bad(psock_t *api) { psync_ret_api(api); }
 
 static void rm_all(void *vpath, ppath_stat *st) {
   char *path;
@@ -674,9 +674,9 @@ err0:
   return PSYNC_NET_PERMFAIL;
 }
 
-psync_socket_t *psync_socket_connect_download(const char *host, int unsigned port,
+psock_t *psync_socket_connect_download(const char *host, int unsigned port,
                                             int usessl) {
-  psync_socket_t *sock;
+  psock_t *sock;
   int64_t dwlspeed;
   sock = psock_connect(host, port, usessl);
   if (sock) {
@@ -690,8 +690,8 @@ psync_socket_t *psync_socket_connect_download(const char *host, int unsigned por
   return sock;
 }
 
-psync_socket_t *psync_api_connect_download() {
-  psync_socket_t *sock;
+psock_t *psync_api_connect_download() {
+  psock_t *sock;
   int64_t dwlspeed;
   sock = psync_api_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
   if (sock) {
@@ -705,7 +705,7 @@ psync_socket_t *psync_api_connect_download() {
   return sock;
 }
 
-void psync_socket_close_download(psync_socket_t *sock) {
+void psync_socket_close_download(psock_t *sock) {
   psock_close(sock);
 }
 
@@ -742,7 +742,7 @@ static unsigned long get_download_bytes_this_sec() {
     return 0;
 }
 
-static int psync_socket_readall_download_th(psync_socket_t *sock, void *buff,
+static int psync_socket_readall_download_th(psock_t *sock, void *buff,
                                             int num, int th) {
   long dwlspeed, readbytes, pending, lpending, rd, rrd;
   unsigned long thissec, ds;
@@ -800,11 +800,11 @@ static int psync_socket_readall_download_th(psync_socket_t *sock, void *buff,
   return readbytes;
 }
 
-int psync_socket_readall_download(psync_socket_t *sock, void *buff, int num) {
+int psync_socket_readall_download(psock_t *sock, void *buff, int num) {
   return psync_socket_readall_download_th(sock, buff, num, 0);
 }
 
-int psync_socket_readall_download_thread(psync_socket_t *sock, void *buff,
+int psync_socket_readall_download_thread(psock_t *sock, void *buff,
                                          int num) {
   return psync_socket_readall_download_th(sock, buff, num, 1);
 }
@@ -837,17 +837,17 @@ static unsigned long get_upload_bytes_this_sec() {
     return 0;
 }
 
-// static void set_send_buf(psync_socket_t *sock){
+// static void set_send_buf(psock_t *sock){
 //   psock_set_sendbuf(sock,
 //   dyn_upload_speed*PSYNC_UPL_AUTO_SHAPER_BUF_PER/100);
 // }
 
-int psync_set_default_sendbuf(psync_socket_t *sock) {
+int psync_set_default_sendbuf(psock_t *sock) {
   //  return psock_set_sendbuf(sock, PSYNC_DEFAULT_SEND_BUFF);
   return 0;
 }
 
-long psync_socket_writeall_upload(psync_socket_t *sock, const void *buff,
+long psync_socket_writeall_upload(psock_t *sock, const void *buff,
                                          int num) {
   long uplspeed, writebytes, wr, wwr;
   unsigned long thissec;
@@ -911,7 +911,7 @@ long psync_socket_writeall_upload(psync_socket_t *sock, const void *buff,
 psync_http_socket *psync_http_connect(const char *host, const char *path,
                                       uint64_t from, uint64_t to,
                                       const char *addhdr) {
-  psync_socket_t *sock;
+  psock_t *sock;
   psync_http_socket *hsock;
   char *readbuff, *ptr, *end, *key, *val;
   int64_t clen;
@@ -922,7 +922,7 @@ psync_http_socket *psync_http_connect(const char *host, const char *path,
   usessl = psync_setting_get_bool(_PS(usessl));
   cl = snprintf(cachekey, sizeof(cachekey) - 1, "HTTP%d-%s", usessl, host) + 1;
   cachekey[sizeof(cachekey) - 1] = 0;
-  sock = (psync_socket_t *)psync_cache_get(cachekey);
+  sock = (psock_t *)psync_cache_get(cachekey);
   if (!sock) {
     sock = psync_socket_connect_download(host, usessl ? 443 : 80, usessl);
     if (!sock)
@@ -1096,7 +1096,7 @@ int psync_http_readall(psync_http_socket *http, void *buff, int num) {
 typedef struct {
   psync_tree tree;
   pthread_cond_t *cond;
-  psync_socket_t **res;
+  psock_t **res;
   int usessl;
   int haswaiter;
   int ready;
@@ -1108,7 +1108,7 @@ psync_tree *connect_cache_tree = PSYNC_TREE_EMPTY;
 
 static void connect_cache_thread(void *ptr) {
   connect_cache_tree_node_t *node;
-  psync_socket_t *sock;
+  psock_t *sock;
   node = (connect_cache_tree_node_t *)ptr;
   sock =
       psock_connect(node->host, node->usessl ? 443 : 80, node->usessl);
@@ -1225,7 +1225,7 @@ void psync_http_connect_and_cache_host(const char *host) {
     debug(D_NOTICE, "connection for %s is already in progress", host);
 }
 
-psync_socket_t *connect_cache_wait_for_http_connection(const char *host,
+psock_t *connect_cache_wait_for_http_connection(const char *host,
                                                      int usessl) {
   connect_cache_tree_node_t *node;
   psync_tree *e;
@@ -1251,7 +1251,7 @@ psync_socket_t *connect_cache_wait_for_http_connection(const char *host,
              (node = connect_cache_neighbour_is_free_duplicate(e, host))) &&
             node->usessl == usessl) {
           pthread_cond_t cond;
-          psync_socket_t *sock;
+          psock_t *sock;
           pthread_cond_init(&cond, NULL);
           node->haswaiter = 1;
           node->cond = &cond;
@@ -1275,7 +1275,7 @@ psync_socket_t *connect_cache_wait_for_http_connection(const char *host,
 
 psync_http_socket *psync_http_connect_multihost(const binresult *hosts,
                                                 const char **host) {
-  psync_socket_t *sock;
+  psock_t *sock;
   psync_http_socket *hsock;
   uint32_t i;
   int usessl, cl;
@@ -1287,7 +1287,7 @@ psync_http_socket *psync_http_connect_multihost(const binresult *hosts,
                   hosts->array[i]->str) +
          1;
     cachekey[sizeof(cachekey) - 1] = 0;
-    sock = (psync_socket_t *)psync_cache_get(cachekey);
+    sock = (psock_t *)psync_cache_get(cachekey);
     if (sock) {
       if (unlikely_log(psock_is_broken(sock->sock))) {
         psock_close_bad(sock);
@@ -1346,7 +1346,7 @@ psync_http_socket *psync_http_connect_multihost(const binresult *hosts,
 psync_http_socket *
 psync_http_connect_multihost_from_cache(const binresult *hosts,
                                         const char **host) {
-  psync_socket_t *sock;
+  psock_t *sock;
   psync_http_socket *hsock;
   uint32_t i;
   int usessl, cl;
@@ -1358,7 +1358,7 @@ psync_http_connect_multihost_from_cache(const binresult *hosts,
                   hosts->array[i]->str) +
          1;
     cachekey[sizeof(cachekey) - 1] = 0;
-    sock = (psync_socket_t *)psync_cache_get(cachekey);
+    sock = (psock_t *)psync_cache_get(cachekey);
     if (sock) {
       if (unlikely_log(psock_is_broken(sock->sock))) {
         psock_close_bad(sock);
@@ -1586,7 +1586,7 @@ char *psync_url_decode(const char *s) {
   return ret;
 }
 
-static int psync_net_get_checksums(psync_socket_t *api, psync_fileid_t fileid,
+static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
                                    uint64_t hash,
                                    psync_file_checksums **checksums) {
   binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("fileid", fileid),
@@ -1672,7 +1672,7 @@ err0:
   return PSYNC_NET_TEMPFAIL;
 }
 
-static int psync_net_get_upload_checksums(psync_socket_t *api,
+static int psync_net_get_upload_checksums(psock_t *api,
                                           psync_uploadid_t uploadid,
                                           psync_file_checksums **checksums) {
   binparam params[] = {P_STR("auth", psync_my_auth),
@@ -2325,7 +2325,7 @@ static void merge_list_to_element(psync_upload_range_list_t *le,
   }
 }
 
-int psync_net_scan_file_for_blocks(psync_socket_t *api, psync_list *rlist,
+int psync_net_scan_file_for_blocks(psock_t *api, psync_list *rlist,
                                    psync_fileid_t fileid, uint64_t filehash,
                                    int fd) {
   psync_file_checksums *checksums;
@@ -2367,7 +2367,7 @@ int psync_net_scan_file_for_blocks(psync_socket_t *api, psync_list *rlist,
   return PSYNC_NET_OK;
 }
 
-int psync_net_scan_upload_for_blocks(psync_socket_t *api, psync_list *rlist,
+int psync_net_scan_upload_for_blocks(psock_t *api, psync_list *rlist,
                                      psync_uploadid_t uploadid,
                                      int fd) {
   psync_file_checksums *checksums;
@@ -2430,7 +2430,7 @@ static int download_file_revisions(psync_fileid_t fileid) {
   binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("fileid", fileid),
                        P_BOOL("showchecksums", 1),
                        P_STR("timeformat", "timestamp")};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   const binresult *revs, *meta;
   psync_sql_res *fr, *hc;
@@ -2563,7 +2563,7 @@ int psync_get_upload_checksum(psync_uploadid_t uploadid, unsigned char *uhash,
                               uint64_t *usize) {
   binparam params[] = {P_STR("auth", psync_my_auth),
                        P_NUM("uploadid", uploadid)};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   api = psync_apipool_get();
   if (unlikely(!api))
@@ -2661,7 +2661,7 @@ void psync_netlibs_init() {
 int psync_do_run_command_res(const char *cmd, size_t cmdlen,
                              const binparam *params, size_t paramscnt,
                              char **err) {
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   uint64_t result;
   int tries;

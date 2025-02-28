@@ -100,7 +100,7 @@ typedef struct {
 typedef struct _async_thread_params_t {
   psync_deflate_t *enc;
   psync_deflate_t *dec;
-  psync_socket_t *api;
+  psock_t *api;
   psync_tree *streams;
   uint64_t datapendingsince;
   int (*process_buf)(struct _async_thread_params_t *);
@@ -719,7 +719,7 @@ static int psync_async_start_thread_locked() {
   async_thread_params_t *tparams;
   psync_deflate_t *enc, *dec;
   binresult *res;
-  psync_socket_t *api;
+  psock_t *api;
   int pair[2];
   int tries;
   tries = 0;

@@ -100,9 +100,9 @@ static const binresult NUM_SMALL[VSMALL_NUMBER_NUM] = {
 
 static uint32_t connfailures = 0;
 
-psync_socket_t *psync_api_connect(const char *hostname, int usessl) {
+psock_t *psync_api_connect(const char *hostname, int usessl) {
   static time_t notuntil = 0;
-  psync_socket_t *ret;
+  psock_t *ret;
   const char *userapi = psync_setting_get_string(_PS(api_server));
   if (psync_timer_time() > notuntil || !userapi) {
     ret = psock_connect(
@@ -385,7 +385,7 @@ static binresult *parse_result(unsigned char *data, size_t datalen) {
   return res;
 }
 
-binresult *get_result(psync_socket_t *sock) {
+binresult *get_result(psock_t *sock) {
   unsigned char *data;
   binresult *res;
   uint32_t ressize;
@@ -408,7 +408,7 @@ binresult *get_result(psync_socket_t *sock) {
   return res;
 }
 
-binresult *get_result_thread(psync_socket_t *sock) {
+binresult *get_result_thread(psock_t *sock) {
   unsigned char *data;
   binresult *res;
   uint32_t ressize;
@@ -438,7 +438,7 @@ void async_result_reader_destroy(async_result_reader *reader) {
     psync_free(reader->data);
 }
 
-int get_result_async(psync_socket_t *sock, async_result_reader *reader) {
+int get_result_async(psock_t *sock, async_result_reader *reader) {
   int rd;
 again:
   rd = psock_read_noblock(sock, reader->data + reader->bytesread,
@@ -528,7 +528,7 @@ unsigned char *do_prepare_command(const char *command, size_t cmdlen,
   return sdata;
 }
 
-binresult *do_send_command(psync_socket_t *sock, const char *command,
+binresult *do_send_command(psock_t *sock, const char *command,
                            size_t cmdlen, const binparam *params,
                            size_t paramcnt, int64_t datalen, int readres) {
   unsigned char *sdata;

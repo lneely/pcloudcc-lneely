@@ -480,9 +480,9 @@ static int wait_sock_ready_for_ssl(int sock) {
 }
 
 
-int psync_socket_try_write_buffer(psync_socket_t *sock) {
+int psock_try_write_buffer(psock_t *sock) {
   if (sock->buffer) {
-    psync_socket_buffer *b;
+    psock_buf_t *b;
     int wrt, cw;
     wrt = 0;
     while ((b = sock->buffer)) {
@@ -531,16 +531,16 @@ int psync_socket_try_write_buffer(psync_socket_t *sock) {
     return 0;
 }
 
-int psync_socket_try_write_buffer_thread(psync_socket_t *sock) {
+int psock_try_write_buffer_thread(psock_t *sock) {
   int ret;
   pthread_mutex_lock(&mutex);
-  ret = psync_socket_try_write_buffer(sock);
+  ret = psock_try_write_buffer(sock);
   pthread_mutex_unlock(&mutex);
   return ret;
 }
 
-int psock_readable(psync_socket_t *sock) {
-  psync_socket_try_write_buffer(sock);
+int psock_readable(psock_t *sock) {
+  psock_try_write_buffer(sock);
   if (sock->ssl && psync_ssl_pendingdata(sock->ssl))
     return 1;
   else if (psync_wait_socket_readable(sock->sock, 0))
@@ -551,7 +551,7 @@ int psock_readable(psync_socket_t *sock) {
   }
 }
 
-int psock_writable(psync_socket_t *sock) {
+int psock_writable(psock_t *sock) {
   if (sock->buffer)
     return 1;
   return !psync_wait_socket_writable(sock->sock, 0);
@@ -564,9 +564,9 @@ int psock_create(int domain, int type, int protocol) {
   return ret;
 }
 
-psync_socket_t *psock_connect(const char *host, int unsigned port,
+psock_t *psock_connect(const char *host, int unsigned port,
                                    int ssl) {
-  psync_socket_t *ret;
+  psock_t *ret;
   void *sslc;
   int sock;
   char sport[8];
@@ -593,7 +593,7 @@ psync_socket_t *psock_connect(const char *host, int unsigned port,
   } else {
     sslc = NULL;
   }
-  ret = psync_new(psync_socket_t);
+  ret = psync_new(psock_t);
   ret->ssl = sslc;
   ret->buffer = NULL;
   ret->sock = sock;
@@ -606,7 +606,7 @@ int psock_wait_write_timeout(int sock) {
 }
 
 
-void psock_close(psync_socket_t *sock) {
+void psock_close(psock_t *sock) {
   if (sock->ssl)
     while (psync_ssl_shutdown(sock->ssl) == PSYNC_SSL_NEED_FINISH)
       if (wait_sock_ready_for_ssl(sock->sock)) {
@@ -618,7 +618,7 @@ void psock_close(psync_socket_t *sock) {
   psync_free(sock);
 }
 
-void psock_close_bad(psync_socket_t *sock) {
+void psock_close_bad(psock_t *sock) {
   if (sock->ssl)
     psync_ssl_free(sock->ssl);
   psock_clear_write_buffered(sock);
@@ -626,11 +626,11 @@ void psock_close_bad(psync_socket_t *sock) {
   psync_free(sock);
 }
 
-void psock_set_write_buffered(psync_socket_t *sock) {
-  psync_socket_buffer *sb;
+void psock_set_write_buffered(psock_t *sock) {
+  psock_buf_t *sb;
   if (sock->buffer)
     return;
-  sb = (psync_socket_buffer *)psync_malloc(offsetof(psync_socket_buffer, buff) +
+  sb = (psock_buf_t *)psync_malloc(offsetof(psock_buf_t, buff) +
                                            PSYNC_FIRST_SOCK_WRITE_BUFF_SIZE);
   sb->next = NULL;
   sb->size = PSYNC_FIRST_SOCK_WRITE_BUFF_SIZE;
@@ -639,14 +639,14 @@ void psock_set_write_buffered(psync_socket_t *sock) {
   sock->buffer = sb;
 }
 
-void psock_set_write_buffered_thread(psync_socket_t *sock) {
+void psock_set_write_buffered_thread(psock_t *sock) {
   pthread_mutex_lock(&mutex);
   psock_set_write_buffered(sock);
   pthread_mutex_unlock(&mutex);
 }
 
-void psock_clear_write_buffered(psync_socket_t *sock) {
-  psync_socket_buffer *nb;
+void psock_clear_write_buffered(psock_t *sock) {
+  psock_buf_t *nb;
   while (sock->buffer) {
     nb = sock->buffer->next;
     free(sock->buffer);
@@ -654,13 +654,13 @@ void psock_clear_write_buffered(psync_socket_t *sock) {
   }
 }
 
-void psock_clear_write_buffered_thread(psync_socket_t *sock) {
+void psock_clear_write_buffered_thread(psock_t *sock) {
   pthread_mutex_lock(&mutex);
   psock_clear_write_buffered(sock);
   pthread_mutex_unlock(&mutex);
 }
 
-int psock_set_recvbuf(psync_socket_t *sock, int bufsize) {
+int psock_set_recvbuf(psock_t *sock, int bufsize) {
 #if defined(SO_RCVBUF) && defined(SOL_SOCKET)
   return setsockopt(sock->sock, SOL_SOCKET, SO_RCVBUF, (const char *)&bufsize,
                     sizeof(bufsize));
@@ -669,7 +669,7 @@ int psock_set_recvbuf(psync_socket_t *sock, int bufsize) {
 #endif
 }
 
-int psock_set_sendbuf(psync_socket_t *sock, int bufsize) {
+int psock_set_sendbuf(psock_t *sock, int bufsize) {
 #if defined(SO_SNDBUF) && defined(SOL_SOCKET)
   return setsockopt(sock->sock, SOL_SOCKET, SO_SNDBUF, (const char *)&bufsize,
                     sizeof(bufsize));
@@ -678,14 +678,14 @@ int psock_set_sendbuf(psync_socket_t *sock, int bufsize) {
 #endif
 }
 
-int psock_is_ssl(psync_socket_t *sock) {
+int psock_is_ssl(psock_t *sock) {
   if (sock->ssl)
     return 1;
   else
     return 0;
 }
 
-int psock_pendingdata(psync_socket_t *sock) {
+int psock_pendingdata(psock_t *sock) {
   if (sock->pending)
     return 1;
   if (sock->ssl)
@@ -694,7 +694,7 @@ int psock_pendingdata(psync_socket_t *sock) {
     return 0;
 }
 
-int psock_pendingdata_buf(psync_socket_t *sock) {
+int psock_pendingdata_buf(psock_t *sock) {
   int ret;
 #if defined(FIONREAD)
   if (ioctl(sock->sock, FIONREAD, &ret))
@@ -707,7 +707,7 @@ int psock_pendingdata_buf(psync_socket_t *sock) {
   return ret;
 }
 
-int psock_pendingdata_buf_thread(psync_socket_t *sock) {
+int psock_pendingdata_buf_thread(psock_t *sock) {
   int ret;
   pthread_mutex_lock(&mutex);
   ret = psock_pendingdata_buf(sock);
@@ -716,15 +716,15 @@ int psock_pendingdata_buf_thread(psync_socket_t *sock) {
 }
 
 
-static int psync_socket_read_ssl(psync_socket_t *sock, void *buff, int num) {
+static int psync_socket_read_ssl(psock_t *sock, void *buff, int num) {
   int r;
-  psync_socket_try_write_buffer(sock);
+  psock_try_write_buffer(sock);
   if (!psync_ssl_pendingdata(sock->ssl) && !sock->pending &&
       psock_wait_read_timeout(sock->sock))
     return -1;
   sock->pending = 0;
   while (1) {
-    psync_socket_try_write_buffer(sock);
+    psock_try_write_buffer(sock);
     r = psync_ssl_read(sock->ssl, buff, num);
     if (r == PSYNC_SSL_FAIL) {
       if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
@@ -744,17 +744,17 @@ static int psync_socket_read_ssl(psync_socket_t *sock, void *buff, int num) {
   }
 }
 
-static int psync_socket_read_plain(psync_socket_t *sock, void *buff, int num) {
+static int psync_socket_read_plain(psock_t *sock, void *buff, int num) {
   int r;
   while (1) {
-    psync_socket_try_write_buffer(sock);
+    psock_try_write_buffer(sock);
     if (sock->pending)
       sock->pending = 0;
     else if (psock_wait_read_timeout(sock->sock)) {
       debug(D_WARNING, "timeouted on socket with pending buffers");
       return -1;
     } else
-      psync_socket_try_write_buffer(sock);
+      psock_try_write_buffer(sock);
     r = read(sock->sock, buff, num);
     if (r == SOCKET_ERROR) {
       if (likely_log(errno == EWOULDBLOCK ||
@@ -767,14 +767,14 @@ static int psync_socket_read_plain(psync_socket_t *sock, void *buff, int num) {
   }
 }
 
-int psock_read(psync_socket_t *sock, void *buff, int num) {
+int psock_read(psock_t *sock, void *buff, int num) {
   if (sock->ssl)
     return psync_socket_read_ssl(sock, buff, num);
   else
     return psync_socket_read_plain(sock, buff, num);
 }
 
-static int psync_socket_read_noblock_ssl(psync_socket_t *sock, void *buff,
+static int psync_socket_read_noblock_ssl(psock_t *sock, void *buff,
                                          int num) {
   int r;
   r = psync_ssl_read(sock->ssl, buff, num);
@@ -791,7 +791,7 @@ static int psync_socket_read_noblock_ssl(psync_socket_t *sock, void *buff,
     return r;
 }
 
-static int psync_socket_read_noblock_plain(psync_socket_t *sock, void *buff,
+static int psync_socket_read_noblock_plain(psock_t *sock, void *buff,
                                            int num) {
   int r;
   r = read(sock->sock, buff, num);
@@ -806,19 +806,19 @@ static int psync_socket_read_noblock_plain(psync_socket_t *sock, void *buff,
     return r;
 }
 
-int psock_read_noblock(psync_socket_t *sock, void *buff, int num) {
-  psync_socket_try_write_buffer(sock);
+int psock_read_noblock(psock_t *sock, void *buff, int num) {
+  psock_try_write_buffer(sock);
   if (sock->ssl)
     return psync_socket_read_noblock_ssl(sock, buff, num);
   else
     return psync_socket_read_noblock_plain(sock, buff, num);
 }
 
-static int psync_socket_read_ssl_thread(psync_socket_t *sock, void *buff,
+static int psync_socket_read_ssl_thread(psock_t *sock, void *buff,
                                         int num) {
   int r;
   pthread_mutex_lock(&mutex);
-  psync_socket_try_write_buffer(sock);
+  psock_try_write_buffer(sock);
   pthread_mutex_unlock(&mutex);
   if (!psync_ssl_pendingdata(sock->ssl) && !sock->pending &&
       psock_wait_read_timeout(sock->sock))
@@ -826,7 +826,7 @@ static int psync_socket_read_ssl_thread(psync_socket_t *sock, void *buff,
   sock->pending = 0;
   while (1) {
     pthread_mutex_lock(&mutex);
-    psync_socket_try_write_buffer(sock);
+    psock_try_write_buffer(sock);
     r = psync_ssl_read(sock->ssl, buff, num);
     pthread_mutex_unlock(&mutex);
     if (r == PSYNC_SSL_FAIL) {
@@ -845,11 +845,11 @@ static int psync_socket_read_ssl_thread(psync_socket_t *sock, void *buff,
   }
 }
 
-static int psync_socket_read_plain_thread(psync_socket_t *sock, void *buff,
+static int psync_socket_read_plain_thread(psock_t *sock, void *buff,
                                           int num) {
   int r;
   pthread_mutex_lock(&mutex);
-  psync_socket_try_write_buffer(sock);
+  psock_try_write_buffer(sock);
   pthread_mutex_unlock(&mutex);
   while (1) {
     if (sock->pending)
@@ -857,7 +857,7 @@ static int psync_socket_read_plain_thread(psync_socket_t *sock, void *buff,
     else if (psock_wait_read_timeout(sock->sock))
       return -1;
     pthread_mutex_lock(&mutex);
-    psync_socket_try_write_buffer(sock);
+    psock_try_write_buffer(sock);
     r = read(sock->sock, buff, num);
     pthread_mutex_unlock(&mutex);
     if (r == SOCKET_ERROR) {
@@ -871,16 +871,16 @@ static int psync_socket_read_plain_thread(psync_socket_t *sock, void *buff,
   }
 }
 
-int psock_read_thread(psync_socket_t *sock, void *buff, int num) {
+int psock_read_thread(psock_t *sock, void *buff, int num) {
   if (sock->ssl)
     return psync_socket_read_ssl_thread(sock, buff, num);
   else
     return psync_socket_read_plain_thread(sock, buff, num);
 }
 
-static int psync_socket_write_to_buf(psync_socket_t *sock, const void *buff,
+static int psync_socket_write_to_buf(psock_t *sock, const void *buff,
                                      int num) {
-  psync_socket_buffer *b;
+  psock_buf_t *b;
   assert(sock->buffer);
   b = sock->buffer;
   while (b->next)
@@ -895,8 +895,8 @@ static int psync_socket_write_to_buf(psync_socket_t *sock, const void *buff,
     do {
       wr = b->size - b->woffset;
       if (!wr) {
-        b->next = (psync_socket_buffer *)psync_malloc(
-            offsetof(psync_socket_buffer, buff) +
+        b->next = (psock_buf_t *)psync_malloc(
+            offsetof(psock_buf_t, buff) +
             PSYNC_SECOND_SOCK_WRITE_BUFF_SIZE);
         b = b->next;
         b->next = NULL;
@@ -916,7 +916,7 @@ static int psync_socket_write_to_buf(psync_socket_t *sock, const void *buff,
   }
 }
 
-int psock_write(psync_socket_t *sock, const void *buff, int num) {
+int psock_write(psock_t *sock, const void *buff, int num) {
   int r;
   if (sock->buffer)
     return psync_socket_write_to_buf(sock, buff, num);
@@ -944,11 +944,11 @@ int psock_write(psync_socket_t *sock, const void *buff, int num) {
   return r;
 }
 
-static int psync_socket_readall_ssl(psync_socket_t *sock, void *buff, int num) {
+static int psync_socket_readall_ssl(psock_t *sock, void *buff, int num) {
   int br, r;
   br = 0;
 
-  psync_socket_try_write_buffer(sock);
+  psock_try_write_buffer(sock);
 
   if (!psync_ssl_pendingdata(sock->ssl) && !sock->pending &&
       psock_wait_read_timeout(sock->sock)) {
@@ -958,7 +958,7 @@ static int psync_socket_readall_ssl(psync_socket_t *sock, void *buff, int num) {
   sock->pending = 0;
 
   while (br < num) {
-    psync_socket_try_write_buffer(sock);
+    psock_try_write_buffer(sock);
 
     r = psync_ssl_read(sock->ssl, (char *)buff + br, num - br);
 
@@ -982,17 +982,17 @@ static int psync_socket_readall_ssl(psync_socket_t *sock, void *buff, int num) {
   return br;
 }
 
-static int psync_socket_readall_plain(psync_socket_t *sock, void *buff, int num) {
+static int psync_socket_readall_plain(psock_t *sock, void *buff, int num) {
   int br, r;
   br = 0;
   while (br < num) {
-    psync_socket_try_write_buffer(sock);
+    psock_try_write_buffer(sock);
     if (sock->pending)
       sock->pending = 0;
     else if (psock_wait_read_timeout(sock->sock))
       return -1;
     else
-      psync_socket_try_write_buffer(sock);
+      psock_try_write_buffer(sock);
     r = read(sock->sock, (char *)buff + br, num - br);
     if (r == SOCKET_ERROR) {
       if (likely_log(errno == EWOULDBLOCK ||
@@ -1008,7 +1008,7 @@ static int psync_socket_readall_plain(psync_socket_t *sock, void *buff, int num)
   return br;
 }
 
-int psock_readall(psync_socket_t *sock, void *buff, int num) {
+int psock_readall(psock_t *sock, void *buff, int num) {
   if (sock->ssl) {
     return psync_socket_readall_ssl(sock, buff, num);
   } else {
@@ -1016,7 +1016,7 @@ int psock_readall(psync_socket_t *sock, void *buff, int num) {
   }
 }
 
-static int psync_socket_writeall_ssl(psync_socket_t *sock, const void *buff,
+static int psync_socket_writeall_ssl(psock_t *sock, const void *buff,
                                      int num) {
   int br, r;
   br = 0;
@@ -1061,7 +1061,7 @@ static int psync_socket_writeall_plain(int sock, const void *buff,
   return br;
 }
 
-int psock_writeall(psync_socket_t *sock, const void *buff, int num) {
+int psock_writeall(psock_t *sock, const void *buff, int num) {
   if (sock->buffer)
     return psync_socket_write_to_buf(sock, buff, num);
   if (sock->ssl)
@@ -1070,12 +1070,12 @@ int psock_writeall(psync_socket_t *sock, const void *buff, int num) {
     return psync_socket_writeall_plain(sock->sock, buff, num);
 }
 
-static int psync_socket_readall_ssl_thread(psync_socket_t *sock, void *buff,
+static int psync_socket_readall_ssl_thread(psock_t *sock, void *buff,
                                            int num) {
   int br, r;
   br = 0;
   pthread_mutex_lock(&mutex);
-  psync_socket_try_write_buffer(sock);
+  psock_try_write_buffer(sock);
   r = psync_ssl_pendingdata(sock->ssl);
   pthread_mutex_unlock(&mutex);
   if (!r && !sock->pending && psock_wait_read_timeout(sock->sock))
@@ -1083,7 +1083,7 @@ static int psync_socket_readall_ssl_thread(psync_socket_t *sock, void *buff,
   sock->pending = 0;
   while (br < num) {
     pthread_mutex_lock(&mutex);
-    psync_socket_try_write_buffer(sock);
+    psock_try_write_buffer(sock);
     r = psync_ssl_read(sock->ssl, (char *)buff + br, num - br);
     pthread_mutex_unlock(&mutex);
     if (r == PSYNC_SSL_FAIL) {
@@ -1105,12 +1105,12 @@ static int psync_socket_readall_ssl_thread(psync_socket_t *sock, void *buff,
   return br;
 }
 
-static int psync_socket_readall_plain_thread(psync_socket_t *sock, void *buff,
+static int psync_socket_readall_plain_thread(psock_t *sock, void *buff,
                                              int num) {
   int br, r;
   br = 0;
   pthread_mutex_lock(&mutex);
-  psync_socket_try_write_buffer(sock);
+  psock_try_write_buffer(sock);
   pthread_mutex_unlock(&mutex);
   while (br < num) {
     if (sock->pending)
@@ -1118,7 +1118,7 @@ static int psync_socket_readall_plain_thread(psync_socket_t *sock, void *buff,
     else if (psock_wait_read_timeout(sock->sock))
       return -1;
     pthread_mutex_lock(&mutex);
-    psync_socket_try_write_buffer(sock);
+    psock_try_write_buffer(sock);
     r = read(sock->sock, (char *)buff + br, num - br);
     pthread_mutex_unlock(&mutex);
     if (r == SOCKET_ERROR) {
@@ -1135,14 +1135,14 @@ static int psync_socket_readall_plain_thread(psync_socket_t *sock, void *buff,
   return br;
 }
 
-int psock_readall_thread(psync_socket_t *sock, void *buff, int num) {
+int psock_readall_thread(psock_t *sock, void *buff, int num) {
   if (sock->ssl)
     return psync_socket_readall_ssl_thread(sock, buff, num);
   else
     return psync_socket_readall_plain_thread(sock, buff, num);
 }
 
-static int psync_socket_writeall_ssl_thread(psync_socket_t *sock,
+static int psync_socket_writeall_ssl_thread(psock_t *sock,
                                             const void *buff, int num) {
   int br, r;
   br = 0;
@@ -1172,7 +1172,7 @@ static int psync_socket_writeall_ssl_thread(psync_socket_t *sock,
   return br;
 }
 
-static int psync_socket_writeall_plain_thread(psync_socket_t *sock,
+static int psync_socket_writeall_plain_thread(psock_t *sock,
                                               const void *buff, int num) {
   int br, r;
   br = 0;
@@ -1197,7 +1197,7 @@ static int psync_socket_writeall_plain_thread(psync_socket_t *sock,
   return br;
 }
 
-int psock_writeall_thread(psync_socket_t *sock, const void *buff,
+int psock_writeall_thread(psock_t *sock, const void *buff,
                                  int num) {
   if (sock->ssl)
     return psync_socket_writeall_ssl_thread(sock, buff, num);
@@ -1218,8 +1218,8 @@ static void copy_address(struct sockaddr_storage *dst,
            sizeof(((struct sockaddr_in6 *)dst)->sin6_addr));
 }
 
-psock_interface_list_t *psock_list_adapters() {
-  psock_interface_list_t *ret;
+psock_ifaces_t *psock_list_adapters() {
+  psock_ifaces_t *ret;
   size_t cnt;
   struct ifaddrs *addrs, *addr;
   sa_family_t family;
@@ -1237,11 +1237,11 @@ psock_interface_list_t *psock_list_adapters() {
     }
     addr = addr->ifa_next;
   }
-  ret = psync_malloc(offsetof(psock_interface_list_t, interfaces) +
-                     sizeof(psync_interface_t) * cnt);
+  ret = psync_malloc(offsetof(psock_ifaces_t, interfaces) +
+                     sizeof(psock_iface_t) * cnt);
   memset(ret, 0,
-         offsetof(psock_interface_list_t, interfaces) +
-             sizeof(psync_interface_t) * cnt);
+         offsetof(psock_ifaces_t, interfaces) +
+             sizeof(psock_iface_t) * cnt);
   ret->interfacecnt = cnt;
   addr = addrs;
   cnt = 0;
@@ -1266,7 +1266,7 @@ psock_interface_list_t *psock_list_adapters() {
   freeifaddrs(addrs);
   return ret;
 empty:
-  ret = psync_malloc(offsetof(psock_interface_list_t, interfaces));
+  ret = psync_malloc(offsetof(psock_ifaces_t, interfaces));
   ret->interfacecnt = 0;
   return ret;
 }

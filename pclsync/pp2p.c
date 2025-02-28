@@ -304,7 +304,7 @@ static int check_token(char *token, uint32_t tlen, unsigned char *key,
   binparam params[] = {
       P_LSTR(PSYNC_CHECKSUM, hashhex, PSYNC_HASH_DIGEST_HEXLEN),
       P_LSTR("keydata", key, keylen), P_LSTR("token", token, tlen)};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   uint64_t result;
   api = psync_apipool_get();
@@ -625,7 +625,7 @@ static int psync_p2p_get_download_token(psync_fileid_t fileid,
       P_LSTR(PSYNC_CHECKSUM, filehashhex, PSYNC_HASH_DIGEST_HEXLEN),
       P_LSTR("keydata", psync_rsa_public_bin->data,
              psync_rsa_public_bin->datalen)};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   const binresult *ctoken;
   *token = NULL; /* especially for gcc */
@@ -740,7 +740,7 @@ int psync_p2p_check_download(psync_fileid_t fileid,
   packet_get pct2;
   packet_check_resp resp;
   struct timeval tv;
-  psock_interface_list_t *il;
+  psock_ifaces_t *il;
   int *sockets;
   size_t i, tlen;
   int sock, msock;

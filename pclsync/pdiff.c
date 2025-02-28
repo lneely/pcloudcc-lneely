@@ -176,7 +176,7 @@ static void psync_notify_cache_change(psync_changetype_t event) {
 }
 
 static binresult *
-get_userinfo_user_digest(psync_socket_t *sock, const char *username,
+get_userinfo_user_digest(psock_t *sock, const char *username,
                          size_t userlen, const char *pwddig, const char *digest,
                          uint32_t diglen, const char *osversion,
                          const char *appversion, const char *deviceid,
@@ -199,7 +199,7 @@ get_userinfo_user_digest(psync_socket_t *sock, const char *username,
 }
 
 static binresult *
-get_userinfo_user_pass(psync_socket_t *sock, const char *username,
+get_userinfo_user_pass(psock_t *sock, const char *username,
                        const char *password, const char *osversion,
                        const char *appversion, const char *deviceid,
                        const char *devicestring) {
@@ -266,7 +266,7 @@ static int check_active_subscribtion(const binresult *res) {
   return 0;
 }
 
-static int check_user_relocated(uint64_t luserid, psync_socket_t *sock) {
+static int check_user_relocated(uint64_t luserid, psock_t *sock) {
   binresult *res;
   const binresult *userids;
   uint64_t result, userid;
@@ -307,11 +307,11 @@ static int check_user_relocated(uint64_t luserid, psync_socket_t *sock) {
   return 0;
 }
 
-static psync_socket_t *get_connected_socket() {
+static psock_t *get_connected_socket() {
   char *auth, *user, *pass, *deviceid, *osversion, *devicestring, *binapi,
       *chrUserid;
   const char *appversion;
-  psync_socket_t *sock;
+  psock_t *sock;
   binresult *res;
   const binresult *cres;
   psync_sql_res *q;
@@ -2547,7 +2547,7 @@ static int setup_exeptions() {
   return pfds[0];
 }
 
-static int send_diff_command(psync_socket_t *sock, subscribed_ids ids) {
+static int send_diff_command(psock_t *sock, subscribed_ids ids) {
   if (psync_notifications_running()) {
     const char *ts = psync_notifications_get_thumb_size();
     if (ts) {
@@ -2627,7 +2627,7 @@ static int send_diff_command(psync_socket_t *sock, subscribed_ids ids) {
   }
 }
 
-static void handle_exception(psync_socket_t **sock, subscribed_ids *ids,
+static void handle_exception(psock_t **sock, subscribed_ids *ids,
                              char ex) {
   if (ex == 'c') {
     if (last_event >= psync_timer_time() - 1)
@@ -2812,7 +2812,7 @@ static void psync_run_analyze_if_needed() {
   }
 }
 
-static int psync_diff_check_quota(psync_socket_t *sock) {
+static int psync_diff_check_quota(psock_t *sock) {
   binparam diffparams[] = {P_STR("timeformat", "timestamp"),
                            P_BOOL("getapiserver", 1)};
   binresult *res;
@@ -2847,11 +2847,11 @@ static int psync_diff_check_quota(psync_socket_t *sock) {
 
 static void psync_diff_adapter_hash(void *out) {
   psync_fast_hash256_ctx ctx;
-  psock_interface_list_t *list;
+  psock_ifaces_t *list;
   list = psock_list_adapters();
   psync_fast_hash256_init(&ctx);
   psync_fast_hash256_update(&ctx, list->interfaces,
-                            list->interfacecnt * sizeof(psync_interface_t));
+                            list->interfacecnt * sizeof(psock_iface_t));
   psync_fast_hash256_final(out, &ctx);
   psync_free(list);
 }
@@ -2867,7 +2867,7 @@ static void psync_diff_adapter_timer(psync_timer_t timer, void *ptr) {
 }
 
 static void psync_diff_thread() {
-  psync_socket_t *sock;
+  psock_t *sock;
   binresult *res = NULL;
   const binresult *entries;
   uint64_t newdiffid, result;

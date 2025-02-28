@@ -183,7 +183,7 @@ psync_folderid_t psync_get_folderid_by_path_or_create(const char *path) {
       binparam params[] = {P_STR("auth", psync_my_auth),
                            P_NUM("folderid", cfolderid),
                            P_LSTR("name", path, len)};
-      psync_socket_t *api;
+      psock_t *api;
       binresult *bres;
       uint64_t result;
       api = psync_apipool_get();

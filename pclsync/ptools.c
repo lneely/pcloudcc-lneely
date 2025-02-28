@@ -86,7 +86,7 @@ int create_backend_event(const char *binapi, const char *category,
                          const char *auth, int os, time_t etime,
                          eventParams *params, char **err) {
   binresult *res;
-  psync_socket_t *sock;
+  psock_t *sock;
   uint64_t result;
   binparam *paramsLocal;
   int i;
@@ -219,7 +219,7 @@ int backend_call(const char *binapi, const char *wsPath,
   binparam *localParams;
   binresult *res;
   binresult *payload;
-  psync_socket_t *sock;
+  psock_t *sock;
   uint64_t result;
 
   if (totalParCnt > 0) {

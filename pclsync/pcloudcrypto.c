@@ -152,7 +152,7 @@ static int psync_cloud_crypto_setup_do_upload(const unsigned char *rsapriv,
                        P_LSTR("privatekey", rsapriv, rsaprivlen),
                        P_LSTR("publickey", rsapub, rsapublen),
                        P_STR("hint", hint), P_STR("timeformat", "timestamp")};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   uint64_t result;
   int tries;
@@ -207,7 +207,7 @@ static int psync_cloud_crypto_download_keys(
     size_t *rsapublen, unsigned char **salt, size_t *saltlen,
     size_t *iterations, char *publicsha1, char *privatesha1, uint32_t *flags) {
   binparam params[] = {P_STR("auth", psync_my_auth)};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   const binresult *data;
   unsigned char *rsaprivstruct, *rsapubstruct;
@@ -296,7 +296,7 @@ static int psync_cloud_crypto_download_keys(
 
 static binresult *psync_get_keys_bin_auth(const char *auth) {
   binparam params[] = {P_STR("auth", auth)};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   api = psync_apipool_get();
   if (!api)
@@ -447,7 +447,7 @@ int psync_cloud_crypto_setup(const char *password, const char *hint) {
 
 int psync_cloud_crypto_get_hint(char **hint) {
   binparam params[] = {P_STR("auth", psync_my_auth)};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   uint64_t result;
   int tries;
@@ -693,7 +693,7 @@ int psync_cloud_crypto_isstarted() {
 
 int psync_cloud_crypto_reset() {
   binparam params[] = {P_STR("auth", psync_my_auth)};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   uint32_t result;
   int tries;
@@ -807,7 +807,7 @@ static psync_encrypted_symmetric_key_t
 psync_crypto_download_folder_enc_key(psync_folderid_t folderid) {
   binparam params[] = {P_STR("auth", psync_my_auth),
                        P_NUM("folderid", folderid)};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   const binresult *b64key;
   uint64_t result;
@@ -861,7 +861,7 @@ psync_crypto_download_folder_enc_key(psync_folderid_t folderid) {
 static psync_encrypted_symmetric_key_t
 psync_crypto_download_file_enc_key(psync_fileid_t fileid) {
   binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("fileid", fileid)};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   const binresult *b64key;
   uint64_t result;
@@ -1650,7 +1650,7 @@ int psync_cloud_crypto_send_mkdir(psync_folderid_t folderid, const char *name,
                        P_BOOL("encrypted", 1),
                        P_LSTR("key", b64key, b64keylen),
                        P_STR("timeformat", "timestamp")};
-  psync_socket_t *api;
+  psock_t *api;
   binresult *res;
   const binresult *meta;
   uint64_t result;

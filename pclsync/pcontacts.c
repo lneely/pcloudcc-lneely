@@ -36,7 +36,7 @@
 #include <stdio.h>
 
 int do_call_contactlist(result_visitor vis, void *param) {
-  psync_socket_t *sock;
+  psock_t *sock;
   binresult *bres;
   int i;
   const binresult *contacts;
@@ -319,7 +319,7 @@ static void process_shares_req_in(const binresult *shares_in, int shcnt) {
 }
 
 void cache_shares() {
-  psync_socket_t *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *errorret;
