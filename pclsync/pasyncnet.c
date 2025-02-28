@@ -27,22 +27,26 @@
   EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <errno.h>
+#include <pthread.h>
+
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/pkcs5.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/ssl.h>
-#include <pthread.h>
 
 #include "papi.h"
 #include "pasyncnet.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcompression.h"
 #include "plibs.h"
 #include "pnetlibs.h"
+#include "prun.h"
 #include "psettings.h"
 #include "pssl.h"
+#include "psys.h"
 #include "ptree.h"
 #include <stddef.h>
 
@@ -96,12 +100,12 @@ typedef struct {
 typedef struct _async_thread_params_t {
   psync_deflate_t *enc;
   psync_deflate_t *dec;
-  psync_socket *api;
+  psock_t *api;
   psync_tree *streams;
   uint64_t datapendingsince;
   int (*process_buf)(struct _async_thread_params_t *);
   char *curreadbuff;
-  psync_socket_t privsock;
+  int privsock;
   uint32_t curreadbuffrem;
   uint32_t curreadbufflen;
   uint32_t currentstreamid;
@@ -131,7 +135,7 @@ typedef struct {
   unsigned char osha1hex[PSYNC_SHA1_DIGEST_HEXLEN];
   psync_sha1_ctx sha1ctx;
   uint64_t remsize;
-  psync_file_t fd;
+  int fd;
 } file_download_add_t;
 
 TASK_WITH_HEADER(task_hdr_file_download_t, task_file_download_t);
@@ -140,7 +144,7 @@ TASK_WITH_HEADER(task_hdr_file_download_if_not_mod_t,
 
 static pthread_mutex_t amutex = PTHREAD_MUTEX_INITIALIZER;
 static int running = 0;
-static psync_socket_t at_sock = INVALID_SOCKET;
+static int at_sock = INVALID_SOCKET;
 
 static int send_pending_data(async_thread_params_t *prms) {
   char buff[4096];
@@ -150,7 +154,7 @@ static int send_pending_data(async_thread_params_t *prms) {
     if (ret == PSYNC_DEFLATE_NODATA || ret == PSYNC_DEFLATE_EOF)
       return 0;
     if (ret > 0) {
-      if (psync_socket_writeall(prms->api, buff, ret) != ret) {
+      if (psock_writeall(prms->api, buff, ret) != ret) {
         debug(D_WARNING, "write of %d bytes to socket failed", ret);
         return -1;
       } else
@@ -173,45 +177,45 @@ static int flush_pending_data(async_thread_params_t *prms) {
   return send_pending_data(prms);
 }
 
-static int socket_t_readall(psync_socket_t sock, void *buff, size_t len) {
+static int socket_t_readall(int sock, void *buff, size_t len) {
   ssize_t rd;
   while (len) {
-    if (psync_wait_socket_read_timeout(sock))
+    if (psock_wait_read_timeout(sock))
       return -1;
-    rd = psync_read_socket(sock, buff, len);
+    rd = read(sock, buff, len);
     if (rd > 0) {
       len -= rd;
       buff = (char *)buff + rd;
     } else if (rd == PSYNC_SOCKET_ERROR &&
-               (psync_sock_err() == P_INTR || psync_sock_err() == P_AGAIN ||
-                psync_sock_err() == P_WOULDBLOCK))
+               (errno == EINTR || errno == EAGAIN ||
+                errno == EWOULDBLOCK))
       continue;
     else {
       debug(D_WARNING, "read from socket of %lu bytes returned %ld, errno %d",
-            (unsigned long)len, (long)rd, (int)psync_sock_err());
+            (unsigned long)len, (long)rd, (int)errno);
       return -1;
     }
   }
   return 0;
 }
 
-static int socket_t_writeall(psync_socket_t sock, const void *buff,
+static int socket_t_writeall(int sock, const void *buff,
                              size_t len) {
   ssize_t wr;
   while (len) {
-    if (psync_wait_socket_write_timeout(sock))
+    if (psock_wait_write_timeout(sock))
       return -1;
-    wr = psync_write_socket(sock, buff, len);
+    wr = write(sock, buff, len);
     if (wr > 0) {
       len -= wr;
       buff = (const char *)buff + wr;
     } else if (wr == PSYNC_SOCKET_ERROR &&
-               (psync_sock_err() == P_INTR || psync_sock_err() == P_AGAIN ||
-                psync_sock_err() == P_WOULDBLOCK))
+               (errno == EINTR || errno == EAGAIN ||
+                errno == EWOULDBLOCK))
       continue;
     else {
       debug(D_WARNING, "write to socket of %lu bytes returned %ld, errno %d",
-            (unsigned long)len, (long)wr, (int)psync_sock_err());
+            (unsigned long)len, (long)wr, (int)errno);
       return -1;
     }
   }
@@ -250,7 +254,7 @@ static int send_data(async_thread_params_t *prms, const void *data, int len) {
       return -1;
   }
   if (!prms->pendingrequests)
-    prms->datapendingsince = psync_millitime();
+    prms->datapendingsince = psys_time_milliseconds();
   prms->pendingrequests++;
   return 0;
 }
@@ -268,9 +272,9 @@ static void file_download_free(stream_t *s, uint32_t error) {
   file_download_add_t *fda;
   fda = (file_download_add_t *)(s + 1);
   if (fda->fd != INVALID_HANDLE_VALUE) {
-    psync_file_close(fda->fd);
+    pfile_close(fda->fd);
     if (error)
-      psync_file_delete(fda->localpath);
+      pfile_delete(fda->localpath);
   }
 }
 
@@ -326,14 +330,14 @@ static int process_file_download_data(stream_t *s, async_thread_params_t *prms,
   psync_account_downloaded_bytes(datalen);
   psync_sha1_update(&fda->sha1ctx, buff, datalen);
   while (datalen) {
-    wr = psync_file_write(fda->fd, buff, datalen);
+    wr = pfile_write(fda->fd, buff, datalen);
     if (wr == -1) {
-      err = (int)psync_fs_err();
+      err = (int)errno;
       debug(D_WARNING, "writing to file %s failed, errno %d", fda->localpath,
             err);
       return file_download_send_error(
           s, prms, fda,
-          err == P_NOSPC ? PSYNC_ASYNC_ERROR_DISK_FULL : PSYNC_ASYNC_ERROR_IO,
+          err == ENOSPC ? PSYNC_ASYNC_ERROR_DISK_FULL : PSYNC_ASYNC_ERROR_IO,
           0);
     }
     datalen -= wr;
@@ -369,7 +373,7 @@ static int process_file_download_headers(stream_t *s,
   if (r.error)
     return file_download_send_error(s, prms, fda, r.error + 100, r.errorflags);
   debug(D_NOTICE,
-        "got headers for file %s size %" P_PRI_U64 " hash %" P_PRI_U64
+        "got headers for file %s size %" PRIu64 " hash %" PRIu64
         " sha1 %.40s",
         fda->localpath, fda->size, fda->hash, fda->sha1hex);
   psync_sql_start_transaction();
@@ -404,10 +408,10 @@ static int process_file_download_headers(stream_t *s,
   } else
     psync_sql_run_free(res);
   psync_sql_commit_transaction();
-  fda->fd = psync_file_open(fda->localpath, P_O_WRONLY, P_O_CREAT | P_O_TRUNC);
+  fda->fd = pfile_open(fda->localpath, O_WRONLY, O_CREAT | O_TRUNC);
   if (fda->fd == INVALID_HANDLE_VALUE) {
     debug(D_WARNING, "could not open file %s, errno %d", fda->localpath,
-          (int)psync_fs_err());
+          (int)errno);
     return file_download_send_error(s, prms, fda, PSYNC_ASYNC_ERROR_FILE, 0);
   }
   fda->remsize = fda->size;
@@ -439,7 +443,7 @@ static int handle_file_download(async_thread_params_t *prms,
   fda->localpath = dwl->localpath;
   fda->fd = INVALID_HANDLE_VALUE;
   len = psync_slprintf(buff, sizeof(buff),
-                       "act=dwl,strm=%" P_PRI_U64 ",fileid=%" P_PRI_U64 "\n",
+                       "act=dwl,strm=%" PRIu64 ",fileid=%" PRIu64 "\n",
                        (uint64_t)s->streamid, (uint64_t)dwl->fileid);
   if (send_data(prms, buff, len)) {
     debug(D_WARNING, "failed to send request for fileid %lu",
@@ -471,7 +475,7 @@ static int handle_file_download_nm(async_thread_params_t *prms,
   fda->fd = INVALID_HANDLE_VALUE;
   len = psync_slprintf(
       buff, sizeof(buff),
-      "act=dwlnm,strm=%" P_PRI_U64 ",fileid=%" P_PRI_U64 ",sha1=%.40s\n",
+      "act=dwlnm,strm=%" PRIu64 ",fileid=%" PRIu64 ",sha1=%.40s\n",
       (uint64_t)s->streamid, (uint64_t)dwl->fileid, dwl->sha1hex);
   if (send_data(prms, buff, len)) {
     debug(D_WARNING, "failed to send request for fileid %lu",
@@ -572,7 +576,7 @@ static int handle_incoming_data(async_thread_params_t *prms) {
   char *ptr;
   int rdsock, wrdecomp;
   while (1) {
-    rdsock = psync_socket_read_noblock(prms->api, buff, sizeof(buff));
+    rdsock = psock_read_noblock(prms->api, buff, sizeof(buff));
     if (rdsock == PSYNC_SOCKET_WOULDBLOCK)
       return 0;
     else if (rdsock <= 0) {
@@ -657,7 +661,7 @@ static int process_stream_header(async_thread_params_t *prms) {
 
 static void psync_async_thread(void *ptr) {
   async_thread_params_t *prms = (async_thread_params_t *)ptr;
-  psync_socket_t sel[2];
+  int sel[2];
   int ret;
   sel[0] = prms->api->sock;
   sel[1] = prms->privsock;
@@ -666,17 +670,17 @@ static void psync_async_thread(void *ptr) {
     if (prms->pendingrequests) {
       if ((prms->pendingrequests >= PSYNC_ASYNC_MAX_GROUPED_REQUESTS ||
            prms->datapendingsince + PSYNC_ASYNC_GROUP_REQUESTS_FOR <
-               psync_millitime()) &&
+               psys_time_milliseconds()) &&
           flush_pending_data(prms))
         break;
-      ret = psync_select_in(sel, 2, PSYNC_ASYNC_GROUP_REQUESTS_FOR / 4);
+      ret = psock_select_in(sel, 2, PSYNC_ASYNC_GROUP_REQUESTS_FOR / 4);
       if (ret == -1)
         continue;
     } else {
-      if (psync_socket_pendingdata(prms->api))
+      if (psock_pendingdata(prms->api))
         ret = 0;
       else
-        ret = psync_select_in(sel, 2, PSYNC_ASYNC_THREAD_TIMEOUT);
+        ret = psock_select_in(sel, 2, PSYNC_ASYNC_THREAD_TIMEOUT);
     }
     if (ret == 0) {
       if (handle_incoming_data(prms))
@@ -686,15 +690,15 @@ static void psync_async_thread(void *ptr) {
         break;
     } else {
       debug(D_NOTICE, "psync_select_in returned %d, exiting, errno %d", ret,
-            (int)psync_sock_err());
+            (int)errno);
       break;
     }
   }
   // close prms->privsock before locking as there might be somebody who keeps
   // the mutex locked while waiting for us to reply
-  psync_close_socket(prms->privsock);
+  close(prms->privsock);
   pthread_mutex_lock(&amutex);
-  psync_close_socket(at_sock);
+  close(at_sock);
   at_sock = INVALID_SOCKET;
   running--;
   pthread_mutex_unlock(&amutex);
@@ -715,8 +719,8 @@ static int psync_async_start_thread_locked() {
   async_thread_params_t *tparams;
   psync_deflate_t *enc, *dec;
   binresult *res;
-  psync_socket *api;
-  psync_socket_t pair[2];
+  psock_t *api;
+  int pair[2];
   int tries;
   tries = 0;
   while (1) {
@@ -745,8 +749,8 @@ static int psync_async_start_thread_locked() {
     goto err0;
   }
   psync_free(res);
-  if (psync_socket_pair(pair)) {
-    debug(D_NOTICE, "psync_socket_pair() failed");
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair)) {
+    debug(D_NOTICE, "socketpair() failed");
     goto err1;
   }
   enc = psync_deflate_init(PSYNC_DEFLATE_COMP_FAST);
@@ -766,14 +770,14 @@ static int psync_async_start_thread_locked() {
   tparams->api = api;
   tparams->privsock = pair[1];
   at_sock = pair[0];
-  psync_run_thread1("async transfer", psync_async_thread, tparams);
+  prun_thread1("async transfer", psync_async_thread, tparams);
   running++;
   return 0;
 err3:
   psync_deflate_destroy(enc);
 err2:
-  psync_close_socket(pair[0]);
-  psync_close_socket(pair[1]);
+  close(pair[0]);
+  close(pair[1]);
 err1:
   psync_apipool_release_bad(api);
 err0:

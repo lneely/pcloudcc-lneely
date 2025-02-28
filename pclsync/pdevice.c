@@ -29,19 +29,66 @@
    DAMAGE.
 */
 
-#ifndef _PSYNC_DIFF_H
-#define _PSYNC_DIFF_H
+#include <dirent.h>
 
-#include "papi.h"
+#include "pdevice.h"
+#include "plibs.h"
+#include "psettings.h"
+#include "psynclib.h"
 
-void psync_diff_init();
-void psync_diff_lock();
-void psync_diff_unlock();
-void psync_diff_wake();
-void psync_diff_create_file(const binresult *meta);
-void psync_diff_update_file(const binresult *meta);
-void psync_diff_delete_file(const binresult *meta);
-void psync_diff_update_folder(const binresult *meta);
-void psync_diff_delete_folder(const binresult *meta);
+static const char *psync_os_name = NULL;
+static const char *psync_software_name = PSYNC_LIB_VERSION;
 
-#endif
+char *pdevice_id() {
+  const char *hardware;
+  char *device, *path;
+  char buf[8];
+  DIR *dh;
+  struct dirent *de;
+  int fd;
+
+  hardware = "Desktop";
+  dh = opendir("/sys/class/power_supply");
+  if (dh) {
+    while ((de = readdir(dh))) {
+      if (de->d_name[0] != '.' ||
+          (de->d_name[1] != 0 &&
+           (de->d_name[1] != '.' || de->d_name[2] != 0))) {
+        path =
+            psync_strcat("/sys/class/power_supply/", de->d_name, "/type", NULL);
+        fd = open(path, O_RDONLY);
+        psync_free(path);
+        if (fd == -1)
+          continue;
+        if (read(fd, buf, 7) == 7 && !memcmp(buf, "Battery", 7)) {
+          close(fd);
+          hardware = "Laptop";
+          break;
+        }
+        close(fd);
+      }
+    }
+    closedir(dh);
+  }
+  device = psync_strcat(hardware, ", Linux", NULL);
+  return device;
+}
+
+char *pdevice_name() {
+  char *osname = pdevice_get_os();
+  char *ret = psync_strcat(osname, ", ", psync_software_name, NULL);
+  free(osname);
+  return ret;
+}
+
+char *pdevice_get_os() {
+  return psync_os_name ? psync_strdup(psync_os_name) : pdevice_id();
+}
+
+void pdevice_set_software(const char *snm) { 
+  psync_software_name = snm; 
+}
+
+const char *pdevice_get_software() { 
+  return psync_software_name; 
+}

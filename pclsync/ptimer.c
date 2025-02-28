@@ -31,9 +31,10 @@
 
 #include "ptimer.h"
 #include "pcache.h"
-#include "pcompat.h"
 #include "pcompiler.h"
+#include "prun.h"
 #include "plibs.h"
+#include "psys.h"
 #include "psynclib.h"
 
 /* Maximum timeout possible is TIMER_ARRAY_SIZE^TIMER_LEVELS seconds, in the
@@ -85,8 +86,8 @@ PSYNC_NOINLINE static void timer_sleep_detected(time_t lt) {
   psync_timer_notify_exception();
 }
 
-static void timer_check_upper_levels(time_t tmdiv, psync_uint_t level,
-                                     psync_uint_t sh) {
+static void timer_check_upper_levels(time_t tmdiv, unsigned long level,
+                                     unsigned long sh) {
   psync_list *l1, *l2, *l;
   time_t m;
   m = tmdiv % TIMER_ARRAY_SIZE;
@@ -149,8 +150,8 @@ static void timer_thread() {
   lt = psync_current_time;
   while (psync_do_run) {
     psync_list_init(&timers);
-    psync_milisleep(1000);
-    psync_current_time = psync_time();
+    psys_sleep_milliseconds(1000);
+    psync_current_time = psys_time_seconds();
     pthread_mutex_lock(&timer_mutex);
     timer_prepare_timers(lt, psync_current_time, &timers);
     if (nextsecwaiters)
@@ -163,19 +164,19 @@ static void timer_thread() {
     else if (unlikely_log(psync_current_time == lt)) {
       if (!psync_do_run)
         break;
-      psync_milisleep(1000);
+      psys_sleep_milliseconds(1000);
     }
     lt = psync_current_time;
   }
 }
 
 void psync_timer_init() {
-  psync_uint_t i, j;
+  unsigned long i, j;
   for (i = 0; i < TIMER_LEVELS; i++)
     for (j = 0; j < TIMER_ARRAY_SIZE; j++)
       psync_list_init(&timerlists[i][j]);
-  psync_current_time = psync_time();
-  psync_run_thread("timer", timer_thread);
+  psync_current_time = psys_time_seconds();
+  prun_thread("timer", timer_thread);
   timer_running = 1;
 }
 
@@ -183,7 +184,7 @@ time_t psync_timer_time() {
   if (timer_running)
     return psync_current_time;
   else
-    return psync_time(NULL);
+    return psys_time_seconds();
 }
 
 void psync_timer_wake() { pthread_cond_signal(&timer_cond); }

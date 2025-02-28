@@ -33,6 +33,8 @@
 #include "plibs.h"
 #include "ptimer.h"
 #include "ptree.h"
+#include "prun.h"
+
 
 typedef struct {
   psync_tree tree;
@@ -63,7 +65,7 @@ static void psync_run_ratelimited_timer(psync_timer_t timer, void *ptr) {
   pthread_mutex_unlock(&task_mutex);
   if (run) {
     debug(D_NOTICE, "running %s in a thread", name);
-    psync_run_thread(name, call);
+    prun_thread(name, call);
   } else {
     psync_timer_stop(timer);
     psync_free(node);
@@ -121,7 +123,7 @@ void psync_run_ratelimited(const char *name, psync_run_ratelimit_callback0 call,
   if (!found) {
     if (runinthread) {
       debug(D_NOTICE, "running %s in a thread", name);
-      psync_run_thread(name, call);
+      prun_thread(name, call);
     } else {
       debug(D_NOTICE, "running %s on this thread", name);
       call();

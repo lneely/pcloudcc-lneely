@@ -29,6 +29,7 @@
    DAMAGE.
 */
 
+#include <errno.h>
 #include <ctype.h>
 #include <mbedtls/bignum.h>
 #include <mbedtls/ctr_drbg.h>
@@ -44,12 +45,13 @@
 #include <stddef.h>
 #include <stdio.h>
 
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcompiler.h"
 
 #include "pcache.h"
 #include "plibs.h"
 #include "pmemlock.h"
+#include "prand.h"
 #include "psettings.h"
 #include "psslcerts.h"
 #include "psynclib.h"
@@ -137,7 +139,7 @@ static pthread_mutex_t rsa_decr_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void psync_ssl_free_psync_encrypted_data_t(psync_encrypted_data_t e) {
   psync_ssl_memclean(e->data, e->datalen);
-  psync_locked_free(e);
+  pmemlock_free(e);
 }
 
 void psync_ssl_rsa_free_binary(psync_binary_rsa_key_t bin) {
@@ -146,7 +148,7 @@ void psync_ssl_rsa_free_binary(psync_binary_rsa_key_t bin) {
 
 void psync_ssl_free_symmetric_key(psync_symmetric_key_t key) {
   psync_ssl_memclean(key->key, key->keylen);
-  psync_locked_free(key);
+  pmemlock_free(key);
 }
 
 psync_encrypted_symmetric_key_t
@@ -212,7 +214,7 @@ typedef struct {
   mbedtls_net_context srv;
   mbedtls_ssl_context ssl;
   mbedtls_ssl_config cfg;
-  psync_socket_t sock;
+  int sock;
   int isbroken;
   char cachekey[];
 } ssl_connection_t;
@@ -278,7 +280,7 @@ static int psync_ssl_detect_aes_hw() {
 
 int psync_ssl_init() {
   unsigned char seed[PSYNC_LHASH_DIGEST_LEN];
-  psync_uint_t i;
+  unsigned long i;
   int result;
 
 #if defined(PSYNC_AES_HW)
@@ -290,7 +292,7 @@ int psync_ssl_init() {
     return PRINT_RETURN(-1);
 
   mbedtls_entropy_init(&psync_mbed_entropy);
-  psync_get_random_seed(seed, seed, sizeof(seed), 0);
+  prand_seed(seed, seed, sizeof(seed), 0);
   mbedtls_entropy_update_manual(&psync_mbed_entropy, seed, sizeof(seed));
 
   mbedtls_ctr_drbg_init(&psync_mbed_rng.rnd);
@@ -354,10 +356,10 @@ static int psync_mbed_read(void *ptr, unsigned char *buf, size_t len) {
   ssize_t ret;
   int err;
   conn = (ssl_connection_t *)ptr;
-  ret = psync_read_socket(conn->sock, buf, len);
+  ret = read(conn->sock, buf, len);
   if (ret == -1) {
-    err = psync_sock_err();
-    if (err == P_WOULDBLOCK || err == P_AGAIN || err == P_INTR)
+    err = errno;
+    if (err == EWOULDBLOCK || err == EAGAIN || err == EINTR)
       return MBEDTLS_ERR_SSL_WANT_READ;
     else
       return MBEDTLS_ERR_NET_RECV_FAILED;
@@ -370,10 +372,10 @@ static int psync_mbed_write(void *ptr, const unsigned char *buf, size_t len) {
   ssize_t ret;
   int err;
   conn = (ssl_connection_t *)ptr;
-  ret = psync_write_socket(conn->sock, buf, len);
+  ret = write(conn->sock, buf, len);
   if (ret == -1) {
-    err = psync_sock_err();
-    if (err == P_WOULDBLOCK || err == P_AGAIN || err == P_INTR)
+    err = errno;
+    if (err == EWOULDBLOCK || err == EAGAIN || err == EINTR)
       return MBEDTLS_ERR_SSL_WANT_WRITE;
     else
       return MBEDTLS_ERR_NET_SEND_FAILED;
@@ -434,7 +436,7 @@ static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
   return -1;
 }
 
-int psync_ssl_connect(psync_socket_t sock, void **sslconn, const char *hostname) {
+int psync_ssl_connect(int sock, void **sslconn, const char *hostname) {
   ssl_connection_t *conn;
   mbedtls_ssl_session *sess;
   int ret;
@@ -683,7 +685,7 @@ psync_ssl_rsa_public_to_binary(psync_rsa_publickey_t rsa) {
   if (len <= 0)
     return PSYNC_INVALID_BIN_RSA;
   ret =
-      psync_locked_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
+      pmemlock_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   memcpy(ret->data, buff + sizeof(buff) - len, len);
   return ret;
@@ -704,7 +706,7 @@ psync_ssl_rsa_private_to_binary(psync_rsa_privatekey_t rsa) {
   if (len <= 0)
     return PSYNC_INVALID_BIN_RSA;
   ret =
-      psync_locked_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
+      pmemlock_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   memcpy(ret->data, buff + sizeof(buff) - len, len);
   psync_ssl_memclean(buff + sizeof(buff) - len, len);
@@ -806,7 +808,7 @@ psync_symmetric_key_t
 psync_ssl_gen_symmetric_key_from_pass(const char *password, size_t keylen,
                                       const unsigned char *salt, size_t saltlen,
                                       size_t iterations) {
-  psync_symmetric_key_t key = (psync_symmetric_key_t)psync_locked_malloc(
+  psync_symmetric_key_t key = (psync_symmetric_key_t)pmemlock_malloc(
       keylen + offsetof(psync_symmetric_key_struct_t, key));
   mbedtls_md_context_t ctx;
   mbedtls_md_init(&ctx);
@@ -883,7 +885,7 @@ psync_symmetric_key_t psync_ssl_rsa_decrypt_data(psync_rsa_privatekey_t rsa,
                                      &psync_mbed_rng, NULL,
                                      0, &len, data, buff, sizeof(buff)))
     return PSYNC_INVALID_SYM_KEY;
-  ret = (psync_symmetric_key_t)psync_locked_malloc(
+  ret = (psync_symmetric_key_t)pmemlock_malloc(
       offsetof(psync_symmetric_key_struct_t, key) + len);
   ret->keylen = len;
   memcpy(ret->key, buff, len);

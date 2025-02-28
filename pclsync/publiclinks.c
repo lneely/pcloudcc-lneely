@@ -31,6 +31,7 @@
 #include "pfsfolder.h"
 #include "plibs.h"
 #include "pnetlibs.h"
+#include "prun.h"
 #include "ptimer.h"
 #include <stdio.h>
 #include <string.h>
@@ -61,7 +62,7 @@ typedef struct _scr_params {
 } scr_params;
 
 static void modify_screenshot_public_link(void *par) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *errorret;
@@ -114,7 +115,7 @@ int64_t do_psync_screenshot_public_link(const char *path, int hasdelay,
       do_psync_file_public_link(path, &params->linkid, link, err, 0, 0, 0);
   if (hasdelay) {
     params->delay = delay;
-    psync_run_thread1("Modify link expiration.", modify_screenshot_public_link,
+    prun_thread1("Modify link expiration.", modify_screenshot_public_link,
                       params);
   } else
     psync_free(params);
@@ -125,7 +126,7 @@ int64_t do_psync_file_public_link(const char *path, int64_t *plinkid,
                                   char **link /*OUT*/, char **err /*OUT*/,
                                   uint64_t expire, int maxdownloads,
                                   int maxtraffic) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *rescode;
@@ -203,7 +204,7 @@ free_ret:
 int64_t do_psync_folder_public_link(const char *path, char **link /*OUT*/,
                                     char **err /*OUT*/, uint64_t expire,
                                     int maxdownloads, int maxtraffic) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *rescode;
@@ -279,7 +280,7 @@ int64_t do_psync_folder_public_link_full(const char *path, char **link /*OUT*/,
                                          char **err /*OUT*/, uint64_t expire,
                                          int maxdownloads, int maxtraffic,
                                          const char *password) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *rescode;
@@ -356,7 +357,7 @@ int64_t do_psync_folder_public_link_full(const char *path, char **link /*OUT*/,
 int64_t do_psync_folder_updownlink_link(int canupload,
                                         unsigned long long folderid,
                                         const char *mail, char **err /*OUT*/) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *errorret;
@@ -406,7 +407,7 @@ int64_t do_psync_tree_public_link(const char *linkname, const char *root,
                                   int numfiles, char **link /*OUT*/,
                                   char **err /*OUT*/, uint64_t expire,
                                   int maxdownloads, int maxtraffic) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *rescode;
@@ -552,7 +553,7 @@ int64_t do_psync_tree_public_link(const char *linkname, const char *root,
 }
 
 int cache_links(char *err, size_t err_size /*OUT*/) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *errorret;
@@ -712,7 +713,7 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
 }
 
 int do_psync_delete_link(int64_t linkid, char **err /*OUT*/) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *errorret;
@@ -752,7 +753,7 @@ int do_psync_delete_link(int64_t linkid, char **err /*OUT*/) {
   return 0;
 }
 
-int process_bres(const char *cmd, binresult *bres, psync_socket *api,
+int process_bres(const char *cmd, binresult *bres, psock_t *api,
                  char **err) {
   const char *errorret;
   int result;
@@ -789,7 +790,7 @@ int do_psync_change_link(unsigned long long linkid, unsigned long long expire,
                          int enableuploadforeveryone,
                          int enableuploadforchosenusers, int disableupload,
                          char **err) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   *err = 0;
@@ -835,7 +836,7 @@ int do_psync_change_link(unsigned long long linkid, unsigned long long expire,
 
 int do_change_link_expire(unsigned long long linkid, unsigned long long expire,
                           char **err) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   *err = 0;
@@ -865,7 +866,7 @@ int do_change_link_expire(unsigned long long linkid, unsigned long long expire,
 
 int do_change_link_password(unsigned long long linkid, const char *password,
                             char **err) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   *err = 0;
@@ -895,7 +896,7 @@ int do_change_link_password(unsigned long long linkid, const char *password,
 int do_change_link_enable_upload(unsigned long long linkid,
                                  int enableuploadforeveryone,
                                  int enableuploadforchosenusers, char **err) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   *err = 0;
@@ -926,7 +927,7 @@ int do_change_link_enable_upload(unsigned long long linkid,
 int64_t do_psync_upload_link(const char *path, const char *comment,
                              char **link /*OUT*/, char **err /*OUT*/,
                              uint64_t expire, int maxspace, int maxfiles) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *rescode;
@@ -1007,7 +1008,7 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
 }
 
 int do_psync_delete_upload_link(int64_t uploadlinkid, char **err /*OUT*/) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
 
@@ -1107,7 +1108,7 @@ plink_info_list_t *do_psync_list_links(char **err /*OUT*/) {
 }
 
 plink_contents_t *do_show_link(const char *code, char **err /*OUT*/) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   psync_list_builder_t *builder;
   link_cont_t *pcont;
@@ -1178,7 +1179,7 @@ plink_contents_t *do_show_link(const char *code, char **err /*OUT*/) {
 }
 
 int cache_upload_links(char **err /*OUT*/) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *errorret;
@@ -1397,7 +1398,7 @@ int do_delete_all_file_links(psync_fileid_t fileid, char **err) {
 
 preciever_list_t *do_list_email_with_access(unsigned long long linkid,
                                             char **err) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *errorret;
@@ -1469,7 +1470,7 @@ preciever_list_t *do_list_email_with_access(unsigned long long linkid,
 
 int do_link_add_access(unsigned long long linkid, const char *mail,
                        char **err) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   int result;
 
@@ -1493,7 +1494,7 @@ int do_link_add_access(unsigned long long linkid, const char *mail,
 
 int do_link_remove_access(unsigned long long linkid,
                           unsigned long long receiverid, char **err) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   *err = 0;
@@ -1515,7 +1516,7 @@ int do_link_remove_access(unsigned long long linkid,
 }
 
 bookmarks_list_t *do_cache_bookmarks(char **err) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
   const char *errorret;
@@ -1604,7 +1605,7 @@ bookmarks_list_t *do_cache_bookmarks(char **err) {
 }
 
 int do_remove_bookmark(const char *code, int locationid, char **err) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
 
@@ -1627,7 +1628,7 @@ int do_remove_bookmark(const char *code, int locationid, char **err) {
 
 int do_change_bookmark(const char *code, int locationid, const char *name,
                        const char *description, char **err) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   uint64_t result;
 

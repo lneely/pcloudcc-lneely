@@ -39,23 +39,26 @@
 
 #include "papi.h"
 #include "pcallbacks.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcompiler.h"
 #include "pdiff.h"
 #include "pfileops.h"
 #include "pfolder.h"
 #include "plibs.h"
 #include "plist.h"
-#include "plocalscan.h"
 #include "pnetlibs.h"
 #include "ppathstatus.h"
+#include "prun.h"
 #include "psettings.h"
-#include "pssl.h"
+#include "psys.h"
 #include "pstatus.h"
 #include "ptasks.h"
 #include "ptimer.h"
 #include "ptools.h"
 #include "pupload.h"
+#include "putil.h"
+
+extern const unsigned char pfile_invalid_chars[];
 
 typedef struct {
   psync_list list;
@@ -85,7 +88,7 @@ static pthread_mutex_t upload_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t upload_cond = PTHREAD_COND_INITIALIZER;
 static uint32_t upload_wakes = 0;
 
-static psync_uint_t current_uploads_waiters = 0;
+static unsigned long current_uploads_waiters = 0;
 static pthread_mutex_t current_uploads_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t current_uploads_cond = PTHREAD_COND_INITIALIZER;
 
@@ -498,7 +501,7 @@ static void set_local_file_conflicted(psync_fileid_t localfileid,
   psync_sql_bind_uint(res, 2, taskid);
   psync_sql_run_free(res);
   newpath = psync_local_path_for_local_file(localfileid, NULL);
-  if (unlikely_log(psync_file_rename_overwrite(localpath, newpath)))
+  if (unlikely_log(pfile_rename_overwrite(localpath, newpath)))
     psync_sql_rollback_transaction();
   else
     psync_sql_commit_transaction();
@@ -507,7 +510,7 @@ static void set_local_file_conflicted(psync_fileid_t localfileid,
 
 static int copy_file(psync_fileid_t fileid, uint64_t hash,
                      psync_folderid_t folderid, const char *name,
-                     psync_fileid_t localfileid, psync_stat_t *st) {
+                     psync_fileid_t localfileid, struct stat *st) {
   binparam params[] = {
     P_STR("auth", psync_my_auth),
     P_NUM("fileid", fileid),
@@ -515,9 +518,9 @@ static int copy_file(psync_fileid_t fileid, uint64_t hash,
     P_NUM("tofolderid", folderid),
     P_STR("toname", name),
 #if defined(PSYNC_HAS_BIRTHTIME)
-    P_NUM("ctime", psync_stat_birthtime(st)),
+    P_NUM("ctime", pfile_stat_birthtime(st)),
 #endif
-    P_NUM("mtime", psync_stat_mtime(st)),
+    P_NUM("mtime", pfile_stat_mtime(st)),
     P_STR("timeformat", "timestamp")
   };
   binresult *res;
@@ -549,7 +552,7 @@ static int copy_file(psync_fileid_t fileid, uint64_t hash,
 
 static int check_file_if_exists(const unsigned char *hashhex, uint64_t fsize,
                                 psync_folderid_t folderid, const char *name,
-                                psync_fileid_t localfileid, psync_stat_t *st) {
+                                psync_fileid_t localfileid, struct stat *st) {
   psync_sql_res *res;
   psync_uint_row row;
   psync_fileid_t fileid;
@@ -574,7 +577,7 @@ static int check_file_if_exists(const unsigned char *hashhex, uint64_t fsize,
               (unsigned long)folderid, name);
         set_local_file_remote_id(localfileid, fileid, hash);
 
-        set_be_file_dates(fileid, psync_stat_ctime(st), psync_stat_mtime(st));
+        set_be_file_dates(fileid, pfile_stat_ctime(st), pfile_stat_mtime(st));
 
         return 1;
       } else
@@ -590,7 +593,7 @@ static int check_file_if_exists(const unsigned char *hashhex, uint64_t fsize,
 
 static int copy_file_if_exists(const unsigned char *hashhex, uint64_t fsize,
                                psync_folderid_t folderid, const char *name,
-                               psync_fileid_t localfileid, psync_stat_t *st) {
+                               psync_fileid_t localfileid, struct stat *st) {
   binparam params[] = {
       P_STR("auth", psync_my_auth), P_NUM("size", fsize),
       P_LSTR(PSYNC_CHECKSUM, hashhex, PSYNC_HASH_DIGEST_HEXLEN),
@@ -654,7 +657,7 @@ static int upload_file(const char *localpath, const unsigned char *hashhex,
                        uint64_t fsize, psync_folderid_t folderid,
                        const char *name, psync_fileid_t localfileid,
                        psync_syncid_t syncid, upload_list_t *upload,
-                       psync_stat_t *st, binparam pr) {
+                       struct stat *st, binparam pr) {
   binparam params[] =
   { P_STR("auth", psync_my_auth),
     P_NUM("folderid", folderid),
@@ -662,15 +665,15 @@ static int upload_file(const char *localpath, const unsigned char *hashhex,
     P_BOOL("nopartial", 1),
     P_STR("timeformat", "timestamp"),
 #if defined(PSYNC_HAS_BIRTHTIME)
-    P_NUM("ctime", psync_stat_birthtime(st)),
+    P_NUM("ctime", pfile_stat_birthtime(st)),
 #endif
-    P_NUM("mtime", psync_stat_mtime(st)),
+    P_NUM("mtime", pfile_stat_mtime(st)),
     {pr.paramtype,
      pr.paramnamelen,
      pr.opts,
      pr.paramname,
      {pr.num}} /* specially for Visual Studio compiler */ };
-  psync_socket *api;
+  psock_t *api;
   void *buff;
   binresult *res;
   const binresult *meta;
@@ -679,8 +682,8 @@ static int upload_file(const char *localpath, const unsigned char *hashhex,
   uint64_t bw, result, fileid, rsize, hash;
   size_t rd;
   ssize_t rrd;
-  psync_file_t fd;
-  fd = psync_file_open(localpath, P_O_RDONLY, 0);
+  int fd;
+  fd = pfile_open(localpath, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE) {
     debug(D_WARNING, "could not open local file %s", localpath);
     return -1;
@@ -703,13 +706,13 @@ static int upload_file(const char *localpath, const unsigned char *hashhex,
       rd = PSYNC_COPY_BUFFER_SIZE;
     else
       rd = fsize - bw;
-    rrd = psync_file_read(fd, buff, rd);
+    rrd = pfile_read(fd, buff, rd);
     if (unlikely_log(rrd <= 0))
       goto err2;
     if (unlikely_log(psync_socket_writeall_upload(api, buff, rrd) != rrd))
       goto err2;
     bw += rrd;
-    if (bw == fsize && psync_file_read(fd, buff, 1) != 0) {
+    if (bw == fsize && pfile_read(fd, buff, 1) != 0) {
       debug(D_WARNING, "file %s has grown while uploading, retrying",
             localpath);
       goto err2;
@@ -718,7 +721,7 @@ static int upload_file(const char *localpath, const unsigned char *hashhex,
     add_bytes_uploaded(rrd);
   }
   psync_free(buff);
-  psync_file_close(fd);
+  pfile_close(fd);
   psync_set_default_sendbuf(api);
   psync_diff_lock();
   res = get_result(api);
@@ -783,16 +786,16 @@ err2:
 err1:
   psync_apipool_release_bad(api);
 err0:
-  psync_file_close(fd);
+  pfile_close(fd);
   return -1;
 err00:
   psync_diff_unlock();
   return -1;
 }
 
-static int upload_range(psync_socket *api, psync_upload_range_list_t *r,
+static int upload_range(psock_t *api, psync_upload_range_list_t *r,
                         upload_list_t *upload, psync_uploadid_t uploadid,
-                        psync_file_t fd) {
+                        int fd) {
   binparam params[] = {P_STR("auth", psync_my_auth),
                        P_NUM("uploadoffset", r->uploadoffset),
                        P_NUM("id", r->id), P_NUM("uploadid", uploadid)};
@@ -800,7 +803,7 @@ static int upload_range(psync_socket *api, psync_upload_range_list_t *r,
   uint64_t bw;
   size_t rd;
   ssize_t rrd;
-  if (unlikely_log(psync_file_seek(fd, r->off, P_SEEK_SET) == -1) ||
+  if (unlikely_log(pfile_seek(fd, r->off, SEEK_SET) == -1) ||
       unlikely_log(!do_send_command(api, "upload_write", strlen("upload_write"),
                                     params, ARRAY_SIZE(params), r->len, 0)))
     return PSYNC_NET_TEMPFAIL;
@@ -817,7 +820,7 @@ static int upload_range(psync_socket *api, psync_upload_range_list_t *r,
       rd = PSYNC_COPY_BUFFER_SIZE;
     else
       rd = r->len - bw;
-    rrd = psync_file_read(fd, buff, rd);
+    rrd = pfile_read(fd, buff, rd);
     if (unlikely_log(rrd <= 0))
       goto err0;
     bw += rrd;
@@ -833,7 +836,7 @@ err0:
   return PSYNC_NET_TEMPFAIL;
 }
 
-static int upload_from_file(psync_socket *api, psync_upload_range_list_t *r,
+static int upload_from_file(psock_t *api, psync_upload_range_list_t *r,
                             psync_uploadid_t uploadid, upload_list_t *upload) {
   binparam params[] = {P_STR("auth", psync_my_auth),
                        P_NUM("uploadoffset", r->uploadoffset),
@@ -852,7 +855,7 @@ static int upload_from_file(psync_socket *api, psync_upload_range_list_t *r,
   }
 }
 
-static int upload_from_upload(psync_socket *api, psync_upload_range_list_t *r,
+static int upload_from_upload(psock_t *api, psync_upload_range_list_t *r,
                               psync_uploadid_t uploadid,
                               upload_list_t *upload) {
   binparam params[] = {P_STR("auth", psync_my_auth),
@@ -871,7 +874,7 @@ static int upload_from_upload(psync_socket *api, psync_upload_range_list_t *r,
   }
 }
 
-static int upload_get_checksum(psync_socket *api, psync_uploadid_t uploadid,
+static int upload_get_checksum(psock_t *api, psync_uploadid_t uploadid,
                                uint32_t id) {
   binparam params[] = {P_STR("auth", psync_my_auth),
                        P_NUM("uploadid", uploadid), P_NUM("id", id)};
@@ -881,11 +884,11 @@ static int upload_get_checksum(psync_socket *api, psync_uploadid_t uploadid,
     return PSYNC_NET_OK;
 }
 
-static int upload_save(psync_socket *api, psync_fileid_t localfileid,
+static int upload_save(psock_t *api, psync_fileid_t localfileid,
                        const char *localpath, const unsigned char *hashhex,
                        uint64_t size, psync_uploadid_t uploadid,
                        psync_folderid_t folderid, const char *name,
-                       uint64_t taskid, psync_stat_t *st, binparam pr) {
+                       uint64_t taskid, struct stat *st, binparam pr) {
   binparam params[] =
   { P_STR("auth", psync_my_auth),
     P_NUM("folderid", folderid),
@@ -893,9 +896,9 @@ static int upload_save(psync_socket *api, psync_fileid_t localfileid,
     P_NUM("uploadid", uploadid),
     P_STR("timeformat", "timestamp"),
 #if defined(PSYNC_HAS_BIRTHTIME)
-    P_NUM("ctime", psync_stat_birthtime(st)),
+    P_NUM("ctime", pfile_stat_birthtime(st)),
 #endif
-    P_NUM("mtime", psync_stat_mtime(st)),
+    P_NUM("mtime", pfile_stat_mtime(st)),
     {pr.paramtype,
      pr.paramnamelen,
      pr.opts,
@@ -952,8 +955,8 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
                            const char *name, psync_fileid_t localfileid,
                            psync_syncid_t syncid, upload_list_t *upload,
                            psync_uploadid_t uploadid, uint64_t uploadoffset,
-                           psync_stat_t *st, binparam pr) {
-  psync_socket *api;
+                           struct stat *st, binparam pr) {
+  psock_t *api;
   binresult *res;
   psync_sql_res *sql;
   psync_uint_row row;
@@ -963,7 +966,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
   psync_list rlist;
   uint64_t result;
   uint32_t rid, respwait, id;
-  psync_file_t fd;
+  int fd;
   int ret;
   debug(D_NOTICE, "uploading file %s with repeating block inspection",
         localpath);
@@ -1023,7 +1026,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
     le->type = PSYNC_URANGE_UPLOAD;
     psync_list_add_tail(&rlist, &le->list);
   }
-  fd = psync_file_open(localpath, P_O_RDONLY, 0);
+  fd = pfile_open(localpath, O_RDONLY, 0);
   if (unlikely(fd == INVALID_HANDLE_VALUE)) {
     debug(D_WARNING, "could not open local file %s", localpath);
     psync_apipool_release(api);
@@ -1139,8 +1142,8 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
         respwait++;
     }
     while (respwait &&
-           (le->type == PSYNC_URANGE_LAST || psync_socket_pendingdata(api) ||
-            psync_select_in(&api->sock, 1,
+           (le->type == PSYNC_URANGE_LAST || psock_pendingdata(api) ||
+            psock_select_in(&api->sock, 1,
                             respwait >= PSYNC_MAX_PENDING_UPLOAD_REQS
                                 ? PSYNC_SOCK_READ_TIMEOUT * 1000
                                 : 0) != SOCKET_ERROR)) {
@@ -1243,13 +1246,13 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
   }
   psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list,
                                    psync_free);
-  if (psync_file_size(fd) != fsize) {
+  if (pfile_size(fd) != fsize) {
     debug(D_NOTICE, "file %s changed filesize while uploading, restarting task",
           localpath);
     ret = PSYNC_NET_TEMPFAIL;
   } else
     ret = PSYNC_NET_OK;
-  psync_file_close(fd);
+  pfile_close(fd);
   if (ret == PSYNC_NET_OK)
     ret = upload_save(api, localfileid, localpath, hashhex, fsize, uploadid,
                       folderid, name, upload->taskid, st, pr);
@@ -1261,14 +1264,14 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
     return 0;
   }
 err1:
-  psync_file_close(fd);
+  pfile_close(fd);
   psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list,
                                    psync_free);
 err0:
   psync_apipool_release_bad(api);
   return -1;
 errp:
-  psync_file_close(fd);
+  pfile_close(fd);
   psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list,
                                    psync_free);
   psync_apipool_release_bad(api);
@@ -1330,7 +1333,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
   psync_folderid_t folderid;
   psync_uploadid_t uploadid;
   uint64_t fsize, ufsize;
-  psync_stat_t st;
+  struct stat st;
   unsigned char hashhex[PSYNC_HASH_DIGEST_HEXLEN],
       uhashhex[PSYNC_HASH_DIGEST_HEXLEN], phashhex[PSYNC_HASH_DIGEST_HEXLEN];
   binparam pr;
@@ -1344,37 +1347,37 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
           (unsigned long)localfileid);
     return 0;
   }
-  if (!psync_stat(localpath, &st) &&
-      psync_stat_mtime(&st) >=
+  if (!stat(localpath, &st) &&
+      pfile_stat_mtime(&st) >=
           psync_timer_time() - PSYNC_UPLOAD_OLDER_THAN_SEC) {
     time_t ctime;
     debug(D_NOTICE, "file %s is too new, waiting for upload", localpath);
     ctime = psync_timer_time();
     psync_apipool_prepare();
-    if (ctime < psync_stat_mtime(&st) - 2)
+    if (ctime < pfile_stat_mtime(&st) - 2)
       debug(D_NOTICE,
             "file %s has a modification time in the future, skipping waits",
             localpath);
     else {
       ret = 0;
       do {
-        if (ctime < psync_stat_mtime(&st))
-          ctime = psync_stat_mtime(&st);
-        if (psync_stat_mtime(&st) + PSYNC_UPLOAD_OLDER_THAN_SEC > ctime)
-          psync_milisleep(
-              (psync_stat_mtime(&st) + PSYNC_UPLOAD_OLDER_THAN_SEC - ctime) *
+        if (ctime < pfile_stat_mtime(&st))
+          ctime = pfile_stat_mtime(&st);
+        if (pfile_stat_mtime(&st) + PSYNC_UPLOAD_OLDER_THAN_SEC > ctime)
+          psys_sleep_milliseconds(
+              (pfile_stat_mtime(&st) + PSYNC_UPLOAD_OLDER_THAN_SEC - ctime) *
                   1000 +
               500);
         else
-          psync_milisleep(500);
-        if (psync_stat(localpath, &st)) {
+          psys_sleep_milliseconds(500);
+        if (stat(localpath, &st)) {
           debug(D_NOTICE, "can not stat %s anymore, failing for now",
                 localpath);
           psync_free(localpath);
           return -1;
         }
         ctime = psync_timer_time();
-      } while (psync_stat_mtime(&st) >= ctime - PSYNC_UPLOAD_OLDER_THAN_SEC &&
+      } while (pfile_stat_mtime(&st) >= ctime - PSYNC_UPLOAD_OLDER_THAN_SEC &&
                ++ret <= 10);
       if (ret == 10) {
         debug(D_NOTICE, "file %s kept changing %d times, skipping for now",
@@ -1389,7 +1392,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
   if (!lock) {
     debug(D_NOTICE, "file %s is currently locked, skipping for now", localpath);
     psync_free(localpath);
-    psync_milisleep(PSYNC_SLEEP_ON_LOCKED_FILE);
+    psys_sleep_milliseconds(PSYNC_SLEEP_ON_LOCKED_FILE);
     return -1;
   }
   res = psync_sql_query_rdlock("SELECT uploadid FROM localfileupload WHERE "
@@ -1461,7 +1464,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
     if (srow && strcmp(srow[0], name)) {
       const char *s1 = srow[0], *s2 = name;
       while (*s1 && *s2 &&
-             (*s1 == *s2 || (psync_invalid_filename_chars[(unsigned char)*s1] &&
+             (*s1 == *s2 || (pfile_invalid_chars[(unsigned char)*s1] &&
                              *s2 == PSYNC_REPLACE_INV_CH_IN_FILENAMES))) {
         s1++;
         s2++;
@@ -1556,7 +1559,7 @@ static void task_run_upload_file_thread(void *ptr) {
   ut = (upload_task_t *)ptr;
   if (task_uploadfile(ut->upllist.syncid, ut->upllist.localfileid, ut->filename,
                       &ut->upllist)) {
-    psync_milisleep(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
+    psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
     res = psync_sql_prep_statement("UPDATE task SET inprogress=0 WHERE id=?");
     psync_sql_bind_uint(res, 1, ut->upllist.taskid);
     psync_sql_run_free(res);
@@ -1639,7 +1642,7 @@ static int task_run_uploadfile(uint64_t taskid, psync_syncid_t syncid,
     psync_sql_run_free(res);
   } else {
     psync_status_send_update();
-    psync_run_thread1("upload file", task_run_upload_file_thread, ut);
+    prun_thread1("upload file", task_run_upload_file_thread, ut);
   }
   return -1;
 }
@@ -1737,7 +1740,7 @@ static void upload_thread() {
           psync_sql_run_free(res);
         }
       } else if (type != PSYNC_UPLOAD_FILE)
-        psync_milisleep(PSYNC_SLEEP_ON_FAILED_UPLOAD);
+        psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_UPLOAD);
       psync_free(row);
       continue;
     }
@@ -1759,7 +1762,7 @@ void psync_wake_upload() {
 
 void psync_upload_init() {
   psync_timer_exception_handler(psync_wake_upload);
-  psync_run_thread("upload main", upload_thread);
+  prun_thread("upload main", upload_thread);
 }
 
 void psync_delete_upload_tasks_for_file(psync_fileid_t localfileid) {

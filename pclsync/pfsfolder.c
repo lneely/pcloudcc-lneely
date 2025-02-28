@@ -42,7 +42,7 @@
 #include "pfsfolder.h"
 #include "pfstasks.h"
 #include "plibs.h"
-#include "psettings.h"
+#include "psys.h"
 #include <string.h>
 
 static PSYNC_THREAD int cryptoerr = 0;
@@ -431,7 +431,7 @@ uint32_t psync_fsfolderflags_by_id(psync_fsfolderid_t folderid,
     *pperm = 0;
 retry:
   if (psync_sql_trylock()) {
-    psync_milisleep(1);
+    psys_sleep_milliseconds(1);
     goto retry;
   }
   res = psync_sql_query_nolock(

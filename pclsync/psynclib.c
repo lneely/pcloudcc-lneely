@@ -45,12 +45,14 @@
 #include "pcache.h"
 #include "pcallbacks.h"
 #include "pcloudcrypto.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcontacts.h"
+#include "pdevice.h"
 #include "pdevice_monitor.h"
 #include "pdiff.h"
+#include "ppath.h"
 #include "pdownload.h"
-#include "pexternalstatus.h"
+#include "psys.h"
 #include "pfileops.h"
 #include "pfolder.h"
 #include "pfsfolder.h"
@@ -61,14 +63,14 @@
 #include "pmemlock.h"
 #include "pnetlibs.h"
 #include "pnotifications.h"
-
-#include "poverlay_protocol.h"
+#include "putil.h"
 
 #include "poverlay.h"
 #include "pp2p.h"
 #include "ppagecache.h"
 #include "ppassword.h"
 #include "ppathstatus.h"
+#include "prun.h"
 #include "pscanner.h"
 #include "psettings.h"
 #include "pshm.h"
@@ -76,7 +78,6 @@
 #include "pstatus.h"
 #include "psyncer.h"
 #include "psynclib.h"
-#include "ptasks.h"
 #include "ptimer.h"
 #include "ptools.h"
 #include "publiclinks.h"
@@ -95,6 +96,8 @@ typedef struct {
   psync_list list;
   char str[];
 } string_list;
+
+PSYNC_THREAD const char *psync_thread_name = "no name";
 
 static psync_malloc_t psync_real_malloc = malloc;
 static psync_realloc_t psync_real_realloc = realloc;
@@ -207,16 +210,6 @@ void psync_set_alloc(psync_malloc_t malloc_call, psync_realloc_t realloc_call,
   psync_real_free = free_call;
 }
 
-void psync_set_software_string(const char *str) {
-  debug(D_NOTICE, "setting software name to %s", str);
-  psync_set_software_name(str);
-}
-
-void psync_set_os_string(const char *str) {
-  debug(D_NOTICE, "setting os name to %s", str);
-  psync_set_os_name(str);
-}
-
 static void psync_stop_crypto_on_sleep() {
   if (psync_setting_get_bool(_PS(sleepstopcrypto)) &&
       psync_crypto_isstarted()) {
@@ -267,11 +260,12 @@ int psync_init() {
       return 0;
     }
   }
-  psync_locked_init();
+  pmemlock_init();
   psync_cache_init();
-  psync_compat_init();
+  psys_init();
+
   if (!psync_database) {
-    psync_database = psync_get_default_database_path();
+    psync_database = ppath_default_db();
     if (unlikely_log(!psync_database)) {
       if (IS_DEBUG)
         pthread_mutex_unlock(&psync_libstate_mutex);
@@ -301,7 +295,7 @@ int psync_init() {
     pthread_mutex_unlock(&psync_libstate_mutex);
   }
 
-  psync_run_thread("Overlay main thread", psync_overlay_main_loop);
+  prun_thread("Overlay main thread", psync_overlay_main_loop);
   psync_overlay_init_callbacks();
   if (PSYNC_SSL_DEBUG_LEVEL)
     psync_set_ssl_debug_callback(ssl_debug_cb);
@@ -366,7 +360,7 @@ void psync_destroy() {
   psync_timer_wake();
   psync_timer_notify_exception();
   psync_sql_sync();
-  psync_milisleep(20);
+  psys_sleep_milliseconds(20);
   psync_sql_lock();
   psync_cache_clean_all();
   psync_sql_close();
@@ -465,7 +459,7 @@ void psync_logout2(uint32_t auth_status, int doinvauth) {
 void psync_logout() { psync_logout2(PSTATUS_AUTH_REQUIRED, 1); }
 
 apiservers_list_t *psync_get_apiservers(char **err) {
-  psync_socket *api;
+  psock_t *api;
   binresult *bres;
   psync_list_builder_t *builder;
   const binresult *locations = 0, *location, *br;
@@ -476,7 +470,7 @@ apiservers_list_t *psync_get_apiservers(char **err) {
   int i, locationscnt, usessl;
   binparam params[] = {P_STR("timeformat", "timestamp")};
   usessl = psync_setting_get_bool(_PS(usessl));
-  api = psync_socket_connect(
+  api = psock_connect(
       PSYNC_API_HOST, usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT, usessl);
 
   if (unlikely(!api)) {
@@ -560,7 +554,7 @@ void psync_unlink() {
   psync_invalidate_auth(psync_my_auth);
   psync_cloud_crypto_stop();
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
-  psync_milisleep(20);
+  psys_sleep_milliseconds(20);
   psync_stop_localscan();
   psync_sql_checkpoint_lock();
   psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
@@ -571,7 +565,7 @@ void psync_unlink() {
   debug(D_NOTICE, "clearing database, locked");
   psync_cache_clean_all();
   ret = psync_sql_close();
-  psync_file_delete(psync_database);
+  pfile_delete(psync_database);
   if (ret) {
     psync_free(deviceid);
     debug(D_ERROR, "failed to close database, exiting");
@@ -756,7 +750,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   psync_uint_row row;
   psync_str_row srow;
   uint64_t perms;
-  psync_stat_t st;
+  struct stat st;
   psync_syncid_t ret;
   int unsigned mbedtls_md;
 
@@ -765,19 +759,19 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   if (unlikely_log(synctype < PSYNC_SYNCTYPE_MIN ||
                    synctype > PSYNC_SYNCTYPE_MAX))
     return_isyncid(PERROR_INVALID_SYNCTYPE);
-  if (unlikely_log(psync_stat(localpath, &st)) ||
-      unlikely_log(!psync_stat_isfolder(&st)))
+  if (unlikely_log(stat(localpath, &st)) ||
+      unlikely_log(!pfile_stat_isfolder(&st)))
     return_isyncid(PERROR_LOCAL_FOLDER_NOT_FOUND);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
-  if (unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md)))
+  if (unlikely_log(!pfile_stat_mode_ok(&st, mbedtls_md)))
     return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
   syncmp = psync_fs_getmountpoint();
   if (syncmp) {
     size_t len = strlen(syncmp);
-    if (!psync_filename_cmpn(syncmp, localpath, len) &&
+    if (!memcmp(syncmp, localpath, len) &&
         (localpath[len] == 0 || localpath[len] == '/' ||
          localpath[len] == '\\')) {
       psync_free(syncmp);
@@ -792,7 +786,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
     if (psync_str_is_prefix(srow[0], localpath)) {
       psync_sql_free_result(res);
       return_isyncid(PERROR_PARENT_OR_SUBFOLDER_ALREADY_SYNCING);
-    } else if (!psync_filename_cmp(srow[0], localpath)) {
+    } else if (!strcmp(srow[0], localpath)) {
       psync_sql_free_result(res);
       return_isyncid(PERROR_FOLDER_ALREADY_SYNCING);
     }
@@ -824,8 +818,8 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   psync_sql_bind_uint(res, 1, folderid);
   psync_sql_bind_string(res, 2, localpath);
   psync_sql_bind_uint(res, 3, synctype);
-  psync_sql_bind_uint(res, 4, psync_stat_inode(&st));
-  psync_sql_bind_uint(res, 5, psync_stat_device(&st));
+  psync_sql_bind_uint(res, 4, pfile_stat_inode(&st));
+  psync_sql_bind_uint(res, 5, pfile_stat_device(&st));
   psync_sql_run(res);
   if (likely_log(psync_sql_affected_rows()))
     ret = psync_sql_insertid();
@@ -844,19 +838,19 @@ int psync_add_sync_by_path_delayed(const char *localpath,
                                    const char *remotepath,
                                    psync_synctype_t synctype) {
   psync_sql_res *res;
-  psync_stat_t st;
+  struct stat st;
   int unsigned mbedtls_md;
   if (unlikely_log(synctype < PSYNC_SYNCTYPE_MIN ||
                    synctype > PSYNC_SYNCTYPE_MAX))
     return_error(PERROR_INVALID_SYNCTYPE);
-  if (unlikely_log(psync_stat(localpath, &st)) ||
-      unlikely_log(!psync_stat_isfolder(&st)))
+  if (unlikely_log(stat(localpath, &st)) ||
+      unlikely_log(!pfile_stat_isfolder(&st)))
     return_error(PERROR_LOCAL_FOLDER_NOT_FOUND);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
-  if (unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md)))
+  if (unlikely_log(!pfile_stat_mode_ok(&st, mbedtls_md)))
     return_error(PERROR_LOCAL_FOLDER_ACC_DENIED);
   res = psync_sql_prep_statement("INSERT INTO syncfolderdelayed (localpath, "
                                  "remotepath, synctype) VALUES (?, ?, ?)");
@@ -866,7 +860,7 @@ int psync_add_sync_by_path_delayed(const char *localpath,
   psync_sql_run_free(res);
   psync_sql_sync();
   if (psync_status_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_ONLINE)
-    psync_run_thread("check delayed syncs", psync_syncer_check_delayed_syncs);
+    prun_thread("check delayed syncs", psync_syncer_check_delayed_syncs);
   return 0;
 }
 
@@ -876,7 +870,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   psync_uint_row urow;
   psync_folderid_t folderid;
   uint64_t perms;
-  psync_stat_t st;
+  struct stat st;
   int unsigned mbedtls_md;
   psync_synctype_t oldsynctype;
   if (unlikely_log(synctype < PSYNC_SYNCTYPE_MIN ||
@@ -899,8 +893,8 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
     psync_sql_rollback_transaction();
     return 0;
   }
-  if (unlikely_log(psync_stat(psync_get_string(row[1]), &st)) ||
-      unlikely_log(!psync_stat_isfolder(&st))) {
+  if (unlikely_log(stat(psync_get_string(row[1]), &st)) ||
+      unlikely_log(!pfile_stat_isfolder(&st))) {
     psync_sql_free_result(res);
     psync_sql_rollback_transaction();
     return_isyncid(PERROR_LOCAL_FOLDER_NOT_FOUND);
@@ -910,7 +904,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
-  if (unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md))) {
+  if (unlikely_log(!pfile_stat_mode_ok(&st, mbedtls_md))) {
     psync_sql_rollback_transaction();
     return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
   }
@@ -1028,7 +1022,7 @@ psync_folder_list_t *psync_get_sync_list() {
 psuggested_folders_t *psync_get_sync_suggestions() {
   char *home;
   psuggested_folders_t *ret;
-  home = psync_get_home_dir();
+  home = ppath_home();
   if (likely_log(home)) {
     ret = psync_scanner_scan_folder(home);
     psync_free(home);
@@ -1116,7 +1110,6 @@ int psync_is_name_to_ignore(const char *name) {
 static void psync_set_run_status(uint32_t status) {
   psync_set_status(PSTATUS_TYPE_RUN, status);
   psync_set_uint_value("runstatus", status);
-  psync_rebuild_icons();
 }
 
 int psync_pause() {
@@ -1144,7 +1137,7 @@ void psync_run_localscan() { psync_wake_localscan(); }
 static int do_run_command_get_res(const char *cmd, size_t cmdlen,
                                   const binparam *params, size_t paramscnt,
                                   char **err, binresult **pres) {
-  psync_socket *api;
+  psock_t *api;
   binresult *res;
   uint64_t result;
   api = psync_apipool_get();
@@ -1178,7 +1171,7 @@ neterr:
 int psync_register(const char *email, const char *password, int termsaccepted,
                    const char *binapi, unsigned int locationid, char **err) {
   binresult *res;
-  psync_socket *sock;
+  psock_t *sock;
   uint64_t result;
   binparam params[] = {P_STR("mail", email), P_STR("password", password),
                        P_STR("termsaccepted", termsaccepted ? "yes" : "0"),
@@ -1200,7 +1193,7 @@ int psync_register(const char *email, const char *password, int termsaccepted,
   }
   res = send_command(sock, "register", params);
   if (unlikely_log(!res)) {
-    psync_socket_close(sock);
+    psock_close(sock);
     if (err)
       *err = psync_strdup("Could not connect to the server.");
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
@@ -1213,7 +1206,7 @@ int psync_register(const char *email, const char *password, int termsaccepted,
       *err = psync_strdup(psync_find_result(res, "error", PARAM_STR)->str);
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   }
-  psync_socket_close(sock);
+  psock_close(sock);
   psync_free(res);
   return result;
 }
@@ -1238,7 +1231,7 @@ int psync_change_password(const char *currentpass, const char *newpass,
   char *device;
   int ret;
   binresult *res;
-  device = psync_deviceid();
+  device = pdevice_id();
   {
     binparam params[] = {P_STR("auth", psync_my_auth),
                          P_STR("oldpassword", currentpass),
@@ -1824,13 +1817,13 @@ static psync_new_version_t *psync_res_to_ver(const binresult *res,
 int check_new_version_on_us_socket(binresult **pres, const char *os,
                                    unsigned long currentversion) {
   binparam params[] = {P_STR("os", os), P_NUM("version", currentversion)};
-  psync_socket *api;
+  psock_t *api;
   binresult *res;
   int usessl;
   uint64_t result;
 
   usessl = psync_setting_get_bool(_PS(usessl));
-  api = psync_socket_connect("binapi.pcloud.com",
+  api = psock_connect("binapi.pcloud.com",
                              usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT,
                              usessl);
   if (unlikely(!api)) {
@@ -1875,15 +1868,15 @@ psync_new_version_t *psync_check_new_version(const char *os,
   return ver;
 }
 
-static void psync_del_all_except(void *ptr, psync_pstat_fast *st) {
+static void psync_del_all_except(void *ptr, ppath_fast_stat *st) {
   const char **nmarr;
   char *fp;
   nmarr = (const char **)ptr;
-  if (!psync_filename_cmp(st->name, nmarr[1]) || psync_stat_fast_isfolder(st))
+  if (!strcmp(st->name, nmarr[1]) || pfile_stat_fast_isfolder(st))
     return;
-  fp = psync_strcat(nmarr[0], PSYNC_DIRECTORY_SEPARATOR, st->name, NULL);
+  fp = psync_strcat(nmarr[0], "/", st->name, NULL);
   debug(D_NOTICE, "deleting old update file %s", fp);
-  if (psync_file_delete(fp))
+  if (pfile_delete(fp))
     debug(D_WARNING, "could not delete %s", fp);
   psync_free(fp);
 }
@@ -1895,14 +1888,14 @@ static char *psync_filename_from_res(const binresult *res) {
   nm = strrchr(psync_find_result(res, "path", PARAM_STR)->str, '/');
   if (unlikely_log(!nm))
     return NULL;
-  path = psync_get_private_tmp_dir();
+  path = ppath_private_tmp();
   if (unlikely_log(!path))
     return NULL;
   nmd = psync_url_decode(nm + 1);
   nmarr[0] = path;
   nmarr[1] = nmd;
-  psync_list_dir_fast(path, psync_del_all_except, (void *)nmarr);
-  ret = psync_strcat(path, PSYNC_DIRECTORY_SEPARATOR, nmd, NULL);
+  ppath_ls_fast(path, psync_del_all_except, (void *)nmarr);
+  ret = psync_strcat(path, "/", nmd, NULL);
   psync_free(nmd);
   psync_free(path);
   return ret;
@@ -1913,8 +1906,8 @@ static int psync_download_new_version(const binresult *res, char **lpath) {
   psync_http_socket *sock;
   char *buff, *filename;
   uint64_t size;
-  psync_stat_t st;
-  psync_file_t fd;
+  struct stat st;
+  int fd;
   int rd;
   char cookie[128];
   sock = psync_http_connect_multihost(
@@ -1939,13 +1932,13 @@ static int psync_download_new_version(const binresult *res, char **lpath) {
     psync_http_close(sock);
     return 1;
   }
-  if (!psync_stat(filename, &st) && psync_stat_size(&st) == size) {
+  if (!stat(filename, &st) && pfile_stat_size(&st) == size) {
     *lpath = filename;
     psync_http_close(sock);
     return 0;
   }
   if (unlikely_log(
-          (fd = psync_file_open(filename, P_O_WRONLY, P_O_CREAT | P_O_TRUNC)) ==
+          (fd = pfile_open(filename, O_WRONLY, O_CREAT | O_TRUNC)) ==
           INVALID_HANDLE_VALUE)) {
     psync_free(filename);
     psync_http_close(sock);
@@ -1954,12 +1947,12 @@ static int psync_download_new_version(const binresult *res, char **lpath) {
   buff = (char *)psync_malloc(PSYNC_COPY_BUFFER_SIZE);
   while (size) {
     rd = psync_http_request_readall(sock, buff, PSYNC_COPY_BUFFER_SIZE);
-    if (unlikely_log(rd <= 0 || psync_file_write(fd, buff, rd) != rd))
+    if (unlikely_log(rd <= 0 || pfile_write(fd, buff, rd) != rd))
       break;
     size -= rd;
   }
   psync_free(buff);
-  psync_file_close(fd);
+  pfile_close(fd);
   psync_http_close(sock);
   if (unlikely_log(size)) {
     psync_free(filename);
@@ -1986,7 +1979,7 @@ psync_check_new_version_download(const char *os, unsigned long currentversion) {
   if (unlikely(ret == -1))
     do {
       debug(D_WARNING, "could not connect to server, sleeping");
-      psync_milisleep(10000);
+      psys_sleep_milliseconds(10000);
       ret = check_new_version_on_us_socket(&res, os, currentversion);
     } while (ret == -1);
   if (ret) {
@@ -2002,7 +1995,7 @@ psync_check_new_version_download(const char *os, unsigned long currentversion) {
   if (unlikely(ret == -1))
     do {
       debug(D_WARNING, "could not download update, sleeping");
-      psync_milisleep(10000);
+      psys_sleep_milliseconds(10000);
       ret = psync_download_new_version(
           psync_find_result(res, "download", PARAM_HASH), &lfilename);
     } while (ret == -1);
@@ -2019,7 +2012,7 @@ psync_check_new_version_download(const char *os, unsigned long currentversion) {
 
 void psync_run_new_version(psync_new_version_t *ver) {
   debug(D_NOTICE, "running %s", ver->localpath);
-  if (psync_run_update_file(ver->localpath))
+  if (pfile_run_update(ver->localpath))
     return;
   psync_destroy();
   exit(0);
@@ -2047,7 +2040,7 @@ static int psync_upload_result(binresult *res, psync_fileid_t *fileid) {
 static int psync_upload_params(binparam *params, size_t paramcnt,
                                const void *data, size_t length,
                                psync_fileid_t *fileid) {
-  psync_socket *api;
+  psock_t *api;
   binresult *res;
   int tries;
   tries = 0;
@@ -2057,7 +2050,7 @@ static int psync_upload_params(binparam *params, size_t paramcnt,
       break;
     if (likely(do_send_command(api, "uploadfile", strlen("uploadfile"), params,
                                paramcnt, length, 0))) {
-      if (psync_socket_writeall(api, data, length) == length) {
+      if (psock_writeall(api, data, length) == length) {
         res = get_result(api);
         if (likely(res)) {
           psync_apipool_release(api);
@@ -2090,33 +2083,33 @@ int psync_upload_data_as(const char *remote_path, const char *remote_filename,
 
 static int psync_load_file(const char *local_path, char **data,
                            size_t *length) {
-  psync_file_t fd;
-  psync_stat_t st1, st2;
+  int fd;
+  struct stat st1, st2;
   char *buff;
   size_t len, off;
   ssize_t rd;
   int tries;
   for (tries = 0; tries < 15; tries++) {
-    fd = psync_file_open(local_path, P_O_RDONLY, 0);
+    fd = pfile_open(local_path, O_RDONLY, 0);
     if (fd == INVALID_HANDLE_VALUE)
       goto err0;
-    if (psync_fstat(fd, &st1))
+    if (fstat(fd, &st1))
       goto err1;
-    len = psync_stat_size(&st1);
+    len = pfile_stat_size(&st1);
     buff = psync_malloc(len);
     if (!buff)
       goto err1;
     off = 0;
     while (off < len) {
-      rd = psync_file_pread(fd, buff + off, len - off, off);
+      rd = pfile_pread(fd, buff + off, len - off, off);
       if (rd < 0)
         break;
       off += rd;
     }
-    psync_file_close(fd);
-    if (off == len && !psync_stat(local_path, &st2) &&
-        psync_stat_size(&st2) == len &&
-        psync_stat_mtime_native(&st1) == psync_stat_mtime_native(&st2)) {
+    pfile_close(fd);
+    if (off == len && !stat(local_path, &st2) &&
+        pfile_stat_size(&st2) == len &&
+        pfile_stat_mtime_native(&st1) == pfile_stat_mtime_native(&st2)) {
       *data = buff;
       *length = len;
       return 0;
@@ -2125,7 +2118,7 @@ static int psync_load_file(const char *local_path, char **data,
   }
   return -1;
 err1:
-  psync_file_close(fd);
+  pfile_close(fd);
 err0:
   return -1;
 }
@@ -2302,7 +2295,7 @@ psync_folderid_t *psync_crypto_folderids() {
 
 int psync_crypto_change_crypto_pass(const char *oldpass, const char *newpass,
                                     const char *hint, const char *code) {
-  psync_socket *api;
+  psock_t *api;
   binresult *res;
   uint64_t result;
   int tries = 0, err;
@@ -2349,7 +2342,7 @@ int psync_crypto_change_crypto_pass(const char *oldpass, const char *newpass,
 int psync_crypto_change_crypto_pass_unlocked(const char *newpass,
                                              const char *hint,
                                              const char *code) {
-  psync_socket *api;
+  psock_t *api;
   binresult *res;
   uint64_t result;
   int tries = 0, err;
@@ -2394,7 +2387,7 @@ int psync_crypto_change_crypto_pass_unlocked(const char *newpass,
 }
 
 int psync_crypto_crypto_send_change_user_private() {
-  psync_socket *api;
+  psock_t *api;
   binresult *res;
   uint64_t result;
   binparam params[] = {P_STR("auth", psync_my_auth)};
@@ -2775,7 +2768,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
       *errMsg = psync_strdup("There is already an active sync or backup for a "
                              "parent of this folder.");
       return PERROR_PARENT_OR_SUBFOLDER_ALREADY_SYNCING;
-    } else if (!psync_filename_cmp(srow[0], localPath)) {
+    } else if (!strcmp(srow[0], localPath)) {
       psync_sql_free_result(sql);
 
       *errMsg = psync_strdup(
@@ -2794,7 +2787,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
     size_t len = strlen(syncmp);
 
     debug(D_NOTICE, "Do check.");
-    if (!psync_filename_cmpn(syncmp, localPath, len) &&
+    if (!memcmp(syncmp, localPath, len) &&
         (localPath[len] == 0 || localPath[len] == '/' ||
          localPath[len] == '\\')) {
       psync_free(syncmp);
@@ -3066,7 +3059,7 @@ void psync_async_delete_sync(void *ptr) {
 
 void psync_async_ui_callback(void *ptr) {
   int eventId = *(int *)ptr;
-  time_t currTime = psync_time();
+  time_t currTime = psys_time_seconds();
 
   if (((currTime - lastBupDelEventTime) > bupNotifDelay) ||
       (lastBupDelEventTime == 0)) {
@@ -3096,7 +3089,7 @@ int psync_delete_sync_by_folderid(psync_folderid_t fId) {
   syncId = (psync_syncid_t)row[0];
   psync_sql_free_result(sqlRes);
 
-  psync_run_thread1("psync_async_sync_delete", psync_async_delete_sync,
+  prun_thread1("psync_async_sync_delete", psync_async_delete_sync,
                     (void *)(uintptr_t)syncId);
 
   return 0;
@@ -3124,7 +3117,7 @@ int psync_delete_backup_device(psync_folderid_t fId) {
 }
 
 void psync_send_backup_del_event(psync_fileorfolderid_t remoteFId) {
-  time_t currTime = psync_time();
+  time_t currTime = psys_time_seconds();
 
   if (((currTime - lastBupDelEventTime) > bupNotifDelay) ||
       (lastBupDelEventTime == 0)) {
@@ -3236,3 +3229,17 @@ int psync_create_backend_event(const char *category, const char *action,
 }
 
 void psync_init_data_event_handler(void *ptr) { psync_init_data_event(ptr); }
+
+// moved from pdiff
+void psync_delete_cached_crypto_keys() { 
+  psync_sql_statement(
+      "DELETE FROM setting WHERE id IN ('crypto_public_key', "
+      "'crypto_private_key', 'crypto_private_iter', "
+      "'crypto_private_salt', 'crypto_private_sha1', 'crypto_public_sha1')");
+  if (psync_sql_affected_rows()) {
+    debug(D_NOTICE, "deleted cached crypto keys");
+    psync_cloud_crypto_clean_cache();
+  }
+  psync_sql_statement("DELETE FROM cryptofolderkey");
+  psync_sql_statement("DELETE FROM cryptofilekey");
+}

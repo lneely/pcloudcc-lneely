@@ -28,11 +28,13 @@
 */
 
 #include "pcallbacks.h"
-#include "pcompat.h"
+#include "pfile.h"
 #include "pfolder.h"
 #include "plibs.h"
 #include "plist.h"
 #include "prunratelimit.h"
+#include "prun.h"
+#include "psys.h"
 #include <string.h>
 
 #define MAX_STATUS_STR_LEN 64
@@ -263,7 +265,7 @@ static void status_change_thread(void *ptr) {
   pstatus_change_callback_t callback = (pstatus_change_callback_t)ptr;
   while (1) {
     // Maximum 2 updates/sec
-    psync_milisleep(500);
+    psys_sleep_milliseconds(500);
     pthread_mutex_lock(&statusmutex);
     while (statuschanges <= 0) {
       statuschanges = -1;
@@ -285,7 +287,6 @@ static void status_change_thread(void *ptr) {
           (status_old.status == PSTATUS_STOPPED) ||
           (status_old.status == PSTATUS_PAUSED) ||
           (status_old.status == PSTATUS_OFFLINE))))
-      psync_run_ratelimited("rebuild icons", psync_rebuild_icons, 1, 1);
     status_old = psync_status;
     pthread_mutex_unlock(&statusmutex);
     if (!psync_do_run)
@@ -301,7 +302,7 @@ void psync_set_status_callback(pstatus_change_callback_t callback) {
   pthread_mutex_lock(&statusmutex);
   statusthreadrunning = 1;
   pthread_mutex_unlock(&statusmutex);
-  psync_run_thread1("status change", status_change_thread, callback);
+  prun_thread1("status change", status_change_thread, callback);
 }
 
 void psync_send_status_update() {
@@ -346,7 +347,7 @@ void psync_set_event_callback(pevent_callback_t callback) {
   eventthreadrunning = 1;
   pthread_mutex_unlock(&statusmutex);
   psync_list_init(&eventlist);
-  psync_run_thread1("event", event_thread, callback);
+  prun_thread1("event", event_thread, callback);
 }
 
 void psync_send_event_by_id(psync_eventtype_t eventid, psync_syncid_t syncid,
@@ -478,7 +479,7 @@ void psync_send_data_event(event_data_struct *data) {
     event_data->str1 = strdup(data->str1);
     event_data->str2 = strdup(data->str2);
 
-    psync_run_thread1("Data Event", data_event_thread, event_data);
+    prun_thread1("Data Event", data_event_thread, event_data);
   } else {
     debug(D_ERROR, "Data event callback function not set.");
   }

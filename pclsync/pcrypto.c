@@ -36,7 +36,7 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcompiler.h"
 
 #include "pssl.h"
@@ -121,7 +121,7 @@ static void psync_hmac_sha512(const unsigned char *msg, size_t msglen,
 
 static void xor16_unaligned_inplace(unsigned char *data,
                                     const unsigned char *key) {
-  psync_uint_t i;
+  unsigned long i;
   for (i = 0; i < PSYNC_AES256_BLOCK_SIZE; i++)
     data[i] ^= key[i];
 }
@@ -162,7 +162,7 @@ static void copy_iv_and_xor_with_counter(unsigned char *dest,
 
 psync_symmetric_key_t psync_crypto_aes256_gen_key_len(size_t len) {
   psync_symmetric_key_t key;
-  key = (psync_symmetric_key_t)psync_locked_malloc(
+  key = (psync_symmetric_key_t)pmemlock_malloc(
       offsetof(psync_symmetric_key_struct_t, key) + len);
   key->keylen = len;
   psync_ssl_rand_strong(key->key, len);
@@ -407,7 +407,7 @@ psync_crypto_aes256_text_encoder_create(psync_symmetric_key_t key) {
   enc = psync_ssl_aes256_create_encoder(key);
   if (unlikely_log(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
-  ret = (psync_crypto_aes256_text_encoder_t)psync_locked_malloc(
+  ret = (psync_crypto_aes256_text_encoder_t)pmemlock_malloc(
       offsetof(psync_crypto_aes256_key_var_iv_struct_t, iv) + key->keylen -
       PSYNC_AES256_KEY_SIZE);
   ret->encoder = enc;
@@ -420,7 +420,7 @@ void psync_crypto_aes256_text_encoder_free(
     psync_crypto_aes256_text_encoder_t enc) {
   psync_ssl_aes256_free_encoder(enc->encoder);
   psync_ssl_memclean(enc->iv, enc->ivlen);
-  psync_locked_free(enc);
+  pmemlock_free(enc);
 }
 
 psync_crypto_aes256_text_decoder_t
@@ -433,7 +433,7 @@ psync_crypto_aes256_text_decoder_create(psync_symmetric_key_t key) {
   enc = psync_ssl_aes256_create_decoder(key);
   if (unlikely_log(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
-  ret = (psync_crypto_aes256_text_encoder_t)psync_locked_malloc(
+  ret = (psync_crypto_aes256_text_encoder_t)pmemlock_malloc(
       offsetof(psync_crypto_aes256_key_var_iv_struct_t, iv) + key->keylen -
       PSYNC_AES256_KEY_SIZE);
   ret->encoder = enc;
@@ -446,7 +446,7 @@ void psync_crypto_aes256_text_decoder_free(
     psync_crypto_aes256_text_decoder_t enc) {
   psync_ssl_aes256_free_encoder(enc->encoder);
   psync_ssl_memclean(enc->iv, enc->ivlen);
-  psync_locked_free(enc);
+  pmemlock_free(enc);
 }
 
 psync_crypto_aes256_sector_encoder_decoder_t
@@ -464,7 +464,7 @@ psync_crypto_aes256_sector_encoder_decoder_create(psync_symmetric_key_t key) {
     psync_ssl_aes256_free_encoder(enc);
     return PSYNC_CRYPTO_INVALID_ENCODER;
   }
-  ret = (psync_crypto_aes256_sector_encoder_decoder_t)psync_locked_malloc(
+  ret = (psync_crypto_aes256_sector_encoder_decoder_t)pmemlock_malloc(
       offsetof(psync_crypto_aes256_enc_dec_var_iv_struct_t, iv) + key->keylen -
       PSYNC_AES256_KEY_SIZE);
   ret->encoder = enc;
@@ -479,7 +479,7 @@ void psync_crypto_aes256_sector_encoder_decoder_free(
   psync_ssl_aes256_free_encoder(enc->encoder);
   psync_ssl_aes256_free_decoder(enc->decoder);
   psync_ssl_memclean(enc->iv, enc->ivlen);
-  psync_locked_free(enc);
+  pmemlock_free(enc);
 }
 
 static int memcmp_const(const unsigned char *s1, const unsigned char *s2,
