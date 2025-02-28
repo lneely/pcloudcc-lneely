@@ -59,13 +59,15 @@ typedef struct {
   int locked;
 } allocator_range;
 
+static int psync_page_size;
+
 static pthread_mutex_t page_mutex = PTHREAD_MUTEX_INITIALIZER;
 static psync_tree *locked_pages = PSYNC_TREE_EMPTY;
 
 static pthread_mutex_t allocator_mutex;
 static psync_tree *allocator_ranges = PSYNC_TREE_EMPTY;
 
-void psync_locked_init() {
+void pmemlock_init() {
   pthread_mutexattr_t mattr;
   pthread_mutexattr_init(&mattr);
   pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
@@ -181,10 +183,10 @@ static int unlock_page(pageid_t pageid, int page_size) {
   return ret;
 }
 
-int psync_mem_lock(void *ptr, size_t size) {
+int pmemlock_lock(void *ptr, size_t size) {
   pageid_t frompage, topage, i;
   int page_size;
-  page_size = psync_get_page_size();
+  page_size = pmemlock_get_pagesize();
   if (page_size == -1)
     return PRINT_RETURN(-1);
   frompage = (uintptr_t)ptr / page_size;
@@ -198,10 +200,10 @@ int psync_mem_lock(void *ptr, size_t size) {
   return 0;
 }
 
-int psync_mem_unlock(void *ptr, size_t size) {
+int pmemlock_unlock(void *ptr, size_t size) {
   pageid_t frompage, topage, i;
   int page_size, ret;
-  page_size = psync_get_page_size();
+  page_size = pmemlock_get_pagesize();
   if (page_size == -1)
     return PRINT_RETURN(-1);
   frompage = (uintptr_t)ptr / page_size;
@@ -226,7 +228,7 @@ static void mark_aligment_bytes(char *ptr, size_t from, size_t to) {
 }
 #endif
 
-void *psync_locked_malloc(size_t size) {
+void *pmemlock_malloc(size_t size) {
   return psync_malloc(size);
   allocator_range *range, *brange;
   psync_tree *tr, **addto;
@@ -247,7 +249,7 @@ void *psync_locked_malloc(size_t size) {
   brange = NULL;
   boffset = 0; // just to make compilers happy
   // psync_mem_lock may call psync_cloud_crypto_clean_cache(), which in turn can
-  // call psync_locked_free() on few pointers, therefore allocator_mutex is
+  // call pmemlock_free() on few pointers, therefore allocator_mutex is
   // recursive
   pthread_mutex_lock(&allocator_mutex);
   psync_tree_for_each_element(range, allocator_ranges, allocator_range, tree)
@@ -264,7 +266,7 @@ void *psync_locked_malloc(size_t size) {
   if (brange) {
   foundneededsize:
     if (unlikely(!brange->locked))
-      if (!psync_mem_lock(brange->mem, brange->size))
+      if (!pmemlock_lock(brange->mem, brange->size))
         brange->locked = 1;
     psync_interval_tree_remove(&brange->freeintervals, boffset, boffset + size);
     ret = brange->mem + boffset;
@@ -283,7 +285,7 @@ void *psync_locked_malloc(size_t size) {
   pthread_mutex_unlock(&allocator_mutex);
   if (ret)
     return ret;
-  page_size = psync_get_page_size();
+  page_size = pmemlock_get_pagesize();
   if (unlikely(page_size == -1))
     page_size = 4096;
   intsize = (size + LM_RANGE_OVERHEAD + page_size - 1) / page_size * page_size;
@@ -293,7 +295,7 @@ void *psync_locked_malloc(size_t size) {
   brange->size = intsize;
   debug(D_NOTICE, "allocating new locked block of size %lu at %p",
         (unsigned long)intsize, brange->mem);
-  if (unlikely(psync_mem_lock(brange->mem, intsize))) {
+  if (unlikely(pmemlock_lock(brange->mem, intsize))) {
     brange->locked = 0;
     debug(D_WARNING, "could not lock %lu bytes in memory",
           (unsigned long)intsize);
@@ -344,7 +346,7 @@ void *psync_locked_malloc(size_t size) {
   return ret;
 }
 
-void psync_locked_free(void *ptr) {
+void pmemlock_free(void *ptr) {
   psync_free(ptr);
   return;
   allocator_range *range;
@@ -391,8 +393,16 @@ found:
     debug(D_NOTICE, "freeing block of size %lu at %p",
           (unsigned long)range->size, range->mem);
     if (range->locked)
-      psync_mem_unlock(range->mem, range->size);
+      pmemlock_unlock(range->mem, range->size);
     psync_munmap_anon(range->mem, range->size);
     psync_free(range);
   }
+}
+
+int pmemlock_get_pagesize() { 
+  return psync_page_size; 
+}
+
+void pmemlock_set_pagesize(int sz) {
+  psync_page_size = sz;
 }

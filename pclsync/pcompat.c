@@ -65,6 +65,7 @@
 #include "pcompat.h"
 #include "pdevice.h"
 #include "plibs.h"
+#include "pmemlock.h"
 #include "prun.h"
 #include "psettings.h"
 #include "pssl.h"
@@ -86,8 +87,6 @@ static int proxy_type = PROXY_NONE;
 static int proxy_detected = 0;
 static char proxy_host[256];
 static char proxy_port[8];
-
-static int psync_page_size;
 
 PSYNC_THREAD const char *psync_thread_name = "no name";
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -126,8 +125,8 @@ void psync_sys_init() {
   psync_gids = psync_new_cnt(gid_t, psync_gids_cnt);
   if (unlikely_log(getgroups(psync_gids_cnt, psync_gids) != psync_gids_cnt))
     psync_gids_cnt = 0;
-  psync_page_size = sysconf(_SC_PAGESIZE);
-  debug(D_NOTICE, "detected page size %d", psync_page_size);
+  pmemlock_set_pagesize(sysconf(_SC_PAGESIZE));
+  debug(D_NOTICE, "detected page size %d", pmemlock_get_pagesize());
 }
 
 int psync_stat_mode_ok(struct stat *buf, unsigned int bits) {
@@ -2071,5 +2070,3 @@ int psync_munlock(void *ptr, size_t size) {
   return -1;
 #endif
 }
-
-int psync_get_page_size() { return psync_page_size; }

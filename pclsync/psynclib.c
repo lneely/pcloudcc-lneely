@@ -260,7 +260,7 @@ int psync_init() {
       return 0;
     }
   }
-  psync_locked_init();
+  pmemlock_init();
   psync_cache_init();
   psync_sys_init();
 

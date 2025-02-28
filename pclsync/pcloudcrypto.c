@@ -609,13 +609,13 @@ retry:
       iterations);
   enc = psync_crypto_aes256_ctr_encoder_decoder_create(aeskey);
   psync_ssl_free_symmetric_key(aeskey);
-  rsaprivdec = (unsigned char *)psync_locked_malloc(rsaprivlen);
+  rsaprivdec = (unsigned char *)pmemlock_malloc(rsaprivlen);
   memcpy(rsaprivdec, rsapriv, rsaprivlen);
   psync_crypto_aes256_ctr_encode_decode_inplace(enc, rsaprivdec, rsaprivlen, 0);
   psync_crypto_aes256_ctr_encoder_decoder_free(enc);
   crypto_privkey = psync_ssl_rsa_load_private(rsaprivdec, rsaprivlen);
   psync_ssl_memclean(rsaprivdec, rsaprivlen);
-  psync_locked_free(rsaprivdec);
+  pmemlock_free(rsaprivdec);
   if (crypto_privkey == PSYNC_INVALID_RSA) {
     psync_ssl_rsa_free_public(crypto_pubkey);
     crypto_pubkey = PSYNC_INVALID_RSA;
@@ -1037,7 +1037,7 @@ static void psync_crypto_release_file_symkey_locked(psync_fileid_t fileid,
 static psync_symmetric_key_t
 psync_crypto_sym_key_ver1_to_sym_key(sym_key_ver1 *v1) {
   psync_symmetric_key_t key;
-  key = (psync_symmetric_key_t)psync_locked_malloc(
+  key = (psync_symmetric_key_t)pmemlock_malloc(
       offsetof(psync_symmetric_key_struct_t, key) + PSYNC_AES256_KEY_SIZE +
       PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN);
   key->keylen = PSYNC_AES256_KEY_SIZE + PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN;

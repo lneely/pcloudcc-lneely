@@ -129,8 +129,9 @@ int psync_munmap_anon(void *ptr, size_t size);
 int psync_mlock(void *ptr, size_t size);
 int psync_munlock(void *ptr, size_t size);
 void psync_anon_reset(void *ptr, size_t size);
+
+// Entropy
 void psync_get_random_seed(unsigned char *seed, const void *addent, size_t aelen, int fast);
-int psync_get_page_size();
 
 // File Operations
 int psync_file_open(const char *path, int access, int flags);
