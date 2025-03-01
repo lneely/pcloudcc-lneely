@@ -38,8 +38,7 @@
 int pnotify_running();
 const char *pnotify_get_thumb_size();
 void pnotify_notify(binresult *res);
-void pnotify_set_callback(
-    pnotification_callback_t notification_callback, const char *thumbsize);
+void pnotify_set_callback(pnotification_callback_t notification_callback, const char *thumbsize);
 psync_notification_list_t *pnotify_get();
 void pnotify_clean();
 
