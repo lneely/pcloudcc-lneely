@@ -2848,10 +2848,10 @@ static void psync_diff_adapter_hash(void *out) {
   psync_fast_hash256_ctx ctx;
   psock_ifaces_t *list;
   list = psock_list_adapters();
-  psync_fast_hash256_init(&ctx);
-  psync_fast_hash256_update(&ctx, list->interfaces,
+  pcrc32c_fast_hash256_init(&ctx);
+  pcrc32c_fast_hash256_update(&ctx, list->interfaces,
                             list->interfacecnt * sizeof(psock_iface_t));
-  psync_fast_hash256_final(out, &ctx);
+  pcrc32c_fast_hash256_final(out, &ctx);
   psync_free(list);
 }
 

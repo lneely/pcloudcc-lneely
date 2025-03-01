@@ -381,7 +381,7 @@ static int psync_pagecache_read_range_from_api(psync_request_t *request,
     page->lastuse = ptimer_time();
     page->size = rb;
     page->usecnt = 0;
-    page->crc = psync_crc32c(PSYNC_CRC_INITIAL, page->page, rb);
+    page->crc = pcrc32c_compute(PSYNC_CRC_INITIAL, page->page, rb);
     page->type = PAGE_TYPE_READ;
     h = waiterhash_by_hash_and_pageid(page->hash, page->pageid);
     lock_wait(page->hash);
@@ -848,7 +848,7 @@ static long check_page_in_memory_by_hash(uint64_t hash, uint64_t pageid,
       page->usecnt++;
       page->lastuse = tm;
     }
-    crc = psync_crc32c(PSYNC_CRC_INITIAL, page->page, page->size);
+    crc = pcrc32c_compute(PSYNC_CRC_INITIAL, page->page, page->size);
     if (unlikely(crc != page->crc)) {
       debug(D_WARNING,
             "memory page CRC does not match %u!=%u, this is most likely memory "
@@ -1677,7 +1677,7 @@ static long check_page_in_database_by_hash(uint64_t hash,
       ret = -1;
     } else {
       if (unlikely(size == dsize && off == 0 &&
-                   psync_crc32c(PSYNC_CRC_INITIAL, buff, size) != crc)) {
+                   pcrc32c_compute(PSYNC_CRC_INITIAL, buff, size) != crc)) {
         debug(D_WARNING,
               "got bad CRC when reading data from cache at offset %lu",
               (unsigned long)(pagecacheid * PSYNC_FS_PAGE_SIZE + off));
@@ -1736,7 +1736,7 @@ static void check_pages_in_database_by_hash(uint64_t hash,
       continue;
     }
     for (j = 0; j < cnt; j++)
-      if (psync_crc32c(PSYNC_CRC_INITIAL,
+      if (pcrc32c_compute(PSYNC_CRC_INITIAL,
                        buff + (cpid - first_page_id + j) * PSYNC_FS_PAGE_SIZE,
                        PSYNC_FS_PAGE_SIZE) ==
           psync_get_result_cell(fres, i + j, 3))
@@ -1799,7 +1799,7 @@ static long check_page_in_database_by_hash_and_cache(uint64_t hash,
       psync_pagecache_return_free_page(page);
       ret = -1;
     } else {
-      ccrc = psync_crc32c(PSYNC_CRC_INITIAL, page->page, dsize);
+      ccrc = pcrc32c_compute(PSYNC_CRC_INITIAL, page->page, dsize);
       if (unlikely(ccrc != crc)) {
         debug(D_WARNING,
               "got bad CRC when reading data from cache at offset %lu, size "
@@ -1996,7 +1996,7 @@ static int psync_pagecache_read_range_from_sock(psync_request_t *request,
     page->lastuse = ptimer_time();
     page->size = rb;
     page->usecnt = 0;
-    page->crc = psync_crc32c(PSYNC_CRC_INITIAL, page->page, rb);
+    page->crc = pcrc32c_compute(PSYNC_CRC_INITIAL, page->page, rb);
     page->type = PAGE_TYPE_READ;
     h = waiterhash_by_hash_and_pageid(page->hash, page->pageid);
     lock_wait(page->hash);
@@ -3235,7 +3235,7 @@ static void psync_pagecache_new_upload_to_cache(uint64_t taskid, uint64_t hash,
     page->lastuse = tm;
     page->size = rd;
     page->usecnt = 1;
-    page->crc = psync_crc32c(PSYNC_CRC_INITIAL, page->page, rd);
+    page->crc = pcrc32c_compute(PSYNC_CRC_INITIAL, page->page, rd);
     page->type = PAGE_TYPE_READ;
     psync_pagecache_add_page_if_not_exists(page, hash, pageid);
     if (rd < PSYNC_FS_PAGE_SIZE)
@@ -3354,7 +3354,7 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
         page->lastuse = tm;
         page->size = pdb;
         page->usecnt = 1;
-        page->crc = psync_crc32c(PSYNC_CRC_INITIAL, page->page, pdb);
+        page->crc = pcrc32c_compute(PSYNC_CRC_INITIAL, page->page, pdb);
         page->type = PAGE_TYPE_READ;
         psync_pagecache_add_page_if_not_exists(page, hash, pageid);
         break;
@@ -3386,7 +3386,7 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
       page->lastuse = tm;
       page->size = rd;
       page->usecnt = 1;
-      page->crc = psync_crc32c(PSYNC_CRC_INITIAL, page->page, rd);
+      page->crc = pcrc32c_compute(PSYNC_CRC_INITIAL, page->page, rd);
       page->type = PAGE_TYPE_READ;
       //      debug(D_NOTICE, "new page %lu crc %lu size %lu", (unsigned
       //      long)pageid, (unsigned long)page->crc, (unsigned long)rd);
@@ -3461,7 +3461,7 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
       page->lastuse = tm;
       page->size = pdb;
       page->usecnt = 1;
-      page->crc = psync_crc32c(PSYNC_CRC_INITIAL, page->page, pdb);
+      page->crc = pcrc32c_compute(PSYNC_CRC_INITIAL, page->page, pdb);
       page->type = PAGE_TYPE_READ;
       //      debug(D_NOTICE, "combined page %lu crc %lu size %lu", (unsigned
       //      long)pageid, (unsigned long)page->crc, (unsigned long)pdb);
@@ -3723,13 +3723,13 @@ static int psync_pagecache_free_page_from_read_cache() {
       page->usecnt = row[4];
       page->crc = row[6];
       psync_sql_free_result(res);
-      if (unlikely(psync_crc32c(PSYNC_CRC_INITIAL, page->page, page->size) !=
+      if (unlikely(pcrc32c_compute(PSYNC_CRC_INITIAL, page->page, page->size) !=
                    page->crc)) {
         debug(
             D_WARNING,
             "page CRC check failed, dropping page, db CRC %u calculated CRC %u",
             (unsigned)page->crc,
-            (unsigned)psync_crc32c(PSYNC_CRC_INITIAL, page->page, page->size));
+            (unsigned)pcrc32c_compute(PSYNC_CRC_INITIAL, page->page, page->size));
         psync_pagecache_return_free_page(page);
       } else {
         page->type = PAGE_TYPE_READ;

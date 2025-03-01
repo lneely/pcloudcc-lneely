@@ -221,7 +221,7 @@ int pfscrypto_init_log(psync_openfile_t *of) {
     return -EIO;
   }
   of->logoffset = PSYNC_CRYPTO_SECTOR_SIZE;
-  psync_fast_hash256_init(&of->loghashctx);
+  pcrc32c_fast_hash256_init(&of->loghashctx);
   return 0;
 }
 
@@ -624,7 +624,7 @@ static int psync_fs_crypto_switch_sectors(psync_openfile_t *of,
               (unsigned)sizeof(hdr), (int)wrt);
         return -EIO;
       }
-      psync_fast_hash256_update(&of->loghashctx, &hdr, sizeof(hdr));
+      pcrc32c_fast_hash256_update(&of->loghashctx, &hdr, sizeof(hdr));
       wrt = pfile_pwrite(of->logfile, &autharr[level], sz,
                               of->logoffset + sizeof(hdr));
       if (unlikely(wrt != sz)) {
@@ -632,7 +632,7 @@ static int psync_fs_crypto_switch_sectors(psync_openfile_t *of,
               (int)wrt);
         return -EIO;
       }
-      psync_fast_hash256_update(&of->loghashctx, &autharr[level], sz);
+      pcrc32c_fast_hash256_update(&of->loghashctx, &autharr[level], sz);
       if (!of->newfile)
         psync_interval_tree_add(&of->writeintervals, hdr.offset,
                                 hdr.offset + sz);
@@ -712,7 +712,7 @@ psync_fs_crypto_write_master_auth(psync_openfile_t *of,
           (unsigned)sizeof(data), (int)wrt);
     return -EIO;
   }
-  psync_fast_hash256_update(&of->loghashctx, &data, sizeof(data));
+  pcrc32c_fast_hash256_update(&of->loghashctx, &data, sizeof(data));
   if (!of->newfile)
     psync_interval_tree_add(&of->writeintervals, offsets->masterauthoff,
                             offsets->masterauthoff + PSYNC_CRYPTO_AUTH_SIZE);
@@ -770,7 +770,7 @@ psync_fs_crypto_check_log_hash(int lfd,
     debug(D_WARNING, "invalid hashid in log file %u", (unsigned)mr->hashid);
     return -1;
   }
-  psync_fast_hash256_init(&ctx);
+  pcrc32c_fast_hash256_init(&ctx);
   off = PSYNC_CRYPTO_SECTOR_SIZE;
   while ((rd = pfile_pread(lfd, buff, PSYNC_CRYPTO_SECTOR_SIZE, off)) !=
          0) {
@@ -779,10 +779,10 @@ psync_fs_crypto_check_log_hash(int lfd,
             (int)errno);
       return -1;
     }
-    psync_fast_hash256_update(&ctx, buff, rd);
+    pcrc32c_fast_hash256_update(&ctx, buff, rd);
     off += rd;
   }
-  psync_fast_hash256_final(chash, &ctx);
+  pcrc32c_fast_hash256_final(chash, &ctx);
   if (memcmp(chash, mr->hash, PSYNC_FAST_HASH256_LEN)) {
     debug(D_WARNING, "calculated hash does not match");
 #if IS_DEBUG
@@ -827,12 +827,12 @@ static int psync_fs_crypto_process_log(int lfd, int dfd,
     return -1;
   }
   if (unlikely(mr->crc !=
-               psync_crc32c(PSYNC_CRC_INITIAL, mr,
+               pcrc32c_compute(PSYNC_CRC_INITIAL, mr,
                             offsetof(psync_crypto_master_record, crc)))) {
     debug(D_WARNING,
           "got log file with bad master record CRC, expected %u got %u",
           (unsigned)mr->crc,
-          (unsigned)psync_crc32c(PSYNC_CRC_INITIAL, mr,
+          (unsigned)pcrc32c_compute(PSYNC_CRC_INITIAL, mr,
                                  offsetof(psync_crypto_master_record, crc)));
     return -1;
   }
@@ -953,8 +953,8 @@ static int psync_fs_crypto_mark_log_finalized(psync_openfile_t *of,
   mr.hashid = PSYNC_LOG_HASHID_FH256;
   mr.logsize = lsize;
   mr.filesize = filesize;
-  psync_fast_hash256_final(&mr.hash, &of->loghashctx);
-  mr.crc = psync_crc32c(PSYNC_CRC_INITIAL, &mr,
+  pcrc32c_fast_hash256_final(&mr.hash, &of->loghashctx);
+  mr.crc = pcrc32c_compute(PSYNC_CRC_INITIAL, &mr,
                         offsetof(psync_crypto_master_record, crc));
   wrt = pfile_pwrite(of->logfile, &mr, sizeof(mr), 0);
   if (unlikely_log(wrt != sizeof(mr)))
@@ -1020,7 +1020,7 @@ static int psync_fs_write_interval_tree_to_log(psync_openfile_t *of) {
               (unsigned)sizeof(logs), (int)wrt);
         return -EIO;
       }
-      psync_fast_hash256_update(&of->loghashctx, logs, sizeof(logs));
+      pcrc32c_fast_hash256_update(&of->loghashctx, logs, sizeof(logs));
       of->logoffset += sizeof(logs);
       last = 0;
     }
@@ -1041,7 +1041,7 @@ static int psync_fs_write_interval_tree_to_log(psync_openfile_t *of) {
             (unsigned)(sizeof(psync_crypto_log_header) * last), (int)wrt);
       return -EIO;
     }
-    psync_fast_hash256_update(&of->loghashctx, logs, last);
+    pcrc32c_fast_hash256_update(&of->loghashctx, logs, last);
     of->logoffset += last;
   }
   return 0;
@@ -1200,7 +1200,7 @@ psync_fs_crypto_write_newfile_full_sector(psync_openfile_t *of, const char *buf,
     psync_fs_crypto_reset_log_to_off(of, of->logoffset);
     return -EIO;
   }
-  psync_fast_hash256_update(&of->loghashctx, &rec, len);
+  pcrc32c_fast_hash256_update(&of->loghashctx, &rec, len);
   psync_fs_crypto_set_sector_log_offset(of, sectorid, of->logoffset, auth);
   of->logoffset += len;
   if (!of->newfile)
