@@ -33,7 +33,7 @@
 #include "pstatus.h"
 #include "pfstasks.h"
 #include "plibs.h"
-#include "prunratelimit.h"
+#include "prunthrottled.h"
 #include "psettings.h"
 #include "ptask.h"
 #include "putil.h"
@@ -232,11 +232,11 @@ void pstatus_upload_recalc() {
 }
 
 void pstatus_download_recalc_async() {
-  psync_run_ratelimited("recalc download", proc_recalc_download, PSYNC_MIN_INTERVAL_RECALC_DOWNLOAD, 1);
+  prun_throttled("recalc download", proc_recalc_download, PSYNC_MIN_INTERVAL_RECALC_DOWNLOAD, 1);
 }
 
 void pstatus_upload_recalc_async() {
-  psync_run_ratelimited("recalc upload", proc_recalc_upload, PSYNC_MIN_INTERVAL_RECALC_UPLOAD, 1);
+  prun_throttled("recalc upload", proc_recalc_upload, PSYNC_MIN_INTERVAL_RECALC_UPLOAD, 1);
 }
 
 uint32_t pstatus_get(uint32_t statusid) {

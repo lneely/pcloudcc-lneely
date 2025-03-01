@@ -46,7 +46,7 @@
 #include "plocalnotify.h"
 #include "plocalscan.h"
 #include "ppathstatus.h"
-#include "prunratelimit.h"
+#include "prunthrottled.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "pstatus.h"
@@ -1234,7 +1234,7 @@ static void psync_do_wake_localscan() {
 }
 
 void psync_wake_localscan() {
-  psync_run_ratelimited("wake localscan", psync_do_wake_localscan,
+  prun_throttled("wake localscan", psync_do_wake_localscan,
                         PSYNC_LOCALSCAN_MIN_INTERVAL, 0);
 }
 

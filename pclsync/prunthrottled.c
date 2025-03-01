@@ -29,7 +29,7 @@
    DAMAGE.
 */
 
-#include "prunratelimit.h"
+#include "prunthrottled.h"
 #include "plibs.h"
 #include "ptimer.h"
 #include "ptree.h"
@@ -38,7 +38,7 @@
 
 typedef struct {
   psync_tree tree;
-  psync_run_ratelimit_callback0 call;
+  prun_throttle_cb call;
   const char *name;
   unsigned char scheduled;
 } psync_rr_tree_node;
@@ -46,10 +46,10 @@ typedef struct {
 static pthread_mutex_t task_mutex = PTHREAD_MUTEX_INITIALIZER;
 static psync_tree *tasks = PSYNC_TREE_EMPTY;
 
-static void psync_run_ratelimited_timer(psync_timer_t timer, void *ptr) {
+static void ratelimit_timer(psync_timer_t timer, void *ptr) {
   psync_rr_tree_node *node;
   const char *name;
-  psync_run_ratelimit_callback0 call;
+  prun_throttle_cb call;
   int run;
   node = (psync_rr_tree_node *)ptr;
   pthread_mutex_lock(&task_mutex);
@@ -72,7 +72,7 @@ static void psync_run_ratelimited_timer(psync_timer_t timer, void *ptr) {
   }
 }
 
-void psync_run_ratelimited(const char *name, psync_run_ratelimit_callback0 call,
+void prun_throttled(const char *name, prun_throttle_cb call,
                            uint32_t minintervalsec, int runinthread) {
   psync_tree *tr, **addto;
   psync_rr_tree_node *node;
@@ -128,6 +128,6 @@ void psync_run_ratelimited(const char *name, psync_run_ratelimit_callback0 call,
       debug(D_NOTICE, "running %s on this thread", name);
       call();
     }
-    psync_timer_register(psync_run_ratelimited_timer, minintervalsec, node);
+    psync_timer_register(ratelimit_timer, minintervalsec, node);
   }
 }

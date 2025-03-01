@@ -34,9 +34,8 @@
 
 #include <stdint.h>
 
-typedef void (*psync_run_ratelimit_callback0)();
+typedef void (*prun_throttle_cb)();
 
-void psync_run_ratelimited(const char *name, psync_run_ratelimit_callback0 call,
-                           uint32_t minintervalsec, int runinthread);
+void prun_throttled(const char *name, prun_throttle_cb call, uint32_t minintervalsec, int runinthread);
 
 #endif
