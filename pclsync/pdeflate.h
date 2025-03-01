@@ -51,11 +51,10 @@ typedef struct _psync_deflate_t psync_deflate_t;
 #define PSYNC_DEFLATE_ERROR -3
 #define PSYNC_DEFLATE_EOF 0
 
-psync_deflate_t *psync_deflate_init(int level);
-void psync_deflate_destroy(psync_deflate_t *def);
-int psync_deflate_write(psync_deflate_t *def, const void *data, int len,
-                        int flush);
-int psync_deflate_read(psync_deflate_t *def, void *data, int len);
-int psync_deflate_pending(psync_deflate_t *def);
+psync_deflate_t *pdeflate_init(int level);
+void pdeflate_destroy(psync_deflate_t *def);
+int pdeflate_write(psync_deflate_t *def, const void *data, int len, int flush);
+int pdeflate_read(psync_deflate_t *def, void *data, int len);
+int pdeflate_pending(psync_deflate_t *def);
 
 #endif

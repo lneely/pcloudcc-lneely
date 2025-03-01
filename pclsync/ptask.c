@@ -41,7 +41,7 @@
 #include <pthread.h>
 
 #include "papi.h"
-#include "pcompression.h"
+#include "pdeflate.h"
 #include "pdownload.h"
 #include "pfile.h"
 #include "plibs.h"
@@ -175,7 +175,7 @@ static void stream_setup_header(async_params_t *prms);
 static int data_send(async_params_t *prms, const void *data, int len) {
   int wr;
   while (len) {
-    wr = psync_deflate_write(prms->enc, data, len, PSYNC_DEFLATE_NOFLUSH);
+    wr = pdeflate_write(prms->enc, data, len, PSYNC_DEFLATE_NOFLUSH);
     if (wr > 0) {
       len -= wr;
       data = (const char *)data + wr;
@@ -195,7 +195,7 @@ static int data_send(async_params_t *prms, const void *data, int len) {
 
 static int data_pending_flush(async_params_t *prms) {
   int ret;
-  ret = psync_deflate_write(prms->enc, "", 0, PSYNC_DEFLATE_FLUSH);
+  ret = pdeflate_write(prms->enc, "", 0, PSYNC_DEFLATE_FLUSH);
   if (ret != 0) {
     debug(D_WARNING, "psync_deflate_write returned %d when flushing", ret);
     return -1;
@@ -208,7 +208,7 @@ static int data_pending_send(async_params_t *prms) {
   char buff[4096];
   int ret;
   while (1) {
-    ret = psync_deflate_read(prms->enc, buff, sizeof(buff));
+    ret = pdeflate_read(prms->enc, buff, sizeof(buff));
     if (ret == PSYNC_DEFLATE_NODATA || ret == PSYNC_DEFLATE_EOF)
       return 0;
     if (ret > 0) {
@@ -506,7 +506,7 @@ static int handle_command_data(async_params_t *prms, char *data, uint32_t type, 
 static int handle_decompressed_data(async_params_t *prms) {
   int rd;
   while (1) {
-    rd = psync_deflate_read(prms->dec, prms->curreadbuff, prms->curreadbuffrem);
+    rd = pdeflate_read(prms->dec, prms->curreadbuff, prms->curreadbuffrem);
     if (rd > 0) {
       prms->curreadbuff += rd;
       prms->curreadbuffrem -= rd;
@@ -536,7 +536,7 @@ static int handle_incoming_data(async_params_t *prms) {
     ptr = buff;
     while (rdsock) {
       wrdecomp =
-          psync_deflate_write(prms->dec, ptr, rdsock, PSYNC_DEFLATE_FLUSH);
+          pdeflate_write(prms->dec, ptr, rdsock, PSYNC_DEFLATE_FLUSH);
       if (wrdecomp == PSYNC_DEFLATE_ERROR) {
         debug(D_ERROR, "psync_deflate_write returned PSYNC_DEFLATE_ERROR");
         return -1;
@@ -595,8 +595,8 @@ static void proc_async_transfer(void *ptr) {
   running--;
   pthread_mutex_unlock(&mutex);
   psync_apipool_release_bad(prms->api);
-  psync_deflate_destroy(prms->enc);
-  psync_deflate_destroy(prms->dec);
+  pdeflate_destroy(prms->enc);
+  pdeflate_destroy(prms->dec);
   psync_tree_for_each_element_call_safe(prms->streams, stream_t, tree,
                                         stream_destroy);
   psync_free(prms);
@@ -645,14 +645,14 @@ static int proc_start_async_transfer() {
     debug(D_NOTICE, "socketpair() failed");
     goto err1;
   }
-  enc = psync_deflate_init(PSYNC_DEFLATE_COMP_FAST);
+  enc = pdeflate_init(PSYNC_DEFLATE_COMP_FAST);
   if (!enc) {
-    debug(D_NOTICE, "psync_deflate_init() failed");
+    debug(D_NOTICE, "pdeflate_init() failed");
     goto err2;
   }
-  dec = psync_deflate_init(PSYNC_DEFLATE_DECOMPRESS);
+  dec = pdeflate_init(PSYNC_DEFLATE_DECOMPRESS);
   if (!dec) {
-    debug(D_NOTICE, "psync_deflate_init() failed");
+    debug(D_NOTICE, "pdeflate_init() failed");
     goto err3;
   }
   tparams = psync_new(async_params_t);
@@ -666,7 +666,7 @@ static int proc_start_async_transfer() {
   running++;
   return 0;
 err3:
-  psync_deflate_destroy(enc);
+  pdeflate_destroy(enc);
 err2:
   close(pair[0]);
   close(pair[1]);

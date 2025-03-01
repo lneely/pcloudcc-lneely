@@ -31,7 +31,7 @@
 
 #include <zlib.h>
 
-#include "pcompression.h"
+#include "pdeflate.h"
 #include "plibs.h"
 
 #define BUFFER_SIZE (4 * 1024)
@@ -52,7 +52,7 @@ struct _psync_deflate_t {
   unsigned char buffer[BUFFER_SIZE];
 };
 
-psync_deflate_t *psync_deflate_init(int level) {
+psync_deflate_t *pdeflate_init(int level) {
   psync_deflate_t *def;
   int ret;
   def = psync_new(psync_deflate_t);
@@ -76,7 +76,7 @@ psync_deflate_t *psync_deflate_init(int level) {
   }
 }
 
-void psync_deflate_destroy(psync_deflate_t *def) {
+void pdeflate_destroy(psync_deflate_t *def) {
   if (def->flags & FLAG_DEFLATE)
     deflateEnd(&def->stream);
   else
@@ -173,7 +173,7 @@ static int psync_deflate_finish_flush_add_buffer(psync_deflate_t *def,
   }
 }
 
-int psync_deflate_write(psync_deflate_t *def, const void *data, int len,
+int pdeflate_write(psync_deflate_t *def, const void *data, int len,
                         int flush) {
   int ret;
   if (!len && flush == PSYNC_DEFLATE_NOFLUSH) {
@@ -202,7 +202,7 @@ int psync_deflate_write(psync_deflate_t *def, const void *data, int len,
     return len - def->stream.avail_in;
 }
 
-int psync_deflate_read(psync_deflate_t *def, void *data, int len) {
+int pdeflate_read(psync_deflate_t *def, void *data, int len) {
   int ret;
   assert(def->bufferstartoff <= def->bufferendoff);
   if (def->bufferendoff == def->bufferstartoff) {
@@ -267,7 +267,7 @@ int psync_deflate_read(psync_deflate_t *def, void *data, int len) {
   return len;
 }
 
-int psync_deflate_pending(psync_deflate_t *def) {
+int pdeflate_pending(psync_deflate_t *def) {
   return def->bufferendoff - def->bufferstartoff +
          (def->flushbuff ? def->flushbufflen : 0);
 }
