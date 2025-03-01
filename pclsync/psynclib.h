@@ -45,6 +45,7 @@
 #include "ptools.h"
 #include "pstatus.h"
 #include "pfoldersync.h"
+#include "publiclinks.h"
 
 typedef uint64_t psync_userid_t;
 typedef uint64_t psync_shareid_t;
@@ -422,34 +423,6 @@ typedef struct {
   psync_notification_t notifications[];
 } psync_notification_list_t;
 
-typedef struct {
-  uint64_t linkid;
-  const char *name;
-  const char *code;
-  const char *comment;
-  const char *fulllink;
-  uint64_t traffic;
-  uint64_t maxspace;
-  uint64_t downloads;
-  uint64_t created;
-  uint64_t modified;
-  uint64_t itemid;
-  uint8_t isfolder;
-  uint8_t isupload;
-  uint8_t icon;
-  uint64_t parentfolderid;
-  uint8_t haspassword;
-  uint8_t type;
-  uint64_t views;
-  uint64_t expire;
-  uint8_t enableuploadforeveryone;
-  uint8_t enableuploadforchosenusers;
-} link_info_t;
-
-typedef struct {
-  uint32_t entrycnt;
-  link_info_t entries[];
-} plink_info_list_t;
 
 typedef enum {
   Dev_Types_UsbRemovableDisk = 1,
@@ -491,20 +464,6 @@ typedef struct {
 } plogged_device_list_t;
 
 typedef struct {
-  const char *name;
-  uint64_t created;
-  uint64_t modified;
-  uint8_t isfolder;
-  uint64_t itemid;
-  uint8_t icon;
-} link_cont_t;
-
-typedef struct {
-  uint32_t entrycnt;
-  link_cont_t entries[];
-} plink_contents_t;
-
-typedef struct {
   uint64_t teamid;
   const char *mail;
   const char *name;
@@ -515,30 +474,6 @@ typedef struct {
   size_t entrycnt;
   contact_info_t entries[];
 } pcontacts_list_t;
-
-typedef struct {
-  uint64_t recieverid;
-  const char *mail;
-} reciever_info_t;
-
-typedef struct {
-  size_t entrycnt;
-  reciever_info_t entries[];
-} preciever_list_t;
-
-typedef struct {
-  const char *link;
-  const char *name;
-  const char *code;
-  const char *description;
-  uint64_t created;
-  uint8_t locationid;
-} bookmark_info_t;
-
-typedef struct {
-  size_t entrycnt;
-  bookmark_info_t entries[];
-} bookmarks_list_t;
 
 typedef struct {
   const char *email;
