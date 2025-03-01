@@ -3238,7 +3238,7 @@ void psync_delete_cached_crypto_keys() {
       "'crypto_private_salt', 'crypto_private_sha1', 'crypto_public_sha1')");
   if (psync_sql_affected_rows()) {
     debug(D_NOTICE, "deleted cached crypto keys");
-    pcryptofolder_clean_cache();
+    pcryptofolder_cache_clean();
   }
   psync_sql_statement("DELETE FROM cryptofolderkey");
   psync_sql_statement("DELETE FROM cryptofilekey");

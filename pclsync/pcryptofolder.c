@@ -96,7 +96,7 @@ typedef struct {
 
 void sha1_hex_null_term(const void *data, size_t len, char *out);
 
-void pcryptofolder_clean_cache() {
+void pcryptofolder_cache_clean() {
   const char *prefixes[] = {"DKEY", "FKEY", "FLDE", "FLDD", "SEEN"};
   pcache_clean_oneof(prefixes, ARRAY_SIZE(prefixes));
 }
@@ -686,7 +686,7 @@ int pcryptofolder_lock() {
   crypto_privkey = PSYNC_INVALID_RSA;
   pthread_rwlock_unlock(&crypto_lock);
   debug(D_NOTICE, "stopped crypto");
-  pcryptofolder_clean_cache();
+  pcryptofolder_cache_clean();
   psync_fs_refresh_crypto_folders();
   return PSYNC_CRYPTO_STOP_SUCCESS;
 }

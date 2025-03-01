@@ -50,10 +50,10 @@
 #define PSYNC_CRYPTO_FAILED_SECTOR_ENCODER                                     \
   ((psync_crypto_aes256_sector_encoder_decoder_t)(PSYNC_CRYPTO_MAX_ERROR + 3))
 
+void pcryptofolder_cache_clean();
 void pcryptofolder_cache_cleanf();
 int pcryptofolder_change_pass(const char *oldpassphrase, const char *newpassphrase, uint32_t flags, char **privenc, char **sign);
 int pcryptofolder_change_pass_unlocked(const char *newpassphrase, uint32_t flags, char **privenc, char **sign);
-void pcryptofolder_clean_cache();
 psync_crypto_aes256_sector_encoder_decoder_t pcryptofolder_filencoder_from_binresult(psync_fileid_t fileid, binresult *res);
 psync_crypto_aes256_sector_encoder_decoder_t pcryptofolder_filencoder_get(psync_fsfileid_t fileid, uint64_t hash, int nonetwork);
 char *pcryptofolder_filencoder_key_get(psync_fsfileid_t fileid, uint64_t hash, size_t *keylen);
