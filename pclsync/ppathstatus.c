@@ -884,7 +884,7 @@ static void comp_hash(const char *s, size_t len, uint32_t *out, uint64_t seed1,
 static int move_encname_to_buff(psync_folderid_t folderid, char *buff,
                                 size_t buff_size, const char *name,
                                 size_t namelen) {
-  psync_crypto_aes256_text_encoder_t enc;
+  pcrypto_textenc_t enc;
   char *encname;
   size_t len;
   if (unlikely(namelen >= buff_size))

@@ -281,7 +281,7 @@ static int psync_add_path_to_list(psync_list *lst, psync_folderid_t folderid) {
 }
 
 static string_list *str_list_decode(psync_folderid_t folderid, string_list *e) {
-  psync_crypto_aes256_text_decoder_t dec;
+  pcrypto_textdec_t dec;
   char *fn;
   dec = pcryptofolder_flddecoder_get(folderid);
   if (psync_crypto_is_error(dec)) {

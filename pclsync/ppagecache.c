@@ -597,7 +597,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
       psync_http_connect_and_cache_host(hosts->array[0]->str);
     set_urls(urls, ret);
     if (request->needkey) {
-      psync_crypto_aes256_sector_encoder_decoder_t enc;
+      pcrypto_sector_encdec_t enc;
       ret = papi_result_thread(api);
       if (unlikely_log(!ret))
         goto err3;
@@ -2080,7 +2080,7 @@ static void psync_pagecache_read_unmodified_thread(void *ptr) {
   psync_request_range_t *range;
   const binresult *hosts;
   psync_urls_t *urls;
-  psync_crypto_aes256_sector_encoder_decoder_t enc;
+  pcrypto_sector_encdec_t enc;
   int err, tries;
   request = (psync_request_t *)ptr;
   if (psync_status_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_OFFLINE) {
@@ -2924,7 +2924,7 @@ int psync_pagecache_read_unmodified_encrypted_locked(psync_openfile_t *of,
       abort();
 #endif
 #else
-      psync_crypto_sector_auth_t sa;
+      pcrypto_sector_auth_t sa;
       psync_crypto_auth_page *p;
       debug(D_NOTICE,
             "checking chain checksums for pages %lu-%lu tree level %d",
@@ -2942,7 +2942,7 @@ int psync_pagecache_read_unmodified_encrypted_locked(psync_openfile_t *of,
             ret = p->waiter->error;
         }
         if (!ret && memcmp(sa, p->auth[ap->idinparent],
-                           sizeof(psync_crypto_sector_auth_t))) {
+                           sizeof(pcrypto_sector_auth_t))) {
           debug(D_ERROR,
                 "chain verification failed for sector %lu at level %u, "
                 "idinparent=%u",

@@ -58,7 +58,7 @@ static inline int psync_crypto_to_error(const void *ptr) {
 static char *get_encname_for_folder(psync_fsfolderid_t folderid,
                                     const char *path, size_t len) {
   char *name, *encname;
-  psync_crypto_aes256_text_encoder_t enc;
+  pcrypto_textenc_t enc;
   enc = pcryptofolder_fldencoder_get(folderid);
   if (psync_crypto_is_error(enc)) {
     cryptoerr = psync_crypto_to_error(enc);
@@ -77,7 +77,7 @@ static psync_fspath_t *ret_folder_data(psync_fsfolderid_t folderid,
   psync_fspath_t *ret;
   if (flags & PSYNC_FOLDER_FLAG_ENCRYPTED &&
       strncmp(psync_fake_prefix, name, psync_fake_prefix_len)) {
-    psync_crypto_aes256_text_encoder_t enc;
+    pcrypto_textenc_t enc;
     char *encname;
     size_t len;
     enc = pcryptofolder_fldencoder_get(folderid);
@@ -110,7 +110,7 @@ static psync_fspath_t *ret_folder_data(psync_fsfolderid_t folderid,
 char *get_decname_for_folder(psync_fsfolderid_t folderid, const char *path,
                              size_t len) {
   char *name, *decname;
-  psync_crypto_aes256_text_decoder_t dec;
+  pcrypto_textdec_t dec;
   dec = pcryptofolder_flddecoder_get(folderid);
   if (psync_crypto_is_error(dec)) {
     cryptoerr = psync_crypto_to_error(dec);

@@ -281,7 +281,7 @@ psync_fs_crypto_do_local_tree_check(psync_openfile_t *of,
                                     psync_crypto_sectorid_t sectorid,
                                     psync_crypto_offsets_t *offsets) {
   unsigned char buff[PSYNC_CRYPTO_SECTOR_SIZE];
-  psync_crypto_sector_auth_t auth;
+  pcrypto_sector_auth_t auth;
   uint64_t off;
   ssize_t rd;
   psync_crypto_sectorid_t sizesect;
@@ -388,7 +388,7 @@ static int psync_fs_crypto_kill_extender_locked(psync_openfile_t *of) {
 static int psync_fs_crypto_read_newfile_full_sector_from_datafile(
     psync_openfile_t *of, char *buf, psync_crypto_sectorid_t sectorid) {
   unsigned char buff[PSYNC_CRYPTO_SECTOR_SIZE];
-  psync_crypto_sector_auth_t auth;
+  pcrypto_sector_auth_t auth;
   psync_crypto_offsets_t offsets;
   uint64_t off;
   int64_t fs;
@@ -691,7 +691,7 @@ psync_fs_crypto_write_master_auth(psync_openfile_t *of,
   ssize_t wrt;
   struct {
     psync_crypto_log_header hdr;
-    psync_crypto_sector_auth_t auth;
+    pcrypto_sector_auth_t auth;
   } data;
   assert(sizeof(data) ==
          sizeof(psync_crypto_log_header) + PSYNC_CRYPTO_AUTH_SIZE);
@@ -1182,7 +1182,7 @@ psync_fs_crypto_write_newfile_full_sector(psync_openfile_t *of, const char *buf,
   psync_crypto_log_data_record rec;
   ssize_t wrt;
   uint32_t len;
-  psync_crypto_sector_auth_t auth;
+  pcrypto_sector_auth_t auth;
   assert(size <= PSYNC_CRYPTO_SECTOR_SIZE);
   assert(sizeof(psync_crypto_log_data_record) ==
          sizeof(psync_crypto_log_header) + PSYNC_CRYPTO_SECTOR_SIZE);

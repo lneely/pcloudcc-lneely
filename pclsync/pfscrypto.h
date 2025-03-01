@@ -48,10 +48,10 @@ typedef struct {
   psync_tree tree;
   psync_crypto_sectorid_t sectorid;
   uint32_t logoffset;
-  psync_crypto_sector_auth_t auth;
+  pcrypto_sector_auth_t auth;
 } psync_sector_inlog_t;
 
-typedef psync_crypto_sector_auth_t
+typedef pcrypto_sector_auth_t
     psync_crypto_auth_sector_t[PSYNC_CRYPTO_HASH_TREE_SECTORS];
 
 int psync_fs_crypto_init_log(psync_openfile_t *of);

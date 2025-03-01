@@ -329,7 +329,7 @@ static void psync_p2p_tcphandler(void *ptr) {
   psync_rsa_publickey_t pubrsa;
   psync_symmetric_key_t aeskey;
   psync_encrypted_symmetric_key_t encaeskey;
-  psync_crypto_aes256_ctr_encoder_decoder_t encoder;
+  pcrypto_ctr_encdec_t encoder;
   char *token, *localpath;
   uint64_t off;
   size_t rd;
@@ -658,7 +658,7 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
   uint32_t keylen = 0, enctype = 0;
   psync_symmetric_key_t key;
   psync_encrypted_symmetric_key_t ekey;
-  psync_crypto_aes256_ctr_encoder_decoder_t decoder;
+  pcrypto_ctr_encdec_t decoder;
   psync_hash_ctx hashctx;
   uint64_t off;
   size_t rd;

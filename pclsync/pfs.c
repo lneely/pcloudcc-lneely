@@ -842,7 +842,7 @@ static int psync_fs_getattr(const char *path, struct FUSE_STAT *stbuf) {
   return -ENOENT;
 }
 
-static int filler_decoded(psync_crypto_aes256_text_decoder_t dec,
+static int filler_decoded(pcrypto_textdec_t dec,
                           fuse_fill_dir_t filler, void *buf, const char *name,
                           struct FUSE_STAT *st, fuse_off_t off) {
   if (dec) {
@@ -866,7 +866,7 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   psync_fstask_folder_t *folder;
   psync_tree *trel;
   const char *name;
-  psync_crypto_aes256_text_decoder_t dec;
+  pcrypto_textdec_t dec;
   uint32_t flags;
   size_t namelen;
   struct FUSE_STAT st;
@@ -977,7 +977,7 @@ static psync_openfile_t *
 psync_fs_create_file(psync_fsfileid_t fileid, psync_fsfileid_t remotefileid,
                      uint64_t size, uint64_t hash, int lock, uint32_t writeid,
                      psync_fstask_folder_t *folder, const char *name,
-                     psync_crypto_aes256_sector_encoder_decoder_t encoder) {
+                     pcrypto_sector_encdec_t encoder) {
   psync_openfile_t *fl;
   psync_tree *tr;
   int64_t d;
@@ -1247,7 +1247,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
   psync_fstask_creat_t *cr;
   psync_fstask_folder_t *folder;
   psync_openfile_t *of;
-  psync_crypto_aes256_sector_encoder_decoder_t encoder;
+  pcrypto_sector_encdec_t encoder;
   char *encsymkey;
   size_t encsymkeylen;
   time_t ctime;
@@ -1583,7 +1583,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
   psync_fstask_folder_t *folder;
   psync_fstask_creat_t *cr;
   psync_symmetric_key_t symkey;
-  psync_crypto_aes256_sector_encoder_decoder_t encoder;
+  pcrypto_sector_encdec_t encoder;
   char *encsymkey;
   size_t encsymkeylen;
   psync_openfile_t *of;
@@ -2106,7 +2106,7 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
         (unsigned long)of->currentsize);
   if (unlikely(of->encrypted &&
                of->encoder == PSYNC_CRYPTO_UNLOADED_SECTOR_ENCODER)) {
-    psync_crypto_aes256_sector_encoder_decoder_t enc;
+    pcrypto_sector_encdec_t enc;
     // we should unlock of->mutex as it can deadlock with sqllock and taking
     // sqllock before network operation is not a good idea
     pthread_mutex_unlock(&of->mutex);
