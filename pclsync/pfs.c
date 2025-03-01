@@ -1822,7 +1822,7 @@ static void psync_fs_upload_release_timer(void *ptr) {
   }
   psync_fs_dec_of_refcnt(ofw->of);
   psync_free(ofw);
-  psync_status_recalc_to_upload_async();
+  pstatus_upload_recalc_async();
 }
 
 static void psync_fs_write_timer(psync_timer_t timer, void *ptr) {
@@ -1912,7 +1912,7 @@ static int psync_fs_flush(const char *path, struct fuse_file_info *fi) {
       psync_sql_bind_uint(res, 3, writeid);
       psync_sql_run_free(res);
     }
-    psync_status_recalc_to_upload_async();
+    pstatus_upload_recalc_async();
     return 0;
   }
   pthread_mutex_unlock(&of->mutex);
@@ -3708,7 +3708,7 @@ err00:
 
 static void psync_fs_wait_start() {
   debug(D_NOTICE, "waiting for online status");
-  psync_wait_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
+  pstatus_wait(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
   if (psync_do_run) {
     debug(D_NOTICE, "starting fs");
     psync_fs_do_start();
@@ -3717,7 +3717,7 @@ static void psync_fs_wait_start() {
 
 static void psync_fs_wait_login() {
   debug(D_NOTICE, "waiting for online status");
-  psync_wait_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
+  pstatus_wait(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
   debug(D_NOTICE, "waited for online status");
   psync_sql_lock();
   waitingforlogin = 0;
@@ -3747,7 +3747,7 @@ int psync_fs_start() {
   pthread_mutex_unlock(&start_mutex);
   if (ret)
     return ret;
-  status = psync_status_get(PSTATUS_TYPE_AUTH);
+  status = pstatus_get(PSTATUS_TYPE_AUTH);
   debug(D_NOTICE, "auth status=%u", status);
   if (status == PSTATUS_AUTH_PROVIDED)
     return psync_fs_do_start();

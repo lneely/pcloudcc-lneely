@@ -43,6 +43,7 @@
 
 #include "paccountevents.h"
 #include "ptools.h"
+#include "pstatus.h"
 
 typedef uint64_t psync_folderid_t;
 typedef uint64_t psync_fileid_t;
@@ -134,60 +135,6 @@ typedef struct {
 #define BEAPI_ERR_DEST_F_EXISTS 2004 // destination folder already exists
 #define BEAPI_ERR_MV_TOO_MANY_IN_SHA                                           \
   2352 // Too many objects moved at once in shared folder
-
-#define PSTATUS_READY 0
-#define PSTATUS_DOWNLOADING 1
-#define PSTATUS_UPLOADING 2
-#define PSTATUS_DOWNLOADINGANDUPLOADING 3
-#define PSTATUS_LOGIN_REQUIRED 4
-#define PSTATUS_BAD_LOGIN_DATA 5
-#define PSTATUS_BAD_LOGIN_TOKEN 6
-#define PSTATUS_ACCOUNT_FULL 7
-#define PSTATUS_DISK_FULL 8
-#define PSTATUS_PAUSED 9
-#define PSTATUS_STOPPED 10
-#define PSTATUS_OFFLINE 11
-#define PSTATUS_CONNECTING 12
-#define PSTATUS_SCANNING 13
-#define PSTATUS_USER_MISMATCH 14
-#define PSTATUS_ACCOUNT_EXPIRED 15
-#define PSTATUS_TFA_REQUIRED 16
-#define PSTATUS_BAD_TFA_CODE 17
-#define PSTATUS_VERIFY_REQUIRED 18
-#define PSTATUS_RELOCATION 19
-#define PSTATUS_RELOCATED 20
-
-#define PSTATUS_ACCOUT_TFAERR PSTATUS_TFA_REQUIRED
-#define PSTATUS_ACCOUT_EXPIRED PSTATUS_ACCOUNT_EXPIRED
-
-typedef struct pstatus_struct_ {
-  const char *downloadstr; /* formatted string with the status of uploads */
-  const char *uploadstr;   /* formatted string with the status of downloads */
-  uint64_t bytestoupload;  /* sum of the sizes of files that need to be uploaded
-                              to sync state */
-  uint64_t
-      bytestouploadcurrent; /* sum of the sizes of files in filesuploading */
-  uint64_t
-      bytesuploaded; /* bytes uploaded in files accounted in filesuploading */
-  uint64_t bytestodownload;        /* sum of the sizes of files that need to be
-                                      downloaded to sync state */
-  uint64_t bytestodownloadcurrent; /* sum of the sizes of files in
-                                      filesdownloading */
-  uint64_t bytesdownloaded;        /* bytes downloaded in files accounted in
-                                      filesdownloading */
-  uint32_t status;          /* current status, one of PSTATUS_ constants */
-  uint32_t filestoupload;   /* number of files to upload in order to sync state,
-                               including filesuploading*/
-  uint32_t filesuploading;  /* number of files currently uploading */
-  uint32_t uploadspeed;     /* in bytes/sec */
-  uint32_t filestodownload; /* number of files to download in order to sync
-                               state, including filesdownloading*/
-  uint32_t filesdownloading; /* number of files currently downloading */
-  uint32_t downloadspeed;    /* in bytes/sec */
-  uint8_t remoteisfull; /* account is full and no files will be synced upwards*/
-  uint8_t localisfull;  /* (some) local hard drive is full and no files will be
-                           synced from the cloud */
-} pstatus_t;
 
 /* PEVENT_LOCAL_FOLDER_CREATED means that a folder was created in remotely and
  * this action was replicated locally, not the other way around. Accordingly
@@ -536,8 +483,6 @@ typedef struct {
   psync_notification_t notifications[];
 } psync_notification_list_t;
 
-typedef enum Status { INSYNC, INPROG, NOSYNC, INVSYNC } external_status;
-
 typedef struct {
   uint64_t linkid;
   const char *name;
@@ -698,14 +643,6 @@ typedef void (*psync_generic_callback_t)();
 void *psync_malloc(size_t size);
 void *psync_realloc(void *ptr, size_t size);
 void psync_free(void *ptr);
-
-/* Status change callback is called every time value is changed. It may be
- * called quite often when there are active uploads/downloads. Callbacks are
- * issued from a special callback thread (e.g. the same thread all the time) and
- * are guaranteed not to overlap.
- */
-
-typedef void (*pstatus_change_callback_t)(pstatus_t *status);
 
 /* Event callback is called every time a download/upload is started/finished,
  * quota is changed, folder is shared or similar. Look at the PEVENT_ constants
@@ -1551,9 +1488,9 @@ uint64_t psync_crypto_priv_key_flags();
  * files and folders not in drive or sync folder INSYNC is returned.
  */
 
-external_status psync_filesystem_status(const char *path);
-external_status psync_status_file(const char *path);
-external_status psync_status_folder(const char *path);
+external_status_t psync_filesystem_status(const char *path);
+external_status_t psync_status_file(const char *path);
+external_status_t psync_status_folder(const char *path);
 
 /*
  * Publik links API functions.

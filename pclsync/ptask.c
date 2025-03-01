@@ -891,8 +891,8 @@ void ptask_download_q(psync_syncid_t syncid, psync_fileid_t fileid, psync_folder
 void ptask_download(psync_syncid_t syncid, psync_fileid_t fileid, psync_folderid_t localfolderid, const char *name) {
   ptask_download_q(syncid, fileid, localfolderid, name);
   pdownload_wake();
-  psync_status_recalc_to_download();
-  psync_send_status_update();
+  pstatus_download_recalc();
+  pstatus_send_status_update();
 }
 
 void ptask_lfile_rename(psync_syncid_t oldsyncid, psync_syncid_t newsyncid, psync_fileid_t fileid, psync_folderid_t oldlocalfolderid, psync_folderid_t newlocalfolderid, const char *newname) {
@@ -966,7 +966,7 @@ void ptask_upload(psync_syncid_t syncid, psync_fileid_t localfileid, const char 
   psync_sql_bind_string(res, 5, name);
   psync_sql_run_free(res);
   psync_wake_upload();
-  psync_status_recalc_to_upload_async();
+  pstatus_upload_recalc_async();
 }
 
 void ptask_rfile_rename(psync_syncid_t oldsyncid, psync_syncid_t newsyncid, psync_fileid_t localfileid, psync_folderid_t newlocalparentfolderid, const char *newname) {

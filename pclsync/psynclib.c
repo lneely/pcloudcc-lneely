@@ -112,6 +112,10 @@ static time_t links_last_refresh_time;
 extern int unlinked;
 extern int tfa;
 
+static inline int psync_status_is_offline() {
+  return pstatus_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_OFFLINE;
+}
+
 #define return_error(err)                                                      \
   do {                                                                         \
     psync_error = err;                                                         \
@@ -287,7 +291,7 @@ int psync_init() {
 
   psync_libs_init();
   psync_settings_init();
-  psync_status_init();
+  pstatus_init();
   psync_timer_sleep_handler(psync_stop_crypto_on_sleep);
   psync_path_status_init();
   if (IS_DEBUG) {
@@ -322,7 +326,7 @@ void psync_start_sync(pstatus_change_callback_t status_callback,
   }
   psync_apiserver_init();
   if (status_callback)
-    psync_set_status_callback(status_callback);
+    pstatus_set_cb(status_callback);
   if (event_callback)
     pqevent_process(event_callback);
   psync_syncer_init();
@@ -354,8 +358,8 @@ void psync_destroy() {
     debug(D_ERROR, "failed to cleanup shm");
   }
   psync_fs_stop();
-  psync_terminate_status_waiters();
-  psync_send_status_update();
+  pstatus_wait_term();
+  pstatus_send_status_update();
   ptask_stop_async();
   psync_timer_wake();
   psync_timer_notify_exception();
@@ -366,7 +370,7 @@ void psync_destroy() {
   psync_sql_close();
 }
 
-void psync_get_status(pstatus_t *status) { psync_callbacks_get_status(status); }
+void psync_get_status(pstatus_t *status) { pstatus_get_cb(status); }
 
 char *psync_get_username() {
   return psync_sql_cellstr("SELECT value FROM setting WHERE id='username'");
@@ -392,7 +396,7 @@ void psync_set_user_pass(const char *username, const char *password, int save) {
       psync_my_pass = psync_strdup(password);
     pthread_mutex_unlock(&psync_my_auth_mutex);
   }
-  psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+  pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
   psync_recache_contacts = 1;
 }
 
@@ -406,7 +410,7 @@ void psync_set_pass(const char *password, int save) {
     psync_my_pass = psync_strdup(password);
     pthread_mutex_unlock(&psync_my_auth_mutex);
   }
-  psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+  pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
 }
 
 void psync_set_auth(const char *auth, int save) {
@@ -415,7 +419,7 @@ void psync_set_auth(const char *auth, int save) {
     psync_set_string_value("auth", auth);
   else
     psync_strlcpy(psync_my_auth, auth, sizeof(psync_my_auth));
-  psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+  pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
 }
 
 int psync_mark_notificaitons_read(uint32_t notificationid) {
@@ -442,8 +446,8 @@ void psync_logout2(uint32_t auth_status, int doinvauth) {
   psync_free(psync_my_pass);
   psync_my_pass = NULL;
   pthread_mutex_unlock(&psync_my_auth_mutex);
-  psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
-  psync_set_status(PSTATUS_TYPE_AUTH, auth_status);
+  pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
+  pstatus_set(PSTATUS_TYPE_AUTH, auth_status);
   psync_fs_pause_until_login();
   pdownload_stop_all();
   psync_stop_all_upload();
@@ -549,17 +553,17 @@ void psync_unlink() {
   // the deviceid from local DB.
   psync_stop_device(0, &errMsg);
 
-  psync_status_recalc_to_download();
-  psync_status_recalc_to_upload();
+  pstatus_download_recalc();
+  pstatus_upload_recalc();
   psync_invalidate_auth(psync_my_auth);
   pcryptofolder_lock();
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   psys_sleep_milliseconds(20);
   psync_stop_localscan();
   psync_sql_checkpoint_lock();
-  psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
-  psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
-  psync_set_status(PSTATUS_TYPE_RUN, PSTATUS_RUN_STOP);
+  pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
+  pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
+  pstatus_set(PSTATUS_TYPE_RUN, PSTATUS_RUN_STOP);
   psync_timer_notify_exception();
   psync_sql_lock();
   debug(D_NOTICE, "clearing database, locked");
@@ -598,10 +602,10 @@ void psync_unlink() {
   psync_notifications_clean();
   psync_pagecache_reopen_read_cache();
   pdiff_unlock();
-  psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
-  psync_set_status(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_QUOTAOK);
-  psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
-  psync_set_status(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN);
+  pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
+  pstatus_set(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_QUOTAOK);
+  pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
+  pstatus_set(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN);
   psync_resume_localscan();
   if (psync_fs_need_per_folder_refresh())
     psync_fs_refresh_folder(0);
@@ -613,10 +617,10 @@ int psync_tfa_type() { return psync_my_2fa_type; }
 
 static void check_tfa_result(uint64_t result) {
   if (result == 2064) {
-    if (psync_status_get(PSTATUS_TYPE_AUTH) == PSTATUS_AUTH_TFAREQ) {
+    if (pstatus_get(PSTATUS_TYPE_AUTH) == PSTATUS_AUTH_TFAREQ) {
       psync_free(psync_my_2fa_token);
       psync_my_2fa_token = NULL;
-      psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+      pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
     }
   }
 }
@@ -729,7 +733,7 @@ void psync_tfa_set_code(const char *code, int trusted, int is_recovery) {
   psync_my_2fa_code[sizeof(psync_my_2fa_code) - 1] = 0;
   psync_my_2fa_trust = trusted;
   psync_my_2fa_code_type = is_recovery ? 2 : 1;
-  psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+  pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
 }
 
 psync_syncid_t psync_add_sync_by_path(const char *localpath,
@@ -859,7 +863,7 @@ int psync_add_sync_by_path_delayed(const char *localpath,
   psync_sql_bind_uint(res, 3, synctype);
   psync_sql_run_free(res);
   psync_sql_sync();
-  if (psync_status_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_ONLINE)
+  if (pstatus_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_ONLINE)
     prun_thread("check delayed syncs", psync_syncer_check_delayed_syncs);
   return 0;
 }
@@ -1108,7 +1112,7 @@ int psync_is_name_to_ignore(const char *name) {
 }
 
 static void psync_set_run_status(uint32_t status) {
-  psync_set_status(PSTATUS_TYPE_RUN, status);
+  pstatus_set(PSTATUS_TYPE_RUN, status);
   psync_set_uint_value("runstatus", status);
 }
 
@@ -2412,7 +2416,7 @@ int psync_crypto_crypto_send_change_user_private() {
   return PRINT_RETURN_CONST(PSYNC_CRYPTO_SETUP_UNKNOWN_ERROR);
 }
 
-external_status psync_filesystem_status(const char *path) {
+external_status_t psync_filesystem_status(const char *path) {
   switch (psync_path_status_get_status(psync_path_status_get(path))) {
   case PSYNC_PATH_STATUS_IN_SYNC:
     return INSYNC;
@@ -2427,11 +2431,11 @@ external_status psync_filesystem_status(const char *path) {
   }
 }
 
-external_status psync_status_file(const char *path) {
+external_status_t psync_status_file(const char *path) {
   return psync_filesystem_status(path);
 }
 
-external_status psync_status_folder(const char *path) {
+external_status_t psync_status_folder(const char *path) {
   return psync_filesystem_status(path);
 }
 

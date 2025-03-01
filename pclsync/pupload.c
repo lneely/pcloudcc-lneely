@@ -103,7 +103,7 @@ void psync_upload_inc_uploads() {
   pthread_mutex_lock(&upload_mutex);
   psync_status.filesuploading++;
   pthread_mutex_unlock(&upload_mutex);
-  psync_send_status_update();
+  pstatus_send_status_update();
 }
 
 void psync_upload_dec_uploads() {
@@ -112,7 +112,7 @@ void psync_upload_dec_uploads() {
   if (psync_status.filesuploading == 0 && current_uploads_waiters)
     pthread_cond_broadcast(&current_uploads_cond);
   pthread_mutex_unlock(&upload_mutex);
-  psync_send_status_update();
+  pstatus_send_status_update();
 }
 void psync_upload_dec_uploads_cnt(uint32_t cnt) {
   pthread_mutex_lock(&upload_mutex);
@@ -120,21 +120,21 @@ void psync_upload_dec_uploads_cnt(uint32_t cnt) {
   if (psync_status.filesuploading == 0 && current_uploads_waiters)
     pthread_cond_broadcast(&current_uploads_cond);
   pthread_mutex_unlock(&upload_mutex);
-  psync_send_status_update();
+  pstatus_send_status_update();
 }
 
 void psync_upload_add_bytes_uploaded(uint64_t bytes) {
   pthread_mutex_lock(&upload_mutex);
   psync_status.bytesuploaded += bytes;
   pthread_mutex_unlock(&upload_mutex);
-  psync_send_status_update();
+  pstatus_send_status_update();
 }
 
 void psync_upload_sub_bytes_uploaded(uint64_t bytes) {
   pthread_mutex_lock(&upload_mutex);
   psync_status.bytesuploaded -= bytes;
   pthread_mutex_unlock(&upload_mutex);
-  psync_send_status_update();
+  pstatus_send_status_update();
 }
 
 static int task_wait_no_uploads(uint64_t taskid) {
@@ -650,7 +650,7 @@ static void add_bytes_uploaded(uint64_t bytes) {
   psync_status.bytesuploaded += bytes;
   wake_upload_when_ready();
   pthread_mutex_unlock(&current_uploads_mutex);
-  psync_send_status_update();
+  pstatus_send_status_update();
 }
 
 static int upload_file(const char *localpath, const unsigned char *hashhex,
@@ -701,7 +701,7 @@ static int upload_file(const char *localpath, const unsigned char *hashhex,
       debug(D_NOTICE, "upload of %s stopped", localpath);
       goto err2;
     }
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
     if (fsize - bw > PSYNC_COPY_BUFFER_SIZE)
       rd = PSYNC_COPY_BUFFER_SIZE;
     else
@@ -815,7 +815,7 @@ static int upload_range(psock_t *api, psync_upload_range_list_t *r,
       debug(D_NOTICE, "upload stopped");
       goto err0;
     }
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
     if (r->len - bw > PSYNC_COPY_BUFFER_SIZE)
       rd = PSYNC_COPY_BUFFER_SIZE;
     else
@@ -1338,7 +1338,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
       uhashhex[PSYNC_HASH_DIGEST_HEXLEN], phashhex[PSYNC_HASH_DIGEST_HEXLEN];
   binparam pr;
   int ret;
-  psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+  pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
   if (upload->stop)
     return -1;
   localpath = psync_local_path_for_local_file(localfileid, NULL);
@@ -1577,7 +1577,7 @@ static void task_run_upload_file_thread(void *ptr) {
   psync_list_del(&ut->upllist.list);
   wake_upload_when_ready();
   pthread_mutex_unlock(&current_uploads_mutex);
-  psync_status_recalc_to_upload_async();
+  pstatus_upload_recalc_async();
   psync_free(ut);
 }
 
@@ -1641,7 +1641,7 @@ static int task_run_uploadfile(uint64_t taskid, psync_syncid_t syncid,
     psync_sql_bind_uint(res, 1, taskid);
     psync_sql_run_free(res);
   } else {
-    psync_status_send_update();
+    pstatus_send_update();
     prun_thread1("upload file", task_run_upload_file_thread, ut);
   }
   return -1;
@@ -1716,7 +1716,7 @@ static void upload_thread() {
   uint64_t taskid;
   uint32_t type;
   while (psync_do_run) {
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
 
     row = psync_sql_row("SELECT id, type, syncid, itemid, localitemid, "
                         "newitemid, name, newsyncid FROM task WHERE "
@@ -1733,7 +1733,7 @@ static void upload_thread() {
                        psync_get_number_or_null(row[7]))) {
         if (type == PSYNC_UPLOAD_FILE) {
           delete_upload_task(taskid, psync_get_number(row[3]));
-          psync_status_recalc_to_upload_async();
+          pstatus_upload_recalc_async();
         } else {
           res = psync_sql_prep_statement("DELETE FROM task WHERE id=?");
           psync_sql_bind_uint(res, 1, taskid);
@@ -1774,7 +1774,7 @@ void psync_delete_upload_tasks_for_file(psync_fileid_t localfileid) {
   psync_sql_bind_uint(res, 2, localfileid);
   psync_sql_run(res);
   if (psync_sql_affected_rows())
-    psync_status_recalc_to_upload_async();
+    pstatus_upload_recalc_async();
   psync_sql_free_result(res);
   pthread_mutex_lock(&current_uploads_mutex);
   psync_list_for_each_element(upl, &uploads, upload_list_t,
@@ -1799,7 +1799,7 @@ void psync_stop_sync_upload(psync_syncid_t syncid) {
 
   pthread_mutex_unlock(&current_uploads_mutex);
 
-  psync_status_recalc_to_upload_async();
+  pstatus_upload_recalc_async();
 }
 
 void psync_stop_all_upload() {

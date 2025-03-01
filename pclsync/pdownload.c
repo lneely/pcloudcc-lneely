@@ -137,7 +137,7 @@ static int task_mkdir(const char *path) {
       } else
         return -1;
     }
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
   }
 }
 
@@ -200,7 +200,7 @@ static int task_renamedir(const char *oldpath, const char *newpath) {
       } else
         return -1;
     }
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
   }
 }
 
@@ -601,7 +601,7 @@ static int task_download_file(download_task_t *dt) {
     psync_status.bytestodownloadcurrent += serversize;
     pthread_mutex_unlock(&current_downloads_mutex);
     dt->size = serversize;
-    psync_status_send_update();
+    pstatus_send_update();
   }
 
   sql = psync_sql_query_rdlock(
@@ -774,9 +774,9 @@ static int task_download_file(download_task_t *dt) {
                                              PSYNC_START_NEW_DOWNLOADS_TRESHOLD)
           pthread_cond_signal(&current_downloads_cond);
         pthread_mutex_unlock(&current_downloads_mutex);
-        psync_send_status_update();
+        pstatus_send_status_update();
         dt->downloadedsize += rd;
-        if (unlikely(!psync_statuses_ok_array(requiredstatuses,
+        if (unlikely(!pstatus_ok_status_arr(requiredstatuses,
                                               ARRAY_SIZE(requiredstatuses))))
           goto err2;
       }
@@ -802,7 +802,7 @@ static int task_download_file(download_task_t *dt) {
         rd = pfile_read(ifd, buff, rd);
         if (unlikely_log(rd <= 0) ||
             unlikely_log(psync_file_writeall_checkoverquota(fd, buff, rd)) ||
-            unlikely(!psync_statuses_ok_array(requiredstatuses,
+            unlikely(!pstatus_ok_status_arr(requiredstatuses,
                                               ARRAY_SIZE(requiredstatuses)))) {
           pfile_close(ifd);
           goto err2;
@@ -816,7 +816,7 @@ static int task_download_file(download_task_t *dt) {
                                              PSYNC_START_NEW_DOWNLOADS_TRESHOLD)
           pthread_cond_signal(&current_downloads_cond);
         pthread_mutex_unlock(&current_downloads_mutex);
-        psync_send_status_update();
+        pstatus_send_status_update();
         dt->downloadedsize += rd;
       }
       pfile_close(ifd);
@@ -1045,7 +1045,7 @@ static void free_task_timer_thread(void *ptr) {
   download_task_t *dt = (download_task_t *)ptr;
   set_task_inprogress(dt->taskid, 0);
   free_download_task(dt);
-  psync_send_status_update();
+  pstatus_send_status_update();
   pdownload_wake();
 }
 
@@ -1066,13 +1066,13 @@ static void handle_async_error(download_task_t *dt, psync_async_result_t *res) {
     psync_sql_run_free(sres);
     set_task_inprogress(dt->taskid, 0);
     free_download_task(dt);
-    psync_send_status_update();
+    pstatus_send_status_update();
     pdownload_wake();
   } else if ((res->errorflags & PSYNC_ASYNC_ERR_FLAG_PERM) ||
              !(res->errorflags & PSYNC_ASYNC_ERR_FLAG_RETRY_AS_IS)) {
     delete_task(dt->taskid);
     free_download_task(dt);
-    psync_status_recalc_to_download_async();
+    pstatus_download_recalc_async();
   } else
     psync_timer_register(free_task_timer, 1, dt);
 }
@@ -1095,7 +1095,7 @@ static void finish_async_download(void *ptr, psync_async_result_t *res) {
       psync_path_status_sync_folder_task_completed(dt->dwllist.syncid,
                                                    dt->localfolderid);
       free_download_task(dt);
-      psync_status_recalc_to_download_async();
+      pstatus_download_recalc_async();
     }
   }
 }
@@ -1114,7 +1114,7 @@ static void finish_async_download_existing_not_mod(download_task_t *dt,
     psync_path_status_sync_folder_task_completed(dt->dwllist.syncid,
                                                  dt->localfolderid);
     free_download_task(dt);
-    psync_status_recalc_to_download_async();
+    pstatus_download_recalc_async();
   }
 }
 
@@ -1139,7 +1139,7 @@ static void task_run_download_file_thread(void *ptr) {
                                                  dt->localfolderid);
   }
   free_download_task(dt);
-  psync_status_recalc_to_download_async();
+  pstatus_download_recalc_async();
 }
 
 static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
@@ -1238,7 +1238,7 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
     free_download_task(dt);
     return -1;
   }
-  psync_send_status_update();
+  pstatus_send_status_update();
   if (hastargetchecksum &&
       psync_get_local_file_checksum(tmpname, dt->checksum, &csize) ==
           PSYNC_NET_OK &&
@@ -1473,7 +1473,7 @@ static void download_thread() {
   uint64_t taskid;
   uint32_t type;
   while (psync_do_run) {
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
 
     row = psync_sql_row(
         "SELECT id, type, syncid, itemid, localitemid, newitemid, name, "
@@ -1490,7 +1490,7 @@ static void download_thread() {
                          psync_get_number_or_null(row[7]))) {
         delete_task(taskid);
         if (type == PSYNC_DOWNLOAD_FILE) {
-          psync_status_recalc_to_download_async();
+          pstatus_download_recalc_async();
           psync_path_status_sync_folder_task_completed(
               psync_get_number(row[2]), psync_get_number(row[4]));
         }
@@ -1539,7 +1539,7 @@ void pdownload_tasks_delete(psync_fileid_t fileid,
   aff = psync_sql_affected_rows();
   psync_sql_free_result(res);
   if (aff)
-    psync_status_recalc_to_download_async();
+    pstatus_download_recalc_async();
   if (deltemp)
     deltemp = 2;
   else
@@ -1569,7 +1569,7 @@ void pdownload_stop_sync(psync_syncid_t syncid) {
           PSYNC_TASK_DWLUPL_MASK) "=" NTO_STR(PSYNC_TASK_DOWNLOAD));
   psync_sql_bind_uint(res, 1, syncid);
   psync_sql_run_free(res);
-  psync_status_recalc_to_download_async();
+  pstatus_download_recalc_async();
   pthread_mutex_lock(&current_downloads_mutex);
   psync_list_for_each_element(dwl, &downloads, download_list_t,
                               list) if (dwl->syncid == syncid) dwl->stop = 1;

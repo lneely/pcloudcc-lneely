@@ -346,7 +346,7 @@ static psock_t *get_connected_socket() {
     psync_free(auth);
     psync_free(user);
     psync_free(pass);
-    psync_wait_status(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
+    pstatus_wait(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
 
     auth = psync_sql_cellstr("SELECT value FROM setting WHERE id='auth'");
     user = psync_sql_cellstr("SELECT value FROM setting WHERE id='user'");
@@ -382,18 +382,18 @@ static psock_t *get_connected_socket() {
         debug(D_WARNING, "tfa sleep");
         continue;
       }
-      psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
-      psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+      pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
+      pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       continue;
     }
 
-    psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+    pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
     saveauth = psync_setting_get_bool(_PS(saveauth));
 
     sock = papi_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
 
     if (unlikely_log(!sock)) {
-      psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
+      pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       continue;
     }
@@ -450,7 +450,7 @@ static psock_t *get_connected_socket() {
 
     if (unlikely_log(!res)) {
       psock_close(sock);
-      psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
+      pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       papi_conn_fail_inc();
       continue;
@@ -472,8 +472,8 @@ static psock_t *get_connected_socket() {
         psync_my_2fa_type = papi_find_result2(res, "tfatype", PARAM_NUM)->num;
         psync_my_2fa_code_type = 0;
         psync_my_2fa_code[0] = 0;
-        psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_TFAREQ);
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+        pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_TFAREQ);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         psock_close(sock);
         psync_free(res);
         continue;
@@ -483,8 +483,8 @@ static psock_t *get_connected_socket() {
         psync_free(psync_my_verify_token);
         psync_my_verify_token =
             psync_strdup(papi_find_result2(res, "verifytoken", PARAM_STR)->str);
-        psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_VERIFYREQ);
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+        pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_VERIFYREQ);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         psock_close(sock);
         psync_free(res);
         continue;
@@ -507,8 +507,8 @@ static psock_t *get_connected_socket() {
 
       if (result == 2330) {
         psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
-        psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATING);
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+        pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATING);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         psock_close(sock);
         psync_free(res);
         continue;
@@ -523,7 +523,7 @@ static psock_t *get_connected_socket() {
         psync_my_2fa_code[0] = 0;
         if (result == 2012 || result == 2064 || result == 2074 ||
             result == 2092)
-          psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADCODE);
+          pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADCODE);
         else if (user && pass) {
           // Ugly fix, sorry :(
           if (!strcmp(user, "pass") && !strcmp(pass, "dummy")) {
@@ -533,21 +533,21 @@ static psock_t *get_connected_socket() {
             psys_sleep_milliseconds(1000);
             continue;
           } else {
-            psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADLOGIN);
+            pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADLOGIN);
             psync_free(psync_my_pass);
             psync_my_pass = NULL;
           }
         } else {
-          psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADTOKEN);
+          pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADTOKEN);
           psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
         }
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       } else if (result == 4000)
         psys_sleep_milliseconds(5 * 60 * 1000);
       else if (result == 2205 || result == 2229) {
         psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
-        psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_EXPIRED);
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+        pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_EXPIRED);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       } else if (result == 2237) {
         digest = 0;
         continue;
@@ -576,16 +576,16 @@ static psock_t *get_connected_socket() {
       if (unlikely_log(luserid != userid)) {
         if (check_user_relocated(luserid, sock)) {
           debug(D_NOTICE, "setting PSTATUS_AUTH_RELOCATED");
-          psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATED);
+          pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATED);
         } else {
           debug(D_NOTICE, "user mistmatch, db userid=%lu, connected userid=%lu",
                 (unsigned long)luserid, (unsigned long)userid);
-          psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_MISMATCH);
+          pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_MISMATCH);
         }
         psync_sql_rollback_transaction();
         psock_close(sock);
         psync_free(res);
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         continue;
       }
       if (saveauth) {
@@ -671,11 +671,11 @@ static psock_t *get_connected_socket() {
       }
       psync_sql_free_result(q);
     }
-    if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED) {
+    if (pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED) {
       psync_sql_rollback_transaction();
       psock_close(sock);
       psync_free(res);
-      psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+      pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       continue;
     }
     debug(D_NOTICE, "userid %lu", (unsigned long)userid);
@@ -1637,8 +1637,8 @@ static void process_deletefile(const binresult *entry) {
 static void start_download() {
   if (needdownload) {
     pdownload_wake();
-    psync_status_recalc_to_download();
-    psync_send_status_update();
+    pstatus_download_recalc();
+    pstatus_send_status_update();
     needdownload = 0;
   }
 }
@@ -2479,7 +2479,7 @@ static uint64_t process_entries(const binresult *entries, uint64_t newdiffid) {
   oused_quota = used_quota;
   needdownload = 0;
   pdiff_lock();
-  if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED) {
+  if (pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED) {
     pdiff_unlock();
     return psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
   }
@@ -2508,8 +2508,8 @@ static uint64_t process_entries(const binresult *entries, uint64_t newdiffid) {
   pdiff_unlock();
   if (needdownload) {
     pdownload_wake();
-    psync_status_recalc_to_download();
-    psync_send_status_update();
+    pstatus_download_recalc();
+    pstatus_send_status_update();
     needdownload = 0;
   }
   used_quota =
@@ -2525,9 +2525,9 @@ static void check_overquota() {
   if (isover != lisover) {
     lisover = isover;
     if (isover) {
-      psync_set_status(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_OVERQUOTA);
+      pstatus_set(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_OVERQUOTA);
     } else
-      psync_set_status(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_QUOTAOK);
+      pstatus_set(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_QUOTAOK);
   }
 }
 
@@ -2635,12 +2635,12 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
       debug(D_NOTICE, "got a pdiff_wake() but no diff events in one "
                       "second, closing socket");
       psock_close(*sock);
-      if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
+      if (pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
         ids->notificationid = 0;
       debug(D_NOTICE, "waiting for new socket");
       *sock = get_connected_socket();
       debug(D_NOTICE, "got new socket");
-      psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
+      pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
       psync_syncer_check_delayed_syncs();
       ids->diffid =
           psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
@@ -2649,16 +2649,16 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
     return;
   }
   debug(D_NOTICE, "exception handler %c", ex);
-  if (ex == 'r' || psync_status_get(PSTATUS_TYPE_RUN) == PSTATUS_RUN_STOP ||
-      psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED ||
+  if (ex == 'r' || pstatus_get(PSTATUS_TYPE_RUN) == PSTATUS_RUN_STOP ||
+      pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED ||
       psync_setting_get_bool(_PS(usessl)) != psock_is_ssl(*sock)) {
     psock_close(*sock);
-    if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
+    if (pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
       ids->notificationid = 0;
     debug(D_NOTICE, "waiting for new socket");
     *sock = get_connected_socket();
     debug(D_NOTICE, "got new socket");
-    psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
+    pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
     psync_syncer_check_delayed_syncs();
     ids->diffid =
         psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
@@ -2673,7 +2673,7 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
       psock_close_bad(*sock);
       pcache_clean_oneof(prefixes, ARRAY_SIZE(prefixes));
       *sock = get_connected_socket();
-      psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
+      pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
       psync_syncer_check_delayed_syncs();
       send_diff_command(*sock, *ids);
     } else {
@@ -2877,14 +2877,14 @@ static void psync_diff_thread() {
   char *err = NULL;
   int should_free_res = 0;
 
-  psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
-  psync_send_status_update();
+  pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
+  pstatus_send_status_update();
 
 restart:
-  psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
+  pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   sock = get_connected_socket();
   debug(D_NOTICE, "connected");
-  psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_SCANNING);
+  pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_SCANNING);
   ids.diffid =
       psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
   if (ids.diffid == 0) {
@@ -2937,7 +2937,7 @@ restart:
     goto restart;
   }
   check_overquota();
-  psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
+  pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
   initialdownload = 0;
   psync_run_analyze_if_needed();
   psync_syncer_check_delayed_syncs();

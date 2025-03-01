@@ -824,7 +824,7 @@ static psync_path_status_t rdunlock_return_in_prog() {
       PSTATUS_COMBINE(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_QUOTAOK),
       PSTATUS_COMBINE(PSTATUS_TYPE_DISKFULL, PSTATUS_DISKFULL_OK)};
   psync_sql_rdunlock();
-  if (psync_statuses_ok_array(requiredstatuses, ARRAY_SIZE(requiredstatuses)))
+  if (pstatus_ok_status_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses)))
     return PSYNC_PATH_STATUS_IN_PROG;
   else
     return PSYNC_PATH_STATUS_PAUSED; // TODO: fix to return proper status

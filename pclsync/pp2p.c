@@ -430,7 +430,7 @@ static void psync_p2p_thread() {
   int tcpsock, socks[2], *inconn;
   socklen_t sl;
   int sret;
-  psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+  pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
   tcpsock = INVALID_SOCKET;
   /*  udpsock=psock_create(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
     if (unlikely_log(udpsock==INVALID_SOCKET)){*/
@@ -499,7 +499,7 @@ static void psync_p2p_thread() {
       }
       pthread_mutex_unlock(&p2pmutex);
     }
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
     sret = psock_select_in(socks, 2, -1);
     if (unlikely_log(sret == -1)) {
       psys_sleep_milliseconds(1);

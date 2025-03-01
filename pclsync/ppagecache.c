@@ -2083,7 +2083,7 @@ static void psync_pagecache_read_unmodified_thread(void *ptr) {
   pcrypto_sector_encdec_t enc;
   int err, tries;
   request = (psync_request_t *)ptr;
-  if (psync_status_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_OFFLINE) {
+  if (pstatus_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_OFFLINE) {
     psync_pagecache_send_error(request, -ENOTCONN);
     return;
   }

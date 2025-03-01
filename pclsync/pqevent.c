@@ -316,20 +316,20 @@ static void proc_send_event(void *ptr) {
   }
 }
 
-void psync_callbacks_get_status(pstatus_t *status) {
+void pstatus_get_cb(pstatus_t *status) {
   static char downloadstr[MAX_STATUS_STR_LEN], uploadstr[MAX_STATUS_STR_LEN];
   memcpy(status, &psync_status, sizeof(pstatus_t));
   status_fill_formatted_str(status, downloadstr, uploadstr);
 }
 
-void psync_set_status_callback(pstatus_change_callback_t callback) {
+void pstatus_set_cb(pstatus_change_callback_t callback) {
   pthread_mutex_lock(&statusmutex);
   statusthreadrunning = 1;
   pthread_mutex_unlock(&statusmutex);
   prun_thread1("status change", status_change_thread, callback);
 }
 
-void psync_send_status_update() {
+void pstatus_send_status_update() {
   if (statusthreadrunning) {
     pthread_mutex_lock(&statusmutex);
     if (++statuschanges == 0) {

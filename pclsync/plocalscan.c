@@ -992,7 +992,7 @@ restart:
     pthread_cond_wait(&scan_cond, &scan_mutex);
   restart_scan = 0;
   pthread_mutex_unlock(&scan_mutex);
-  if (!psync_statuses_ok_array(requiredstatuses, ARRAY_SIZE(requiredstatuses)))
+  if (!pstatus_ok_status_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses)))
     return;
   reload_ignored_folders();
   for (i = 0; i < SCAN_LIST_CNT; i++)
@@ -1169,7 +1169,7 @@ restart:
 
   if (w) {
     psync_wake_upload();
-    psync_status_recalc_to_upload_async();
+    pstatus_upload_recalc_async();
   }
   for (i = 0; i < SCAN_LIST_CNT; i++)
     psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list,
@@ -1203,15 +1203,15 @@ static void scanner_thread() {
   time_t lastscan;
   int w;
   psys_sleep_milliseconds(1500);
-  psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
-  psync_wait_status(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
+  pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+  pstatus_wait(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
   scanner_scan(1);
-  psync_set_status(PSTATUS_TYPE_LOCALSCAN, PSTATUS_LOCALSCAN_READY);
+  pstatus_set(PSTATUS_TYPE_LOCALSCAN, PSTATUS_LOCALSCAN_READY);
   scanner_wait();
   w = 0;
   lastscan = 0;
   while (psync_do_run) {
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
     if (lastscan + 5 >= psync_current_time) {
       psys_sleep_milliseconds(2000);
       pthread_mutex_lock(&scan_mutex);

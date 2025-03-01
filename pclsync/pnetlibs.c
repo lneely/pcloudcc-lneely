@@ -393,15 +393,15 @@ void psync_set_local_full(int over) {
   if (over != isover) {
     isover = over;
     if (isover) {
-      psync_set_status(PSTATUS_TYPE_DISKFULL, PSTATUS_DISKFULL_FULL);
+      pstatus_set(PSTATUS_TYPE_DISKFULL, PSTATUS_DISKFULL_FULL);
     } else
-      psync_set_status(PSTATUS_TYPE_DISKFULL, PSTATUS_DISKFULL_OK);
+      pstatus_set(PSTATUS_TYPE_DISKFULL, PSTATUS_DISKFULL_OK);
   }
 }
 
 int psync_handle_api_result(uint64_t result) {
   if (result == 2000) {
-    psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADLOGIN);
+    pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADLOGIN);
     psync_timer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   } else if (result == 2003 || result == 2009 || result == 2005 ||
@@ -734,7 +734,7 @@ void psync_account_downloaded_bytes(int unsigned bytes) {
           psync_current_time - PSYNC_SPEED_CALC_AVERAGE_SEC)
         sum += download_bytes_sec[i].bytes;
     download_speed = sum / PSYNC_SPEED_CALC_AVERAGE_SEC;
-    psync_status_set_download_speed(download_speed);
+    pstatus_download_set_speed(download_speed);
   }
 }
 
@@ -829,7 +829,7 @@ static void account_uploaded_bytes(int unsigned bytes) {
           psync_current_time - PSYNC_SPEED_CALC_AVERAGE_SEC)
         sum += upload_bytes_sec[i].bytes;
     upload_speed = sum / PSYNC_SPEED_CALC_AVERAGE_SEC;
-    psync_status_set_upload_speed(upload_speed);
+    pstatus_upload_set_speed(upload_speed);
   }
 }
 

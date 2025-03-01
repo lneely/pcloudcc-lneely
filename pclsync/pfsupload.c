@@ -507,7 +507,7 @@ static int save_meta(const binresult *meta, psync_folderid_t folderid,
         (unsigned long)folderid, name,
         (unsigned long)papi_find_result2(meta, "modified", PARAM_NUM)->num,
         (unsigned long)papi_find_result2(meta, "size", PARAM_NUM)->num);
-  psync_status_recalc_to_upload_async();
+  pstatus_upload_recalc_async();
   return 0;
 }
 
@@ -604,7 +604,7 @@ static void perm_fail_upload_task(uint64_t taskid) {
   psync_sql_run_free(sql);
   psync_fs_task_deleted(taskid);
   psync_sql_commit_transaction();
-  psync_status_recalc_to_upload_async();
+  pstatus_upload_recalc_async();
 }
 
 static int copy_file(psock_t *api, const struct stat *st,
@@ -805,7 +805,7 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
       debug(D_NOTICE, "got stop for file %s", name);
       goto err2;
     }
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
     if (fsize - usize > PSYNC_COPY_BUFFER_SIZE)
       rd = PSYNC_COPY_BUFFER_SIZE;
     else
@@ -929,7 +929,7 @@ static int upload_modify_send_local(psock_t *api,
       debug(D_NOTICE, "got stop");
       goto err0;
     }
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
     if (length - bw > PSYNC_COPY_BUFFER_SIZE)
       rd = PSYNC_COPY_BUFFER_SIZE;
     else
@@ -1149,7 +1149,7 @@ static void large_upload() {
   char fileidhex[sizeof(psync_fsfileid_t) * 2 + 2];
   debug(D_NOTICE, "started");
   while (1) {
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
     res = psync_sql_query("SELECT id, type, folderid, text1, text2, int1, "
                           "fileid, int2 FROM fstask WHERE status=2 AND "
                           "type IN (" NTO_STR(PSYNC_FS_TASK_CREAT) ", " NTO_STR(
@@ -1211,7 +1211,7 @@ static void large_upload() {
       res = psync_sql_prep_statement("DELETE FROM fstask WHERE id=?");
       psync_sql_bind_uint(res, 1, taskid);
       psync_sql_run_free(res);
-      psync_status_recalc_to_upload_async();
+      pstatus_upload_recalc_async();
     }
     psync_upload_dec_uploads();
     if (ret) {
@@ -1934,9 +1934,9 @@ static void psync_fsupload_process_tasks(psync_list *tasks) {
 
   if (creats) {
     psync_upload_dec_uploads_cnt(creats);
-    psync_status_recalc_to_upload_async();
+    pstatus_upload_recalc_async();
   } else if (cancels || dels)
-    psync_status_recalc_to_upload_async();
+    pstatus_upload_recalc_async();
 
   if (dels)
     pdiff_wake();
@@ -2063,7 +2063,7 @@ static void psync_fsupload_check_tasks() {
   uint32_t cnt;
   psync_list_init(&tasks);
   cnt = 0;
-  if (psync_status_get(PSTATUS_TYPE_ACCFULL) == PSTATUS_ACCFULL_QUOTAOK)
+  if (pstatus_get(PSTATUS_TYPE_ACCFULL) == PSTATUS_ACCFULL_QUOTAOK)
     res = psync_sql_query_rdlock(
         "SELECT f.id, f.type, f.folderid, f.fileid, f.text1, f.text2, f.int1, "
         "f.int2, f.sfolderid, f.status FROM fstask f"
@@ -2129,7 +2129,7 @@ static void psync_fsupload_thread() {
   clean_stuck_tasks();
   waited = 0;
   while (psync_do_run) {
-    psync_wait_statuses_array(requiredstatusesnooverquota,
+    pstatus_wait_statuses_arr(requiredstatusesnooverquota,
                               ARRAY_SIZE(requiredstatusesnooverquota));
     // it is better to sleep a bit to give a chance for events to accumulate
     if (waited)
