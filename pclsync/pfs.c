@@ -1467,7 +1467,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
           ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encsymkey));
           goto ex0;
         }
-        encoder = psync_crypto_aes256_sector_encoder_decoder_create(symkey);
+        encoder = pcrypto_sec_encdec_create(symkey);
         psync_ssl_free_symmetric_key(symkey);
         if (unlikely_log(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
           psync_free(encsymkey);
@@ -1638,7 +1638,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
       psync_free(fpath);
       return -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encsymkey));
     }
-    encoder = psync_crypto_aes256_sector_encoder_decoder_create(symkey);
+    encoder = pcrypto_sec_encdec_create(symkey);
     psync_ssl_free_symmetric_key(symkey);
     if (unlikely_log(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
       psync_fstask_release_folder_tasks_locked(folder);
@@ -1713,7 +1713,7 @@ static void psync_fs_free_openfile(psync_openfile_t *of) {
     if (of->encoder != PSYNC_CRYPTO_UNLOADED_SECTOR_ENCODER &&
         of->encoder != PSYNC_CRYPTO_FAILED_SECTOR_ENCODER) {
       assert(of->encoder != PSYNC_CRYPTO_LOADING_SECTOR_ENCODER);
-      psync_crypto_aes256_sector_encoder_decoder_free(of->encoder);
+      pcrypto_sec_encdec_free(of->encoder);
     }
     close_if_valid(of->logfile);
     psync_tree_for_each_element_call_safe(

@@ -382,9 +382,9 @@ static void psync_p2p_tcphandler(void *ptr) {
           (unsigned long)localfileid);
     goto err0;
   }
-  aeskey = psync_crypto_aes256_ctr_gen_key();
+  aeskey = pcrypto_key();
   encaeskey = psync_ssl_rsa_encrypt_symmetric_key(pubrsa, aeskey);
-  encoder = psync_crypto_aes256_ctr_encoder_decoder_create(aeskey);
+  encoder = pcrypto_ctr_encdec_create(aeskey);
   psync_ssl_free_symmetric_key(aeskey);
   keylen = encaeskey->datalen;
   enctype = P2P_ENCTYPE_RSA_AES;
@@ -397,7 +397,7 @@ static void psync_p2p_tcphandler(void *ptr) {
     if (encaeskey != PSYNC_INVALID_ENC_SYM_KEY)
       psync_free(encaeskey);
     if (encoder != PSYNC_CRYPTO_INVALID_ENCODER)
-      psync_crypto_aes256_ctr_encoder_decoder_free(encoder);
+      pcrypto_ctr_encdec_free(encoder);
     pfile_close(fd);
     goto err0;
   }
@@ -410,12 +410,12 @@ static void psync_p2p_tcphandler(void *ptr) {
       rd = sizeof(buff);
     if (unlikely_log(pfile_read(fd, buff, rd) != rd))
       break;
-    psync_crypto_aes256_ctr_encode_decode_inplace(encoder, buff, rd, off);
+    pcrypto_ctr_encdec_decode(encoder, buff, rd, off);
     if (unlikely_log(socket_write_all(sock, buff, rd)))
       break;
     off += rd;
   }
-  psync_crypto_aes256_ctr_encoder_decoder_free(encoder);
+  pcrypto_ctr_encdec_free(encoder);
   pfile_close(fd);
   debug(D_NOTICE, "file sent successfuly");
 err0:
@@ -688,13 +688,13 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
     return PSYNC_NET_TEMPFAIL;
   }
   psync_free(ekey);
-  decoder = psync_crypto_aes256_ctr_encoder_decoder_create(key);
+  decoder = pcrypto_ctr_encdec_create(key);
   psync_ssl_free_symmetric_key(key);
   if (decoder == PSYNC_CRYPTO_INVALID_ENCODER)
     return PSYNC_NET_PERMFAIL;
   fd = pfile_open(filename, O_WRONLY, O_CREAT | O_TRUNC);
   if (unlikely(fd == INVALID_HANDLE_VALUE)) {
-    psync_crypto_aes256_ctr_encoder_decoder_free(decoder);
+    pcrypto_ctr_encdec_free(decoder);
     debug(D_ERROR, "could not open %s", filename);
     return PSYNC_NET_PERMFAIL;
   }
@@ -707,13 +707,13 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
       rd = fsize - off;
     if (unlikely_log(socket_read_all(sock, buff, rd)))
       goto err0;
-    psync_crypto_aes256_ctr_encode_decode_inplace(decoder, buff, rd, off);
+    pcrypto_ctr_encdec_decode(decoder, buff, rd, off);
     if (unlikely_log(pfile_write(fd, buff, rd) != rd))
       goto err0;
     psync_hash_update(&hashctx, buff, rd);
     off += rd;
   }
-  psync_crypto_aes256_ctr_encoder_decoder_free(decoder);
+  pcrypto_ctr_encdec_free(decoder);
   pfile_close(fd);
   psync_hash_final(hashbin, &hashctx);
   psync_binhex(hashhex, hashbin, PSYNC_HASH_DIGEST_LEN);
@@ -726,7 +726,7 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
   } else
     return PSYNC_NET_OK;
 err0:
-  psync_crypto_aes256_ctr_encoder_decoder_free(decoder);
+  pcrypto_ctr_encdec_free(decoder);
   pfile_close(fd);
   psync_hash_final(hashbin, &hashctx);
   return PSYNC_NET_TEMPFAIL;

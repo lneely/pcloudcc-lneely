@@ -384,7 +384,7 @@ int pcryptofolder_setup(const char *password, const char *hint) {
   aeskey = psync_ssl_gen_symmetric_key_from_pass(
       password, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE, salt,
       PSYNC_CRYPTO_PBKDF2_SALT_LEN, PSYNC_CRYPTO_PASS_TO_KEY_ITERATIONS);
-  enc = psync_crypto_aes256_ctr_encoder_decoder_create(aeskey);
+  enc = pcrypto_ctr_encdec_create(aeskey);
   psync_ssl_free_symmetric_key(aeskey);
   if (unlikely(enc == PSYNC_CRYPTO_INVALID_ENCODER)) {
     debug(D_WARNING, "psync_crypto_aes256_ctr_encoder_decoder_create failed");
@@ -394,7 +394,7 @@ int pcryptofolder_setup(const char *password, const char *hint) {
   rsa = psync_ssl_gen_rsa(PSYNC_CRYPTO_RSA_SIZE);
   if (unlikely(rsa == PSYNC_INVALID_RSA)) {
     debug(D_WARNING, "RSA key generation failed");
-    psync_crypto_aes256_ctr_encoder_decoder_free(enc);
+    pcrypto_ctr_encdec_free(enc);
     return PSYNC_CRYPTO_SETUP_KEYGEN_FAILED;
   } else
     debug(D_NOTICE, "RSA key generated");
@@ -409,7 +409,7 @@ int pcryptofolder_setup(const char *password, const char *hint) {
       psync_ssl_rsa_free_private(rsaprivate);
     if (rsapublic != PSYNC_INVALID_RSA)
       psync_ssl_rsa_free_public(rsapublic);
-    psync_crypto_aes256_ctr_encoder_decoder_free(enc);
+    pcrypto_ctr_encdec_free(enc);
     return PSYNC_CRYPTO_SETUP_KEYGEN_FAILED;
   }
   rsaprivatebin = psync_ssl_rsa_private_to_binary(rsaprivate);
@@ -424,13 +424,13 @@ int pcryptofolder_setup(const char *password, const char *hint) {
       psync_ssl_rsa_free_binary(rsaprivatebin);
     if (rsapublicbin != PSYNC_INVALID_BIN_RSA)
       psync_ssl_rsa_free_binary(rsapublicbin);
-    psync_crypto_aes256_ctr_encoder_decoder_free(enc);
+    pcrypto_ctr_encdec_free(enc);
     return PSYNC_CRYPTO_SETUP_KEYGEN_FAILED;
   }
   debug(D_NOTICE, "encoding private key");
-  psync_crypto_aes256_ctr_encode_decode_inplace(enc, rsaprivatebin->data,
+  pcrypto_ctr_encdec_decode(enc, rsaprivatebin->data,
                                                 rsaprivatebin->datalen, 0);
-  psync_crypto_aes256_ctr_encoder_decoder_free(enc);
+  pcrypto_ctr_encdec_free(enc);
   debug(D_NOTICE, "encoded private key, uploading keys");
   ret = psync_cloud_crypto_setup_upload(
       rsaprivatebin->data, rsaprivatebin->datalen, rsapublicbin->data,
@@ -616,12 +616,12 @@ retry:
   aeskey = psync_ssl_gen_symmetric_key_from_pass(
       password, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE, salt, saltlen,
       iterations);
-  enc = psync_crypto_aes256_ctr_encoder_decoder_create(aeskey);
+  enc = pcrypto_ctr_encdec_create(aeskey);
   psync_ssl_free_symmetric_key(aeskey);
   rsaprivdec = (unsigned char *)pmemlock_malloc(rsaprivlen);
   memcpy(rsaprivdec, rsapriv, rsaprivlen);
-  psync_crypto_aes256_ctr_encode_decode_inplace(enc, rsaprivdec, rsaprivlen, 0);
-  psync_crypto_aes256_ctr_encoder_decoder_free(enc);
+  pcrypto_ctr_encdec_decode(enc, rsaprivdec, rsaprivlen, 0);
+  pcrypto_ctr_encdec_free(enc);
   crypto_privkey = psync_ssl_rsa_load_private(rsaprivdec, rsaprivlen);
   psync_ssl_memclean(rsaprivdec, rsaprivlen);
   pmemlock_free(rsaprivdec);
@@ -1080,7 +1080,7 @@ psync_crypto_get_folder_encoder_locked(psync_folderid_t folderid) {
     }
     realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
     psync_crypto_release_folder_symkey_locked(folderid, symkey);
-    enc = psync_crypto_aes256_text_encoder_create(realkey);
+    enc = pcrypto_textenc_create(realkey);
     psync_ssl_free_symmetric_key(realkey);
     return enc;
   default:
@@ -1122,7 +1122,7 @@ psync_crypto_get_folder_decoder_locked(psync_folderid_t folderid) {
     }
     realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
     psync_crypto_release_folder_symkey_locked(folderid, symkey);
-    dec = psync_crypto_aes256_text_decoder_create(realkey);
+    dec = pcrypto_textdec_create(realkey);
     psync_ssl_free_symmetric_key(realkey);
     return dec;
   default:
@@ -1179,7 +1179,7 @@ psync_crypto_get_temp_folder_encoder_locked(psync_fsfolderid_t folderid) {
     }
     realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
     psync_ssl_free_symmetric_key(symkey);
-    enc = psync_crypto_aes256_text_encoder_create(realkey);
+    enc = pcrypto_textenc_create(realkey);
     psync_ssl_free_symmetric_key(realkey);
     return enc;
   default:
@@ -1241,7 +1241,7 @@ psync_crypto_get_temp_folder_decoder_locked(psync_fsfolderid_t folderid) {
     }
     realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
     psync_ssl_free_symmetric_key(symkey);
-    dec = psync_crypto_aes256_text_decoder_create(realkey);
+    dec = pcrypto_textdec_create(realkey);
     psync_ssl_free_symmetric_key(realkey);
     return dec;
   default:
@@ -1283,7 +1283,7 @@ pcryptofolder_flddecoder_get(psync_fsfolderid_t folderid) {
 }
 
 static void psync_crypto_free_folder_decoder(void *ptr) {
-  psync_crypto_aes256_text_decoder_free(
+  pcrypto_textdec_free(
       (psync_crypto_aes256_text_decoder_t)ptr);
 }
 
@@ -1295,7 +1295,7 @@ void pcryptofolder_flddecoder_release(
     pcache_add(buff, decoder, PSYNC_CRYPTO_CACHE_DIR_ECODER_SEC,
                     psync_crypto_free_folder_decoder, 2);
   } else
-    psync_crypto_aes256_text_decoder_free(decoder);
+    pcrypto_textdec_free(decoder);
 }
 
 char *
@@ -1308,13 +1308,13 @@ pcryptofolder_flddecode_filename(psync_crypto_aes256_text_decoder_t decoder,
   if (!filenameenc)
     return NULL;
   filenamedec =
-      psync_crypto_aes256_decode_text(decoder, filenameenc, filenameenclen);
+      pcrypto_decode_text(decoder, filenameenc, filenameenclen);
   psync_free(filenameenc);
   return (char *)filenamedec;
 }
 
 static void psync_crypto_free_folder_encoder(void *ptr) {
-  psync_crypto_aes256_text_encoder_free(
+  pcrypto_textenc_free(
       (psync_crypto_aes256_text_encoder_t)ptr);
 }
 
@@ -1367,7 +1367,7 @@ void pcryptofolder_fldencoder_release(
     pcache_add(buff, encoder, PSYNC_CRYPTO_CACHE_DIR_ECODER_SEC,
                     psync_crypto_free_folder_encoder, 2);
   } else
-    psync_crypto_aes256_text_encoder_free(encoder);
+    pcrypto_textenc_free(encoder);
 }
 
 char *
@@ -1375,7 +1375,7 @@ pcryptofolder_fldencode_filename(psync_crypto_aes256_text_encoder_t encoder,
                                    const char *name) {
   unsigned char *filenameenc, *filenameb32;
   size_t filenameenclen;
-  psync_crypto_aes256_encode_text(encoder, (const unsigned char *)name,
+  pcrypto_encode_text(encoder, (const unsigned char *)name,
                                   strlen(name), &filenameenc, &filenameenclen);
   filenameb32 =
       psync_base32_encode(filenameenc, filenameenclen, &filenameenclen);
@@ -1411,7 +1411,7 @@ psync_crypto_get_file_encoder_locked(psync_fileid_t fileid, uint64_t hash,
     }
     realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
     psync_crypto_release_file_symkey_locked(fileid, hash, symkey);
-    enc = psync_crypto_aes256_sector_encoder_decoder_create(realkey);
+    enc = pcrypto_sec_encdec_create(realkey);
     psync_ssl_free_symmetric_key(realkey);
     return enc;
   default:
@@ -1470,7 +1470,7 @@ psync_crypto_get_temp_file_encoder_locked(psync_fsfileid_t fileid,
       }
       realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
       psync_ssl_free_symmetric_key(symkey);
-      enc = psync_crypto_aes256_sector_encoder_decoder_create(realkey);
+      enc = pcrypto_sec_encdec_create(realkey);
       psync_ssl_free_symmetric_key(realkey);
       return enc;
     default:
@@ -1562,7 +1562,7 @@ pcryptofolder_filencoder_from_binresult(psync_fileid_t fileid,
 }
 
 static void psync_crypto_free_file_encoder(void *ptr) {
-  psync_crypto_aes256_sector_encoder_decoder_free(
+  pcrypto_sec_encdec_free(
       (psync_crypto_aes256_sector_encoder_decoder_t)ptr);
 }
 
@@ -1575,7 +1575,7 @@ void pcryptofolder_filencoder_release(
     pcache_add(buff, encoder, PSYNC_CRYPTO_CACHE_FILE_ECODER_SEC,
                     psync_crypto_free_file_encoder, 2);
   } else
-    psync_crypto_aes256_sector_encoder_decoder_free(encoder);
+    pcrypto_sec_encdec_free(encoder);
 }
 
 char *psync_crypto_get_name_encoded_locked(psync_folderid_t folderid,
@@ -1587,7 +1587,7 @@ char *psync_crypto_get_name_encoded_locked(psync_folderid_t folderid,
   enc = psync_crypto_get_folder_encoder_check_cache_locked(folderid);
   if (psync_crypto_is_error(enc))
     return (char *)enc;
-  psync_crypto_aes256_encode_text(enc, (const unsigned char *)name,
+  pcrypto_encode_text(enc, (const unsigned char *)name,
                                   strlen(name), &nameenc, &nameenclen);
   ret = (char *)psync_base32_encode(nameenc, nameenclen, &nameenclen);
   psync_crypto_release_folder_encoder_locked(folderid, enc);
@@ -1859,19 +1859,19 @@ int psync_pcloud_crypto_reencode_key(
     if (unlikely(aeskey == PSYNC_INVALID_SYM_KEY))
       goto err_nm_1;
     rsaprivlen -= offsetof(priv_key_ver1, key);
-    enc = psync_crypto_aes256_ctr_encoder_decoder_create(aeskey);
+    enc = pcrypto_ctr_encdec_create(aeskey);
     psync_ssl_free_symmetric_key(aeskey);
     if (unlikely(enc == PSYNC_CRYPTO_INVALID_ENCODER))
       goto err_nm_1;
     rsaprivdec = (unsigned char *)psync_malloc(rsaprivlen);
     if (unlikely(!rsaprivdec)) {
-      psync_crypto_aes256_ctr_encoder_decoder_free(enc);
+      pcrypto_ctr_encdec_free(enc);
       goto err_nm_1;
     }
     memcpy(rsaprivdec, rsapriv_struct->key, rsaprivlen);
-    psync_crypto_aes256_ctr_encode_decode_inplace(enc, rsaprivdec, rsaprivlen,
+    pcrypto_ctr_encdec_decode(enc, rsaprivdec, rsaprivlen,
                                                   0);
-    psync_crypto_aes256_ctr_encoder_decoder_free(enc);
+    pcrypto_ctr_encdec_free(enc);
     newpriv = (unsigned char *)psync_malloc(offsetof(priv_key_ver1, key) +
                                             rsaprivlen);
     if (unlikely(!newpriv))
@@ -1886,14 +1886,14 @@ int psync_pcloud_crypto_reencode_key(
     if (unlikely(aeskey == PSYNC_INVALID_SYM_KEY))
       goto err_nm_1;
     // rsaprivlen-=offsetof(priv_key_ver1, key);
-    enc = psync_crypto_aes256_ctr_encoder_decoder_create(aeskey);
+    enc = pcrypto_ctr_encdec_create(aeskey);
     psync_ssl_free_symmetric_key(aeskey);
     if (unlikely(enc == PSYNC_CRYPTO_INVALID_ENCODER))
       goto err_nm_1;
     memcpy(rsapriv_struct->key, rsaprivdec, rsaprivlen);
-    psync_crypto_aes256_ctr_encode_decode_inplace(enc, rsapriv_struct->key,
+    pcrypto_ctr_encdec_decode(enc, rsapriv_struct->key,
                                                   rsaprivlen, 0);
-    psync_crypto_aes256_ctr_encoder_decoder_free(enc);
+    pcrypto_ctr_encdec_free(enc);
     newprivlen = offsetof(priv_key_ver1, key) + rsaprivlen;
     priv = psync_ssl_rsa_load_private(rsaprivdec, rsaprivlen);
     psync_ssl_memclean(rsaprivdec, rsaprivlen);
@@ -1973,14 +1973,14 @@ int psync_pcloud_crypto_encode_key(const char *newpassphrase, uint32_t flags,
       rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN, 20000);
   if (unlikely(aeskey == PSYNC_INVALID_SYM_KEY))
     goto err_nm_1;
-  enc = psync_crypto_aes256_ctr_encoder_decoder_create(aeskey);
+  enc = pcrypto_ctr_encdec_create(aeskey);
   psync_ssl_free_symmetric_key(aeskey);
   if (unlikely(enc == PSYNC_CRYPTO_INVALID_ENCODER))
     goto err_nm_1;
   memcpy(rsapriv_struct->key, rsapriv->data, rsaprivlen);
-  psync_crypto_aes256_ctr_encode_decode_inplace(enc, rsapriv_struct->key,
+  pcrypto_ctr_encdec_decode(enc, rsapriv_struct->key,
                                                 rsaprivlen, 0);
-  psync_crypto_aes256_ctr_encoder_decoder_free(enc);
+  pcrypto_ctr_encdec_free(enc);
   rsaprivlen += offsetof(priv_key_ver1, key);
 
   psync_sha256(newpriv, rsaprivlen, newprivsha);
