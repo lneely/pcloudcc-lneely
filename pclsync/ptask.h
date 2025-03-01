@@ -32,6 +32,8 @@
 #ifndef _PSYNC_TASKS_H
 #define _PSYNC_TASKS_H
 
+#include <stdint.h>
+
 #include "pfoldersync.h"
 
 #define PSYNC_ASYNC_ERR_FLAG_PERM                                              \
