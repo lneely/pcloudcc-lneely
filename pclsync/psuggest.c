@@ -29,7 +29,7 @@
    DAMAGE.
 */
 
-#include "pscanner.h"
+#include "psuggest.h"
 #include "pfile.h"
 #include "plibs.h"
 #include "plist.h"
@@ -187,7 +187,7 @@ static void free_folder(scan_folder *f) {
   psync_free(f);
 }
 
-psuggested_folders_t *psync_scanner_scan_folder(const char *path) {
+psuggested_folders_t *psuggest_scan_folder(const char *path) {
   scan_folder *f;
   psync_list suggestions;
   suggested_folder *s, *sf[PSYNC_SCANNER_MAX_SUGGESTIONS];

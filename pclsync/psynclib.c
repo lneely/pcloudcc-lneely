@@ -70,7 +70,7 @@
 #include "ppath.h"
 #include "ppathstatus.h"
 #include "prun.h"
-#include "pscanner.h"
+#include "psuggest.h"
 #include "psettings.h"
 #include "pshm.h"
 #include "pssl.h"
@@ -1028,7 +1028,7 @@ psuggested_folders_t *psync_get_sync_suggestions() {
   psuggested_folders_t *ret;
   home = ppath_home();
   if (likely_log(home)) {
-    ret = psync_scanner_scan_folder(home);
+    ret = psuggest_scan_folder(home);
     psync_free(home);
     return ret;
   } else {

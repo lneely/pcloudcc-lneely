@@ -32,8 +32,8 @@
 #ifndef _PSYNC_SCANNER_H
 #define _PSYNC_SCANNER_H
 
-#include "psynclib.h"
+#include "pfoldersync.h"
 
-psuggested_folders_t *psync_scanner_scan_folder(const char *path);
+psuggested_folders_t *psuggest_scan_folder(const char *path);
 
 #endif
