@@ -187,7 +187,7 @@ int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
             psync_interval_tree_free(fl->authenticatedints);
             fl->authenticatedints = NULL;
           }
-          size = psync_fs_crypto_plain_size(size);
+          size = pfscrypto_plain_size(size);
         }
         debug(D_NOTICE, "updating fileid %ld to %lu, hash %lu size %lu",
               (long)fileid, (unsigned long)newfileid, (unsigned long)hash,
@@ -461,7 +461,7 @@ static void psync_row_to_file_stat(psync_variant_row row,
   stbuf->st_ino = fileid_to_inode(psync_get_number(row[4]));
   size = psync_get_number(row[1]);
   if (flags & PSYNC_FOLDER_FLAG_ENCRYPTED)
-    size = psync_fs_crypto_plain_size(size);
+    size = pfscrypto_plain_size(size);
   memset(stbuf, 0, sizeof(struct FUSE_STAT));
 #ifdef FUSE_STAT_HAS_BIRTHTIME
   stbuf->st_birthtime = psync_get_number(row[2]);
@@ -657,7 +657,7 @@ static int psync_creat_local_to_file_stat(psync_fstask_creat_t *cr,
     if (fill_stat_from_open_file(cr->fileid, stbuf))
       size = stbuf->st_size;
     else {
-      size = psync_fs_crypto_plain_size(pfile_stat_size(&st));
+      size = pfscrypto_plain_size(pfile_stat_size(&st));
       stbuf->st_size = size;
     }
   } else {
@@ -1022,7 +1022,7 @@ psync_fs_create_file(psync_fsfileid_t fileid, psync_fsfileid_t remotefileid,
   } else {
     fl = psync_new(psync_openfile_t);
     memset(fl, 0, sizeof(psync_openfile_t));
-    size = psync_fs_crypto_plain_size(size);
+    size = pfscrypto_plain_size(size);
   }
   if (d < 0)
     psync_tree_add_before(&openfiles, tr, &fl->tree);
@@ -1156,7 +1156,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
     if (unlikely_log(fs == -1))
       return -EIO;
     if (of->encrypted)
-      of->currentsize = psync_fs_crypto_plain_size(fs);
+      of->currentsize = pfscrypto_plain_size(fs);
     else
       of->currentsize = fs;
   } else {
@@ -1197,7 +1197,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
               (long)of->fileid);
         return -EIO;
       }
-      ret = psync_fs_crypto_init_log(of);
+      ret = pfscrypto_init_log(of);
       if (ret) {
         debug(D_ERROR, "could not init log file for fileid %ld",
               (long)of->fileid);
@@ -1840,7 +1840,7 @@ static void psync_fs_write_timer(psync_timer_t timer, void *ptr) {
       debug(D_ERROR, "file is static file, which should not generally happen");
       goto unlock_ex;
     }
-    if (unlikely(of->encrypted && psync_fs_crypto_flush_file(of))) {
+    if (unlikely(of->encrypted && pfscrypto_flush(of))) {
       debug(D_WARNING,
             "we are in timer and we failed to flush crypto file, life sux");
       goto unlock_ex;
@@ -1878,7 +1878,7 @@ static int psync_fs_flush(const char *path, struct fuse_file_info *fi) {
     }
     writeid = of->writeid;
     if (of->encrypted) {
-      ret = psync_fs_crypto_flush_file(of);
+      ret = pfscrypto_flush(of);
       if (unlikely_log(ret)) {
         pthread_mutex_unlock(&of->mutex);
         return ret;
@@ -1940,7 +1940,7 @@ static int psync_fs_fsync(const char *path, int datasync,
     return 0;
   }
   if (of->encrypted) {
-    ret = psync_fs_crypto_flush_file(of);
+    ret = pfscrypto_flush(of);
     if (unlikely_log(ret)) {
       pthread_mutex_unlock(&of->mutex);
       return ret;
@@ -2022,9 +2022,9 @@ static int psync_fs_read(const char *path, char *buf, size_t size,
   }
   if (of->encrypted) {
     if (of->newfile)
-      return psync_fs_crypto_read_newfile_locked(of, buf, size, offset);
+      return pfscrypto_read_new(of, buf, size, offset);
     else if (of->modified)
-      return psync_fs_crypto_read_modified_locked(of, buf, size, offset);
+      return pfscrypto_read_mod(of, buf, size, offset);
     else
       return psync_pagecache_read_unmodified_encrypted_locked(of, buf, size,
                                                               offset);
@@ -2137,7 +2137,7 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
       psync_sql_unlock();
       return -PRINT_RETURN_CONST(PSYNC_FS_ERR_CRYPTO_EXPIRED);
     }
-    size = psync_fs_crypto_crypto_size(of->initialsize);
+    size = pfscrypto_crypto_size(of->initialsize);
     encsymkey = pcryptofolder_filencoder_key_get(of->fileid, of->hash,
                                                         &encsymkeylen);
     if (unlikely_log(psync_crypto_is_error(encsymkey))) {
@@ -2278,10 +2278,10 @@ psync_fs_check_modified_file_write_space(psync_openfile_t *of, size_t size,
   uint64_t from, to;
   psync_interval_tree_t *tr;
   if (of->encrypted) {
-    from = psync_fs_crypto_data_sectorid_by_sectorid(offset /
+    from = pfscrypto_sector_id(offset /
                                                      PSYNC_CRYPTO_SECTOR_SIZE) *
            PSYNC_CRYPTO_SECTOR_SIZE;
-    to = psync_fs_crypto_data_sectorid_by_sectorid((offset + size) /
+    to = pfscrypto_sector_id((offset + size) /
                                                    PSYNC_CRYPTO_SECTOR_SIZE) *
              PSYNC_CRYPTO_SECTOR_SIZE +
          (offset + size) % PSYNC_CRYPTO_SECTOR_SIZE;
@@ -2468,7 +2468,7 @@ static int psync_fs_write(const char *path, const char *buf, size_t size,
 retry:
   if (of->newfile) {
     if (of->encrypted)
-      return psync_fs_crypto_write_newfile_locked(of, buf, size, offset);
+      return pfscrypto_write_new(of, buf, size, offset);
     else
       ret = psync_fs_write_newfile(of, buf, size, offset);
     pthread_mutex_unlock(&of->mutex);
@@ -2487,7 +2487,7 @@ retry:
       }
     }
     if (of->encrypted)
-      return psync_fs_crypto_write_modified_locked(of, buf, size, offset);
+      return pfscrypto_write_mod(of, buf, size, offset);
     else {
       debug(D_NOTICE, "write of %lu bytes at offset %lu", (unsigned long)size,
             (unsigned long)offset);
@@ -3223,7 +3223,7 @@ retry:
       return ret;
   }
   if (of->encrypted)
-    return psync_fs_crypto_ftruncate(of, size);
+    return pfscrypto_truncate(of, size);
   else {
     if (psync_fs_modfile_check_size_ok(of, size))
       ret = -PRINT_RETURN_CONST(EIO);

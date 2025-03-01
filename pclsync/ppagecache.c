@@ -2421,7 +2421,7 @@ static void psync_pagecache_read_unmodified_readahead(
     uint32_t asize, aoff;
     for (i = 0; i < pagecnt; i += PSYNC_CRYPTO_HASH_TREE_SECTORS) {
       for (l = 0; l < offsets->treelevels; l++) {
-        psync_fs_crypto_get_auth_sector_off(first_page_id + i, l, offsets,
+        pfscrypto_get_auth_off(first_page_id + i, l, offsets,
                                             &aoffset, &asize, &aoff);
         pageid = aoffset / PSYNC_FS_PAGE_SIZE;
         check_or_request_page(fileid, hash, pageid, ranges);
@@ -2431,8 +2431,8 @@ static void psync_pagecache_read_unmodified_readahead(
       }
     }
     // this may include some auth sectors, but should do no harm
-    rto = psync_fs_crypto_data_sectorid_by_sectorid(first_page_id + pagecnt);
-    first_page_id = psync_fs_crypto_data_sectorid_by_sectorid(first_page_id);
+    rto = pfscrypto_sector_id(first_page_id + pagecnt);
+    first_page_id = pfscrypto_sector_id(first_page_id);
     pagecnt = rto - first_page_id;
   }
   pages_in_db = has_pages_in_db(hash, first_page_id, pagecnt, 1);
@@ -2778,7 +2778,7 @@ int psync_pagecache_read_unmodified_encrypted_locked(psync_openfile_t *of,
     needkey = 0;
   pthread_mutex_unlock(&of->mutex);
   assert(PSYNC_CRYPTO_SECTOR_SIZE == PSYNC_FS_PAGE_SIZE);
-  psync_fs_crypto_offsets_by_plainsize(initialsize, &offsets);
+  pfscrypto_offset_by_size(initialsize, &offsets);
   if (offset >= initialsize)
     return 0;
   if (offset + size > initialsize)
@@ -2802,7 +2802,7 @@ int psync_pagecache_read_unmodified_encrypted_locked(psync_openfile_t *of,
       dp[i].authpage = ap;
       continue;
     }
-    psync_fs_crypto_get_auth_sector_off(first_page_id + i, 0, &offsets,
+    pfscrypto_get_auth_off(first_page_id + i, 0, &offsets,
                                         &aoffset, &asize, &aoff);
     ap = psync_new(psync_crypto_auth_page);
     ap->waiter = NULL;
@@ -2822,7 +2822,7 @@ int psync_pagecache_read_unmodified_encrypted_locked(psync_openfile_t *of,
       unsigned long l;
       lap = ap;
       for (l = 1; l <= offsets.treelevels; l++) {
-        psync_fs_crypto_get_auth_sector_off(first_page_id + i, l, &offsets,
+        pfscrypto_get_auth_off(first_page_id + i, l, &offsets,
                                             &aoffset, &asize, &aoff);
         cap = psync_new(psync_crypto_auth_page);
         cap->waiter = NULL;
@@ -2862,7 +2862,7 @@ int psync_pagecache_read_unmodified_encrypted_locked(psync_openfile_t *of,
     }
     dp[i].buff = pbuff;
     dp[i].pagesize = apsize;
-    apageid = psync_fs_crypto_data_sectorid_by_sectorid(first_page_id + i);
+    apageid = pfscrypto_sector_id(first_page_id + i);
     rb = check_page_in_memory_by_hash(hash, apageid, pbuff, apsize, 0);
     if (rb == -1)
       rb = check_page_in_database_by_hash(hash, apageid, pbuff, apsize, 0);
@@ -3054,7 +3054,7 @@ int psync_pagecache_readv_locked(psync_openfile_t *of,
   psync_list_init(&waiting);
   for (i = 0; i < cnt; i++) {
     assert(ranges[i].offset + ranges[i].size <= of->encrypted
-               ? psync_fs_crypto_crypto_size(initialsize)
+               ? pfscrypto_crypto_size(initialsize)
                : initialsize);
     poffset = offset_round_down_to_page(ranges[i].offset);
     pageoff = ranges[i].offset - poffset;

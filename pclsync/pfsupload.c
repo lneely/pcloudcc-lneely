@@ -2146,7 +2146,7 @@ static void psync_fsupload_thread() {
 }
 
 void psync_fsupload_init() {
-  psync_fs_crypto_check_logs();
+  pfscrypto_check_logs();
   psync_timer_exception_handler(psync_fsupload_wake);
   prun_thread("fsupload main", psync_fsupload_thread);
 }
