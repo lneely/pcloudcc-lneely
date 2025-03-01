@@ -2153,7 +2153,7 @@ int psync_upload_file_as(const char *remote_path, const char *remote_filename,
 }
 
 int psync_password_quality(const char *password) {
-  uint64_t score = psync_password_score(password);
+  uint64_t score = ppassword_score(password);
   if (score < (uint64_t)1 << 30)
     return 0;
   if (score < (uint64_t)1 << 40)
@@ -2163,7 +2163,7 @@ int psync_password_quality(const char *password) {
 }
 
 int psync_password_quality10000(const char *password) {
-  uint64_t score = psync_password_score(password);
+  uint64_t score = ppassword_score(password);
   if (score < (uint64_t)1 << 30)
     return score / (((uint64_t)1 << 30) / 10000 + 1);
   if (score < (uint64_t)1 << 40)
