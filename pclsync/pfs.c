@@ -526,7 +526,7 @@ static int psync_creat_db_to_file_stat(psync_fileid_t fileid,
 static int psync_creat_stat_fake_file(struct FUSE_STAT *stbuf) {
   time_t ctime;
   memset(stbuf, 0, sizeof(struct FUSE_STAT));
-  ctime = psync_timer_time();
+  ctime = ptimer_time();
 #ifdef FUSE_STAT_HAS_BIRTHTIME
   stbuf->st_birthtime = ctime;
 #endif
@@ -1829,7 +1829,7 @@ static void psync_fs_write_timer(psync_timer_t timer, void *ptr) {
   psync_openfile_t *of;
   of = (psync_openfile_t *)ptr;
   psync_fs_lock_file(of);
-  psync_timer_stop(timer);
+  ptimer_stop(timer);
   of->writetimer = PSYNC_INVALID_TIMER;
   debug(D_NOTICE, "got write timer for file %s", of->currentname);
   if (of->releasedforupload)
@@ -1885,7 +1885,7 @@ static int psync_fs_flush(const char *path, struct fuse_file_info *fi) {
       }
     }
     of->releasedforupload = 1;
-    if (of->writetimer && !psync_timer_stop(of->writetimer)) {
+    if (of->writetimer && !ptimer_stop(of->writetimer)) {
       if (--of->refcnt == 0) {
         debug(D_BUG, "zero refcnt in flush after canceling timer");
         assert(of->refcnt);
@@ -2002,7 +2002,7 @@ static int psync_fs_read(const char *path, char *buf, size_t size,
   time_t currenttime;
   psync_fs_set_thread_name();
   of = fh_to_openfile(fi->fh);
-  currenttime = psync_timer_time();
+  currenttime = ptimer_time();
   psync_fs_lock_file(of);
   if (of->currentsec == currenttime) {
     of->bytesthissec += size;
@@ -2059,10 +2059,10 @@ static void psync_fs_inc_writeid_locked(psync_openfile_t *of) {
   }
   of->writeid++;
   if (of->writetimer == PSYNC_INVALID_TIMER ||
-      !psync_timer_stop(of->writetimer)) {
+      !ptimer_stop(of->writetimer)) {
     if (of->writetimer == PSYNC_INVALID_TIMER)
       psync_fs_inc_of_refcnt_locked(of);
-    of->writetimer = psync_timer_register(psync_fs_write_timer,
+    of->writetimer = ptimer_register(psync_fs_write_timer,
                                           PSYNC_UPLOAD_NOWRITE_TIMER, of);
   }
 }
@@ -2306,7 +2306,7 @@ static void psync_fs_throttle(size_t size, uint64_t speed) {
   assert(speed > 0);
   cnt = 0;
   while (++cnt <= PSYNC_FS_MAX_SHAPER_SLEEP_SEC) {
-    currsec = psync_timer_time();
+    currsec = ptimer_time();
     pthread_mutex_lock(&throttle_mutex);
     if (currsec != thissec) {
       thissec = currsec;
@@ -2325,7 +2325,7 @@ static void psync_fs_throttle(size_t size, uint64_t speed) {
       }
     }
     pthread_mutex_unlock(&throttle_mutex);
-    psync_timer_wait_next_sec();
+    ptimer_wait_next_sec();
   }
 }
 
@@ -3270,7 +3270,7 @@ static int psync_fs_truncate(const char *path, fuse_off_t size) {
 
 static void psync_fs_start_callback_timer(psync_timer_t timer, void *ptr) {
   psync_generic_callback_t callback;
-  psync_timer_stop(timer);
+  ptimer_stop(timer);
   callback = psync_start_callback;
   if (callback)
     prun_thread("fs start callback", callback);
@@ -3288,7 +3288,7 @@ static void *psync_fs_init(struct fuse_conn_info *conn) {
 #endif
   conn->max_readahead = 1024 * 1024;
   if (psync_start_callback)
-    psync_timer_register(psync_fs_start_callback_timer, 1, NULL);
+    ptimer_register(psync_fs_start_callback_timer, 1, NULL);
   return 0;
 }
 
@@ -3313,8 +3313,8 @@ static void psync_invalidate_os_cache_noret() {
 
 static void psync_fs_refresh_timer(psync_timer_t timer, void *ptr) {
   time_t ct;
-  ct = psync_timer_time();
-  psync_timer_stop(timer);
+  ct = ptimer_time();
+  ptimer_stop(timer);
   pthread_mutex_lock(&fsrefreshmutex);
   fsrefreshtimerscheduled = 0;
   lastfsrefresh = ct;
@@ -3328,7 +3328,7 @@ void psync_fs_refresh() {
   int todo;
   if (!pfile_invalidate_os_cache_needed())
     return;
-  ct = psync_timer_time();
+  ct = ptimer_time();
   todo = 0;
   pthread_mutex_lock(&fsrefreshmutex);
   if (fsrefreshtimerscheduled)
@@ -3345,7 +3345,7 @@ void psync_fs_refresh() {
     prun_thread("os cache invalidate", psync_invalidate_os_cache_noret);
   } else if (todo == 1) {
     debug(D_NOTICE, "setting timer to invalidate cache");
-    psync_timer_register(psync_fs_refresh_timer, REFRESH_SEC, NULL);
+    ptimer_register(psync_fs_refresh_timer, REFRESH_SEC, NULL);
   }
 }
 

@@ -2008,7 +2008,7 @@ err0:
   psync_fsupload_process_tasks(tasks);
 err:
   papi_rdr_free(&reader);
-  psync_timer_notify_exception();
+  ptimer_notify_exception();
   upload_wakes++;
   psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_UPLOAD);
 }
@@ -2147,7 +2147,7 @@ static void psync_fsupload_thread() {
 
 void psync_fsupload_init() {
   pfscrypto_check_logs();
-  psync_timer_exception_handler(psync_fsupload_wake);
+  ptimer_exception_handler(psync_fsupload_wake);
   prun_thread("fsupload main", psync_fsupload_thread);
 }
 

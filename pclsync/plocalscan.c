@@ -222,11 +222,11 @@ static void reload_ignored_folders() {
   psync_sha256((const unsigned char *)ign, ignlen, checkcurr);
 
   if (!memcmp(ign_checksum, checkcurr, PSYNC_SHA256_DIGEST_LEN) &&
-      ign_last_check + 3600 < psync_timer_time())
+      ign_last_check + 3600 < ptimer_time())
     return;
 
   memcpy(ign_checksum, checkcurr, PSYNC_SHA256_DIGEST_LEN);
-  ign_last_check = psync_timer_time();
+  ign_last_check = ptimer_time();
   ign_paths_cnt = 0;
   next = ign;
   home = NULL;
@@ -943,7 +943,7 @@ retry:
     } else {
       psync_sql_commit_transaction();
       if (tries == 10)
-        psync_timer_notify_exception();
+        ptimer_notify_exception();
       tries++;
       psys_sleep_milliseconds(20 + tries * 20);
       psync_sql_start_transaction();
@@ -1343,7 +1343,7 @@ void psync_localscan_init() {
   const char *localpath;
   psync_syncid_t syncid;
   psync_list_init(&scan_folders_list);
-  psync_timer_exception_handler(psync_wake_localscan_noscan);
+  ptimer_exception_handler(psync_wake_localscan_noscan);
   prun_thread("localscan", scanner_thread);
   localnotify = psync_localnotify_init();
   res = psync_sql_query_rdlock(

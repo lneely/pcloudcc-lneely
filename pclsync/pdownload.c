@@ -1050,7 +1050,7 @@ static void free_task_timer_thread(void *ptr) {
 }
 
 static void free_task_timer(psync_timer_t timer, void *ptr) {
-  psync_timer_stop(timer);
+  ptimer_stop(timer);
   prun_thread1("free task", free_task_timer_thread, ptr);
 }
 
@@ -1074,7 +1074,7 @@ static void handle_async_error(download_task_t *dt, psync_async_result_t *res) {
     free_download_task(dt);
     pstatus_download_recalc_async();
   } else
-    psync_timer_register(free_task_timer, 1, dt);
+    ptimer_register(free_task_timer, 1, dt);
 }
 
 static void finish_async_download(void *ptr, psync_async_result_t *res) {
@@ -1089,7 +1089,7 @@ static void finish_async_download(void *ptr, psync_async_result_t *res) {
     }
     if (rename_and_create_local(dt, res->file.sha1hex, res->file.size,
                                 res->file.hash))
-      psync_timer_register(free_task_timer, 1, dt);
+      ptimer_register(free_task_timer, 1, dt);
     else {
       delete_task(dt->taskid);
       ppathstatus_syncfldr_task_completed(dt->dwllist.syncid,
@@ -1108,7 +1108,7 @@ static void finish_async_download_existing_not_mod(download_task_t *dt,
                             res->file.sha1hex, res->file.size,
                             res->file.hash)) {
     debug(D_WARNING, "stat_and_create_local failed for %s", dt->localname);
-    psync_timer_register(free_task_timer, 1, dt);
+    ptimer_register(free_task_timer, 1, dt);
   } else {
     delete_task(dt->taskid);
     ppathstatus_syncfldr_task_completed(dt->dwllist.syncid,
@@ -1516,7 +1516,7 @@ void pdownload_wake() {
 }
 
 void pdownload_init() {
-  psync_timer_exception_handler(pdownload_wake);
+  ptimer_exception_handler(pdownload_wake);
   prun_thread("download main", download_thread);
 }
 

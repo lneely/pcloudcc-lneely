@@ -67,7 +67,7 @@ static void ratelimit_timer(psync_timer_t timer, void *ptr) {
     debug(D_NOTICE, "running %s in a thread", name);
     prun_thread(name, call);
   } else {
-    psync_timer_stop(timer);
+    ptimer_stop(timer);
     psync_free(node);
   }
 }
@@ -128,6 +128,6 @@ void prun_throttled(const char *name, prun_throttle_cb call,
       debug(D_NOTICE, "running %s on this thread", name);
       call();
     }
-    psync_timer_register(ratelimit_timer, minintervalsec, node);
+    ptimer_register(ratelimit_timer, minintervalsec, node);
   }
 }

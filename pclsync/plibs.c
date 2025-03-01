@@ -1761,7 +1761,7 @@ void psync_libs_init() {
 
 static void run_after_sec(psync_timer_t timer, void *ptr) {
   struct run_after_ptr *fp = (struct run_after_ptr *)ptr;
-  psync_timer_stop(timer);
+  ptimer_stop(timer);
   fp->run(fp->ptr);
   psync_free(fp);
 }
@@ -1771,16 +1771,16 @@ void psync_run_after_sec(psync_run_after_t run, void *ptr, uint32_t seconds) {
   fp = psync_new(struct run_after_ptr);
   fp->run = run;
   fp->ptr = ptr;
-  psync_timer_register(run_after_sec, seconds, fp);
+  ptimer_register(run_after_sec, seconds, fp);
 }
 
 static void free_after_sec(psync_timer_t timer, void *ptr) {
-  psync_timer_stop(timer);
+  ptimer_stop(timer);
   psync_free(ptr);
 }
 
 void psync_free_after_sec(void *ptr, uint32_t seconds) {
-  psync_timer_register(free_after_sec, seconds, ptr);
+  ptimer_register(free_after_sec, seconds, ptr);
 }
 
 int psync_match_pattern(const char *name, const char *pattern, size_t plen) {

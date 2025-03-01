@@ -74,7 +74,7 @@ static void fsroot_change() { psync_fs_remount(); }
 
 static psync_setting_t settings[] = {
     {"usessl",
-     psync_timer_do_notify_exception,
+     ptimer_do_notify_exception,
      NULL,
      {PSYNC_USE_SSL_DEFAULT},
      PSYNC_TBOOL},

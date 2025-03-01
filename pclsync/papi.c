@@ -104,7 +104,7 @@ psock_t *papi_connect(const char *hostname, int usessl) {
   static time_t notuntil = 0;
   psock_t *ret;
   const char *userapi = psync_setting_get_string(_PS(api_server));
-  if (psync_timer_time() > notuntil || !userapi) {
+  if (ptimer_time() > notuntil || !userapi) {
     ret = psock_connect(
         hostname, usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT, usessl);
     if (ret) {
@@ -117,7 +117,7 @@ psock_t *papi_connect(const char *hostname, int usessl) {
     if (ret) {
       debug(D_NOTICE, "failed to connect to %s, but was able to connect to %s",
             hostname, userapi);
-      notuntil = psync_timer_time() + 1800;
+      notuntil = ptimer_time() + 1800;
     }
     return ret;
   }

@@ -83,7 +83,7 @@ PSYNC_NOINLINE static void timer_sleep_detected(time_t lt) {
   }
   pthread_mutex_unlock(&timer_ex_mutex);
   pcache_clean();
-  psync_timer_notify_exception();
+  ptimer_notify_exception();
 }
 
 static void timer_check_upper_levels(time_t tmdiv, unsigned long level,
@@ -170,7 +170,7 @@ static void timer_thread() {
   }
 }
 
-void psync_timer_init() {
+void ptimer_init() {
   unsigned long i, j;
   for (i = 0; i < TIMER_LEVELS; i++)
     for (j = 0; j < TIMER_ARRAY_SIZE; j++)
@@ -180,16 +180,16 @@ void psync_timer_init() {
   timer_running = 1;
 }
 
-time_t psync_timer_time() {
+time_t ptimer_time() {
   if (timer_running)
     return psync_current_time;
   else
     return psys_time_seconds();
 }
 
-void psync_timer_wake() { pthread_cond_signal(&timer_cond); }
+void ptimer_wake() { pthread_cond_signal(&timer_cond); }
 
-psync_timer_t psync_timer_register(psync_timer_callback func, time_t numsec,
+psync_timer_t ptimer_register(psync_timer_callback func, time_t numsec,
                                    void *param) {
   psync_timer_t timer;
   uint32_t i;
@@ -224,7 +224,7 @@ psync_timer_t psync_timer_register(psync_timer_callback func, time_t numsec,
   return timer;
 }
 
-int psync_timer_stop(psync_timer_t timer) {
+int ptimer_stop(psync_timer_t timer) {
   int needfree = 0;
   pthread_mutex_lock(&timer_mutex);
   if (timer->opts & PTIMER_IS_RUNNING)
@@ -241,7 +241,7 @@ int psync_timer_stop(psync_timer_t timer) {
     return 1;
 }
 
-void psync_timer_exception_handler(psync_exception_callback func) {
+void ptimer_exception_handler(psync_exception_callback func) {
   struct exception_list *t;
   t = psync_new(struct exception_list);
   t->next = NULL;
@@ -253,7 +253,7 @@ void psync_timer_exception_handler(psync_exception_callback func) {
   pthread_mutex_unlock(&timer_ex_mutex);
 }
 
-void psync_timer_sleep_handler(psync_exception_callback func) {
+void ptimer_sleep_handler(psync_exception_callback func) {
   struct exception_list *t;
   t = psync_new(struct exception_list);
   t->next = NULL;
@@ -265,7 +265,7 @@ void psync_timer_sleep_handler(psync_exception_callback func) {
   pthread_mutex_unlock(&timer_ex_mutex);
 }
 
-void psync_timer_do_notify_exception() {
+void ptimer_do_notify_exception() {
   struct exception_list *e;
   pthread_t threadid;
   e = excepions;
@@ -279,7 +279,7 @@ void psync_timer_do_notify_exception() {
   pthread_mutex_unlock(&timer_ex_mutex);
 }
 
-void psync_timer_wait_next_sec() {
+void ptimer_wait_next_sec() {
   time_t ctime;
   pthread_mutex_lock(&timer_mutex);
   ctime = psync_current_time;

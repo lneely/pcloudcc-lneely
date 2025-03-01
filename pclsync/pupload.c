@@ -1349,10 +1349,10 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
   }
   if (!stat(localpath, &st) &&
       pfile_stat_mtime(&st) >=
-          psync_timer_time() - PSYNC_UPLOAD_OLDER_THAN_SEC) {
+          ptimer_time() - PSYNC_UPLOAD_OLDER_THAN_SEC) {
     time_t ctime;
     debug(D_NOTICE, "file %s is too new, waiting for upload", localpath);
-    ctime = psync_timer_time();
+    ctime = ptimer_time();
     psync_apipool_prepare();
     if (ctime < pfile_stat_mtime(&st) - 2)
       debug(D_NOTICE,
@@ -1376,7 +1376,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
           psync_free(localpath);
           return -1;
         }
-        ctime = psync_timer_time();
+        ctime = ptimer_time();
       } while (pfile_stat_mtime(&st) >= ctime - PSYNC_UPLOAD_OLDER_THAN_SEC &&
                ++ret <= 10);
       if (ret == 10) {
@@ -1761,7 +1761,7 @@ void psync_wake_upload() {
 }
 
 void psync_upload_init() {
-  psync_timer_exception_handler(psync_wake_upload);
+  ptimer_exception_handler(psync_wake_upload);
   prun_thread("upload main", upload_thread);
 }
 

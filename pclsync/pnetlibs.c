@@ -201,7 +201,7 @@ psock_t *psync_apipool_get() {
   }
   ret = psync_get_api();
   if (unlikely_log(!ret))
-    psync_timer_notify_exception();
+    ptimer_notify_exception();
   return ret;
 }
 
@@ -224,7 +224,7 @@ void psync_apipool_prepare() {
     psock_t *ret;
     ret = psync_get_api();
     if (unlikely_log(!ret))
-      psync_timer_notify_exception();
+      ptimer_notify_exception();
     else {
       debug(D_NOTICE, "prepared api connection");
       psync_apipool_release(ret);
@@ -255,7 +255,7 @@ binresult *psync_do_api_run_command(const char *command, size_t cmdlen,
     psync_apipool_release_bad(api);
   } while (++tries <= PSYNC_RETRY_REQUEST);
 
-  psync_timer_notify_exception();
+  ptimer_notify_exception();
 
   return NULL;
 }
@@ -402,7 +402,7 @@ void psync_set_local_full(int over) {
 int psync_handle_api_result(uint64_t result) {
   if (result == 2000) {
     pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADLOGIN);
-    psync_timer_notify_exception();
+    ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   } else if (result == 2003 || result == 2009 || result == 2005 ||
              result == 2029 || result == 2067 || result == 5002)
@@ -776,7 +776,7 @@ static int psync_socket_readall_download_th(psock_t *sock, void *buff,
     readbytes = 0;
     while (num) {
       while ((thissec = get_download_bytes_this_sec()) >= dwlspeed)
-        psync_timer_wait_next_sec();
+        ptimer_wait_next_sec();
       if (num > dwlspeed - thissec)
         rrd = dwlspeed - thissec;
       else
@@ -862,7 +862,7 @@ long psync_socket_writeall_upload(psock_t *sock, const void *buff,
         dyn_upload_speed =
             (dyn_upload_speed * PSYNC_UPL_AUTO_SHAPER_INC_PER) / 100;
         //        set_send_buf(sock);
-        psync_timer_wait_next_sec();
+        ptimer_wait_next_sec();
       }
       debug(D_NOTICE, "dyn_upload_speed=%lu", dyn_upload_speed);
       if (num > dyn_upload_speed - thissec)
@@ -890,7 +890,7 @@ long psync_socket_writeall_upload(psock_t *sock, const void *buff,
     writebytes = 0;
     while (num) {
       while ((thissec = get_upload_bytes_this_sec()) >= uplspeed)
-        psync_timer_wait_next_sec();
+        ptimer_wait_next_sec();
       if (num > uplspeed - thissec)
         wwr = uplspeed - thissec;
       else
@@ -1327,7 +1327,7 @@ psync_http_socket *psync_http_connect_multihost(const binresult *hosts,
         }
       }
       if (!sock) {
-        psync_timer_notify_exception();
+        ptimer_notify_exception();
         return NULL;
       }
     }
@@ -1618,7 +1618,7 @@ static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
       psync_apipool_release_bad(api);
   }
   if (unlikely_log(!res)) {
-    psync_timer_notify_exception();
+    ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   }
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
@@ -1688,7 +1688,7 @@ static int psync_net_get_upload_checksums(psock_t *api,
   *checksums = NULL;
   res = papi_send2(api, "upload_blockchecksums", params);
   if (unlikely_log(!res)) {
-    psync_timer_notify_exception();
+    ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   }
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
@@ -2445,7 +2445,7 @@ static int download_file_revisions(psync_fileid_t fileid) {
   res = papi_send2(api, "listrevisions", params);
   if (unlikely_log(!res)) {
     psync_apipool_release_bad(api);
-    psync_timer_notify_exception();
+    ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   }
   psync_apipool_release(api);
@@ -2574,7 +2574,7 @@ int psync_get_upload_checksum(psync_uploadid_t uploadid, unsigned char *uhash,
   res = papi_send2(api, "upload_info", params);
   if (unlikely_log(!res)) {
     psync_apipool_release_bad(api);
-    psync_timer_notify_exception();
+    ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   }
   psync_apipool_release(api);
@@ -2657,7 +2657,7 @@ int psync_send_debug(int thread, const char *file, const char *function,
 }
 
 void psync_netlibs_init() {
-  psync_timer_register(psync_netlibs_timer, 1, NULL);
+  ptimer_register(psync_netlibs_timer, 1, NULL);
   sem_init(&api_pool_sem, 0, PSYNC_APIPOOL_MAXACTIVE);
 }
 

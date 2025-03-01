@@ -416,7 +416,7 @@ int psync_fstask_mkdir(psync_fsfolderid_t folderid, const char *name,
     else
       return -PRINT_RETURN_CONST(EEXIST);
   }
-  ctime = psync_timer_time();
+  ctime = ptimer_time();
   if (folderflags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
     key = pcryptofolder_filencoder_key_new(PSYNC_CRYPTO_SYM_FLAG_ISDIR,
                                                  &klen);
@@ -883,7 +883,7 @@ int psync_fstask_add_local_creat_static(psync_fsfolderid_t folderid,
   lc = (psync_fstask_local_creat_t *)(((char *)cr) + addlen);
   lc->data = data;
   lc->datalen = datalen;
-  lc->ctime = psync_timer_time();
+  lc->ctime = ptimer_time();
   psync_fstask_insert_into_tree(
       &folder->creats, offsetof(psync_fstask_creat_t, name), &cr->tree);
   psync_local_taskid--;
@@ -1229,7 +1229,7 @@ static void fill_mkdir_data(psync_fsfolderid_t folderid,
                             psync_fstask_mkdir_t *mkdir) {
   psync_sql_res *res;
   psync_uint_row row;
-  mkdir->ctime = mkdir->mtime = psync_timer_time();
+  mkdir->ctime = mkdir->mtime = ptimer_time();
   mkdir->subdircnt = 0;
   if (folderid < 0) {
     res = psync_sql_query("SELECT int1 FROM fstask WHERE id=?");

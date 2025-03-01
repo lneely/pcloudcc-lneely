@@ -2542,7 +2542,7 @@ static int setup_exeptions() {
   if (pipe(pfds) == SOCKET_ERROR)
     return INVALID_SOCKET;
   exceptionsockwrite = pfds[1];
-  psync_timer_exception_handler(diff_exception_handler);
+  ptimer_exception_handler(diff_exception_handler);
   return pfds[0];
 }
 
@@ -2629,7 +2629,7 @@ static int send_diff_command(psock_t *sock, subscribed_ids ids) {
 static void handle_exception(psock_t **sock, subscribed_ids *ids,
                              char ex) {
   if (ex == 'c') {
-    if (last_event >= psync_timer_time() - 1)
+    if (last_event >= ptimer_time() - 1)
       return;
     if (psock_select_in(&(*sock)->sock, 1, 1000) != 0) {
       debug(D_NOTICE, "got a pdiff_wake() but no diff events in one "
@@ -2759,7 +2759,7 @@ static void psync_diff_refresh_fs(const binresult *entries) {
 }
 
 static void psync_run_analyze_if_needed() {
-  if (psync_timer_time() >
+  if (ptimer_time() >
       psync_sql_cellint("SELECT value FROM setting WHERE id='lastanalyze'", 0) +
           24 * 3600) {
     static const char *skiptables[] = {"pagecache", "sqlite_stat1"};
@@ -2805,7 +2805,7 @@ static void psync_run_analyze_if_needed() {
     res = psync_sql_prep_statement(
         "REPLACE INTO setting (id, value) VALUES (?, ?)");
     psync_sql_bind_string(res, 1, "lastanalyze");
-    psync_sql_bind_uint(res, 2, psync_timer_time());
+    psync_sql_bind_uint(res, 2, ptimer_time());
     psync_sql_run_free(res);
     debug(D_NOTICE, "done running ANALYZE on tables");
   }
@@ -2950,7 +2950,7 @@ restart:
   socks[0] = exceptionsock;
   socks[1] = sock->sock;
   psync_diff_adapter_hash(adapter_hash);
-  psync_timer_register(psync_diff_adapter_timer,
+  ptimer_register(psync_diff_adapter_timer,
                        PSYNC_DIFF_CHECK_ADAPTER_CHANGE_SEC, NULL);
   send_diff_command(sock, ids);
   psys_sleep_milliseconds(50);
@@ -2992,13 +2992,13 @@ restart:
       res = papi_result(sock);
       should_free_res = 1;
       if (unlikely_log(!res)) {
-        psync_timer_notify_exception();
+        ptimer_notify_exception();
         handle_exception(&sock, &ids, 'r');
         socks[1] = sock->sock;
         last_event = 0;
         continue;
       }
-      last_event = psync_timer_time();
+      last_event = ptimer_time();
       result = papi_find_result2(res, "result", PARAM_NUM)->num;
       if (unlikely(result)) {
         if (result == 6003 || result == 6002) { // timeout or cancel
@@ -3093,7 +3093,7 @@ void pdiff_init() {
 }
 
 void pdiff_wake() {
-  if (last_event >= psync_timer_time() - 1)
+  if (last_event >= ptimer_time() - 1)
     return;
   write(exceptionsockwrite, "c", 1);
 }

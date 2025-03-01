@@ -88,7 +88,7 @@ static void cache_timer(psync_timer_t timer, void *ptr) {
   pthread_mutex_unlock(&cachelocks[hash_to_lock(he->hash)]);
   he->free(he->value);
   psync_free(he);
-  psync_timer_stop(timer);
+  ptimer_stop(timer);
 }
 
 void pcache_init() {
@@ -126,7 +126,7 @@ void *pcache_get(const char *key) {
   pthread_mutex_lock(&cachelocks[hash_to_lock(h)]);
   psync_list_for_each_element(
       he, lst, cache_entry_t, list) if (he->hash == h && !strcmp(key, he->key)) {
-    if (psync_timer_stop(he->timer))
+    if (ptimer_stop(he->timer))
       continue;
     psync_list_del(&he->list);
     pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
@@ -190,7 +190,7 @@ void pcache_add(const char *key, void *ptr, time_t freeafter,
    * "faster" (e.g. further from idle slowstart reset)
    */
   psync_list_add_head(lst, &he->list);
-  he->timer = psync_timer_register(cache_timer, freeafter, he);
+  he->timer = ptimer_register(cache_timer, freeafter, he);
   pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
 }
 
@@ -213,7 +213,7 @@ restart:
   pthread_mutex_lock(&cachelocks[hash_to_lock(h)]);
   psync_list_for_each_element(
       he, lst, cache_entry_t, list) if (he->hash == h && !strcmp(key, he->key)) {
-    if (psync_timer_stop(he->timer))
+    if (ptimer_stop(he->timer))
       continue;
     psync_list_del(&he->list);
     pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
@@ -232,7 +232,7 @@ void pcache_clean() {
     pthread_mutex_lock(&cachelocks[hash_to_lock(h)]);
     psync_list_for_each_safe(l1, l2, &cache_hash[h]) {
       he = psync_list_element(l1, cache_entry_t, list);
-      if (!psync_timer_stop(he->timer)) {
+      if (!ptimer_stop(he->timer)) {
         psync_list_del(l1);
         he->free(he->value);
         psync_free(he);
@@ -259,7 +259,7 @@ void pcache_clean_oneof(const char **prefixes, size_t cnt) {
           break;
       if (i == cnt)
         continue;
-      if (!psync_timer_stop(he->timer)) {
+      if (!ptimer_stop(he->timer)) {
         psync_list_del(l1);
         he->free(he->value);
         psync_free(he);

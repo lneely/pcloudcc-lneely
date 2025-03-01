@@ -552,7 +552,7 @@ void pp2p_init() {
   unsigned char computerbin[PSYNC_HASH_DIGEST_LEN];
   psync_ssl_rand_weak(computerbin, PSYNC_HASH_DIGEST_LEN);
   psync_binhex(computername, computerbin, PSYNC_HASH_DIGEST_LEN);
-  psync_timer_exception_handler(psync_p2p_wake);
+  ptimer_exception_handler(psync_p2p_wake);
   if (!psync_setting_get_bool(_PS(p2psync)))
     return;
   psync_p2p_start();

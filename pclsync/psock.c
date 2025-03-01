@@ -222,7 +222,7 @@ static void addr_save(const char *host, const char *port,
       "protocol, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
   psync_sql_bind_string(res, 1, host);
   psync_sql_bind_string(res, 2, port);
-  psync_sql_bind_uint(res, 4, psync_timer_time());
+  psync_sql_bind_uint(res, 4, ptimer_time());
   id = 0;
   do {
     psync_sql_bind_uint(res, 3, id++);

@@ -282,7 +282,7 @@ int psync_init() {
     return_error(PERROR_DATABASE_OPEN);
   }
   psync_sql_statement("UPDATE task SET inprogress=0 WHERE inprogress=1");
-  psync_timer_init();
+  ptimer_init();
   if (unlikely_log(psync_ssl_init())) {
     if (IS_DEBUG)
       pthread_mutex_unlock(&psync_libstate_mutex);
@@ -292,7 +292,7 @@ int psync_init() {
   psync_libs_init();
   psync_settings_init();
   pstatus_init();
-  psync_timer_sleep_handler(psync_stop_crypto_on_sleep);
+  ptimer_sleep_handler(psync_stop_crypto_on_sleep);
   ppathstatus_init();
   if (IS_DEBUG) {
     psync_libstate = 1;
@@ -361,8 +361,8 @@ void psync_destroy() {
   pstatus_wait_term();
   pstatus_send_status_update();
   ptask_stop_async();
-  psync_timer_wake();
-  psync_timer_notify_exception();
+  ptimer_wake();
+  ptimer_notify_exception();
   psync_sql_sync();
   psys_sleep_milliseconds(20);
   psync_sql_lock();
@@ -455,7 +455,7 @@ void psync_logout2(uint32_t auth_status, int doinvauth) {
   pcache_clean();
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   psync_restart_localscan();
-  psync_timer_notify_exception();
+  ptimer_notify_exception();
   if (psync_fs_need_per_folder_refresh())
     psync_fs_refresh_folder(0);
 }
@@ -564,7 +564,7 @@ void psync_unlink() {
   pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
   pstatus_set(PSTATUS_TYPE_RUN, PSTATUS_RUN_STOP);
-  psync_timer_notify_exception();
+  ptimer_notify_exception();
   psync_sql_lock();
   debug(D_NOTICE, "clearing database, locked");
   pcache_clean();
@@ -1123,7 +1123,7 @@ int psync_pause() {
 
 int psync_stop() {
   psync_set_run_status(PSTATUS_RUN_STOP);
-  psync_timer_notify_exception();
+  ptimer_notify_exception();
   return 0;
 }
 
@@ -1399,7 +1399,7 @@ void psync_set_string_value(const char *valuename, const char *value) {
   psync_sql_run_free(res);
 }
 
-void psync_network_exception() { psync_timer_notify_exception(); }
+void psync_network_exception() { ptimer_notify_exception(); }
 
 static int create_request(psync_list_builder_t *builder, void *element,
                           psync_variant_row row) {
@@ -2064,7 +2064,7 @@ static int psync_upload_params(binparam *params, size_t paramcnt,
     }
     psync_apipool_release_bad(api);
   } while (++tries <= PSYNC_RETRY_REQUEST);
-  psync_timer_notify_exception();
+  ptimer_notify_exception();
   return -1;
 }
 
@@ -2229,7 +2229,7 @@ int psync_crypto_isexpired() {
   int64_t ce;
   ce = psync_sql_cellint("SELECT value FROM setting WHERE id='cryptoexpires'",
                          0);
-  return ce ? (ce < psync_timer_time()) : 0;
+  return ce ? (ce < ptimer_time()) : 0;
 }
 
 time_t psync_crypto_expires() {

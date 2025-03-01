@@ -69,7 +69,7 @@ static void modify_screenshot_public_link(void *par) {
   scr_params *linkidp = (scr_params *)par;
 
   uint64_t time =
-      psync_timer_time() + ((linkidp->delay) ? linkidp->delay : 2592000);
+      ptimer_time() + ((linkidp->delay) ? linkidp->delay : 2592000);
   time = time - time % 3600;
   binparam params[] = {PAPI_STR("auth", psync_my_auth),
                        PAPI_NUM("linkid", linkidp->linkid), PAPI_NUM("expire", time)};
