@@ -1101,7 +1101,7 @@ static void process_modifyfolder(const binresult *entry) {
     psync_sql_bind_uint(res, 1, mtime);
     psync_sql_bind_uint(res, 2, parentfolderid);
     psync_sql_run_free(res);
-    psync_path_status_folder_moved(folderid, oldparentfolderid, parentfolderid);
+    ppathstatus_fldr_moved(folderid, oldparentfolderid, parentfolderid);
   }
   /* We should check if oldparentfolderid is in downloadlist, not folderid. If
    * parentfolderid is not in and folderid is in, it means that folder that is a
@@ -1237,7 +1237,7 @@ static void process_deletefolder(const binresult *entry) {
   }
   meta = papi_find_result2(entry, "metadata", PARAM_HASH);
   folderid = papi_find_result2(meta, "folderid", PARAM_NUM)->num;
-  psync_path_status_folder_deleted(folderid);
+  ppathstatus_fldr_deleted(folderid);
   if (psyncer_dl_has_folder(folderid)) {
     psyncer_dl_queue_del(folderid);
     res = psync_sql_query(
@@ -2503,7 +2503,7 @@ static uint64_t process_entries(const binresult *entries, uint64_t newdiffid) {
   psync_set_uint_value("usedquota", used_quota);
   // update_ba_emails();
   // update_ba_teams();
-  psync_path_status_clear_path_cache();
+  ppathstatus_clear_cache();
   psync_sql_commit_transaction();
   pdiff_unlock();
   if (needdownload) {

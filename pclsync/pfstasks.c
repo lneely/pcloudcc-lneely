@@ -466,7 +466,7 @@ int psync_fstask_mkdir(psync_fsfolderid_t folderid, const char *name,
   if (!depend)
     psync_fsupload_wake();
   if (folderid >= 0)
-    psync_path_status_drive_folder_changed(folderid);
+    ppathstatus_drive_fldr_changed(folderid);
   return 0;
 }
 
@@ -719,7 +719,7 @@ psync_fstask_creat_t *psync_fstask_add_creat(psync_fstask_folder_t *folder,
       &folder->creats, offsetof(psync_fstask_creat_t, name), &task->tree);
   folder->taskscnt += 2;
   if (folder->folderid >= 0)
-    psync_path_status_drive_folder_changed(folder->folderid);
+    ppathstatus_drive_fldr_changed(folder->folderid);
   return task;
 }
 
@@ -793,7 +793,7 @@ psync_fstask_add_modified_file(psync_fstask_folder_t *folder, const char *name,
   psync_fstask_insert_into_tree(
       &folder->creats, offsetof(psync_fstask_creat_t, name), &task->tree);
   if (folder->folderid >= 0)
-    psync_path_status_drive_folder_changed(folder->folderid);
+    ppathstatus_drive_fldr_changed(folder->folderid);
   folder->taskscnt += 2;
   return task;
 }
@@ -1032,7 +1032,7 @@ int psync_fstask_unlink(psync_fsfolderid_t folderid, const char *name) {
     psync_free(cr);
     folder->taskscnt--;
     if (folder->folderid >= 0)
-      psync_path_status_drive_folder_changed(folder->folderid);
+      ppathstatus_drive_fldr_changed(folder->folderid);
   }
   revoffileid = get_file_at_old_location(fileid);
   psync_sql_start_transaction();
@@ -1172,7 +1172,7 @@ int psync_fstask_rename_file(psync_fsfileid_t fileid,
     psync_free(cr);
     folder->taskscnt--;
     if (folder->folderid >= 0)
-      psync_path_status_drive_folder_changed(folder->folderid);
+      ppathstatus_drive_fldr_changed(folder->folderid);
   }
   psync_fs_rename_openfile_locked(fileid, to_folderid, new_name);
   nlen++;
@@ -1221,7 +1221,7 @@ int psync_fstask_rename_file(psync_fsfileid_t fileid,
   else if (rfileid > 0 && parentfolderid >= 0)
     add_history_record(rfileid, parentfolderid, name);
   if (folder->folderid >= 0)
-    psync_path_status_drive_folder_changed(folder->folderid);
+    ppathstatus_drive_fldr_changed(folder->folderid);
   return 0;
 }
 
@@ -1444,7 +1444,7 @@ int psync_fstask_rename_folder(psync_fsfolderid_t folderid,
   psync_fsupload_wake();
 
   if (to_folderid >= 0) {
-    psync_path_status_drive_folder_changed(to_folderid);
+    ppathstatus_drive_fldr_changed(to_folderid);
   }
 
   return 0;
@@ -1516,10 +1516,10 @@ void psync_fstask_folder_created(psync_folderid_t parentfolderid,
     folder->folderid = folderid;
     psync_tree_add(&folders, &folder->tree, folder_cmp);
     psync_fstask_release_folder_tasks_locked(folder);
-    psync_path_status_drive_folder_changed(folderid);
+    ppathstatus_drive_fldr_changed(folderid);
   }
   if (pchg)
-    psync_path_status_drive_folder_changed(parentfolderid);
+    ppathstatus_drive_fldr_changed(parentfolderid);
 }
 
 void psync_fstask_folder_deleted(psync_folderid_t parentfolderid,
@@ -1597,7 +1597,7 @@ void psync_fstask_file_created(psync_folderid_t parentfolderid, uint64_t taskid,
             (unsigned long)parentfolderid);
     psync_fstask_release_folder_tasks_locked(folder);
     if (cr)
-      psync_path_status_drive_folder_changed(parentfolderid);
+      ppathstatus_drive_fldr_changed(parentfolderid);
   } else
     debug(D_NOTICE, "could not find unlink for file %s in folderid %lu", name,
           (unsigned long)parentfolderid);
@@ -1627,7 +1627,7 @@ void psync_fstask_file_modified(psync_folderid_t parentfolderid,
     }
     psync_fstask_release_folder_tasks_locked(folder);
     if (cr)
-      psync_path_status_drive_folder_changed(parentfolderid);
+      ppathstatus_drive_fldr_changed(parentfolderid);
   }
   if (!folder || !cr)
     psync_fstask_look_for_creat_in_db(parentfolderid, taskid, name, fileid);
@@ -1672,7 +1672,7 @@ void psync_fstask_file_renamed(psync_folderid_t folderid, uint64_t taskid,
     }
     psync_fstask_release_folder_tasks_locked(folder);
     if (cr)
-      psync_path_status_drive_folder_changed(folderid);
+      ppathstatus_drive_fldr_changed(folderid);
   }
   res = psync_sql_query("SELECT id, folderid, text1 FROM fstask WHERE id=?");
   psync_sql_bind_uint(res, 1, frtaskid);
@@ -1725,7 +1725,7 @@ void psync_fstask_folder_renamed(psync_folderid_t parentfolderid,
     }
     psync_fstask_release_folder_tasks_locked(folder);
     if (mk)
-      psync_path_status_drive_folder_changed(parentfolderid);
+      ppathstatus_drive_fldr_changed(parentfolderid);
   }
   res = psync_sql_query("SELECT id, folderid, text1 FROM fstask WHERE id=?");
   psync_sql_bind_uint(res, 1, frtaskid);
@@ -1781,7 +1781,7 @@ static void psync_init_task_mkdir(psync_variant_row row) {
   folder->taskscnt++;
   psync_fstask_release_folder_tasks_locked(folder);
   if (folderid >= 0)
-    psync_path_status_drive_folder_changed(folderid);
+    ppathstatus_drive_fldr_changed(folderid);
 }
 
 static void psync_init_task_rmdir(psync_variant_row row) {
@@ -1846,7 +1846,7 @@ static void psync_init_task_creat(psync_variant_row row) {
   folder->taskscnt += 2;
   psync_fstask_release_folder_tasks_locked(folder);
   if (folderid >= 0)
-    psync_path_status_drive_folder_changed(folderid);
+    ppathstatus_drive_fldr_changed(folderid);
 }
 
 static void psync_init_do_task_unlink(uint64_t taskid,
@@ -1957,7 +1957,7 @@ static void psync_init_task_renfile_to(psync_variant_row row) {
   psync_fstask_release_folder_tasks_locked(folder);
   psync_fs_rename_openfile_locked(cr->fileid, folderid, name);
   if (folderid >= 0)
-    psync_path_status_drive_folder_changed(folderid);
+    ppathstatus_drive_fldr_changed(folderid);
 }
 
 static void psync_init_task_renfolder_from(psync_variant_row row) {
@@ -2019,7 +2019,7 @@ static void psync_init_task_renfolder_to(psync_variant_row row) {
   folder->taskscnt += 2;
   psync_fstask_release_folder_tasks_locked(folder);
   if (folderid >= 0)
-    psync_path_status_drive_folder_changed(folderid);
+    ppathstatus_drive_fldr_changed(folderid);
 }
 
 static void psync_init_task_modify(psync_variant_row row) {
@@ -2057,7 +2057,7 @@ static void psync_init_task_modify(psync_variant_row row) {
       &folder->creats, offsetof(psync_fstask_creat_t, name), &cr->tree);
   folder->taskscnt += 2;
   if (folder->folderid >= 0)
-    psync_path_status_drive_folder_changed(folder->folderid);
+    ppathstatus_drive_fldr_changed(folder->folderid);
   psync_fstask_release_folder_tasks_locked(folder);
 }
 

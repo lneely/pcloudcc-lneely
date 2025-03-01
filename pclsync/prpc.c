@@ -198,9 +198,9 @@ static void psync_overlay_get_status_response(rpc_message_t *request,
   stat = PSYNC_PATH_STATUS_NOT_OURS;
 
   if (overlays_running) {
-    stat = psync_path_status_get(request->value);
+    stat = ppathstatus_get(request->value);
   }
-  switch (psync_path_status_get_status(stat)) {
+  switch (ppathstatus_get_status(stat)) {
   case PSYNC_PATH_STATUS_IN_SYNC:
     response->type = 10;
     break;

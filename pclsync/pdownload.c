@@ -304,7 +304,7 @@ static void delete_local_folder_from_db(psync_folderid_t localfolderid,
     psync_sql_bind_uint(res, 1, localfolderid);
     psync_sql_run_free(res);
   }
-  psync_path_status_sync_folder_deleted(syncid, localfolderid);
+  ppathstatus_syncfldr_deleted(syncid, localfolderid);
 }
 
 static int task_renamefolder(psync_syncid_t newsyncid,
@@ -354,7 +354,7 @@ static int task_renamefolder(psync_syncid_t newsyncid,
       "SELECT syncid, localparentfolderid FROM localfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, localfolderid);
   if ((urow = psync_sql_fetch_rowint(res))) {
-    psync_path_status_sync_folder_moved(localfolderid, urow[0], urow[1],
+    ppathstatus_syncfldr_moved(localfolderid, urow[0], urow[1],
                                         newsyncid, newlocalparentfolderid);
     psync_sql_free_result(res);
   } else {
@@ -1092,7 +1092,7 @@ static void finish_async_download(void *ptr, psync_async_result_t *res) {
       psync_timer_register(free_task_timer, 1, dt);
     else {
       delete_task(dt->taskid);
-      psync_path_status_sync_folder_task_completed(dt->dwllist.syncid,
+      ppathstatus_syncfldr_task_completed(dt->dwllist.syncid,
                                                    dt->localfolderid);
       free_download_task(dt);
       pstatus_download_recalc_async();
@@ -1111,7 +1111,7 @@ static void finish_async_download_existing_not_mod(download_task_t *dt,
     psync_timer_register(free_task_timer, 1, dt);
   } else {
     delete_task(dt->taskid);
-    psync_path_status_sync_folder_task_completed(dt->dwllist.syncid,
+    ppathstatus_syncfldr_task_completed(dt->dwllist.syncid,
                                                  dt->localfolderid);
     free_download_task(dt);
     pstatus_download_recalc_async();
@@ -1135,7 +1135,7 @@ static void task_run_download_file_thread(void *ptr) {
     pdownload_wake();
   } else {
     delete_task(dt->taskid);
-    psync_path_status_sync_folder_task_completed(dt->dwllist.syncid,
+    ppathstatus_syncfldr_task_completed(dt->dwllist.syncid,
                                                  dt->localfolderid);
   }
   free_download_task(dt);
@@ -1368,7 +1368,7 @@ static void task_del_folder_rec_do(const char *localpath,
     psync_sql_bind_uint(res, 1, localfolderid);
     psync_sql_run_free(res);
   }
-  psync_path_status_sync_folder_deleted(syncid, localfolderid);
+  ppathstatus_syncfldr_deleted(syncid, localfolderid);
 }
 
 static int task_del_folder_rec(psync_folderid_t localfolderid,
@@ -1491,7 +1491,7 @@ static void download_thread() {
         delete_task(taskid);
         if (type == PSYNC_DOWNLOAD_FILE) {
           pstatus_download_recalc_async();
-          psync_path_status_sync_folder_task_completed(
+          ppathstatus_syncfldr_task_completed(
               psync_get_number(row[2]), psync_get_number(row[4]));
         }
       } else if (type != PSYNC_DOWNLOAD_FILE)

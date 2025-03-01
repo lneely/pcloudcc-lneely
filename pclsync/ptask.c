@@ -884,7 +884,7 @@ void ptask_download_q(psync_syncid_t syncid, psync_fileid_t fileid, psync_folder
   psync_sql_bind_uint(res, 3, fileid);
   psync_sql_bind_uint(res, 4, localfolderid);
   psync_sql_bind_string(res, 5, name);
-  psync_path_status_sync_folder_task_added_locked(syncid, localfolderid);
+  ppath_syncfldr_task_added_locked(syncid, localfolderid);
   psync_sql_run_free(res);
 }
 

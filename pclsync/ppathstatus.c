@@ -147,7 +147,7 @@ static inline int psync_crypto_to_error(const void *ptr) {
   return -((int)(uintptr_t)ptr);
 }
 
-void psync_path_status_init() {
+void ppathstatus_init() {
   size_t i;
   psync_sql_lock();
   psync_list_init(&cache_free);
@@ -171,8 +171,8 @@ void psync_path_status_init() {
   psync_tree_for_each_element_call_safe(sync_data, sync_data_t, tree,
                                         sync_data_free);
   sync_data = PSYNC_TREE_EMPTY;
-  psync_path_status_reload_syncs();
-  psync_path_status_clear_path_cache();
+  ppathstatus_reload_syncs();
+  ppathstatus_clear_cache();
   load_sync_tasks();
   psync_sql_unlock();
 }
@@ -194,7 +194,7 @@ static int create_sync_list_entry(psync_list_builder_t *builder, void *element,
   return 0;
 }
 
-void psync_path_status_reload_syncs() {
+void ppathstatus_reload_syncs() {
   psync_list_builder_t *builder;
   psync_sql_res *res;
   path_sync_list_t *old;
@@ -207,13 +207,13 @@ void psync_path_status_reload_syncs() {
   psync_list_bulder_add_sql(builder, res, create_sync_list_entry);
   old = syncs;
   syncs = (path_sync_list_t *)psync_list_builder_finalize(builder);
-  psync_path_status_clear_sync_path_cache();
+  ppathstatus_clear_sync_cache();
   psync_sql_unlock();
   if (old)
     psync_free_after_sec(old, 30);
 }
 
-void psync_path_status_clear_path_cache() {
+void ppathstatus_clear_cache() {
   uint64_t ndrv_hash_seed, nsync_hash_seed;
   do {
     psync_ssl_rand_strong((unsigned char *)&ndrv_hash_seed,
@@ -226,7 +226,7 @@ void psync_path_status_clear_path_cache() {
   psync_sql_unlock();
 }
 
-void psync_path_status_clear_sync_path_cache() {
+void ppathstatus_clear_sync_cache() {
   uint64_t nsync_hash_seed;
   do {
     psync_ssl_rand_strong((unsigned char *)&nsync_hash_seed,
@@ -245,7 +245,7 @@ static uint32_t hash_folderid(psync_folderid_t folderid) {
   return h;
 }
 
-void psync_path_status_del_from_parent_cache(psync_folderid_t folderid) {
+void ppathstatus_del_from_parent_cache(psync_folderid_t folderid) {
   parent_cache_entry_t *p;
   uint32_t h;
   h = hash_folderid(folderid) % PARENT_HASH_SIZE;
@@ -339,7 +339,7 @@ static psync_folderid_t get_parent_folder(psync_folderid_t folderid) {
   return p->parentfolderid;
 }
 
-void psync_path_status_drive_folder_changed(psync_folderid_t folderid) {
+void ppathstatus_drive_fldr_changed(psync_folderid_t folderid) {
   psync_fstask_folder_t *folder;
   folder_tasks_t *ft;
   int changed;
@@ -416,13 +416,13 @@ static void folder_moved_commit(void *ptr) {
   psync_free(mp);
 }
 
-void psync_path_status_folder_moved(psync_folderid_t folderid,
+void ppathstatus_fldr_moved(psync_folderid_t folderid,
                                     psync_folderid_t old_parent_folderid,
                                     psync_folderid_t new_parent_folderid) {
   folder_moved_params_t *mp;
   if (old_parent_folderid == new_parent_folderid)
     return;
-  psync_path_status_del_from_parent_cache(folderid);
+  ppathstatus_del_from_parent_cache(folderid);
   if (!get_folder_tasks(folderid, 0))
     return;
   mp = psync_new(folder_moved_params_t);
@@ -432,7 +432,7 @@ void psync_path_status_folder_moved(psync_folderid_t folderid,
   psync_sql_transation_add_callbacks(folder_moved_commit, psync_free, mp);
 }
 
-void psync_path_status_folder_deleted(psync_folderid_t folderid) {
+void ppathstatus_fldr_deleted(psync_folderid_t folderid) {
   folder_tasks_t *ft;
   ft = get_folder_tasks(folderid, 0);
   if (ft) {
@@ -447,7 +447,7 @@ void psync_path_status_folder_deleted(psync_folderid_t folderid) {
       free_folder_tasks(ft);
     }
   }
-  psync_path_status_del_from_parent_cache(folderid);
+  ppathstatus_del_from_parent_cache(folderid);
 }
 
 static void sync_data_free(sync_data_t *sd) {
@@ -582,7 +582,7 @@ static psync_folderid_t get_sync_parent_folder(sync_data_t *sd,
   return p->parentfolderid;
 }
 
-void psync_path_status_sync_folder_task_added_locked(
+void ppath_syncfldr_task_added_locked(
     psync_syncid_t syncid, psync_folderid_t localfolderid) {
   sync_data_t *sd;
   folder_tasks_t *ft;
@@ -604,11 +604,11 @@ void psync_path_status_sync_folder_task_added_locked(
   }
 }
 
-void psync_path_status_sync_folder_task_added(psync_syncid_t syncid,
+void ppath_syncfldr_task_added(psync_syncid_t syncid,
                                               psync_folderid_t localfolderid) {
   psync_sql_lock();
-  psync_path_status_clear_sync_path_cache();
-  psync_path_status_sync_folder_task_added_locked(syncid, localfolderid);
+  ppathstatus_clear_sync_cache();
+  ppath_syncfldr_task_added_locked(syncid, localfolderid);
   psync_sql_unlock();
 }
 
@@ -619,14 +619,14 @@ static void load_sync_tasks() {
       "SELECT syncid, localitemid FROM task WHERE type=?");
   psync_sql_bind_uint(res, 1, PSYNC_DOWNLOAD_FILE);
   while ((row = psync_sql_fetch_rowint(res)))
-    psync_path_status_sync_folder_task_added_locked(row[0], row[1]);
+    ppath_syncfldr_task_added_locked(row[0], row[1]);
   psync_sql_free_result(res);
   res = psync_sql_query_nolock(
       "SELECT lf.syncid, lf.localparentfolderid FROM task t, localfile lf "
       "WHERE t.type=? AND t.localitemid=lf.id AND t.syncid=lf.syncid");
   psync_sql_bind_uint(res, 1, PSYNC_UPLOAD_FILE);
   while ((row = psync_sql_fetch_rowint(res)))
-    psync_path_status_sync_folder_task_added_locked(row[0], row[1]);
+    ppath_syncfldr_task_added_locked(row[0], row[1]);
   psync_sql_free_result(res);
 }
 
@@ -665,7 +665,7 @@ static void free_sync_folder_tasks(sync_data_t *sd, folder_tasks_t *ft) {
   psync_free(ft);
 }
 
-void psync_path_status_sync_folder_task_completed(
+void ppathstatus_syncfldr_task_completed(
     psync_syncid_t syncid, psync_folderid_t localfolderid) {
   sync_data_t *sd;
   folder_tasks_t *ft;
@@ -673,7 +673,7 @@ void psync_path_status_sync_folder_task_completed(
   //  (unsigned long)localfolderid, local_folder_has_tasks(syncid,
   //  localfolderid));
   psync_sql_lock();
-  psync_path_status_clear_sync_path_cache();
+  ppathstatus_clear_sync_cache();
   if (local_folder_has_tasks(syncid, localfolderid) ||
       !(sd = get_sync_data(syncid, 0)) ||
       !(ft = get_sync_folder_tasks(sd, localfolderid, 0))) {
@@ -694,7 +694,7 @@ void psync_path_status_sync_folder_task_completed(
   psync_sql_unlock();
 }
 
-void psync_path_status_sync_delete(psync_syncid_t syncid) {
+void ppathstatus_syncfldr_delete(psync_syncid_t syncid) {
   sync_data_t *sd;
   psync_sql_lock();
   sd = get_sync_data(syncid, 0);
@@ -760,7 +760,7 @@ static void sync_folder_moved_commit(void *ptr) {
   psync_free(mp);
 }
 
-void psync_path_status_sync_folder_moved(psync_folderid_t folderid,
+void ppathstatus_syncfldr_moved(psync_folderid_t folderid,
                                          psync_syncid_t old_syncid,
                                          psync_folderid_t old_parent_folderid,
                                          psync_syncid_t new_syncid,
@@ -784,7 +784,7 @@ void psync_path_status_sync_folder_moved(psync_folderid_t folderid,
   psync_sql_transation_add_callbacks(sync_folder_moved_commit, psync_free, mp);
 }
 
-void psync_path_status_sync_folder_deleted(psync_syncid_t syncid,
+void ppathstatus_syncfldr_deleted(psync_syncid_t syncid,
                                            psync_folderid_t folderid) {
   sync_data_t *sd;
   folder_tasks_t *ft;
@@ -1421,7 +1421,7 @@ static int psync_path_is_prefix_of(const char *prefix, size_t prefix_len,
   }
 }
 
-psync_path_status_t psync_path_status_get(const char *path) {
+psync_path_status_t ppathstatus_get(const char *path) {
   char *dp;
   path_sync_list_t *sn;
   size_t i, len;

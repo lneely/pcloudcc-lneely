@@ -660,9 +660,9 @@ static void scan_rename_file(sync_folderlist *rnfr, sync_folderlist *rnto) {
   ptask_rfile_rename(rnfr->syncid, rnto->syncid, rnfr->localid,
                                 rnto->localparentfolderid, rnto->name);
   if (filetoupload) {
-    psync_path_status_sync_folder_task_added_locked(rnto->syncid,
+    ppath_syncfldr_task_added_locked(rnto->syncid,
                                                     rnto->localparentfolderid);
-    psync_path_status_sync_folder_task_completed(old_syncid,
+    ppathstatus_syncfldr_task_completed(old_syncid,
                                                  old_parentfolderid);
   }
 }
@@ -691,7 +691,7 @@ static void scan_upload_file(sync_folderlist *fl) {
     return;
   localfileid = psync_sql_insertid();
   ptask_upload_q(fl->syncid, localfileid, fl->name);
-  psync_path_status_sync_folder_task_added(fl->syncid, fl->localparentfolderid);
+  ppath_syncfldr_task_added(fl->syncid, fl->localparentfolderid);
 }
 
 static void scan_upload_modified_file(sync_folderlist *fl) {
@@ -708,7 +708,7 @@ static void scan_upload_modified_file(sync_folderlist *fl) {
   psync_sql_bind_uint(res, 5, fl->localid);
   psync_sql_run_free(res);
   ptask_upload_q(fl->syncid, fl->localid, fl->name);
-  psync_path_status_sync_folder_task_added(fl->syncid, fl->localparentfolderid);
+  ppath_syncfldr_task_added(fl->syncid, fl->localparentfolderid);
 }
 
 static void scan_delete_file(sync_folderlist *fl) {
@@ -738,7 +738,7 @@ static void scan_delete_file(sync_folderlist *fl) {
   psync_sql_run_free(res);
   if (fileid)
     ptask_rfile_rm(fl->syncid, fileid);
-  psync_path_status_sync_folder_task_completed(syncid, localparentfolderid);
+  ppathstatus_syncfldr_task_completed(syncid, localparentfolderid);
 }
 
 static void scan_create_folder(sync_folderlist *fl) {
@@ -848,7 +848,7 @@ static void scan_rename_folder(sync_folderlist *rnfr, sync_folderlist *rnto) {
       "SELECT syncid, localparentfolderid FROM localfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, rnfr->localid);
   if ((row = psync_sql_fetch_rowint(res))) {
-    psync_path_status_sync_folder_moved(
+    ppathstatus_syncfldr_moved(
         rnfr->localid, row[0], row[1], rnto->syncid, rnto->localparentfolderid);
     psync_sql_free_result(res);
   } else {
@@ -904,7 +904,7 @@ static void delete_local_folder_rec(psync_folderid_t localfolderid) {
   res = psync_sql_query("SELECT syncid FROM localfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, localfolderid);
   if (row)
-    psync_path_status_sync_folder_deleted(row[0], localfolderid);
+    ppathstatus_syncfldr_deleted(row[0], localfolderid);
   psync_sql_free_result(res);
   res = psync_sql_prep_statement("DELETE FROM localfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, localfolderid);
@@ -1163,7 +1163,7 @@ restart:
     w++;
     check_for_query_cnt();
   }
-  psync_path_status_clear_sync_path_cache();
+  ppathstatus_clear_sync_cache();
 
   psync_sql_commit_transaction();
 

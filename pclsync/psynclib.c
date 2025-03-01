@@ -293,7 +293,7 @@ int psync_init() {
   psync_settings_init();
   pstatus_init();
   psync_timer_sleep_handler(psync_stop_crypto_on_sleep);
-  psync_path_status_init();
+  ppathstatus_init();
   if (IS_DEBUG) {
     psync_libstate = 1;
     pthread_mutex_unlock(&psync_libstate_mutex);
@@ -593,7 +593,7 @@ void psync_unlink() {
   debug(D_NOTICE, "clearing database, finished");
   psync_fs_pause_until_login();
   psync_fs_clean_tasks();
-  psync_path_status_init();
+  ppathstatus_init();
   psyncer_dl_queue_clear();
   psync_sql_unlock();
   psync_sql_checkpoint_unlock();
@@ -833,7 +833,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   if (ret == PSYNC_INVALID_SYNCID)
     return_isyncid(PERROR_FOLDER_ALREADY_SYNCING);
   psync_sql_sync();
-  psync_path_status_reload_syncs();
+  ppathstatus_reload_syncs();
   psyncer_create(ret);
   return ret;
 }
@@ -953,14 +953,14 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   res = psync_sql_prep_statement("DELETE FROM localfolder WHERE syncid=?");
   psync_sql_bind_uint(res, 1, syncid);
   psync_sql_run_free(res);
-  psync_path_status_sync_delete(syncid);
+  ppathstatus_syncfldr_delete(syncid);
   psync_sql_commit_transaction();
   psync_localnotify_del_sync(syncid);
   psync_restat_sync_folders_del(syncid);
   pdownload_stop_sync(syncid);
   psync_stop_sync_upload(syncid);
   psync_sql_sync();
-  psync_path_status_reload_syncs();
+  ppathstatus_reload_syncs();
   psyncer_create(syncid);
   return 0;
 }
@@ -1012,8 +1012,8 @@ int psync_delete_sync(psync_syncid_t syncid) {
     psync_restat_sync_folders_del(syncid);
     psync_restart_localscan();
     psync_sql_sync();
-    psync_path_status_sync_delete(syncid);
-    psync_path_status_reload_syncs();
+    ppathstatus_syncfldr_delete(syncid);
+    ppathstatus_reload_syncs();
 
     return 0;
   }
@@ -2417,7 +2417,7 @@ int psync_crypto_crypto_send_change_user_private() {
 }
 
 external_status_t psync_filesystem_status(const char *path) {
-  switch (psync_path_status_get_status(psync_path_status_get(path))) {
+  switch (ppathstatus_get_status(ppathstatus_get(path))) {
   case PSYNC_PATH_STATUS_IN_SYNC:
     return INSYNC;
   case PSYNC_PATH_STATUS_IN_PROG:

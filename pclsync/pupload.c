@@ -1318,7 +1318,7 @@ static void delete_from_localfile(psync_fileid_t localfileid) {
     res = psync_sql_prep_statement("DELETE FROM localfile WHERE id=?");
     psync_sql_bind_uint(res, 1, localfileid);
     psync_sql_run_free(res);
-    psync_path_status_sync_folder_task_completed(syncid, folderid);
+    ppathstatus_syncfldr_task_completed(syncid, folderid);
   } else
     psync_sql_free_result(res);
 }
@@ -1548,7 +1548,7 @@ static void delete_upload_task(uint64_t taskid, psync_fileid_t localfileid) {
       "SELECT syncid, localparentfolderid FROM localfile WHERE id=?");
   psync_sql_bind_uint(res, 1, localfileid);
   if ((row = psync_sql_fetch_rowint(res)))
-    psync_path_status_sync_folder_task_completed(row[0], row[1]);
+    ppathstatus_syncfldr_task_completed(row[0], row[1]);
   psync_sql_free_result(res);
   psync_sql_unlock();
 }

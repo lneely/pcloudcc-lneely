@@ -511,7 +511,7 @@ re:
     psync_free(localpath);
     psync_free(remotepath);
     if (!psync_sql_commit_transaction() && syncid != -1) {
-      psync_path_status_reload_syncs();
+      ppathstatus_reload_syncs();
       psyncer_create(syncid);
       goto re;
     }
