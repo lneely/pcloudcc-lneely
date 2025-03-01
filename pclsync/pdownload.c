@@ -40,7 +40,7 @@
 #include <mbedtls/ssl.h>
 
 #include "papi.h"
-#include "pcallbacks.h"
+#include "pqevent.h"
 #include "pdownload.h"
 #include "pfolder.h"
 #include "plibs.h"
@@ -244,7 +244,7 @@ static int call_func_for_folder(psync_folderid_t localfolderid,
   if (likely(localpath)) {
     res = func(localpath);
     if (!res) {
-      psync_send_event_by_id(event, syncid, localpath, folderid);
+      pqevent_queue_sync_event_id(event, syncid, localpath, folderid);
       if (updatemtime)
         update_local_folder_mtime(localpath, localfolderid);
       psync_decrease_local_folder_taskcnt(localfolderid);
@@ -271,7 +271,7 @@ static int call_func_for_folder_name(psync_folderid_t localfolderid,
   if (likely(localpath)) {
     res = func(localpath);
     if (!res) {
-      psync_send_event_by_path(event, syncid, localpath, folderid, name);
+      pqevent_queue_sync_event_path(event, syncid, localpath, folderid, name);
       if (updatemtime)
         update_local_folder_mtime(localpath, localfolderid);
       psync_decrease_local_folder_taskcnt(localfolderid);
@@ -394,7 +394,7 @@ static int task_renamefolder(psync_syncid_t newsyncid,
   else {
     psync_decrease_local_folder_taskcnt(localfolderid);
     psync_sql_commit_transaction();
-    psync_send_event_by_id(PEVENT_LOCAL_FOLDER_RENAMED, newsyncid, newpath,
+    pqevent_queue_sync_event_id(PEVENT_LOCAL_FOLDER_RENAMED, newsyncid, newpath,
                            folderid);
     debug(D_NOTICE, "local folder renamed from %s to %s", oldpath, newpath);
   }
@@ -688,7 +688,7 @@ static int task_download_file(download_task_t *dt) {
   if (dt->dwllist.stop)
     return 0;
 
-  //  psync_send_event_by_id(PEVENT_FILE_DOWNLOAD_STARTED, syncid, name,
+  //  pqevent_queue_sync_event_id(PEVENT_FILE_DOWNLOAD_STARTED, syncid, name,
   //  fileid);
   if (serversize >= PSYNC_MIN_SIZE_FOR_P2P) {
     rt = psync_p2p_check_download(dt->dwllist.fileid, serverhashhex, serversize,
@@ -865,7 +865,7 @@ static int task_download_file(download_task_t *dt) {
   }
   if (rename_and_create_local(dt, serverhashhex, serversize, hash))
     goto err0;
-  //  psync_send_event_by_id(PEVENT_FILE_DOWNLOAD_FINISHED, syncid, name,
+  //  pqevent_queue_sync_event_id(PEVENT_FILE_DOWNLOAD_FINISHED, syncid, name,
   //  fileid);
   debug(D_NOTICE, "file downloaded %s", dt->localname);
   psync_list_for_each_element_call(&ranges, psync_range_list_t, list,
@@ -925,7 +925,7 @@ static int task_delete_file(psync_syncid_t syncid, psync_fileid_t fileid,
         debug(D_NOTICE, "local file %s deleted", name);
       //      threre are some reports about crashes here, comment out for now as
       //      events are not fully implemented anyway
-      //      psync_send_event_by_path(PEVENT_LOCAL_FILE_DELETED, row[1], name,
+      //      pqevent_queue_sync_event_path(PEVENT_LOCAL_FILE_DELETED, row[1], name,
       //      fileid, remotepath);
       psync_free(name);
     }

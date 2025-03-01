@@ -37,7 +37,6 @@
 #include <pthread.h>
 #include <stddef.h>
 
-#include "pcallbacks.h"
 #include "pdownload.h"
 #include "pfile.h"
 #include "pfolder.h"

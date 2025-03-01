@@ -43,8 +43,7 @@
 #include "papi.h"
 #include "pbusinessaccount.h"
 #include "pcache.h"
-#include "pcallbacks.h"
-#include "pfile.h"
+#include "pqevent.h"
 #include "pcontacts.h"
 #include "pdevice.h"
 #include "pdiff.h"
@@ -1766,7 +1765,7 @@ static void process_modifyuserinfo(const binresult *entry) {
   psync_sql_bind_uint(q, 2, crstat);
   psync_sql_run(q);
   psync_sql_free_result(q);
-  psync_send_eventid(PEVENT_USERINFO_CHANGED);
+  pqevent_queue_eventid(PEVENT_USERINFO_CHANGED);
 }
 
 static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
@@ -1925,7 +1924,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
   } else {
     fill_str(e->toemail, email, emaillen);
     fill_str(e->fromemail, email, emaillen);
-    psync_send_eventdata(eventid, e);
+    pqevent_queue_event(eventid, e);
   }
 }
 
@@ -1948,7 +1947,7 @@ static void do_send_eventdata(void *param) {
 
   if (email) {
     psync_diff_lock();
-    psync_send_eventdata(data->eventid, data->event_data);
+    pqevent_queue_event(data->eventid, data->event_data);
     psync_diff_unlock();
   }
 
@@ -2517,7 +2516,7 @@ static uint64_t process_entries(const binresult *entries, uint64_t newdiffid) {
   used_quota =
       psync_sql_cellint("SELECT value FROM setting WHERE id='usedquota'", 0);
   if (oused_quota != used_quota)
-    psync_send_eventid(PEVENT_USEDQUOTA_CHANGED);
+    pqevent_queue_eventid(PEVENT_USEDQUOTA_CHANGED);
   return psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
 }
 
@@ -2836,7 +2835,7 @@ static int psync_diff_check_quota(psock_t *sock) {
     debug(D_WARNING, "corrected locally calculated quota from %lu to %lu",
           (unsigned long)oused_quota, (unsigned long)used_quota);
     psync_set_uint_value("usedquota", used_quota);
-    psync_send_eventid(PEVENT_USEDQUOTA_CHANGED);
+    pqevent_queue_eventid(PEVENT_USEDQUOTA_CHANGED);
   }
   uq = papi_find_result2(papi_find_result2(res, "apiserver", PARAM_HASH),
                          "binapi", PARAM_ARRAY);

@@ -33,6 +33,9 @@
 
 #include <stdint.h>
 
+#include "ptevent.h"
+#include "psynclib.h"
+
 #define PSTATUS_NUM_STATUSES 6
 
 #define PSTATUS_TYPE_RUN 0
@@ -76,6 +79,7 @@
 
 #define PSTATUS_COMBINE(type, statuses) (((type) << 24) + (statuses))
 
+
 void psync_status_init();
 void psync_status_recalc_to_download();
 void psync_status_recalc_to_download_async();
@@ -94,6 +98,12 @@ void psync_status_set_upload_speed(uint32_t speed);
 ;
 
 void psync_status_send_update();
+
+void psync_callbacks_get_status(pstatus_t *status);
+void psync_set_status_callback(pstatus_change_callback_t callback);
+void psync_send_status_update();
+void ptevent_process(event_data_struct *data);
+
 
 static inline int psync_status_is_offline() {
   return psync_status_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_OFFLINE;

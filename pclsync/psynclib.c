@@ -44,7 +44,8 @@
 #include "papi.h"
 #include "pbusinessaccount.h"
 #include "pcache.h"
-#include "pcallbacks.h"
+#include "ptevent.h"
+#include "pqevent.h"
 #include "pcloudcrypto.h"
 #include "pcontacts.h"
 #include "pdevice.h"
@@ -323,7 +324,7 @@ void psync_start_sync(pstatus_change_callback_t status_callback,
   if (status_callback)
     psync_set_status_callback(status_callback);
   if (event_callback)
-    psync_set_event_callback(event_callback);
+    pqevent_process(event_callback);
   psync_syncer_init();
   psync_diff_init();
   psync_upload_init();
@@ -3052,7 +3053,7 @@ void psync_async_delete_sync(void *ptr) {
   debug(D_NOTICE, "Backup stopped on the Web.");
 
   if (res == 0) {
-    psync_send_eventid(PEVENT_BACKUP_STOP);
+    pqevent_queue_eventid(PEVENT_BACKUP_STOP);
   }
 }
 
@@ -3064,7 +3065,7 @@ void psync_async_ui_callback(void *ptr) {
       (lastBupDelEventTime == 0)) {
     debug(D_NOTICE, "Send event to UI. Event id: [%d]", eventId);
 
-    psync_send_eventid(eventId);
+    pqevent_queue_eventid(eventId);
 
     lastBupDelEventTime = currTime;
   }
@@ -3121,9 +3122,9 @@ void psync_send_backup_del_event(psync_fileorfolderid_t remoteFId) {
   if (((currTime - lastBupDelEventTime) > bupNotifDelay) ||
       (lastBupDelEventTime == 0)) {
     if (remoteFId == 0) {
-      psync_send_eventid(PEVENT_BKUP_F_DEL_NOTSYNCED);
+      pqevent_queue_eventid(PEVENT_BKUP_F_DEL_NOTSYNCED);
     } else {
-      psync_send_eventid(PEVENT_BKUP_F_DEL_SYNCED);
+      pqevent_queue_eventid(PEVENT_BKUP_F_DEL_SYNCED);
     }
 
     lastBupDelEventTime = currTime;
@@ -3227,7 +3228,7 @@ int psync_create_backend_event(const char *category, const char *action,
                               P_OS_ID, rawtime, &params, &err);
 }
 
-void psync_init_data_event_handler(void *ptr) { psync_init_data_event(ptr); }
+void psync_init_data_event_handler(void *ptr) { ptevent_init(ptr); }
 
 // moved from pdiff
 void psync_delete_cached_crypto_keys() { 

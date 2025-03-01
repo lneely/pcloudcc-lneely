@@ -59,7 +59,7 @@
 #include "pupload.h"
 #include "putil.h"
 
-#include "pcallbacks.h"
+#include "pqevent.h"
 
 
 typedef struct {
@@ -1650,7 +1650,7 @@ static int handle_rename_folder_api_error(uint64_t result,
                    "folder at once.");
     psync_fstask_folder_renamed(task->folderid, task->id, task->text1,
                                 task->int1);
-    psync_send_eventid(PEVENT_SHARE_RENAME_F);
+    pqevent_queue_eventid(PEVENT_SHARE_RENAME_F);
     return 0;
   }
 

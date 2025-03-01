@@ -38,7 +38,7 @@
 #include <stddef.h>
 
 #include "papi.h"
-#include "pcallbacks.h"
+#include "ptevent.h"
 #include "pfile.h"
 #include "pcompiler.h"
 #include "pdiff.h"
@@ -373,7 +373,7 @@ int handle_api_errors(sync_err_struct *err_struct) {
 
     psync_delete_sync(syncId);
 
-    psync_send_data_event(event_data);
+    ptevent_process(event_data);
 
     psync_free(event_data);
     break;

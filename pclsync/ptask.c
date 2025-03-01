@@ -41,7 +41,6 @@
 #include <pthread.h>
 
 #include "papi.h"
-#include "pcallbacks.h"
 #include "pcompression.h"
 #include "pdownload.h"
 #include "pfile.h"

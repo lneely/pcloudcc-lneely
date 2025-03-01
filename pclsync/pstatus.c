@@ -31,7 +31,6 @@
 
 #include "pfile.h"
 #include "pstatus.h"
-#include "pcallbacks.h"
 #include "pfstasks.h"
 #include "plibs.h"
 #include "prunratelimit.h"
@@ -46,7 +45,7 @@ static uint32_t statuses[PSTATUS_NUM_STATUSES] = {
     PSTATUS_INVALID,     PSTATUS_ACCFULL_QUOTAOK,
     PSTATUS_DISKFULL_OK, PSTATUS_LOCALSCAN_SCANNING};
 
-static pthread_mutex_t statusmutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t status_internal_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t statuscond = PTHREAD_COND_INITIALIZER;
 static unsigned long status_waiters = 0;
 
@@ -245,14 +244,14 @@ void psync_status_recalc_to_upload_async() {
 }
 
 uint32_t psync_status_get(uint32_t statusid) {
-  pthread_mutex_lock(&statusmutex);
+  pthread_mutex_lock(&status_internal_mutex);
   statusid = statuses[statusid];
-  pthread_mutex_unlock(&statusmutex);
+  pthread_mutex_unlock(&status_internal_mutex);
   return statusid;
 }
 
 void psync_set_status(uint32_t statusid, uint32_t status) {
-  pthread_mutex_lock(&statusmutex);
+  pthread_mutex_lock(&status_internal_mutex);
   statuses[statusid] = status;
   if (status_waiters)
     pthread_cond_broadcast(&statuscond);
@@ -260,7 +259,7 @@ void psync_set_status(uint32_t statusid, uint32_t status) {
       (statuses[PSTATUS_TYPE_ACCFULL] == PSTATUS_ACCFULL_OVERQUOTA);
   psync_status.localisfull =
       (statuses[PSTATUS_TYPE_DISKFULL] == PSTATUS_DISKFULL_FULL);
-  pthread_mutex_unlock(&statusmutex);
+  pthread_mutex_unlock(&status_internal_mutex);
   status = psync_calc_status();
   if (psync_status.status != status) {
     psync_status.status = status;
@@ -269,13 +268,13 @@ void psync_set_status(uint32_t statusid, uint32_t status) {
 }
 
 void psync_wait_status(uint32_t statusid, uint32_t status) {
-  pthread_mutex_lock(&statusmutex);
+  pthread_mutex_lock(&status_internal_mutex);
   while ((statuses[statusid] & status) == 0 && psync_do_run) {
     status_waiters++;
-    pthread_cond_wait(&statuscond, &statusmutex);
+    pthread_cond_wait(&statuscond, &status_internal_mutex);
     status_waiters--;
   }
-  pthread_mutex_unlock(&statusmutex);
+  pthread_mutex_unlock(&status_internal_mutex);
   if (unlikely(!psync_do_run)) {
     debug(D_NOTICE, "exiting");
     pthread_exit(NULL);
@@ -283,15 +282,15 @@ void psync_wait_status(uint32_t statusid, uint32_t status) {
 }
 
 void psync_terminate_status_waiters() {
-  pthread_mutex_lock(&statusmutex);
+  pthread_mutex_lock(&status_internal_mutex);
   if (status_waiters)
     pthread_cond_broadcast(&statuscond);
-  pthread_mutex_unlock(&statusmutex);
+  pthread_mutex_unlock(&status_internal_mutex);
 }
 
 void psync_wait_statuses_array(const uint32_t *combinedstatuses, uint32_t cnt) {
   uint32_t waited, i, statusid, status;
-  pthread_mutex_lock(&statusmutex);
+  pthread_mutex_lock(&status_internal_mutex);
   do {
     waited = 0;
     for (i = 0; i < cnt; i++) {
@@ -300,12 +299,12 @@ void psync_wait_statuses_array(const uint32_t *combinedstatuses, uint32_t cnt) {
       while ((statuses[statusid] & status) == 0) {
         waited = 1;
         status_waiters++;
-        pthread_cond_wait(&statuscond, &statusmutex);
+        pthread_cond_wait(&statuscond, &status_internal_mutex);
         status_waiters--;
       }
     }
   } while (waited);
-  pthread_mutex_unlock(&statusmutex);
+  pthread_mutex_unlock(&status_internal_mutex);
 }
 
 void psync_wait_statuses(uint32_t first, ...) {
@@ -323,16 +322,16 @@ void psync_wait_statuses(uint32_t first, ...) {
 
 int psync_statuses_ok_array(const uint32_t *combinedstatuses, uint32_t cnt) {
   uint32_t i, statusid, status;
-  pthread_mutex_lock(&statusmutex);
+  pthread_mutex_lock(&status_internal_mutex);
   for (i = 0; i < cnt; i++) {
     statusid = combinedstatuses[i] >> 24;
     status = combinedstatuses[i] & 0x00ffffff;
     if ((statuses[statusid] & status) == 0) {
-      pthread_mutex_unlock(&statusmutex);
+      pthread_mutex_unlock(&status_internal_mutex);
       return 0;
     }
   }
-  pthread_mutex_unlock(&statusmutex);
+  pthread_mutex_unlock(&status_internal_mutex);
   return 1;
 }
 

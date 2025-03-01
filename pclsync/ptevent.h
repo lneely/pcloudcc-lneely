@@ -27,14 +27,16 @@
    IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef _PSYNC_CALLBACKS_H
-#define _PSYNC_CALLBACKS_H
+// ptevent is a thread-based event system that processes each event in parallel.
+// Each event spawns its own thread, allowing for concurrent event handling.
+// Primarily used for events containing string/numeric data.
 
-#include "psynclib.h"
+#ifndef __PTEVENT_H
+#define __PTEVENT_H
 
-typedef void(/*_cdecl*/ *data_event_callback)(int eventId, char *str1,
-                                              char *str2, uint64_t uint1,
-                                              uint64_t uint2);
+#include <stdint.h>
+
+#define PEVENT_SYNC_RENAME_F 1
 
 typedef struct {
   int eventid;
@@ -44,26 +46,9 @@ typedef struct {
   uint64_t uint2;
 } event_data_struct;
 
-void psync_callbacks_get_status(pstatus_t *status);
-void psync_set_status_callback(pstatus_change_callback_t callback);
-void psync_send_status_update();
-void psync_set_event_callback(pevent_callback_t callback);
-void psync_send_event_by_id(psync_eventtype_t eventid, psync_syncid_t syncid,
-                            const char *localpath,
-                            psync_fileorfolderid_t remoteid);
-void psync_send_event_by_path(psync_eventtype_t eventid, psync_syncid_t syncid,
-                              const char *localpath,
-                              psync_fileorfolderid_t remoteid,
-                              const char *remotepath);
-void psync_send_eventid(psync_eventtype_t eventid);
-void psync_send_eventdata(psync_eventtype_t eventid, void *eventdata);
+typedef void(*data_event_callback)(int eventId, char *str1, char *str2, uint64_t uint1, uint64_t uint2);
 
-#define PEVENT_SYNC_RENAME_F 1
+void ptevent_init(void *ptr);
+void ptevent_process(event_data_struct *data);
 
-void psync_init_data_event(void *ptr);
-
-void psync_send_data_event(event_data_struct *data);
-
-void psync_data_event_test(int eventid, char *str1, char *str2, uint64_t uint1,
-                           uint64_t uint2);
 #endif
