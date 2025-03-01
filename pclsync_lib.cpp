@@ -37,9 +37,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "poverlay_protocol.h"
-
-#include "poverlay.h"
+#include "prpc.h"
 #include "psynclib.h"
 #include "pshm.h"
 #include "pdevice.h"

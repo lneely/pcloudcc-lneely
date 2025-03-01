@@ -58,9 +58,9 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include "overlay_client.h"
-#include "poverlay_protocol.h"
+#include "rpcclient.h"
 #include "plibs.h"
+#include "prpc.h"
 
 #define POVERLAY_BUFSIZE 512
 
@@ -73,34 +73,11 @@
 #define POVERLAY_READ_INCOMPLETE -105
 #define POVERLAY_READ_INVALID_RESPONSE -106
 
-int QueryState(pCloud_FileState *state, char *path) {
-  int rep = 0;
-  char *errm;
-  size_t errm_size;
-
-  if (!SendCall(4, path /*IN*/, &rep, &errm, &errm_size)) {
-    debug(D_NOTICE, "QueryState responese rep[%d] path[%s]", rep, path);
-    if (errm)
-      debug(D_NOTICE, "The error is %s", errm);
-    if (rep == 10)
-      *state = FileStateInSync;
-    else if (rep == 12)
-      *state = FileStateInProgress;
-    else if (rep == 11)
-      *state = FileStateNoSync;
-    else
-      *state = FileStateInvalid;
-  } else
-    debug(D_ERROR, "QueryState ERROR rep[%d] path[%s]", rep, path);
-  free(errm);
-  return 0;
-}
-
 // socket_connect creates and connects to a unix socket at the
 // specified sockpath. it may write an error message and error message
 // size to out and out_size, and a "ret" value to ret (i think this is
 // redundant maybe...)
-int socket_connect(const char *sockpath, char **out, size_t *out_size,
+static int socket_connect(const char *sockpath, char **out, size_t *out_size,
                    int *ret) {
   int fd;
   struct sockaddr_un addr;
@@ -127,7 +104,7 @@ int socket_connect(const char *sockpath, char **out, size_t *out_size,
   return fd;
 }
 
-int write_request(int fd, int msgtype, const char *value, char **out,
+static int write_request(int fd, int msgtype, const char *value, char **out,
                   size_t *out_size, int *ret) {
   uint64_t bytes_written;
   int rc;
@@ -135,15 +112,15 @@ int write_request(int fd, int msgtype, const char *value, char **out,
   int size;
   char *buf;
   const char *err;
-  message *request;
+  rpc_message_t *request;
   char *curbuf;
 
   *ret = 0; // Initialize ret to 0
 
   len = strlen(value);
-  size = sizeof(message) + len + 1;
+  size = sizeof(rpc_message_t) + len + 1;
   buf = (char *)malloc(size);
-  request = (message *)buf;
+  request = (rpc_message_t *)buf;
   memset(request, 0, size);
   request->type = msgtype;
   strncpy(request->value, value, len + 1);
@@ -176,11 +153,11 @@ int write_request(int fd, int msgtype, const char *value, char **out,
   return *ret;
 }
 
-int read_response(int fd, char **out, size_t *out_size, int *ret) {
-    message *msg;
+static int read_response(int fd, char **out, size_t *out_size, int *ret) {
+    rpc_message_t *msg;
     ssize_t bytes_read;
 
-    msg = (message *)malloc(POVERLAY_BUFSIZE);
+    msg = (rpc_message_t *)malloc(POVERLAY_BUFSIZE);
     if (msg == NULL) {
         const char *error_msg = "Memory allocation failed";
         *out = strdup(error_msg);
@@ -208,8 +185,31 @@ int read_response(int fd, char **out, size_t *out_size, int *ret) {
     return 0;
 }
 
+int rpc_get_state(pCloud_FileState *state, char *path) {
+  int rep = 0;
+  char *errm;
+  size_t errm_size;
+
+  if (!rpc_call(4, path /*IN*/, &rep, &errm, &errm_size)) {
+    debug(D_NOTICE, "rpc_get_state responese rep[%d] path[%s]", rep, path);
+    if (errm)
+      debug(D_NOTICE, "The error is %s", errm);
+    if (rep == 10)
+      *state = FileStateInSync;
+    else if (rep == 12)
+      *state = FileStateInProgress;
+    else if (rep == 11)
+      *state = FileStateNoSync;
+    else
+      *state = FileStateInvalid;
+  } else
+    debug(D_ERROR, "rpc_get_state ERROR rep[%d] path[%s]", rep, path);
+  free(errm);
+  return 0;
+}
+
 // path contains the input argument(s). 
-int SendCall(int id, const char *path, int *ret, char **errm, size_t *errmsz) {
+int rpc_call(int id, const char *path, int *ret, char **errm, size_t *errmsz) {
   int result;
   int sockfd;
 

@@ -63,7 +63,7 @@
 #include "pmemlock.h"
 #include "pnetlibs.h"
 #include "pnotify.h"
-#include "poverlay.h"
+#include "prpc.h"
 #include "pp2p.h"
 #include "ppagecache.h"
 #include "ppassword.h"

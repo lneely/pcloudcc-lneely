@@ -42,11 +42,9 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <time.h>
+#include <unistd.h>
 
-#include "pfile.h"
-#include "poverlay_protocol.h"
-
-#include "poverlay.h"
+#include "prpc.h"
 #include "ppathstatus.h"
 
 #include "plibs.h"
@@ -105,8 +103,8 @@ void psync_overlay_handle_request(void *lpvParam) {
   int readbytes;                // total bytes read from request
   char rqbuf[POVERLAY_BUFSIZE]; // request buffer, contains the request message
   char *rqbufp;                 // request buffer ptr, for convenient iteration
-  message *request;     // request message
-  message *response;   // response message and payload
+  rpc_message_t *request;       // request message
+  rpc_message_t *response;      // response message and payload
 
   request = NULL;
   response = NULL;
@@ -120,7 +118,7 @@ void psync_overlay_handle_request(void *lpvParam) {
     readbytes += rc;
     rqbufp = rqbufp + rc;
     if (readbytes > 12) {
-      request = (message *)rqbuf;
+      request = (rpc_message_t *)rqbuf;
       if (request->length == (uint64_t)readbytes)
         break;
     }
@@ -133,8 +131,8 @@ void psync_overlay_handle_request(void *lpvParam) {
     goto cleanup;
   }
 
-  request = (message *)rqbuf;
-  response = (message *)malloc(POVERLAY_BUFSIZE);
+  request = (rpc_message_t *)rqbuf;
+  response = (rpc_message_t *)malloc(POVERLAY_BUFSIZE);
   if (request) {
     psync_overlay_get_response(request, response);
 
@@ -192,8 +190,8 @@ void psync_overlay_init_callbacks() {
   memset(callbacks, 0, sizeof(poverlay_callback) * callbacks_size);
 }
 
-static void psync_overlay_get_status_response(message *request,
-                                              message *response,
+static void psync_overlay_get_status_response(rpc_message_t *request,
+                                              rpc_message_t *response,
                                               size_t available_space) {
   psync_path_status_t stat;
 
@@ -220,8 +218,8 @@ static void psync_overlay_get_status_response(message *request,
   }
 }
 
-static void psync_overlay_get_overlay_response(message *request,
-                                               message *response,
+static void psync_overlay_get_overlay_response(rpc_message_t *request,
+                                               rpc_message_t *response,
                                                size_t available_space) {
   int cbidx; // callback index (based on message type)
   int cbret; // callback return value
@@ -256,8 +254,8 @@ static void psync_overlay_get_overlay_response(message *request,
   }
 }
 
-void psync_overlay_get_response(message *request,
-                                message *response) {
+void psync_overlay_get_response(rpc_message_t *request,
+                                rpc_message_t *response) {
 
   const char *dbgmsg; // debug messages
   size_t value_avail; // space available to store value (flexible array)
@@ -265,7 +263,7 @@ void psync_overlay_get_response(message *request,
   dbgmsg = NULL;
   memset(response, 0, POVERLAY_BUFSIZE);
   response->length = 0;
-  value_avail = POVERLAY_BUFSIZE - sizeof(message);
+  value_avail = POVERLAY_BUFSIZE - sizeof(rpc_message_t);
 
   // never print the crypto password to the logs in plain text
   dbgmsg = (request->type == 20) ? "REDACTED" : request->value;
@@ -291,7 +289,7 @@ void psync_overlay_get_response(message *request,
 
   // truncate messages that exceed the buffer boundaries
   size_t value_length = strnlen(response->value, value_avail);
-  response->length = sizeof(message) + value_length + 1;
+  response->length = sizeof(rpc_message_t) + value_length + 1;
   if (response->length > POVERLAY_BUFSIZE) {
     response->length = POVERLAY_BUFSIZE;
     response->value[value_avail - 1] = '\0';
