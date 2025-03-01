@@ -965,7 +965,7 @@ void ptask_upload(psync_syncid_t syncid, psync_fileid_t localfileid, const char 
   psync_sql_bind_uint(res, 4, localfileid);
   psync_sql_bind_string(res, 5, name);
   psync_sql_run_free(res);
-  psync_wake_upload();
+  pupload_wake();
   pstatus_upload_recalc_async();
 }
 

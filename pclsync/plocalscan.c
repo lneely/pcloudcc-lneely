@@ -673,7 +673,7 @@ static void scan_upload_file(sync_folderlist *fl) {
   debug(D_NOTICE, "file created %s", fl->name);
   /* it is possible that files that are reported as new are already uploading
    * -- is it? when? how? and with what localid?
-  psync_delete_upload_tasks_for_file(fl->localid);
+  pupload_del_tasks(fl->localid);
   */
   res = psync_sql_prep_statement(
       "INSERT OR IGNORE INTO localfile (localparentfolderid, syncid, size, "
@@ -698,7 +698,7 @@ static void scan_upload_modified_file(sync_folderlist *fl) {
   psync_sql_res *res;
   debug(D_NOTICE, "file modified %s (%lu)", fl->name,
         (unsigned long)fl->localid);
-  psync_delete_upload_tasks_for_file(fl->localid);
+  pupload_del_tasks(fl->localid);
   res = psync_sql_prep_statement("UPDATE localfile SET size=?, inode=?, "
                                  "mtime=?, mtimenative=? WHERE id=?");
   psync_sql_bind_uint(res, 1, fl->size);
@@ -732,7 +732,7 @@ static void scan_delete_file(sync_folderlist *fl) {
     return;
   }
   psync_sql_free_result(res);
-  psync_delete_upload_tasks_for_file(fl->localid);
+  pupload_del_tasks(fl->localid);
   res = psync_sql_prep_statement("DELETE FROM localfile WHERE id=?");
   psync_sql_bind_uint(res, 1, fl->localid);
   psync_sql_run_free(res);
@@ -895,7 +895,7 @@ static void delete_local_folder_rec(psync_folderid_t localfolderid) {
   res = psync_sql_query("SELECT id FROM localfile WHERE localparentfolderid=?");
   psync_sql_bind_uint(res, 1, localfolderid);
   while ((row = psync_sql_fetch_rowint(res)))
-    psync_delete_upload_tasks_for_file(row[0]);
+    pupload_del_tasks(row[0]);
   psync_sql_free_result(res);
   res = psync_sql_prep_statement(
       "DELETE FROM localfile WHERE localparentfolderid=?");
@@ -1168,7 +1168,7 @@ restart:
   psync_sql_commit_transaction();
 
   if (w) {
-    psync_wake_upload();
+    pupload_wake();
     pstatus_upload_recalc_async();
   }
   for (i = 0; i < SCAN_LIST_CNT; i++)

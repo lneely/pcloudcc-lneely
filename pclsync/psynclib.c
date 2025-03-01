@@ -331,7 +331,7 @@ void psync_start_sync(pstatus_change_callback_t status_callback,
     pqevent_process(event_callback);
   psyncer_init();
   pdiff_init();
-  psync_upload_init();
+  pupload_init();
   pdownload_init();
   psync_netlibs_init();
   psync_localscan_init();
@@ -450,7 +450,7 @@ void psync_logout2(uint32_t auth_status, int doinvauth) {
   pstatus_set(PSTATUS_TYPE_AUTH, auth_status);
   psync_fs_pause_until_login();
   pdownload_stop_all();
-  psync_stop_all_upload();
+  pupload_stop_all();
   ptask_stop_async();
   pcache_clean();
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
@@ -548,7 +548,7 @@ void psync_unlink() {
   unlinked = 1;
   tfa = 0;
   pdownload_stop_all();
-  psync_stop_all_upload();
+  pupload_stop_all();
   // Stop the root backup folder before unlinking the database. 0 means fetch
   // the deviceid from local DB.
   psync_stop_device(0, &errMsg);
@@ -958,7 +958,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   psync_localnotify_del_sync(syncid);
   psync_restat_sync_folders_del(syncid);
   pdownload_stop_sync(syncid);
-  psync_stop_sync_upload(syncid);
+  pupload_stop_sync(syncid);
   psync_sql_sync();
   ppathstatus_reload_syncs();
   psyncer_create(syncid);
@@ -1007,7 +1007,7 @@ int psync_delete_sync(psync_syncid_t syncid) {
     return -1;
   else {
     pdownload_stop_sync(syncid);
-    psync_stop_sync_upload(syncid);
+    pupload_stop_sync(syncid);
     psync_localnotify_del_sync(syncid);
     psync_restat_sync_folders_del(syncid);
     psync_restart_localscan();

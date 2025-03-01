@@ -99,14 +99,14 @@ static const uint32_t requiredstatuses[] = {
     PSTATUS_COMBINE(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE),
     PSTATUS_COMBINE(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_QUOTAOK)};
 
-void psync_upload_inc_uploads() {
+void pupload_inc() {
   pthread_mutex_lock(&upload_mutex);
   psync_status.filesuploading++;
   pthread_mutex_unlock(&upload_mutex);
   pstatus_send_status_update();
 }
 
-void psync_upload_dec_uploads() {
+void pupload_dec() {
   pthread_mutex_lock(&upload_mutex);
   psync_status.filesuploading--;
   if (psync_status.filesuploading == 0 && current_uploads_waiters)
@@ -114,7 +114,7 @@ void psync_upload_dec_uploads() {
   pthread_mutex_unlock(&upload_mutex);
   pstatus_send_status_update();
 }
-void psync_upload_dec_uploads_cnt(uint32_t cnt) {
+void pupload_dec_by(uint32_t cnt) {
   pthread_mutex_lock(&upload_mutex);
   psync_status.filesuploading -= cnt;
   if (psync_status.filesuploading == 0 && current_uploads_waiters)
@@ -123,14 +123,14 @@ void psync_upload_dec_uploads_cnt(uint32_t cnt) {
   pstatus_send_status_update();
 }
 
-void psync_upload_add_bytes_uploaded(uint64_t bytes) {
+void pupload_bytes_add(uint64_t bytes) {
   pthread_mutex_lock(&upload_mutex);
   psync_status.bytesuploaded += bytes;
   pthread_mutex_unlock(&upload_mutex);
   pstatus_send_status_update();
 }
 
-void psync_upload_sub_bytes_uploaded(uint64_t bytes) {
+void pupload_bytes_sub(uint64_t bytes) {
   pthread_mutex_lock(&upload_mutex);
   psync_status.bytesuploaded -= bytes;
   pthread_mutex_unlock(&upload_mutex);
@@ -1563,7 +1563,7 @@ static void task_run_upload_file_thread(void *ptr) {
     res = psync_sql_prep_statement("UPDATE task SET inprogress=0 WHERE id=?");
     psync_sql_bind_uint(res, 1, ut->upllist.taskid);
     psync_sql_run_free(res);
-    psync_wake_upload();
+    pupload_wake();
   } else
     delete_upload_task(ut->upllist.taskid, ut->upllist.localfileid);
   pthread_mutex_lock(&current_uploads_mutex);
@@ -1753,19 +1753,19 @@ static void upload_thread() {
   }
 }
 
-void psync_wake_upload() {
+void pupload_wake() {
   pthread_mutex_lock(&upload_mutex);
   if (!upload_wakes++)
     pthread_cond_signal(&upload_cond);
   pthread_mutex_unlock(&upload_mutex);
 }
 
-void psync_upload_init() {
-  ptimer_exception_handler(psync_wake_upload);
+void pupload_init() {
+  ptimer_exception_handler(pupload_wake);
   prun_thread("upload main", upload_thread);
 }
 
-void psync_delete_upload_tasks_for_file(psync_fileid_t localfileid) {
+void pupload_del_tasks(psync_fileid_t localfileid) {
   psync_sql_res *res;
   upload_list_t *upl;
   res = psync_sql_prep_statement(
@@ -1783,7 +1783,7 @@ void psync_delete_upload_tasks_for_file(psync_fileid_t localfileid) {
   pthread_mutex_unlock(&current_uploads_mutex);
 }
 
-void psync_stop_sync_upload(psync_syncid_t syncid) {
+void pupload_stop_sync(psync_syncid_t syncid) {
   upload_list_t *upl;
   psync_sql_res *res;
 
@@ -1802,7 +1802,7 @@ void psync_stop_sync_upload(psync_syncid_t syncid) {
   pstatus_upload_recalc_async();
 }
 
-void psync_stop_all_upload() {
+void pupload_stop_all() {
   upload_list_t *upl;
   pthread_mutex_lock(&current_uploads_mutex);
   psync_list_for_each_element(upl, &uploads, upload_list_t, list) upl->stop = 1;

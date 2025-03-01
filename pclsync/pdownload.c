@@ -290,7 +290,7 @@ static void delete_local_folder_from_db(psync_folderid_t localfolderid,
         psync_sql_query("SELECT id FROM localfile WHERE localparentfolderid=?");
     psync_sql_bind_uint(res, 1, localfolderid);
     while ((row = psync_sql_fetch_rowint(res)))
-      psync_delete_upload_tasks_for_file(row[0]);
+      pupload_del_tasks(row[0]);
     psync_sql_free_result(res);
     res = psync_sql_prep_statement(
         "DELETE FROM localfile WHERE localparentfolderid=?");
@@ -1333,7 +1333,7 @@ static void task_del_folder_rec_do(const char *localpath,
   psync_sql_bind_uint(res, 1, localfolderid);
   psync_sql_bind_uint(res, 2, syncid);
   while ((vrow = psync_sql_fetch_row(res))) {
-    psync_delete_upload_tasks_for_file(psync_get_number(vrow[0]));
+    pupload_del_tasks(psync_get_number(vrow[0]));
     nm = psync_strcat(localpath, "/",
                       psync_get_string(vrow[1]), NULL);
     debug(D_NOTICE, "deleting %s", nm);
