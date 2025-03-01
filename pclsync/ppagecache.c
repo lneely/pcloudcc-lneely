@@ -2931,7 +2931,7 @@ int psync_pagecache_read_unmodified_encrypted_locked(psync_openfile_t *of,
             (unsigned long)ap->firstpageid,
             (unsigned long)ap->firstpageid + ap->size / PSYNC_CRYPTO_AUTH_SIZE,
             (int)offsets.treelevels);
-      pcrypto_sign_sector(of->encoder, (unsigned char *)ap->auth,
+      pcrypto_sign_sec(of->encoder, (unsigned char *)ap->auth,
                                     ap->size, sa);
       p = ap->parent;
       ap->parent = NULL;
@@ -2951,7 +2951,7 @@ int psync_pagecache_read_unmodified_encrypted_locked(psync_openfile_t *of,
           ret = -EIO;
         }
         ap = p;
-        pcrypto_sign_sector(of->encoder, (unsigned char *)ap->auth,
+        pcrypto_sign_sec(of->encoder, (unsigned char *)ap->auth,
                                       ap->size, sa);
         p = ap->parent;
       } while (p);
@@ -2975,7 +2975,7 @@ int psync_pagecache_read_unmodified_encrypted_locked(psync_openfile_t *of,
     if (!ret) {
       apageid = first_page_id + i - ap->firstpageid;
       assert(apageid >= 0 && apageid < PSYNC_CRYPTO_HASH_TREE_SECTORS);
-      if (pcrypto_decode_sector(
+      if (pcrypto_decode_sec(
               of->encoder, (unsigned char *)dp[i].buff, dp[i].pagesize,
               (unsigned char *)dp[i].buff, ap->auth[apageid],
               first_page_id + i)) {

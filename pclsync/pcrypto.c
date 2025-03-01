@@ -567,7 +567,7 @@ void pcrypto_encode_sec(
   }
 }
 
-int pcrypto_decode_sector(
+int pcrypto_decode_sec(
     pcrypto_sector_encdec_t enc, const unsigned char *data,
     size_t datalen, unsigned char *out, const pcrypto_sector_auth_t auth,
     uint64_t sectorid) {
@@ -649,7 +649,7 @@ int pcrypto_decode_sector(
                        PSYNC_AES256_BLOCK_SIZE);
 }
 
-void pcrypto_sign_sector(
+void pcrypto_sign_sec(
     pcrypto_sector_encdec_t enc, const unsigned char *data,
     size_t datalen, pcrypto_sector_auth_t authout) {
   unsigned char buff[PSYNC_AES256_BLOCK_SIZE * 3 + PSYNC_SHA512_DIGEST_LEN];

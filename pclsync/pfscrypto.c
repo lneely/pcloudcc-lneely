@@ -251,7 +251,7 @@ static int psync_fs_crypto_read_newfile_full_sector_from_log(
           (unsigned)hdr.length, (int)rd);
     return -EIO;
   }
-  if (unlikely_log(pcrypto_decode_sector(
+  if (unlikely_log(pcrypto_decode_sec(
           of->encoder, buff, rd, (unsigned char *)buf, se->auth, se->sectorid)))
     return -EIO;
   else
@@ -303,7 +303,7 @@ psync_fs_crypto_do_local_tree_check(psync_openfile_t *of,
   rd = pfile_pread(of->datafile, buff, ssize, off);
   if (unlikely_log(rd != ssize))
     return -1;
-  pcrypto_sign_sector(of->encoder, buff, ssize, auth);
+  pcrypto_sign_sec(of->encoder, buff, ssize, auth);
   level = 0;
   while (level < offsets->treelevels) {
     level++;
@@ -329,7 +329,7 @@ psync_fs_crypto_do_local_tree_check(psync_openfile_t *of,
             (unsigned)ssize, (unsigned)authoff);
       return -1;
     }
-    pcrypto_sign_sector(of->encoder, buff, ssize, auth);
+    pcrypto_sign_sec(of->encoder, buff, ssize, auth);
   }
   return 0;
 }
@@ -423,7 +423,7 @@ static int psync_fs_crypto_read_newfile_full_sector_from_datafile(
   rd = pfile_pread(of->datafile, auth, sizeof(auth), off);
   if (unlikely_log(rd != sizeof(auth)))
     return -EIO;
-  if (unlikely_log(pcrypto_decode_sector(
+  if (unlikely_log(pcrypto_decode_sec(
           of->encoder, buff, ssize, (unsigned char *)buf, auth, sectorid)))
     return -EIO;
 #if defined(PSYNC_DO_LOCAL_FULL_TREE_CHECK)
@@ -615,7 +615,7 @@ static int psync_fs_crypto_switch_sectors(psync_openfile_t *of,
       //      debug(D_NOTICE, "writing level %u signatures to offset %I64u size
       //      %u", level, hdr.offset, sz);
       hdr.length = sz;
-      pcrypto_sign_sector(of->encoder,
+      pcrypto_sign_sec(of->encoder,
                                     (unsigned char *)&autharr[level], sz,
                                     autharr[level + 1][oldsecn]);
       wrt = pfile_pwrite(of->logfile, &hdr, sizeof(hdr), of->logoffset);
@@ -699,7 +699,7 @@ psync_fs_crypto_write_master_auth(psync_openfile_t *of,
   assert(offsets->lastauthsectorlen[offsets->treelevels - 1] > 0);
   assert(offsets->lastauthsectorlen[offsets->treelevels - 1] <=
          PSYNC_CRYPTO_SECTOR_SIZE);
-  pcrypto_sign_sector(
+  pcrypto_sign_sec(
       of->encoder, (unsigned char *)&autharr[offsets->treelevels - 1],
       offsets->lastauthsectorlen[offsets->treelevels - 1], data.auth);
   memset(&data.hdr, 0, sizeof(psync_crypto_log_header));
