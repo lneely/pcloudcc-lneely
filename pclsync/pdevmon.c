@@ -39,7 +39,7 @@
 #include "prun.h"
 
 
-#include "pdevice_monitor.h"
+#include "pdevmon.h"
 #include "plocalscan.h"
 #include "ptimer.h"
 
@@ -48,7 +48,7 @@
 static pthread_mutex_t devmon_mutex = PTHREAD_MUTEX_INITIALIZER;
 static psync_timer_t devmon_activity_timer = NULL;
 
-void devmon_activity_timer_action() {
+static void on_timer_activity() {
   psync_timer_stop(devmon_activity_timer);
   pthread_mutex_lock(&devmon_mutex);
   devmon_activity_timer = NULL;
@@ -56,19 +56,18 @@ void devmon_activity_timer_action() {
   psync_restat_sync_folders();
 }
 
-void devmon_activity_timer_start() {
+static void timer_start() {
   pthread_mutex_lock(&devmon_mutex);
   if (!devmon_activity_timer)
-    devmon_activity_timer = psync_timer_register(
-        devmon_activity_timer_action, DEV_MONITOR_ACTIVITY_TIMER_INT, NULL);
+    devmon_activity_timer = psync_timer_register(on_timer_activity, DEV_MONITOR_ACTIVITY_TIMER_INT, NULL);
   pthread_mutex_unlock(&devmon_mutex);
 }
 
-void enumerate_devices(struct udev *udev, device_event event) {
-  devmon_activity_timer_start();
+static void enum_devices(struct udev *udev, device_event event) {
+  timer_start();
 }
 
-void monitor_usb_dev() {
+static void monitor_usb() {
   struct udev *udev;
   struct udev_device *dev;
   struct udev_monitor *mon;
@@ -106,7 +105,7 @@ void monitor_usb_dev() {
          select() ensured that this will not block. */
       dev = udev_monitor_receive_device(mon);
       if (dev) {
-        enumerate_devices(udev, Dev_Event_arrival);
+        enum_devices(udev, Dev_Event_arrival);
       } else {
         // printf("No Device from receive_device(). An error occured.\n");
       }
@@ -118,12 +117,11 @@ void monitor_usb_dev() {
   return;
 }
 
-void device_monitor_thread() {
+static void proc_devmon() {
   debug(D_NOTICE, "Waiting for USB devices connect/disconnect events");
-  monitor_usb_dev();
+  monitor_usb();
 }
 
-void psync_devmon_init() {
-  prun_thread("libusb handle events completed thread",
-                   device_monitor_thread);
+void pdevmon_init() {
+  prun_thread("libusb handle events completed thread", proc_devmon);
 }

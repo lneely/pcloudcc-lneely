@@ -37,7 +37,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-void psync_devmon_init();
+
+void pdevmon_init();
+
 #ifdef __cplusplus
 }
 #endif

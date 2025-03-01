@@ -49,7 +49,7 @@
 #include "pcryptofolder.h"
 #include "pcontacts.h"
 #include "pdevice.h"
-#include "pdevice_monitor.h"
+#include "pdevmon.h"
 #include "pdiff.h"
 #include "pdownload.h"
 #include "pfile.h"
@@ -334,7 +334,7 @@ void psync_start_sync(pstatus_change_callback_t status_callback,
   psync_p2p_init();
   if (psync_setting_get_bool(_PS(autostartfs)))
     psync_fs_start();
-  psync_devmon_init();
+  pdevmon_init();
 }
 
 void psync_set_notification_callback(
