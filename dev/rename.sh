@@ -40,7 +40,7 @@ while IFS= read -r line; do
         oldpattern_escaped=$(echo "$oldpattern" | sed 's/[\/&]/\\&/g')
         newpattern_escaped=$(echo "$newpattern" | sed 's/[\/&]/\\&/g')
         
-        echo "Replacing: '$oldpattern' with '$newpattern'"
+        # echo "Replacing: '$oldpattern' with '$newpattern'"
         
         # Execute the find and sed command
         find . -name "*.[ch]" -exec sed -i "s/$oldpattern_escaped/$newpattern_escaped/g" {} \;
@@ -49,4 +49,4 @@ while IFS= read -r line; do
     fi
 done
 
-echo "All replacements completed!"
+# echo "All replacements completed!"

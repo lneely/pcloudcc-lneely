@@ -335,7 +335,7 @@ void psync_start_sync(pstatus_change_callback_t status_callback,
   pdownload_init();
   psync_netlibs_init();
   psync_localscan_init();
-  psync_p2p_init();
+  pp2p_init();
   if (psync_setting_get_bool(_PS(autostartfs)))
     psync_fs_start();
   pdevmon_init();

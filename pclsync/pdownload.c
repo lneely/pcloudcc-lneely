@@ -680,7 +680,7 @@ static int task_download_file(download_task_t *dt) {
   //  pqevent_queue_sync_event_id(PEVENT_FILE_DOWNLOAD_STARTED, syncid, name,
   //  fileid);
   if (serversize >= PSYNC_MIN_SIZE_FOR_P2P) {
-    rt = psync_p2p_check_download(dt->dwllist.fileid, serverhashhex, serversize,
+    rt = pp2p_check_download(dt->dwllist.fileid, serverhashhex, serversize,
                                   dt->tmpname);
     if (rt == PSYNC_NET_OK) {
       if (rename_and_create_local(dt, serverhashhex, serversize, hash))
