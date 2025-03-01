@@ -29,32 +29,19 @@
    DAMAGE.
 */
 
-#ifndef _PSYNC_SYNCER_H
-#define _PSYNC_SYNCER_H
+#pragma once
 
-#include "psynclib.h"
+#ifndef _PDEVICE_MONITOR
+#define _PDEVICE_MONITOR
 
-void psync_syncer_init();
-void psync_syncer_new(psync_syncid_t syncid);
-
-void psync_increase_local_folder_taskcnt(psync_folderid_t lfolderid);
-void psync_decrease_local_folder_taskcnt(psync_folderid_t lfolderid);
-psync_folderid_t psync_create_local_folder_in_db(
-    psync_syncid_t syncid, psync_folderid_t folderid,
-    psync_folderid_t localparentfolderid, const char *name);
-void psync_add_folder_for_downloadsync(psync_syncid_t syncid,
-                                       psync_synctype_t synctype,
-                                       psync_folderid_t folderid,
-                                       psync_folderid_t lfoiderid);
-
-void psync_add_folder_to_downloadlist(psync_folderid_t folderid);
-void psync_del_folder_from_downloadlist(psync_folderid_t folderid);
-void psync_clear_downloadlist();
-int psync_is_folder_in_downloadlist(psync_folderid_t folderid);
-
-int psync_str_is_prefix(const char *str1, const char *str2);
-void psync_syncer_check_delayed_syncs();
-
-int psync_left_str_is_prefix(const char *str1, const char *str2);
-
+#ifdef __cplusplus
+extern "C" {
 #endif
+
+void pdevmon_init();
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif //_PDEVICE_MONITOR

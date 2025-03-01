@@ -429,7 +429,7 @@ int psync_sql_connect(const char *db) {
   code = sqlite3_open(db, &psync_db);
   if (likely(code == SQLITE_OK)) {
     if (initmutex) {
-      psync_rwlock_init(&psync_db_lock);
+      plocks_init(&psync_db_lock);
       pthread_mutexattr_init(&mattr);
       pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
       pthread_mutex_init(&psync_db_checkpoint_mutex, &mattr);
@@ -446,7 +446,7 @@ int psync_sql_connect(const char *db) {
                  "DELETE FROM setting WHERE id='justcheckingiflocked'")) {
       debug(D_ERROR, "database is locked");
       sqlite3_close(psync_db);
-      psync_rwlock_destroy(&psync_db_lock);
+      plocks_destroy(&psync_db_lock);
       return -1;
     }
 
@@ -478,7 +478,7 @@ int psync_sql_close() {
   while (1) {
     code = sqlite3_close(psync_db);
     if (code == SQLITE_BUSY) {
-      psync_cache_clean_all();
+      pcache_clean();
       tries++;
       if (tries > 100) {
         psys_sleep_milliseconds_fast(tries - 90);
@@ -637,7 +637,7 @@ void psync_sql_dump_locks() {
 
 #if IS_DEBUG
 int psync_sql_do_trylock(const char *file, unsigned line) {
-  if (psync_rwlock_trywrlock(&psync_db_lock))
+  if (plocks_trywrlock(&psync_db_lock))
     return -1;
   if (++sqllockcnt == 1) {
     clock_gettime(CLOCK_REALTIME, &sqllockstart);
@@ -646,18 +646,18 @@ int psync_sql_do_trylock(const char *file, unsigned line) {
   return 0;
 }
 #else
-int psync_sql_trylock() { return psync_rwlock_trywrlock(&psync_db_lock); }
+int psync_sql_trylock() { return plocks_trywrlock(&psync_db_lock); }
 #endif
 
 #if IS_DEBUG
 void psync_sql_do_lock(const char *file, unsigned line) {
-  if (psync_rwlock_trywrlock(&psync_db_lock)) {
+  if (plocks_trywrlock(&psync_db_lock)) {
     struct timespec start, end;
     unsigned long msec;
     clock_gettime(CLOCK_REALTIME, &start);
     memcpy(&end, &start, sizeof(end));
     end.tv_sec += PSYNC_DEBUG_LOCK_TIMEOUT;
-    if (psync_rwlock_timedwrlock(&psync_db_lock, &end)) {
+    if (plocks_timedwrlock(&psync_db_lock, &end)) {
       debug(D_BUG, "sql write lock timed out called from %s:%u", file, line);
       senddebug("sql write lock timed out called from %s:%u", file, line);
       psync_sql_dump_locks();
@@ -678,7 +678,7 @@ void psync_sql_do_lock(const char *file, unsigned line) {
   }
 }
 #else
-void psync_sql_lock() { psync_rwlock_wrlock(&psync_db_lock); }
+void psync_sql_lock() { plocks_wrlock(&psync_db_lock); }
 #endif
 
 void psync_sql_unlock() {
@@ -695,23 +695,23 @@ void psync_sql_unlock() {
             "held database write lock for %lu milliseconds taken from %s:%u",
             msec, wrlockfile, wrlockline);
     record_wrunlock();
-    psync_rwlock_unlock(&psync_db_lock);
+    plocks_unlock(&psync_db_lock);
   } else
-    psync_rwlock_unlock(&psync_db_lock);
+    plocks_unlock(&psync_db_lock);
 #else
-  psync_rwlock_unlock(&psync_db_lock);
+  plocks_unlock(&psync_db_lock);
 #endif
 }
 
 #if IS_DEBUG
 void psync_sql_do_rdlock(const char *file, unsigned line) {
-  if (psync_rwlock_tryrdlock(&psync_db_lock)) {
+  if (plocks_tryrdlock(&psync_db_lock)) {
     struct timespec start, end;
     unsigned long msec;
     clock_gettime(CLOCK_REALTIME, &start);
     memcpy(&end, &start, sizeof(end));
     end.tv_sec += PSYNC_DEBUG_LOCK_TIMEOUT;
-    if (psync_rwlock_timedrdlock(&psync_db_lock, &end)) {
+    if (plocks_timedrdlock(&psync_db_lock, &end)) {
       debug(D_BUG, "sql read lock timed out, called from %s:%u", file, line);
       senddebug("sql read lock timed out, called from %s:%u", file, line);
       psync_sql_dump_locks();
@@ -731,7 +731,7 @@ void psync_sql_do_rdlock(const char *file, unsigned line) {
   }
 }
 #else
-void psync_sql_rdlock() { psync_rwlock_rdlock(&psync_db_lock); }
+void psync_sql_rdlock() { plocks_rdlock(&psync_db_lock); }
 #endif
 
 void psync_sql_rdunlock() {
@@ -744,7 +744,7 @@ void psync_sql_rdunlock() {
     struct timespec end;
     unsigned long msec;
     rd_lock_data *lock;
-    psync_rwlock_unlock(&psync_db_lock);
+    plocks_unlock(&psync_db_lock);
     clock_gettime(CLOCK_REALTIME, &end);
     lock = record_rdunlock();
     msec = (end.tv_sec - sqlrdlockstart.tv_sec) * 1000 + end.tv_nsec / 1000000 -
@@ -755,28 +755,28 @@ void psync_sql_rdunlock() {
             lock->file, lock->line);
     psync_free(lock);
   } else
-    psync_rwlock_unlock(&psync_db_lock);
+    plocks_unlock(&psync_db_lock);
 #else
-  psync_rwlock_unlock(&psync_db_lock);
+  plocks_unlock(&psync_db_lock);
 #endif
 }
 
 int psync_sql_has_waiters() {
-  return psync_rwlock_num_waiters(&psync_db_lock) > 0;
+  return plocks_num_waiters(&psync_db_lock) > 0;
 }
 
 int psync_sql_isrdlocked() {
-  return psync_rwlock_holding_rdlock(&psync_db_lock);
+  return plocks_holding_rdlock(&psync_db_lock);
 }
 
-int psync_sql_islocked() { return psync_rwlock_holding_lock(&psync_db_lock); }
+int psync_sql_islocked() { return plocks_holding_lock(&psync_db_lock); }
 
 int psync_sql_tryupgradelock() {
 #if IS_DEBUG
-  if (psync_rwlock_holding_wrlock(&psync_db_lock))
+  if (plocks_holding_wrlock(&psync_db_lock))
     return 0;
-  assert(psync_rwlock_holding_rdlock(&psync_db_lock));
-  if (psync_rwlock_towrlock(&psync_db_lock))
+  assert(plocks_holding_rdlock(&psync_db_lock));
+  if (plocks_towrlock(&psync_db_lock))
     return -1;
   else {
     rd_lock_data *lock = record_rdunlock();
@@ -789,7 +789,7 @@ int psync_sql_tryupgradelock() {
     return 0;
   }
 #else
-  return psync_rwlock_towrlock(&psync_db_lock);
+  return plocks_towrlock(&psync_db_lock);
 #endif
 }
 
@@ -948,24 +948,24 @@ static void psync_sql_check_query_plan_locked(const char *sql) {
   psync_tree *node;
   int cmp;
   if (!sql_tree) {
-    psync_tree_add_after(&sql_tree, NULL, psync_sql_new_tree_node(sql));
+    ptree_add_after(&sql_tree, NULL, psync_sql_new_tree_node(sql));
     return;
   }
   node = sql_tree;
   while (1) {
-    cmp = strcmp(sql, psync_tree_element(node, psync_sql_tree_t, tree)->sql);
+    cmp = strcmp(sql, ptree_element(node, psync_sql_tree_t, tree)->sql);
     if (cmp < 0) {
       if (node->left)
         node = node->left;
       else {
-        psync_tree_add_before(&sql_tree, node, psync_sql_new_tree_node(sql));
+        ptree_add_before(&sql_tree, node, psync_sql_new_tree_node(sql));
         break;
       }
     } else if (cmp > 0) {
       if (node->right)
         node = node->right;
       else {
-        psync_tree_add_after(&sql_tree, node, psync_sql_new_tree_node(sql));
+        ptree_add_after(&sql_tree, node, psync_sql_new_tree_node(sql));
         break;
       }
     } else
@@ -1225,7 +1225,7 @@ psync_sql_res *psync_sql_do_query(const char *sql, const char *file,
 psync_sql_res *psync_sql_query(const char *sql) {
 #endif
   psync_sql_res *ret;
-  ret = (psync_sql_res *)psync_cache_get(sql);
+  ret = (psync_sql_res *)pcache_get(sql);
   if (ret) {
     //    debug(D_NOTICE, "got query %s from cache", sql);
     ret->locked = SQL_WRITE_LOCK;
@@ -1293,7 +1293,7 @@ psync_sql_res *psync_sql_do_query_rdlock(const char *sql, const char *file,
 psync_sql_res *psync_sql_query_rdlock(const char *sql) {
 #endif
   psync_sql_res *ret;
-  ret = (psync_sql_res *)psync_cache_get(sql);
+  ret = (psync_sql_res *)pcache_get(sql);
   if (ret) {
     //    debug(D_NOTICE, "got query %s from cache", sql);
     ret->locked = SQL_READ_LOCK;
@@ -1372,7 +1372,7 @@ psync_sql_res *psync_sql_query_nolock(const char *sql) {
     abort();
   }
 #endif
-  ret = (psync_sql_res *)psync_cache_get(sql);
+  ret = (psync_sql_res *)pcache_get(sql);
   if (ret) {
     //    debug(D_NOTICE, "got query %s from cache", sql);
     ret->locked = SQL_NO_LOCK;
@@ -1420,7 +1420,7 @@ void psync_sql_free_result(psync_sql_res *res) {
   memset(res->row, 0xff, res->column_count * sizeof(psync_variant));
 #endif
   if (code == SQLITE_OK)
-    psync_cache_add(res->sql, res, PSYNC_QUERY_CACHE_SEC, psync_sql_free_cache,
+    pcache_add(res->sql, res, PSYNC_QUERY_CACHE_SEC, psync_sql_free_cache,
                     PSYNC_QUERY_MAX_CNT);
   else
     psync_sql_free_cache(res);
@@ -1484,7 +1484,7 @@ psync_sql_res *psync_sql_do_prep_statement(const char *sql, const char *file,
 psync_sql_res *psync_sql_prep_statement(const char *sql) {
 #endif
   psync_sql_res *ret;
-  ret = psync_cache_get(sql);
+  ret = pcache_get(sql);
   if (ret) {
     //    debug(D_NOTICE, "got statement %s from cache", sql);
     ret->locked = SQL_WRITE_LOCK;
@@ -1570,7 +1570,7 @@ int psync_sql_run_free(psync_sql_res *res) {
     return -1;
   } else {
     psync_sql_res_unlock(res);
-    psync_cache_add(res->sql, res, PSYNC_QUERY_CACHE_SEC, psync_sql_free_cache,
+    pcache_add(res->sql, res, PSYNC_QUERY_CACHE_SEC, psync_sql_free_cache,
                     PSYNC_QUERY_MAX_CNT);
     return 0;
   }
@@ -1761,7 +1761,7 @@ void psync_libs_init() {
 
 static void run_after_sec(psync_timer_t timer, void *ptr) {
   struct run_after_ptr *fp = (struct run_after_ptr *)ptr;
-  psync_timer_stop(timer);
+  ptimer_stop(timer);
   fp->run(fp->ptr);
   psync_free(fp);
 }
@@ -1771,16 +1771,16 @@ void psync_run_after_sec(psync_run_after_t run, void *ptr, uint32_t seconds) {
   fp = psync_new(struct run_after_ptr);
   fp->run = run;
   fp->ptr = ptr;
-  psync_timer_register(run_after_sec, seconds, fp);
+  ptimer_register(run_after_sec, seconds, fp);
 }
 
 static void free_after_sec(psync_timer_t timer, void *ptr) {
-  psync_timer_stop(timer);
+  ptimer_stop(timer);
   psync_free(ptr);
 }
 
 void psync_free_after_sec(void *ptr, uint32_t seconds) {
-  psync_timer_register(free_after_sec, seconds, ptr);
+  ptimer_register(free_after_sec, seconds, ptr);
 }
 
 int psync_match_pattern(const char *name, const char *pattern, size_t plen) {
@@ -2127,7 +2127,7 @@ psync_task_run_tasks(psync_task_callback_t const *callbacks,
   return ret;
 }
 
-void *psync_task_get_result(psync_task_manager_t tm, int id) {
+void *psync_task_papi_result(psync_task_manager_t tm, int id) {
   void *ret;
   pthread_mutex_lock(&tm->mutex);
   if (tm->tasks[id].status == PSYNC_TASK_STATUS_RUNNING) {
@@ -2526,7 +2526,7 @@ void psync_qpartition(void *base, size_t cnt, size_t sort_first, size_t size,
 
 void psync_try_free_memory() {
   sqlite3_db_release_memory(psync_db);
-  psync_cache_clean_all();
+  pcache_clean();
 }
 
 static void time_format(time_t tm, unsigned long ns, char *result) {

@@ -117,7 +117,7 @@ typedef struct {
    * for non-encrypted files only offsetof(psync_openfile_t, encoder) bytes are
    * allocated keep all fields for encryption after encoder
    */
-  psync_crypto_aes256_sector_encoder_decoder_t encoder;
+  pcrypto_sector_encdec_t encoder;
   psync_tree *sectorsinlog;
   psync_interval_tree_t *authenticatedints;
   psync_fast_hash256_ctx loghashctx;

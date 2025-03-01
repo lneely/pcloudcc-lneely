@@ -48,7 +48,7 @@ typedef union {
   uint_halfptr_t cnt[2];
 } psync_rwlock_lockcnt_t;
 
-void psync_rwlock_init(psync_rwlock_t *rw) {
+void plocks_init(psync_rwlock_t *rw) {
   assert(sizeof(void *) == sizeof(psync_rwlock_lockcnt_t));
   rw->rcount = 0;
   rw->rwait = 0;
@@ -61,7 +61,7 @@ void psync_rwlock_init(psync_rwlock_t *rw) {
   pthread_cond_init(&rw->wcond, NULL);
 }
 
-void psync_rwlock_destroy(psync_rwlock_t *rw) {
+void plocks_destroy(psync_rwlock_t *rw) {
   pthread_key_delete(rw->cntkey);
   pthread_mutex_destroy(&rw->mutex);
   pthread_cond_destroy(&rw->rcond);
@@ -142,7 +142,7 @@ static psync_rwlock_lockcnt_t psync_rwlock_create_cnt(uint_halfptr_t rd,
   return cnt;
 }
 
-void psync_rwlock_rdlock(psync_rwlock_t *rw) {
+void plocks_rdlock(psync_rwlock_t *rw) {
   if (psync_rwlock_check_rdrecursive_in(rw))
     return;
   pthread_mutex_lock(&rw->mutex);
@@ -156,7 +156,7 @@ void psync_rwlock_rdlock(psync_rwlock_t *rw) {
   psync_rwlock_set_count(rw, psync_rwlock_create_cnt(1, 0));
 }
 
-int psync_rwlock_tryrdlock(psync_rwlock_t *rw) {
+int plocks_tryrdlock(psync_rwlock_t *rw) {
   if (psync_rwlock_check_rdrecursive_in(rw))
     return 0;
   pthread_mutex_lock(&rw->mutex);
@@ -170,7 +170,7 @@ int psync_rwlock_tryrdlock(psync_rwlock_t *rw) {
   return 0;
 }
 
-int psync_rwlock_timedrdlock(psync_rwlock_t *rw,
+int plocks_timedrdlock(psync_rwlock_t *rw,
                              const struct timespec *abstime) {
   if (psync_rwlock_check_rdrecursive_in(rw))
     return 0;
@@ -190,7 +190,7 @@ int psync_rwlock_timedrdlock(psync_rwlock_t *rw,
   return 0;
 }
 
-void psync_rwlock_rdlock_starvewr(psync_rwlock_t *rw) {
+void plocks_rdlock_starvewr(psync_rwlock_t *rw) {
   if (psync_rwlock_check_rdrecursive_in(rw))
     return;
   pthread_mutex_lock(&rw->mutex);
@@ -206,7 +206,7 @@ void psync_rwlock_rdlock_starvewr(psync_rwlock_t *rw) {
   psync_rwlock_set_count(rw, psync_rwlock_create_cnt(1, 0));
 }
 
-void psync_rwlock_wrlock(psync_rwlock_t *rw) {
+void plocks_wrlock(psync_rwlock_t *rw) {
   if (psync_rwlock_check_wrrecursive_in(rw))
     return;
   pthread_mutex_lock(&rw->mutex);
@@ -220,7 +220,7 @@ void psync_rwlock_wrlock(psync_rwlock_t *rw) {
   psync_rwlock_set_count(rw, psync_rwlock_create_cnt(0, 1));
 }
 
-int psync_rwlock_trywrlock(psync_rwlock_t *rw) {
+int plocks_trywrlock(psync_rwlock_t *rw) {
   if (psync_rwlock_check_wrrecursive_in(rw))
     return 0;
   pthread_mutex_lock(&rw->mutex);
@@ -234,7 +234,7 @@ int psync_rwlock_trywrlock(psync_rwlock_t *rw) {
   return 0;
 }
 
-int psync_rwlock_timedwrlock(psync_rwlock_t *rw,
+int plocks_timedwrlock(psync_rwlock_t *rw,
                              const struct timespec *abstime) {
   if (psync_rwlock_check_wrrecursive_in(rw))
     return 0;
@@ -255,7 +255,7 @@ int psync_rwlock_timedwrlock(psync_rwlock_t *rw,
   return 0;
 }
 
-void psync_rwlock_rslock(psync_rwlock_t *rw) {
+void plocks_rslock(psync_rwlock_t *rw) {
   psync_rwlock_lockcnt_t cnt;
   cnt = psync_rwlock_get_count(rw);
   assert(cnt.cnt[0] == 0);
@@ -283,7 +283,7 @@ void psync_rwlock_rslock(psync_rwlock_t *rw) {
   psync_rwlock_set_count(rw, cnt);
 }
 
-int psync_rwlock_towrlock(psync_rwlock_t *rw) {
+int plocks_towrlock(psync_rwlock_t *rw) {
   psync_rwlock_lockcnt_t cnt;
   cnt = psync_rwlock_get_count(rw);
   if (cnt.cnt[1] && cnt.cnt[1] != PSYNC_WR_RESERVED)
@@ -317,7 +317,7 @@ int psync_rwlock_towrlock(psync_rwlock_t *rw) {
   return 0;
 }
 
-void psync_rwlock_unlock(psync_rwlock_t *rw) {
+void plocks_unlock(psync_rwlock_t *rw) {
   if (psync_rwlock_check_recursive_out(rw))
     return;
   pthread_mutex_lock(&rw->mutex);
@@ -359,7 +359,7 @@ void psync_rwlock_unlock(psync_rwlock_t *rw) {
   pthread_mutex_unlock(&rw->mutex);
 }
 
-unsigned psync_rwlock_num_waiters(psync_rwlock_t *rw) {
+unsigned plocks_num_waiters(psync_rwlock_t *rw) {
   unsigned ret;
   pthread_mutex_lock(&rw->mutex);
   ret = rw->rwait + rw->wwait;
@@ -367,17 +367,17 @@ unsigned psync_rwlock_num_waiters(psync_rwlock_t *rw) {
   return ret;
 }
 
-int psync_rwlock_holding_rdlock(psync_rwlock_t *rw) {
+int plocks_holding_rdlock(psync_rwlock_t *rw) {
   return psync_rwlock_get_count(rw).cnt[0] != 0;
 }
 
-int psync_rwlock_holding_wrlock(psync_rwlock_t *rw) {
+int plocks_holding_wrlock(psync_rwlock_t *rw) {
   psync_rwlock_lockcnt_t cnt;
   cnt = psync_rwlock_get_count(rw);
   return cnt.cnt[1] != 0 && cnt.cnt[1] != PSYNC_WR_RESERVED;
 }
 
-int psync_rwlock_holding_lock(psync_rwlock_t *rw) {
+int plocks_holding_lock(psync_rwlock_t *rw) {
   psync_rwlock_lockcnt_t cnt;
   cnt = psync_rwlock_get_count(rw);
   return cnt.cnt[0] != 0 || cnt.cnt[1] != 0;

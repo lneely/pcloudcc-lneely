@@ -33,49 +33,49 @@
 #include <assert.h>
 #include <string.h>
 
-static inline long int psync_tree_max(long int a, long int b) {
+static inline long int ptree_max(long int a, long int b) {
   return a > b ? a : b;
 }
 
-static void psync_tree_recalc_height(psync_tree *e) {
+static void ptree_recalc_height(psync_tree *e) {
   e->height =
-      psync_tree_max(psync_tree_height(e->left), psync_tree_height(e->right)) +
+      ptree_max(ptree_height(e->left), ptree_height(e->right)) +
       1;
 }
 
-static psync_tree *psync_tree_rotate_left(psync_tree *e) {
+static psync_tree *ptree_rotate_left(psync_tree *e) {
   psync_tree *e2;
   e2 = e->right;
   e2->parent = e->parent;
   e->right = e2->left;
   if (e->right) {
     e->right->parent = e;
-    psync_tree_recalc_height(e);
+    ptree_recalc_height(e);
   } else
-    e->height = psync_tree_height(e->left) + 1;
+    e->height = ptree_height(e->left) + 1;
   e->parent = e2;
   e2->left = e;
-  psync_tree_recalc_height(e2);
+  ptree_recalc_height(e2);
   return e2;
 }
 
-static psync_tree *psync_tree_rotate_right(psync_tree *e) {
+static psync_tree *ptree_rotate_right(psync_tree *e) {
   psync_tree *e2;
   e2 = e->left;
   e2->parent = e->parent;
   e->left = e2->right;
   if (e->left) {
     e->left->parent = e;
-    psync_tree_recalc_height(e);
+    ptree_recalc_height(e);
   } else
-    e->height = psync_tree_height(e->right) + 1;
+    e->height = ptree_height(e->right) + 1;
   e->parent = e2;
   e2->right = e;
-  psync_tree_recalc_height(e2);
+  ptree_recalc_height(e2);
   return e2;
 }
 
-psync_tree *psync_tree_init_node(psync_tree *node) {
+psync_tree *ptree_init_node(psync_tree *node) {
   node->left = NULL;
   node->right = NULL;
   node->parent = NULL;
@@ -83,12 +83,12 @@ psync_tree *psync_tree_init_node(psync_tree *node) {
   return node;
 }
 
-static psync_tree *psync_tree_go_up_rebalance_add(psync_tree *tree,
+static psync_tree *ptree_go_up_rebalance_add(psync_tree *tree,
                                                   psync_tree *e) {
   long int lheight, rheight, dheight;
 up:
-  lheight = psync_tree_height(e->left);
-  rheight = psync_tree_height(e->right);
+  lheight = ptree_height(e->left);
+  rheight = ptree_height(e->right);
   dheight = lheight - rheight;
   if (dheight == 0)
     return tree;
@@ -102,46 +102,46 @@ up:
       return tree;
     }
   } else if (dheight == 2) {
-    if (psync_tree_height(e->left->right) > psync_tree_height(e->left->left))
-      e->left = psync_tree_rotate_left(e->left);
+    if (ptree_height(e->left->right) > ptree_height(e->left->left))
+      e->left = ptree_rotate_left(e->left);
     if (e == tree)
-      return psync_tree_rotate_right(e);
+      return ptree_rotate_right(e);
     else {
       psync_tree *e2 = e->parent;
       if (e2->left == e)
-        e2->left = psync_tree_rotate_right(e);
+        e2->left = ptree_rotate_right(e);
       else {
         assert(e2->right == e);
-        e2->right = psync_tree_rotate_right(e);
+        e2->right = ptree_rotate_right(e);
       }
       return tree;
     }
   } else {
     assert(dheight == -2);
-    if (psync_tree_height(e->right->left) > psync_tree_height(e->right->right))
-      e->right = psync_tree_rotate_right(e->right);
+    if (ptree_height(e->right->left) > ptree_height(e->right->right))
+      e->right = ptree_rotate_right(e->right);
     if (e == tree)
-      return psync_tree_rotate_left(e);
+      return ptree_rotate_left(e);
     else {
       psync_tree *e2 = e->parent;
       if (e2->left == e)
-        e2->left = psync_tree_rotate_left(e);
+        e2->left = ptree_rotate_left(e);
       else {
         assert(e2->right == e);
-        e2->right = psync_tree_rotate_left(e);
+        e2->right = ptree_rotate_left(e);
       }
       return tree;
     }
   }
 }
 
-psync_tree *psync_tree_get_add_after(psync_tree *tree, psync_tree *node,
+psync_tree *ptree_get_add_after(psync_tree *tree, psync_tree *node,
                                      psync_tree *newnode) {
   if (!tree)
-    return psync_tree_init_node(newnode);
+    return ptree_init_node(newnode);
   if (!node)
-    return psync_tree_get_add_before(tree, psync_tree_get_first(tree), newnode);
-  psync_tree_init_node(newnode);
+    return ptree_get_add_before(tree, ptree_get_first(tree), newnode);
+  ptree_init_node(newnode);
   if (node->right) {
     node = node->right;
     while (node->left)
@@ -150,16 +150,16 @@ psync_tree *psync_tree_get_add_after(psync_tree *tree, psync_tree *node,
   } else
     node->right = newnode;
   newnode->parent = node;
-  return psync_tree_go_up_rebalance_add(tree, node);
+  return ptree_go_up_rebalance_add(tree, node);
 }
 
-psync_tree *psync_tree_get_add_before(psync_tree *tree, psync_tree *node,
+psync_tree *ptree_get_add_before(psync_tree *tree, psync_tree *node,
                                       psync_tree *newnode) {
   if (!tree)
-    return psync_tree_init_node(newnode);
+    return ptree_init_node(newnode);
   if (!node)
-    return psync_tree_get_add_after(tree, psync_tree_get_last(tree), newnode);
-  psync_tree_init_node(newnode);
+    return ptree_get_add_after(tree, ptree_get_last(tree), newnode);
+  ptree_init_node(newnode);
   if (node->left) {
     node = node->left;
     while (node->right)
@@ -168,25 +168,25 @@ psync_tree *psync_tree_get_add_before(psync_tree *tree, psync_tree *node,
   } else
     node->left = newnode;
   newnode->parent = node;
-  return psync_tree_go_up_rebalance_add(tree, node);
+  return ptree_go_up_rebalance_add(tree, node);
 }
 
-psync_tree *psync_tree_get_added_at(psync_tree *tree, psync_tree *parent,
+psync_tree *ptree_get_added_at(psync_tree *tree, psync_tree *parent,
                                     psync_tree *newnode) {
-  psync_tree_init_node(newnode);
+  ptree_init_node(newnode);
   newnode->parent = parent;
   if (parent)
-    return psync_tree_go_up_rebalance_add(tree, parent);
+    return ptree_go_up_rebalance_add(tree, parent);
   else
     return tree;
 }
 
-static psync_tree *psync_tree_go_up_rebalance_del(psync_tree *tree,
+static psync_tree *ptree_go_up_rebalance_del(psync_tree *tree,
                                                   psync_tree *e) {
   long int lheight, rheight, dheight;
 up:
-  lheight = psync_tree_height(e->left);
-  rheight = psync_tree_height(e->right);
+  lheight = ptree_height(e->left);
+  rheight = ptree_height(e->right);
   dheight = lheight - rheight;
   if (dheight == 0) {
     e->height = rheight + 1;
@@ -200,34 +200,34 @@ up:
   } else if (dheight == 1 || dheight == -1)
     return tree;
   else if (dheight == 2) {
-    if (psync_tree_height(e->left->right) > psync_tree_height(e->left->left))
-      e->left = psync_tree_rotate_left(e->left);
+    if (ptree_height(e->left->right) > ptree_height(e->left->left))
+      e->left = ptree_rotate_left(e->left);
     if (e == tree)
-      return psync_tree_rotate_right(e);
+      return ptree_rotate_right(e);
     else {
       psync_tree *e2 = e->parent;
       if (e2->left == e)
-        e2->left = psync_tree_rotate_right(e);
+        e2->left = ptree_rotate_right(e);
       else {
         assert(e2->right == e);
-        e2->right = psync_tree_rotate_right(e);
+        e2->right = ptree_rotate_right(e);
       }
       e = e2;
       goto up;
     }
   } else {
     assert(dheight == -2);
-    if (psync_tree_height(e->right->left) > psync_tree_height(e->right->right))
-      e->right = psync_tree_rotate_right(e->right);
+    if (ptree_height(e->right->left) > ptree_height(e->right->right))
+      e->right = ptree_rotate_right(e->right);
     if (e == tree)
-      return psync_tree_rotate_left(e);
+      return ptree_rotate_left(e);
     else {
       psync_tree *e2 = e->parent;
       if (e2->left == e)
-        e2->left = psync_tree_rotate_left(e);
+        e2->left = ptree_rotate_left(e);
       else {
         assert(e2->right == e);
-        e2->right = psync_tree_rotate_left(e);
+        e2->right = ptree_rotate_left(e);
       }
       e = e2;
       goto up;
@@ -235,7 +235,7 @@ up:
   }
 }
 
-static psync_tree *psync_tree_replace_me_with(psync_tree *tree,
+static psync_tree *ptree_replace_me_with(psync_tree *tree,
                                               psync_tree *node,
                                               psync_tree *repl) {
   psync_tree *parent;
@@ -252,20 +252,20 @@ static psync_tree *psync_tree_replace_me_with(psync_tree *tree,
   if (repl)
     repl->parent = parent;
   if (parent)
-    return psync_tree_go_up_rebalance_del(tree, parent);
+    return ptree_go_up_rebalance_del(tree, parent);
   else if (!tree)
     return NULL;
   else
-    return psync_tree_go_up_rebalance_del(tree, tree);
+    return ptree_go_up_rebalance_del(tree, tree);
 }
 
-psync_tree *psync_tree_get_del(psync_tree *tree, psync_tree *node) {
+psync_tree *ptree_get_del(psync_tree *tree, psync_tree *node) {
   if (!node->left && !node->right)
-    return psync_tree_replace_me_with(tree, node, NULL);
+    return ptree_replace_me_with(tree, node, NULL);
   else if (!node->left)
-    return psync_tree_replace_me_with(tree, node, node->right);
+    return ptree_replace_me_with(tree, node, node->right);
   else if (!node->right)
-    return psync_tree_replace_me_with(tree, node, node->left);
+    return ptree_replace_me_with(tree, node, node->left);
   else {
     psync_tree *el, *parent, **addr;
     if (node->left->height > node->right->height) {
@@ -309,6 +309,6 @@ psync_tree *psync_tree_get_del(psync_tree *tree, psync_tree *node) {
       assert(node == tree);
       tree = el;
     }
-    return psync_tree_go_up_rebalance_del(tree, parent);
+    return ptree_go_up_rebalance_del(tree, parent);
   }
 }

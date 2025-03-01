@@ -29,7 +29,7 @@
    DAMAGE.
 */
 
-#include "prunratelimit.h"
+#include "prunthrottled.h"
 #include "plibs.h"
 #include "ptimer.h"
 #include "ptree.h"
@@ -38,7 +38,7 @@
 
 typedef struct {
   psync_tree tree;
-  psync_run_ratelimit_callback0 call;
+  prun_throttle_cb call;
   const char *name;
   unsigned char scheduled;
 } psync_rr_tree_node;
@@ -46,10 +46,10 @@ typedef struct {
 static pthread_mutex_t task_mutex = PTHREAD_MUTEX_INITIALIZER;
 static psync_tree *tasks = PSYNC_TREE_EMPTY;
 
-static void psync_run_ratelimited_timer(psync_timer_t timer, void *ptr) {
+static void ratelimit_timer(psync_timer_t timer, void *ptr) {
   psync_rr_tree_node *node;
   const char *name;
-  psync_run_ratelimit_callback0 call;
+  prun_throttle_cb call;
   int run;
   node = (psync_rr_tree_node *)ptr;
   pthread_mutex_lock(&task_mutex);
@@ -60,19 +60,19 @@ static void psync_run_ratelimited_timer(psync_timer_t timer, void *ptr) {
     name = node->name;
   } else {
     run = 0;
-    psync_tree_del(&tasks, &node->tree);
+    ptree_del(&tasks, &node->tree);
   }
   pthread_mutex_unlock(&task_mutex);
   if (run) {
     debug(D_NOTICE, "running %s in a thread", name);
     prun_thread(name, call);
   } else {
-    psync_timer_stop(timer);
+    ptimer_stop(timer);
     psync_free(node);
   }
 }
 
-void psync_run_ratelimited(const char *name, psync_run_ratelimit_callback0 call,
+void prun_throttled(const char *name, prun_throttle_cb call,
                            uint32_t minintervalsec, int runinthread) {
   psync_tree *tr, **addto;
   psync_rr_tree_node *node;
@@ -82,7 +82,7 @@ void psync_run_ratelimited(const char *name, psync_run_ratelimit_callback0 call,
   tr = tasks;
   if (tr) {
     while (1) {
-      node = psync_tree_element(tr, psync_rr_tree_node, tree);
+      node = ptree_element(tr, psync_rr_tree_node, tree);
       if (call < node->call) {
         if (tr->left)
           tr = tr->left;
@@ -117,7 +117,7 @@ void psync_run_ratelimited(const char *name, psync_run_ratelimit_callback0 call,
     node->name = name;
     node->scheduled = 0;
     *addto = &node->tree;
-    psync_tree_added_at(&tasks, tr, &node->tree);
+    ptree_added_at(&tasks, tr, &node->tree);
   }
   pthread_mutex_unlock(&task_mutex);
   if (!found) {
@@ -128,6 +128,6 @@ void psync_run_ratelimited(const char *name, psync_run_ratelimit_callback0 call,
       debug(D_NOTICE, "running %s on this thread", name);
       call();
     }
-    psync_timer_register(psync_run_ratelimited_timer, minintervalsec, node);
+    ptimer_register(ratelimit_timer, minintervalsec, node);
   }
 }

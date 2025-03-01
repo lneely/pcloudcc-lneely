@@ -1,5 +1,7 @@
 /*
-   Copyright (c) 2013 pCloud Ltd.  All rights reserved.
+   Copyright (c) 2015 Anton Titov.
+
+   Copyright (c) 2015 pCloud Ltd.  All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions
@@ -27,42 +29,32 @@
    DAMAGE.
 */
 
-#ifndef _PSYNC_EXTERNAL_STATUS_H
-#define _PSYNC_EXTERNAL_STATUS_H
+#ifndef _PSYNC_COMPRESSION_H
+#define _PSYNC_COMPRESSION_H
 
-#include "pfsfolder.h"
-#include "plist.h"
-#include "psynclib.h"
+struct _psync_deflate_t;
 
-typedef struct {
-  psync_list list;
-  char *str;
-} string_list_t;
+typedef struct _psync_deflate_t psync_deflate_t;
 
-static inline const char *print_external_status(external_status stat) {
-  switch (stat) {
-  case INSYNC:
-    return "INSYNC";
-  case INPROG:
-    return "INPROG";
-  case NOSYNC:
-    return "NOSYNC";
-  default:
-    return "NOSYNC";
-  }
-}
+#define PSYNC_DEFLATE_DECOMPRESS 0
+#define PSYNC_DEFLATE_COMP_FASTEST 1
+#define PSYNC_DEFLATE_COMP_FAST 2
+#define PSYNC_DEFLATE_COMP_MED 6
+#define PSYNC_DEFLATE_COMP_BEST 9
 
-external_status do_psync_external_status(char *path);
-external_status do_psync_external_status_file(const char *path);
-external_status do_psync_external_status_folder(const char *path);
+#define PSYNC_DEFLATE_NOFLUSH 0
+#define PSYNC_DEFLATE_FLUSH 1
+#define PSYNC_DEFLATE_FLUSH_END 2
 
-external_status psync_sync_status_folder(const char *path, int syncid);
-string_list_t *sync_get_sync_folders();
+#define PSYNC_DEFLATE_NODATA -1
+#define PSYNC_DEFLATE_FULL -2
+#define PSYNC_DEFLATE_ERROR -3
+#define PSYNC_DEFLATE_EOF 0
 
-external_status psync_external_status_folderid(psync_fsfolderid_t folder_id);
-external_status psync_sync_status_file(const char *name,
-                                       psync_fsfolderid_t folderid, int syncid);
-external_status psync_sync_status_folderid(psync_fsfolderid_t folderid,
-                                           int syncid);
+psync_deflate_t *pdeflate_init(int level);
+void pdeflate_destroy(psync_deflate_t *def);
+int pdeflate_write(psync_deflate_t *def, const void *data, int len, int flush);
+int pdeflate_read(psync_deflate_t *def, void *data, int len);
+int pdeflate_pending(psync_deflate_t *def);
 
-#endif //_PSYNC_EXTERNAL_STATUS_H
+#endif

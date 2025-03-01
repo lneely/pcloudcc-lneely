@@ -26,32 +26,47 @@
   DAMAGE.
 */
 
-/*
-Dependencies:
-  - stddef.h
- */
+// dependencies:
+// - poverlay_protocol.h
+// - psynclib.h
 
-#ifndef OVERLAY_CLIENT_H
-#define OVERLAY_CLIENT_H
+#ifndef POVERLAY_H
+#define POVERLAY_H
 
-#define PCLOUD_TESTING
-#ifdef __cplusplus
-extern "C" {
+#ifndef VOID
+#define VOID void
 #endif
 
-#include <stddef.h>
-
-typedef enum _pCloud_FileState {
-  FileStateInSync = 0,
-  FileStateNoSync,
-  FileStateInProgress,
-  FileStateInvalid
-} pCloud_FileState;
-
-int QueryState(pCloud_FileState *, char *);
-int SendCall(int id, const char *, int *, char **, size_t *);
-
-#ifdef __cplusplus
-}
+#ifndef LPVOID
+#define LPVOID void *
 #endif
-#endif // OVERLAY_CLIENT_H
+
+#ifndef POVERLAY_SOCK_PATH
+#define POVERLAY_SOCK_PATH "/tmp/pcloud_unix_soc.sock"
+#endif
+
+#include "psynclib.h"
+
+extern int overlays_running;
+extern int callbacks_running;
+
+typedef struct _rpc_message_t {
+  uint32_t type;
+  uint64_t length;
+  char value[];
+} rpc_message_t;
+
+void psync_overlay_main_loop(VOID);
+void psync_overlay_handle_request(LPVOID);
+void psync_overlay_get_response(rpc_message_t*, rpc_message_t*);
+void psync_overlay_stop_overlays();
+void psync_overlay_start_overlays();
+void psync_overlay_stop_overlay_callbacks();
+void psync_overlay_start_overlay_callbacks();
+int psync_overlay_overlays_running();
+int psync_overlay_callbacks_running();
+
+void psync_overlay_init_callbacks();
+int psync_overlay_register_callback(int, poverlay_callback);
+
+#endif // POVERLAY_H

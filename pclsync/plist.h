@@ -34,6 +34,9 @@
 
 #include "pcompiler.h"
 #include <stddef.h>
+#include <stdint.h>
+
+typedef uint32_t psync_listtype_t;
 
 typedef struct _psync_list {
   struct _psync_list *next;

@@ -38,19 +38,20 @@
 #include <pthread.h>
 
 #include "pdevice.h"
-#include "pfolder.h"
+#include "pfile.h"
+#include "pfoldersync.h"
 #include "plibs.h"
 #include "prun.h"
 #include "plist.h"
 #include "plocalnotify.h"
 #include "plocalscan.h"
 #include "ppathstatus.h"
-#include "prunratelimit.h"
+#include "prunthrottled.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "pstatus.h"
 #include "psys.h"
-#include "ptasks.h"
+#include "ptask.h"
 #include "ptimer.h"
 #include "pupload.h"
 #include "ppath.h"
@@ -221,11 +222,11 @@ static void reload_ignored_folders() {
   psync_sha256((const unsigned char *)ign, ignlen, checkcurr);
 
   if (!memcmp(ign_checksum, checkcurr, PSYNC_SHA256_DIGEST_LEN) &&
-      ign_last_check + 3600 < psync_timer_time())
+      ign_last_check + 3600 < ptimer_time())
     return;
 
   memcpy(ign_checksum, checkcurr, PSYNC_SHA256_DIGEST_LEN);
-  ign_last_check = psync_timer_time();
+  ign_last_check = ptimer_time();
   ign_paths_cnt = 0;
   next = ign;
   home = NULL;
@@ -656,12 +657,12 @@ static void scan_rename_file(sync_folderlist *rnfr, sync_folderlist *rnto) {
   psync_sql_bind_string(res, 3, rnto->name);
   psync_sql_bind_uint(res, 4, rnfr->localid);
   psync_sql_run_free(res);
-  psync_task_rename_remote_file(rnfr->syncid, rnto->syncid, rnfr->localid,
+  ptask_rfile_rename(rnfr->syncid, rnto->syncid, rnfr->localid,
                                 rnto->localparentfolderid, rnto->name);
   if (filetoupload) {
-    psync_path_status_sync_folder_task_added_locked(rnto->syncid,
+    ppath_syncfldr_task_added_locked(rnto->syncid,
                                                     rnto->localparentfolderid);
-    psync_path_status_sync_folder_task_completed(old_syncid,
+    ppathstatus_syncfldr_task_completed(old_syncid,
                                                  old_parentfolderid);
   }
 }
@@ -672,7 +673,7 @@ static void scan_upload_file(sync_folderlist *fl) {
   debug(D_NOTICE, "file created %s", fl->name);
   /* it is possible that files that are reported as new are already uploading
    * -- is it? when? how? and with what localid?
-  psync_delete_upload_tasks_for_file(fl->localid);
+  pupload_del_tasks(fl->localid);
   */
   res = psync_sql_prep_statement(
       "INSERT OR IGNORE INTO localfile (localparentfolderid, syncid, size, "
@@ -689,15 +690,15 @@ static void scan_upload_file(sync_folderlist *fl) {
   if (unlikely_log(!psync_sql_affected_rows()))
     return;
   localfileid = psync_sql_insertid();
-  psync_task_upload_file_silent(fl->syncid, localfileid, fl->name);
-  psync_path_status_sync_folder_task_added(fl->syncid, fl->localparentfolderid);
+  ptask_upload_q(fl->syncid, localfileid, fl->name);
+  ppath_syncfldr_task_added(fl->syncid, fl->localparentfolderid);
 }
 
 static void scan_upload_modified_file(sync_folderlist *fl) {
   psync_sql_res *res;
   debug(D_NOTICE, "file modified %s (%lu)", fl->name,
         (unsigned long)fl->localid);
-  psync_delete_upload_tasks_for_file(fl->localid);
+  pupload_del_tasks(fl->localid);
   res = psync_sql_prep_statement("UPDATE localfile SET size=?, inode=?, "
                                  "mtime=?, mtimenative=? WHERE id=?");
   psync_sql_bind_uint(res, 1, fl->size);
@@ -706,8 +707,8 @@ static void scan_upload_modified_file(sync_folderlist *fl) {
   psync_sql_bind_uint(res, 4, fl->mtimenat);
   psync_sql_bind_uint(res, 5, fl->localid);
   psync_sql_run_free(res);
-  psync_task_upload_file_silent(fl->syncid, fl->localid, fl->name);
-  psync_path_status_sync_folder_task_added(fl->syncid, fl->localparentfolderid);
+  ptask_upload_q(fl->syncid, fl->localid, fl->name);
+  ppath_syncfldr_task_added(fl->syncid, fl->localparentfolderid);
 }
 
 static void scan_delete_file(sync_folderlist *fl) {
@@ -731,13 +732,13 @@ static void scan_delete_file(sync_folderlist *fl) {
     return;
   }
   psync_sql_free_result(res);
-  psync_delete_upload_tasks_for_file(fl->localid);
+  pupload_del_tasks(fl->localid);
   res = psync_sql_prep_statement("DELETE FROM localfile WHERE id=?");
   psync_sql_bind_uint(res, 1, fl->localid);
   psync_sql_run_free(res);
   if (fileid)
-    psync_task_delete_remote_file(fl->syncid, fileid);
-  psync_path_status_sync_folder_task_completed(syncid, localparentfolderid);
+    ptask_rfile_rm(fl->syncid, fileid);
+  ppathstatus_syncfldr_task_completed(syncid, localparentfolderid);
 }
 
 static void scan_create_folder(sync_folderlist *fl) {
@@ -795,7 +796,7 @@ static void scan_create_folder(sync_folderlist *fl) {
   psync_sql_run_free(res);
   if (unlikely_log(!psync_sql_affected_rows()))
     return;
-  psync_task_create_remote_folder(fl->syncid, localfolderid, fl->name);
+  ptask_rdir_mk(fl->syncid, localfolderid, fl->name);
   return;
 hasfolder:
   return;
@@ -807,7 +808,7 @@ static void scan_created_folder(sync_folderlist *fl) {
     debug(D_WARNING, "local folder %s does not have localid", fl->name);
     return;
   }
-  localpath = psync_local_path_for_local_folder(fl->localid, fl->syncid, NULL);
+  localpath = pfolder_lpath_lfldr(fl->localid, fl->syncid, NULL);
   if (likely_log(localpath)) {
     debug(D_NOTICE, "scanning just created folder %s localid %lu name %s",
           localpath, (unsigned long)fl->localid, fl->name);
@@ -847,7 +848,7 @@ static void scan_rename_folder(sync_folderlist *rnfr, sync_folderlist *rnto) {
       "SELECT syncid, localparentfolderid FROM localfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, rnfr->localid);
   if ((row = psync_sql_fetch_rowint(res))) {
-    psync_path_status_sync_folder_moved(
+    ppathstatus_syncfldr_moved(
         rnfr->localid, row[0], row[1], rnto->syncid, rnto->localparentfolderid);
     psync_sql_free_result(res);
   } else {
@@ -878,7 +879,7 @@ static void scan_rename_folder(sync_folderlist *rnfr, sync_folderlist *rnto) {
           (unsigned)rnfr->syncid, (unsigned)rnto->syncid);
     update_syncid_rec(rnfr->localid, rnto->syncid);
   }
-  psync_task_rename_remote_folder(rnfr->syncid, rnto->syncid, rnfr->localid,
+  ptask_rdir_rename(rnfr->syncid, rnto->syncid, rnfr->localid,
                                   rnto->localparentfolderid, rnto->name);
 }
 
@@ -894,7 +895,7 @@ static void delete_local_folder_rec(psync_folderid_t localfolderid) {
   res = psync_sql_query("SELECT id FROM localfile WHERE localparentfolderid=?");
   psync_sql_bind_uint(res, 1, localfolderid);
   while ((row = psync_sql_fetch_rowint(res)))
-    psync_delete_upload_tasks_for_file(row[0]);
+    pupload_del_tasks(row[0]);
   psync_sql_free_result(res);
   res = psync_sql_prep_statement(
       "DELETE FROM localfile WHERE localparentfolderid=?");
@@ -903,7 +904,7 @@ static void delete_local_folder_rec(psync_folderid_t localfolderid) {
   res = psync_sql_query("SELECT syncid FROM localfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, localfolderid);
   if (row)
-    psync_path_status_sync_folder_deleted(row[0], localfolderid);
+    ppathstatus_syncfldr_deleted(row[0], localfolderid);
   psync_sql_free_result(res);
   res = psync_sql_prep_statement("DELETE FROM localfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, localfolderid);
@@ -942,7 +943,7 @@ retry:
     } else {
       psync_sql_commit_transaction();
       if (tries == 10)
-        psync_timer_notify_exception();
+        ptimer_notify_exception();
       tries++;
       psys_sleep_milliseconds(20 + tries * 20);
       psync_sql_start_transaction();
@@ -951,7 +952,7 @@ retry:
   }
   delete_local_folder_rec(fl->localid);
   if (folderid)
-    psync_task_delete_remote_folder(fl->syncid, folderid);
+    ptask_rdir_rm(fl->syncid, folderid);
 }
 
 #define check_for_query_cnt()                                                  \
@@ -991,7 +992,7 @@ restart:
     pthread_cond_wait(&scan_cond, &scan_mutex);
   restart_scan = 0;
   pthread_mutex_unlock(&scan_mutex);
-  if (!psync_statuses_ok_array(requiredstatuses, ARRAY_SIZE(requiredstatuses)))
+  if (!pstatus_ok_status_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses)))
     return;
   reload_ignored_folders();
   for (i = 0; i < SCAN_LIST_CNT; i++)
@@ -1162,13 +1163,13 @@ restart:
     w++;
     check_for_query_cnt();
   }
-  psync_path_status_clear_sync_path_cache();
+  ppathstatus_clear_sync_cache();
 
   psync_sql_commit_transaction();
 
   if (w) {
-    psync_wake_upload();
-    psync_status_recalc_to_upload_async();
+    pupload_wake();
+    pstatus_upload_recalc_async();
   }
   for (i = 0; i < SCAN_LIST_CNT; i++)
     psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list,
@@ -1202,15 +1203,15 @@ static void scanner_thread() {
   time_t lastscan;
   int w;
   psys_sleep_milliseconds(1500);
-  psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
-  psync_wait_status(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
+  pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+  pstatus_wait(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
   scanner_scan(1);
-  psync_set_status(PSTATUS_TYPE_LOCALSCAN, PSTATUS_LOCALSCAN_READY);
+  pstatus_set(PSTATUS_TYPE_LOCALSCAN, PSTATUS_LOCALSCAN_READY);
   scanner_wait();
   w = 0;
   lastscan = 0;
   while (psync_do_run) {
-    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
     if (lastscan + 5 >= psync_current_time) {
       psys_sleep_milliseconds(2000);
       pthread_mutex_lock(&scan_mutex);
@@ -1233,7 +1234,7 @@ static void psync_do_wake_localscan() {
 }
 
 void psync_wake_localscan() {
-  psync_run_ratelimited("wake localscan", psync_do_wake_localscan,
+  prun_throttled("wake localscan", psync_do_wake_localscan,
                         PSYNC_LOCALSCAN_MIN_INTERVAL, 0);
 }
 
@@ -1342,7 +1343,7 @@ void psync_localscan_init() {
   const char *localpath;
   psync_syncid_t syncid;
   psync_list_init(&scan_folders_list);
-  psync_timer_exception_handler(psync_wake_localscan_noscan);
+  ptimer_exception_handler(psync_wake_localscan_noscan);
   prun_thread("localscan", scanner_thread);
   localnotify = psync_localnotify_init();
   res = psync_sql_query_rdlock(

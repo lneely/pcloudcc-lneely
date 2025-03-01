@@ -43,27 +43,26 @@
 #include "papi.h"
 #include "pbusinessaccount.h"
 #include "pcache.h"
-#include "pcallbacks.h"
-#include "pfile.h"
+#include "pqevent.h"
 #include "pcontacts.h"
 #include "pdevice.h"
 #include "pdiff.h"
 #include "pdownload.h"
 #include "pfileops.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "pfs.h"
 #include "pfsxattr.h"
 #include "plibs.h"
 #include "pnetlibs.h"
-#include "pnotifications.h"
+#include "pnotify.h"
 #include "ppathstatus.h"
 #include "prun.h"
 #include "psettings.h"
 #include "pstatus.h"
 #include "psynclib.h"
-#include "psyncer.h"
+#include "pfoldersync.h"
 #include "psys.h"
-#include "ptasks.h"
+#include "ptask.h"
 #include "ptimer.h"
 #include "ptools.h"
 #include "publiclinks.h"
@@ -81,17 +80,17 @@
   pair.key = "metadata";                                                       \
   pair.value = (binresult *)meta;
 #define bind_num(s)                                                            \
-  psync_sql_bind_uint(res, off++, psync_find_result(meta, s, PARAM_NUM)->num)
+  psync_sql_bind_uint(res, off++, papi_find_result2(meta, s, PARAM_NUM)->num)
 #define bind_bool(s)                                                           \
-  psync_sql_bind_uint(res, off++, psync_find_result(meta, s, PARAM_BOOL)->num)
+  psync_sql_bind_uint(res, off++, papi_find_result2(meta, s, PARAM_BOOL)->num)
 #define bind_str(s)                                                            \
   do {                                                                         \
-    br = psync_find_result(meta, s, PARAM_STR);                                \
+    br = papi_find_result2(meta, s, PARAM_STR);                                \
     psync_sql_bind_lstring(res, off++, br->str, br->length);                   \
   } while (0)
 #define bind_opt_str(s)                                                        \
   do {                                                                         \
-    br = psync_check_result(meta, s, PARAM_STR);                               \
+    br = papi_check_result2(meta, s, PARAM_STR);                               \
     if (br)                                                                    \
       psync_sql_bind_lstring(res, off++, br->str, br->length);                 \
     else                                                                       \
@@ -99,7 +98,7 @@
   } while (0)
 #define bind_opt_num(s)                                                        \
   do {                                                                         \
-    br = psync_check_result(meta, s, PARAM_NUM);                               \
+    br = papi_check_result2(meta, s, PARAM_NUM);                               \
     if (br)                                                                    \
       psync_sql_bind_uint(res, off++, br->num);                                \
     else                                                                       \
@@ -107,7 +106,7 @@
   } while (0)
 #define bind_opt_double(s)                                                     \
   do {                                                                         \
-    br = psync_check_result(meta, s, PARAM_STR);                               \
+    br = papi_check_result2(meta, s, PARAM_STR);                               \
     if (br)                                                                    \
       psync_sql_bind_double(res, off++, atof(br->str));                        \
     else                                                                       \
@@ -163,6 +162,7 @@ int unlinked = 0;
 int tfa = 0;
 
 static void psync_diff_refresh_fs_add_folder(psync_folderid_t folderid);
+
 static void do_send_eventdata(void *param);
 
 static void psync_notify_cache_change(psync_changetype_t event) {
@@ -176,35 +176,33 @@ static void psync_notify_cache_change(psync_changetype_t event) {
     psync_free(chtype);
 }
 
-static binresult *
-get_userinfo_user_digest(psock_t *sock, const char *username,
+static binresult *get_userinfo_user_digest(psock_t *sock, const char *username,
                          size_t userlen, const char *pwddig, const char *digest,
                          uint32_t diglen, const char *osversion,
                          const char *appversion, const char *deviceid,
                          const char *devicestring) {
   binparam params[] = {
-      P_STR("timeformat", "timestamp"),
-      P_LSTR("username", username, userlen),
-      P_LSTR("digest", digest, diglen),
-      P_LSTR("passworddigest", pwddig, PSYNC_SHA1_DIGEST_HEXLEN),
-      P_STR("osversion", osversion),
-      P_STR("appversion", appversion),
-      P_STR("deviceid", deviceid),
-      P_STR("device", devicestring),
-      P_BOOL("getauth", 1),
-      P_BOOL("getapiserver", 1),
-      P_BOOL("cryptokeyssign", 1),
-      P_BOOL("getlastsubscription", 1),
-      P_NUM("os", P_OS_ID)};
-  return send_command(sock, "login", params);
+      PAPI_STR("timeformat", "timestamp"),
+      PAPI_LSTR("username", username, userlen),
+      PAPI_LSTR("digest", digest, diglen),
+      PAPI_LSTR("passworddigest", pwddig, PSYNC_SHA1_DIGEST_HEXLEN),
+      PAPI_STR("osversion", osversion),
+      PAPI_STR("appversion", appversion),
+      PAPI_STR("deviceid", deviceid),
+      PAPI_STR("device", devicestring),
+      PAPI_BOOL("getauth", 1),
+      PAPI_BOOL("getapiserver", 1),
+      PAPI_BOOL("cryptokeyssign", 1),
+      PAPI_BOOL("getlastsubscription", 1),
+      PAPI_NUM("os", P_OS_ID)};
+  return papi_send2(sock, "login", params);
 }
 
-static binresult *
-get_userinfo_user_pass(psock_t *sock, const char *username,
+static binresult *get_userinfo_user_pass(psock_t *sock, const char *username,
                        const char *password, const char *osversion,
                        const char *appversion, const char *deviceid,
                        const char *devicestring) {
-  binparam empty_params[] = {P_STR("MS", "sucks")};
+  binparam empty_params[] = {PAPI_STR("MS", "sucks")};
   psync_sha1_ctx ctx;
   binresult *res, *ret;
   const binresult *dig;
@@ -213,17 +211,17 @@ get_userinfo_user_pass(psock_t *sock, const char *username,
   unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
   char sha1hex[PSYNC_SHA1_DIGEST_HEXLEN];
 
-  res = send_command(sock, "getdigest", empty_params);
+  res = papi_send2(sock, "getdigest", empty_params);
 
   if (!res)
     return res;
 
-  if (psync_find_result(res, "result", PARAM_NUM)->num != 0) {
+  if (papi_find_result2(res, "result", PARAM_NUM)->num != 0) {
     psync_free(res);
     return NULL;
   }
 
-  dig = psync_find_result(res, "digest", PARAM_STR);
+  dig = papi_find_result2(res, "digest", PARAM_STR);
 
   debug(D_NOTICE, "got digest %s", dig->str);
 
@@ -254,9 +252,9 @@ get_userinfo_user_pass(psock_t *sock, const char *username,
 static int check_active_subscribtion(const binresult *res) {
   const binresult *sub;
   char *status;
-  sub = psync_check_result(res, "lastsubscription", PARAM_HASH);
+  sub = papi_check_result2(res, "lastsubscription", PARAM_HASH);
   if (sub) {
-    status = psync_strdup(psync_find_result(sub, "status", PARAM_STR)->str);
+    status = psync_strdup(papi_find_result2(sub, "status", PARAM_STR)->str);
     if (!strcmp(status, "active")) {
       psync_free(status);
       return 1;
@@ -273,21 +271,21 @@ static int check_user_relocated(uint64_t luserid, psock_t *sock) {
   uint64_t result, userid;
   int cnt, i, lid, clid;
   binresult *id;
-  binparam params[] = {P_STR("timeformat", "timestamp"),
-                       P_STR("auth", psync_my_auth)};
-  res = send_command(sock, "getolduserids", params);
+  binparam params[] = {PAPI_STR("timeformat", "timestamp"),
+                       PAPI_STR("auth", psync_my_auth)};
+  res = papi_send2(sock, "getolduserids", params);
   if (unlikely_log(!res))
     return 0;
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     debug(D_NOTICE, "getolduserids returned error %lu %s",
           (unsigned long)result,
-          psync_find_result(res, "error", PARAM_STR)->str);
+          papi_find_result2(res, "error", PARAM_STR)->str);
     psync_free(res);
     return 0;
   }
 
-  userids = psync_find_result(res, "userids", PARAM_ARRAY);
+  userids = papi_find_result2(res, "userids", PARAM_ARRAY);
   cnt = userids->length;
   if (!cnt) {
     psync_free(res);
@@ -299,8 +297,8 @@ static int check_user_relocated(uint64_t luserid, psock_t *sock) {
 
   for (i = 0; i < cnt; ++i) {
     id = userids->array[i];
-    userid = psync_find_result(id, "userid", PARAM_NUM)->num;
-    lid = psync_find_result(id, "locationid", PARAM_NUM)->num;
+    userid = papi_find_result2(id, "userid", PARAM_NUM)->num;
+    lid = papi_find_result2(id, "locationid", PARAM_NUM)->num;
     if (luserid == userid && lid == clid) {
       return 1;
     }
@@ -348,7 +346,7 @@ static psock_t *get_connected_socket() {
     psync_free(auth);
     psync_free(user);
     psync_free(pass);
-    psync_wait_status(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
+    pstatus_wait(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
 
     auth = psync_sql_cellstr("SELECT value FROM setting WHERE id='auth'");
     user = psync_sql_cellstr("SELECT value FROM setting WHERE id='user'");
@@ -384,18 +382,18 @@ static psock_t *get_connected_socket() {
         debug(D_WARNING, "tfa sleep");
         continue;
       }
-      psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
-      psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+      pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
+      pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       continue;
     }
 
-    psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+    pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
     saveauth = psync_setting_get_bool(_PS(saveauth));
 
-    sock = psync_api_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
+    sock = papi_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
 
     if (unlikely_log(!sock)) {
-      psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
+      pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       continue;
     }
@@ -405,77 +403,77 @@ static psock_t *get_connected_socket() {
       const char *method = psync_my_2fa_code_type == 1
                                ? "tfa_login"
                                : "tfa_loginwithrecoverycode";
-      binparam params[] = {P_STR("timeformat", "timestamp"),
-                           P_STR("token", psync_my_2fa_token),
-                           P_STR("code", psync_my_2fa_code),
-                           P_BOOL("trustdevice", psync_my_2fa_trust),
-                           P_STR("osversion", osversion),
-                           P_STR("appversion", appversion),
-                           P_STR("deviceid", deviceid),
-                           P_STR("device", devicestring),
-                           P_BOOL("getauth", 1),
-                           P_BOOL("cryptokeyssign", 1),
-                           P_BOOL("getapiserver", 1),
-                           P_BOOL("getlastsubscription", 1),
-                           P_NUM("os", P_OS_ID)};
-      res = send_command(sock, method, params);
+      binparam params[] = {PAPI_STR("timeformat", "timestamp"),
+                           PAPI_STR("token", psync_my_2fa_token),
+                           PAPI_STR("code", psync_my_2fa_code),
+                           PAPI_BOOL("trustdevice", psync_my_2fa_trust),
+                           PAPI_STR("osversion", osversion),
+                           PAPI_STR("appversion", appversion),
+                           PAPI_STR("deviceid", deviceid),
+                           PAPI_STR("device", devicestring),
+                           PAPI_BOOL("getauth", 1),
+                           PAPI_BOOL("cryptokeyssign", 1),
+                           PAPI_BOOL("getapiserver", 1),
+                           PAPI_BOOL("getlastsubscription", 1),
+                           PAPI_NUM("os", P_OS_ID)};
+      res = papi_send2(sock, method, params);
     } else if (user && pass && pass[0]) {
       if (digest) {
         res = get_userinfo_user_pass(sock, user, pass, osversion, appversion,
                                      deviceid, devicestring);
       } else {
         binparam params[] = {
-            P_STR("timeformat", "timestamp"), P_STR("username", user),
-            P_STR("password", pass),          P_STR("osversion", osversion),
-            P_STR("appversion", appversion),  P_STR("deviceid", deviceid),
-            P_STR("device", devicestring),    P_BOOL("getauth", 1),
-            P_BOOL("cryptokeyssign", 1),      P_BOOL("getapiserver", 1),
-            P_BOOL("getlastsubscription", 1), P_NUM("os", P_OS_ID)};
-        res = send_command(sock, "login", params);
+            PAPI_STR("timeformat", "timestamp"), PAPI_STR("username", user),
+            PAPI_STR("password", pass),          PAPI_STR("osversion", osversion),
+            PAPI_STR("appversion", appversion),  PAPI_STR("deviceid", deviceid),
+            PAPI_STR("device", devicestring),    PAPI_BOOL("getauth", 1),
+            PAPI_BOOL("cryptokeyssign", 1),      PAPI_BOOL("getapiserver", 1),
+            PAPI_BOOL("getlastsubscription", 1), PAPI_NUM("os", P_OS_ID)};
+        res = papi_send2(sock, "login", params);
       }
     } else {
-      binparam params[] = {P_STR("timeformat", "timestamp"),
-                           P_STR("auth", auth),
-                           P_STR("osversion", osversion),
-                           P_STR("appversion", appversion),
-                           P_STR("deviceid", deviceid),
-                           P_STR("device", devicestring),
-                           P_BOOL("getauth", 1),
-                           P_BOOL("cryptokeyssign", 1),
-                           P_BOOL("getapiserver", 1),
-                           P_BOOL("getlastsubscription", 1),
-                           P_NUM("os", P_OS_ID)};
-      res = send_command(sock, "userinfo", params);
+      binparam params[] = {PAPI_STR("timeformat", "timestamp"),
+                           PAPI_STR("auth", auth),
+                           PAPI_STR("osversion", osversion),
+                           PAPI_STR("appversion", appversion),
+                           PAPI_STR("deviceid", deviceid),
+                           PAPI_STR("device", devicestring),
+                           PAPI_BOOL("getauth", 1),
+                           PAPI_BOOL("cryptokeyssign", 1),
+                           PAPI_BOOL("getapiserver", 1),
+                           PAPI_BOOL("getlastsubscription", 1),
+                           PAPI_NUM("os", P_OS_ID)};
+      res = papi_send2(sock, "userinfo", params);
     }
 
     psync_free(osversion);
 
     if (unlikely_log(!res)) {
       psock_close(sock);
-      psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
+      pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
-      psync_api_conn_fail_inc();
+      papi_conn_fail_inc();
       continue;
     }
 
-    psync_api_conn_fail_reset();
-    result = psync_find_result(res, "result", PARAM_NUM)->num;
+    papi_conn_fail_reset();
+    result = papi_find_result2(res, "result", PARAM_NUM)->num;
 
     if (unlikely(result)) {
       debug(D_NOTICE, "userinfo returned error %lu %s", (unsigned long)result,
-            psync_find_result(res, "error", PARAM_STR)->str);
+            papi_find_result2(res, "error", PARAM_STR)->str);
       // here we only handle statuses that need to access the result
       if (result == 2297) {
         psync_free(psync_my_2fa_token);
         psync_my_2fa_token =
-            psync_strdup(psync_find_result(res, "token", PARAM_STR)->str);
+            psync_strdup(papi_find_result2(res, "token", PARAM_STR)->str);
         psync_my_2fa_has_devices =
-            psync_find_result(res, "hasdevices", PARAM_BOOL)->num;
-        psync_my_2fa_type = psync_find_result(res, "tfatype", PARAM_NUM)->num;
+            papi_find_result2(res, "hasdevices", PARAM_BOOL)->num;
+        psync_my_2fa_type = papi_find_result2(res, "tfatype", PARAM_NUM)->num;
         psync_my_2fa_code_type = 0;
         psync_my_2fa_code[0] = 0;
-        psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_TFAREQ);
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+        pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_TFAREQ);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         psock_close(sock);
         psync_free(res);
         continue;
@@ -484,21 +482,21 @@ static psock_t *get_connected_socket() {
       if (result == 2306) {
         psync_free(psync_my_verify_token);
         psync_my_verify_token =
-            psync_strdup(psync_find_result(res, "verifytoken", PARAM_STR)->str);
-        psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_VERIFYREQ);
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+            psync_strdup(papi_find_result2(res, "verifytoken", PARAM_STR)->str);
+        pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_VERIFYREQ);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         psock_close(sock);
         psync_free(res);
         continue;
       }
 
       if (result == 2321) {
-        cres = psync_check_result(res, "location", PARAM_HASH);
+        cres = papi_check_result2(res, "location", PARAM_HASH);
         if (cres) {
           binapi =
-              psync_strdup(psync_find_result(cres, "binapi", PARAM_STR)->str);
+              psync_strdup(papi_find_result2(cres, "binapi", PARAM_STR)->str);
 
-          locationid = psync_find_result(cres, "id", PARAM_NUM)->num;
+          locationid = papi_find_result2(cres, "id", PARAM_NUM)->num;
           psync_set_apiserver(binapi, locationid);
         }
 
@@ -509,8 +507,8 @@ static psock_t *get_connected_socket() {
 
       if (result == 2330) {
         psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
-        psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATING);
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+        pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATING);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         psock_close(sock);
         psync_free(res);
         continue;
@@ -525,7 +523,7 @@ static psock_t *get_connected_socket() {
         psync_my_2fa_code[0] = 0;
         if (result == 2012 || result == 2064 || result == 2074 ||
             result == 2092)
-          psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADCODE);
+          pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADCODE);
         else if (user && pass) {
           // Ugly fix, sorry :(
           if (!strcmp(user, "pass") && !strcmp(pass, "dummy")) {
@@ -535,21 +533,21 @@ static psock_t *get_connected_socket() {
             psys_sleep_milliseconds(1000);
             continue;
           } else {
-            psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADLOGIN);
+            pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADLOGIN);
             psync_free(psync_my_pass);
             psync_my_pass = NULL;
           }
         } else {
-          psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADTOKEN);
+          pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADTOKEN);
           psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
         }
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       } else if (result == 4000)
         psys_sleep_milliseconds(5 * 60 * 1000);
       else if (result == 2205 || result == 2229) {
         psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
-        psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_EXPIRED);
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+        pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_EXPIRED);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       } else if (result == 2237) {
         digest = 0;
         continue;
@@ -558,9 +556,9 @@ static psock_t *get_connected_socket() {
       continue;
     }
 
-    psync_my_userid = userid = psync_find_result(res, "userid", PARAM_NUM)->num;
-    current_quota = psync_find_result(res, "quota", PARAM_NUM)->num;
-    cres = psync_check_result(res, "freequota", PARAM_NUM);
+    psync_my_userid = userid = papi_find_result2(res, "userid", PARAM_NUM)->num;
+    current_quota = papi_find_result2(res, "quota", PARAM_NUM)->num;
+    cres = papi_check_result2(res, "freequota", PARAM_NUM);
 
     if (cres) {
       free_quota = cres->num;
@@ -568,26 +566,26 @@ static psock_t *get_connected_socket() {
 
     luserid =
         psync_sql_cellint("SELECT value FROM setting WHERE id='userid'", 0);
-    psync_is_business = psync_find_result(res, "business", PARAM_BOOL)->num;
+    psync_is_business = papi_find_result2(res, "business", PARAM_BOOL)->num;
     lid = psync_setting_get_uint(_PS(location_id));
     psync_sql_start_transaction();
-    psync_strlcpy(psync_my_auth, psync_find_result(res, "auth", PARAM_STR)->str,
+    psync_strlcpy(psync_my_auth, papi_find_result2(res, "auth", PARAM_STR)->str,
                   sizeof(psync_my_auth));
 
     if (luserid) {
       if (unlikely_log(luserid != userid)) {
         if (check_user_relocated(luserid, sock)) {
           debug(D_NOTICE, "setting PSTATUS_AUTH_RELOCATED");
-          psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATED);
+          pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATED);
         } else {
           debug(D_NOTICE, "user mistmatch, db userid=%lu, connected userid=%lu",
                 (unsigned long)luserid, (unsigned long)userid);
-          psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_MISMATCH);
+          pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_MISMATCH);
         }
         psync_sql_rollback_transaction();
         psock_close(sock);
         psync_free(res);
-        psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+        pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         continue;
       }
       if (saveauth) {
@@ -615,12 +613,12 @@ static psock_t *get_connected_socket() {
       psync_sql_bind_string(q, 1, "usedquota");
       psync_sql_bind_uint(q, 2, 0);
       psync_sql_run(q);
-      result = psync_find_result(res, "premium", PARAM_BOOL)->num;
+      result = papi_find_result2(res, "premium", PARAM_BOOL)->num;
       psync_sql_bind_string(q, 1, "premium");
       psync_sql_bind_uint(q, 2, result);
       psync_sql_run(q);
       if (result)
-        result = psync_find_result(res, "premiumexpires", PARAM_NUM)->num;
+        result = papi_find_result2(res, "premiumexpires", PARAM_NUM)->num;
       else
         result = 0;
       psync_sql_bind_string(q, 1, "premiumexpires");
@@ -628,42 +626,42 @@ static psock_t *get_connected_socket() {
       psync_sql_run(q);
       psync_sql_bind_string(q, 1, "emailverified");
       psync_sql_bind_uint(
-          q, 2, psync_find_result(res, "emailverified", PARAM_BOOL)->num);
+          q, 2, papi_find_result2(res, "emailverified", PARAM_BOOL)->num);
       psync_sql_run(q);
       psync_sql_bind_string(q, 1, "registered");
       psync_sql_bind_uint(q, 2,
-                          psync_find_result(res, "registered", PARAM_NUM)->num);
+                          papi_find_result2(res, "registered", PARAM_NUM)->num);
       psync_sql_run(q);
       psync_sql_bind_string(q, 1, "username");
       psync_sql_bind_string(q, 2,
-                            psync_find_result(res, "email", PARAM_STR)->str);
+                            papi_find_result2(res, "email", PARAM_STR)->str);
       psync_sql_run(q);
       psync_sql_bind_string(q, 1, "language");
       psync_sql_bind_string(q, 2,
-                            psync_find_result(res, "language", PARAM_STR)->str);
+                            papi_find_result2(res, "language", PARAM_STR)->str);
       psync_sql_run(q);
       psync_sql_bind_string(q, 1, "plan");
-      psync_sql_bind_uint(q, 2, psync_find_result(res, "plan", PARAM_NUM)->num);
+      psync_sql_bind_uint(q, 2, papi_find_result2(res, "plan", PARAM_NUM)->num);
       psync_sql_run(q);
       psync_sql_bind_string(q, 1, "business");
       psync_sql_bind_uint(q, 2,
-                          psync_find_result(res, "business", PARAM_BOOL)->num);
+                          papi_find_result2(res, "business", PARAM_BOOL)->num);
       psync_sql_run(q);
       psync_sql_bind_string(q, 1, "premiumlifetime");
       psync_sql_bind_uint(
-          q, 2, psync_find_result(res, "premiumlifetime", PARAM_BOOL)->num);
+          q, 2, papi_find_result2(res, "premiumlifetime", PARAM_BOOL)->num);
       psync_sql_run(q);
-      cres = psync_check_result(res, "vivapcloud", PARAM_BOOL);
+      cres = papi_check_result2(res, "vivapcloud", PARAM_BOOL);
       if (cres) {
         psync_sql_bind_string(q, 1, "vivapcloud");
         psync_sql_bind_uint(q, 2, cres->num);
         psync_sql_run(q);
       }
-      cres = psync_check_result(res, "family", PARAM_HASH);
+      cres = papi_check_result2(res, "family", PARAM_HASH);
       if (cres) {
         psync_sql_bind_string(q, 1, "owner");
         psync_sql_bind_uint(q, 2,
-                            psync_find_result(cres, "owner", PARAM_BOOL)->num);
+                            papi_find_result2(cres, "owner", PARAM_BOOL)->num);
         psync_sql_run(q);
       }
       if (saveauth) {
@@ -673,15 +671,15 @@ static psock_t *get_connected_socket() {
       }
       psync_sql_free_result(q);
     }
-    if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED) {
+    if (pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED) {
       psync_sql_rollback_transaction();
       psock_close(sock);
       psync_free(res);
-      psync_wait_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
+      pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       continue;
     }
     debug(D_NOTICE, "userid %lu", (unsigned long)userid);
-    cres = psync_check_result(res, "account", PARAM_HASH);
+    cres = papi_check_result2(res, "account", PARAM_HASH);
     q = psync_sql_prep_statement(
         "REPLACE INTO setting (id, value) VALUES (?, ?)");
     if (cres) {
@@ -690,11 +688,11 @@ static psock_t *get_connected_socket() {
       psync_sql_run(q);
       psync_sql_bind_string(q, 1, "firstname");
       psync_sql_bind_string(
-          q, 2, psync_find_result(cres, "firstname", PARAM_STR)->str);
+          q, 2, papi_find_result2(cres, "firstname", PARAM_STR)->str);
       psync_sql_run(q);
       psync_sql_bind_string(q, 1, "lastname");
       psync_sql_bind_string(
-          q, 2, psync_find_result(cres, "lastname", PARAM_STR)->str);
+          q, 2, papi_find_result2(cres, "lastname", PARAM_STR)->str);
       psync_sql_run(q);
       isbusiness = 1;
     } else {
@@ -704,12 +702,12 @@ static psock_t *get_connected_socket() {
       isbusiness = 0;
     }
 
-    cres = psync_check_result(res, "cryptov2isactive", PARAM_BOOL);
+    cres = papi_check_result2(res, "cryptov2isactive", PARAM_BOOL);
     if (cres)
       psync_set_bool_setting("cryptov2isactive", cres->num);
     else
       psync_set_bool_setting("cryptov2isactive", 0);
-    cryptosetup = psync_find_result(res, "cryptosetup", PARAM_BOOL)->num;
+    cryptosetup = papi_find_result2(res, "cryptosetup", PARAM_BOOL)->num;
     psync_sql_bind_string(q, 1, "cryptosetup");
     psync_sql_bind_uint(q, 2, cryptosetup);
     psync_sql_run(q);
@@ -720,9 +718,9 @@ static psock_t *get_connected_socket() {
           "SELECT value FROM setting WHERE id='crypto_private_sha1'");
       if (!publicsha1 || !privatesha1 ||
           strcmp(publicsha1,
-                 psync_find_result(res, "publicsha1", PARAM_STR)->str) ||
+                 papi_find_result2(res, "publicsha1", PARAM_STR)->str) ||
           strcmp(privatesha1,
-                 psync_find_result(res, "privatesha1", PARAM_STR)->str))
+                 papi_find_result2(res, "privatesha1", PARAM_STR)->str))
         psync_delete_cached_crypto_keys();
       psync_free(privatesha1);
       psync_free(publicsha1);
@@ -730,9 +728,9 @@ static psock_t *get_connected_socket() {
       psync_delete_cached_crypto_keys();
     psync_sql_bind_string(q, 1, "cryptosubscription");
     psync_sql_bind_uint(
-        q, 2, psync_find_result(res, "cryptosubscription", PARAM_BOOL)->num);
+        q, 2, papi_find_result2(res, "cryptosubscription", PARAM_BOOL)->num);
     psync_sql_run(q);
-    cres = psync_check_result(res, "cryptoexpires", PARAM_NUM);
+    cres = papi_check_result2(res, "cryptoexpires", PARAM_NUM);
     psync_sql_bind_string(q, 1, "cryptoexpires");
     psync_sql_bind_uint(q, 2, cres ? cres->num : 0);
     psync_sql_run(q);
@@ -757,7 +755,7 @@ static psock_t *get_connected_socket() {
       psync_sql_statement("DELETE FROM setting WHERE id='pass'");
     else
       psync_sql_statement("DELETE FROM setting WHERE id IN ('pass', 'auth')");
-    cres = psync_find_result(psync_find_result(res, "apiserver", PARAM_HASH),
+    cres = papi_find_result2(papi_find_result2(res, "apiserver", PARAM_HASH),
                              "binapi", PARAM_ARRAY);
     if (cres->length)
       psync_apipool_set_server(cres->array[0]->str);
@@ -774,40 +772,40 @@ static psock_t *get_connected_socket() {
       time(&rawtime);
 
       char *macAddr;
-      macAddr = getMACaddr();
+      macAddr = ptools_get_mac_addr();
 
       eventParams params = {1, // Number of parameters we are passing below.
-                            {P_STR(EPARAM_MAC, macAddr)}};
-      create_backend_event(apiserver, INST_EVENT_CATEG, INST_EVENT_FLOGIN,
+                            {PAPI_STR(EPARAM_MAC, macAddr)}};
+      ptools_create_backend_event(apiserver, INST_EVENT_CATEG, INST_EVENT_FLOGIN,
                            INST_EVENT_CATEG, psync_my_auth, P_OS_ID, rawtime,
                            &params, (char **)res);
     } else {
       debug(D_NOTICE, "Not a first login. Run sync event.");
 
-      send_psyncs_event(apiserver, psync_my_auth);
+      ptools_send_psyncs_event(apiserver, psync_my_auth);
     }
 
     if (isbusiness) {
-      binparam params[] = {P_STR("timeformat", "timestamp"),
-                           P_STR("auth", psync_my_auth)};
-      res = send_command(sock, "account_info", params);
+      binparam params[] = {PAPI_STR("timeformat", "timestamp"),
+                           PAPI_STR("auth", psync_my_auth)};
+      res = papi_send2(sock, "account_info", params);
       if (unlikely_log(!res)) {
         psock_close(sock);
         continue;
       }
-      result = psync_find_result(res, "result", PARAM_NUM)->num;
+      result = papi_find_result2(res, "result", PARAM_NUM)->num;
       if (likely(result == 0)) {
-        cres = psync_check_result(res, "account", PARAM_HASH);
+        cres = papi_check_result2(res, "account", PARAM_HASH);
         q = psync_sql_prep_statement(
             "REPLACE INTO setting (id, value) VALUES (?, ?)");
         psync_sql_bind_string(q, 1, "company");
         psync_sql_bind_string(
-            q, 2, psync_find_result(cres, "company", PARAM_STR)->str);
+            q, 2, papi_find_result2(cres, "company", PARAM_STR)->str);
         psync_sql_run_free(q);
-        cres = psync_check_result(cres, "owner", PARAM_HASH);
+        cres = papi_check_result2(cres, "owner", PARAM_HASH);
         psync_set_bool_setting(
             "owner_cryptosetup",
-            psync_find_result(cres, "cryptosetup", PARAM_BOOL)->num);
+            papi_find_result2(cres, "cryptosetup", PARAM_BOOL)->num);
       } else
         debug(D_WARNING,
               "account_info returned %lu, continuing without business info",
@@ -834,19 +832,19 @@ static psock_t *get_connected_socket() {
 static uint64_t extract_meta_folder_flags(const binresult *meta) {
   const binresult *res;
   uint64_t flags = 0;
-  if ((res = psync_check_result(meta, "encrypted", PARAM_BOOL)) && res->num)
+  if ((res = papi_check_result2(meta, "encrypted", PARAM_BOOL)) && res->num)
     flags |= PSYNC_FOLDER_FLAG_ENCRYPTED;
-  if ((res = psync_check_result(meta, "ispublicroot", PARAM_BOOL)) && res->num)
+  if ((res = papi_check_result2(meta, "ispublicroot", PARAM_BOOL)) && res->num)
     flags |= PSYNC_FOLDER_FLAG_PUBLIC_ROOT;
-  if ((res = psync_check_result(meta, "isbackupdevicelist", PARAM_BOOL)) &&
+  if ((res = papi_check_result2(meta, "isbackupdevicelist", PARAM_BOOL)) &&
       res->num)
     flags |= PSYNC_FOLDER_FLAG_BACKUP_DEVICE_LIST;
-  if ((res = psync_check_result(meta, "isbackupdevice", PARAM_BOOL)) &&
+  if ((res = papi_check_result2(meta, "isbackupdevice", PARAM_BOOL)) &&
       res->num)
     flags |= PSYNC_FOLDER_FLAG_BACKUP_DEVICE;
-  if ((res = psync_check_result(meta, "isbackuproot", PARAM_BOOL)) && res->num)
+  if ((res = papi_check_result2(meta, "isbackuproot", PARAM_BOOL)) && res->num)
     flags |= PSYNC_FOLDER_FLAG_BACKUP_ROOT;
-  if ((res = psync_check_result(meta, "isbackup", PARAM_BOOL)) && res->num)
+  if ((res = papi_check_result2(meta, "isbackup", PARAM_BOOL)) && res->num)
     flags |= PSYNC_FOLDER_FLAG_BACKUP;
 
   return flags;
@@ -884,26 +882,26 @@ static void process_createfolder(const binresult *entry) {
     if (!st2)
       return;
   }
-  meta = psync_find_result(entry, "metadata", PARAM_HASH);
+  meta = papi_find_result2(entry, "metadata", PARAM_HASH);
   flags = extract_meta_folder_flags(meta);
-  if (psync_find_result(meta, "ismine", PARAM_BOOL)->num) {
+  if (papi_find_result2(meta, "ismine", PARAM_BOOL)->num) {
     userid = psync_my_userid;
     perms = PSYNC_PERM_ALL;
   } else {
-    userid = psync_find_result(meta, "userid", PARAM_NUM)->num;
-    perms = psync_get_permissions(meta);
+    userid = papi_find_result2(meta, "userid", PARAM_NUM)->num;
+    perms = pfileops_get_perms(meta);
   }
-  name = psync_find_result(meta, "name", PARAM_STR);
-  folderid = psync_find_result(meta, "folderid", PARAM_NUM)->num;
-  parentfolderid = psync_find_result(meta, "parentfolderid", PARAM_NUM)->num;
-  mtime = psync_find_result(meta, "modified", PARAM_NUM)->num;
+  name = papi_find_result2(meta, "name", PARAM_STR);
+  folderid = papi_find_result2(meta, "folderid", PARAM_NUM)->num;
+  parentfolderid = papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num;
+  mtime = papi_find_result2(meta, "modified", PARAM_NUM)->num;
   psync_sql_bind_uint(st, 1, folderid);
   psync_sql_bind_uint(st, 2, parentfolderid);
   psync_sql_bind_uint(st, 3, userid);
   psync_sql_bind_uint(st, 4, perms);
   psync_sql_bind_lstring(st, 5, name->str, name->length);
   psync_sql_bind_uint(st, 6,
-                      psync_find_result(meta, "created", PARAM_NUM)->num);
+                      papi_find_result2(meta, "created", PARAM_NUM)->num);
   psync_sql_bind_uint(st, 7, mtime);
   psync_sql_bind_uint(st, 8, flags);
   psync_sql_run(st);
@@ -916,7 +914,7 @@ static void process_createfolder(const binresult *entry) {
     psync_sql_bind_uint(res, 3, perms);
     psync_sql_bind_lstring(res, 4, name->str, name->length);
     psync_sql_bind_uint(res, 5,
-                        psync_find_result(meta, "created", PARAM_NUM)->num);
+                        papi_find_result2(meta, "created", PARAM_NUM)->num);
     psync_sql_bind_uint(res, 6, mtime);
     psync_sql_bind_uint(res, 7, flags);
     psync_sql_bind_uint(res, 8, folderid);
@@ -925,9 +923,9 @@ static void process_createfolder(const binresult *entry) {
   psync_sql_bind_uint(st2, 1, mtime);
   psync_sql_bind_uint(st2, 2, parentfolderid);
   psync_sql_run(st2);
-  if (psync_is_folder_in_downloadlist(parentfolderid) &&
+  if (psyncer_dl_has_folder(parentfolderid) &&
       !psync_is_name_to_ignore(name->str)) {
-    psync_add_folder_to_downloadlist(folderid);
+    psyncer_dl_queue_add(folderid);
     res = psync_sql_query(
         "SELECT syncid, localfolderid, synctype FROM syncedfolder WHERE "
         "folderid=? AND " PSYNC_SQL_DOWNLOAD);
@@ -942,14 +940,14 @@ static void process_createfolder(const binresult *entry) {
             (unsigned long)row[1], name->str, (unsigned long)folderid,
             (unsigned long)parentfolderid);
       localfolderid =
-          psync_create_local_folder_in_db(syncid, folderid, row[1], name->str);
+          psyncer_db_folder_create(syncid, folderid, row[1], name->str);
       psync_sql_bind_uint(stmt, 1, syncid);
       psync_sql_bind_uint(stmt, 2, folderid);
       psync_sql_bind_uint(stmt, 3, localfolderid);
       psync_sql_bind_uint(stmt, 4, row[2]);
       psync_sql_run(stmt);
       if (psync_sql_affected_rows() == 1) {
-        psync_task_create_local_folder(syncid, folderid, localfolderid);
+        ptask_ldir_mk(syncid, folderid, localfolderid);
         needdownload = 1;
       } else {
         stmt2 = psync_sql_prep_statement("UPDATE syncedfolder SET folderid=? "
@@ -1036,18 +1034,18 @@ static void process_modifyfolder(const binresult *entry) {
     if (!st)
       return;
   }
-  meta = psync_find_result(entry, "metadata", PARAM_HASH);
+  meta = papi_find_result2(entry, "metadata", PARAM_HASH);
   flags = extract_meta_folder_flags(meta);
-  if (psync_find_result(meta, "ismine", PARAM_BOOL)->num) {
+  if (papi_find_result2(meta, "ismine", PARAM_BOOL)->num) {
     userid = psync_my_userid;
     perms = PSYNC_PERM_ALL;
   } else {
-    userid = psync_find_result(meta, "userid", PARAM_NUM)->num;
-    perms = psync_get_permissions(meta);
+    userid = papi_find_result2(meta, "userid", PARAM_NUM)->num;
+    perms = pfileops_get_perms(meta);
   }
-  name = psync_find_result(meta, "name", PARAM_STR);
-  folderid = psync_find_result(meta, "folderid", PARAM_NUM)->num;
-  parentfolderid = psync_find_result(meta, "parentfolderid", PARAM_NUM)->num;
+  name = papi_find_result2(meta, "name", PARAM_STR);
+  folderid = papi_find_result2(meta, "folderid", PARAM_NUM)->num;
+  parentfolderid = papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num;
   res = psync_sql_query(
       "SELECT parentfolderid, name, flags FROM folder WHERE id=?");
   psync_sql_bind_uint(res, 1, folderid);
@@ -1080,13 +1078,13 @@ static void process_modifyfolder(const binresult *entry) {
     psync_delete_backup_device(folderid);
   }
 
-  mtime = psync_find_result(meta, "modified", PARAM_NUM)->num;
+  mtime = papi_find_result2(meta, "modified", PARAM_NUM)->num;
   psync_sql_bind_uint(st, 1, parentfolderid);
   psync_sql_bind_uint(st, 2, userid);
   psync_sql_bind_uint(st, 3, perms);
   psync_sql_bind_lstring(st, 4, name->str, name->length);
   psync_sql_bind_uint(st, 5,
-                      psync_find_result(meta, "created", PARAM_NUM)->num);
+                      papi_find_result2(meta, "created", PARAM_NUM)->num);
   psync_sql_bind_uint(st, 6, mtime);
   psync_sql_bind_uint(st, 7, flags);
   psync_sql_bind_uint(st, 8, folderid);
@@ -1103,29 +1101,29 @@ static void process_modifyfolder(const binresult *entry) {
     psync_sql_bind_uint(res, 1, mtime);
     psync_sql_bind_uint(res, 2, parentfolderid);
     psync_sql_run_free(res);
-    psync_path_status_folder_moved(folderid, oldparentfolderid, parentfolderid);
+    ppathstatus_fldr_moved(folderid, oldparentfolderid, parentfolderid);
   }
   /* We should check if oldparentfolderid is in downloadlist, not folderid. If
    * parentfolderid is not in and folderid is in, it means that folder that is a
    * "root" of a syncid is modified, we do not care about that.
    */
-  oldsync = psync_is_folder_in_downloadlist(oldparentfolderid);
+  oldsync = psyncer_dl_has_folder(oldparentfolderid);
   if (oldparentfolderid == parentfolderid)
     newsync = oldsync;
   else {
-    newsync = psync_is_folder_in_downloadlist(parentfolderid);
+    newsync = psyncer_dl_has_folder(parentfolderid);
     psync_diff_refresh_fs_add_folder(oldparentfolderid);
   }
   if ((oldsync || newsync) &&
       (oldparentfolderid != parentfolderid || strcmp(name->str, oldname))) {
     if (!oldsync)
-      psync_add_folder_to_downloadlist(folderid);
+      psyncer_dl_queue_add(folderid);
     else if (!newsync) {
       res = psync_sql_query(
           "SELECT id FROM syncfolder WHERE folderid=? AND " PSYNC_SQL_DOWNLOAD);
       psync_sql_bind_uint(res, 1, folderid);
       if (!psync_sql_fetch_rowint(res))
-        psync_del_folder_from_downloadlist(folderid);
+        psyncer_dl_queue_del(folderid);
       psync_sql_free_result(res);
     }
     res = psync_sql_query(
@@ -1156,7 +1154,7 @@ static void process_modifyfolder(const binresult *entry) {
       }
       localfolderid = row[0];
       psync_sql_free_result(res);
-      psync_task_rename_local_folder(
+      ptask_ldir_rename(
           psync_get_result_cell(fres2, i, 0), folderid, localfolderid,
           psync_get_result_cell(fres2, i, 1), name->str);
       needdownload = 1;
@@ -1188,7 +1186,7 @@ static void process_modifyfolder(const binresult *entry) {
       localfolderid = row[0];
       psync_sql_free_result(res);
       del_synced_folder_rec(folderid, syncid);
-      psync_task_delete_local_folder_recursive(syncid, folderid, localfolderid);
+      ptask_ldir_rm_r(syncid, folderid, localfolderid);
       needdownload = 1;
     }
     for (/*i is already=cnt*/; i < fres2->rows; i++) {
@@ -1197,10 +1195,10 @@ static void process_modifyfolder(const binresult *entry) {
             "creating local folder %lu/%s for folderid %lu, parentfolderid %lu",
             (unsigned long)psync_get_result_cell(fres2, i, 1), name->str,
             (unsigned long)folderid, (unsigned long)parentfolderid);
-      localfolderid = psync_create_local_folder_in_db(
+      localfolderid = psyncer_db_folder_create(
           syncid, folderid, psync_get_result_cell(fres2, i, 1), name->str);
-      psync_task_create_local_folder(syncid, folderid, localfolderid);
-      psync_add_folder_for_downloadsync(
+      ptask_ldir_mk(syncid, folderid, localfolderid);
+      psyncer_dl_folder_add(
           syncid, psync_get_result_cell(fres2, i, 2), folderid, localfolderid);
       needdownload = 1;
     }
@@ -1237,11 +1235,11 @@ static void process_deletefolder(const binresult *entry) {
     if (!st2)
       return;
   }
-  meta = psync_find_result(entry, "metadata", PARAM_HASH);
-  folderid = psync_find_result(meta, "folderid", PARAM_NUM)->num;
-  psync_path_status_folder_deleted(folderid);
-  if (psync_is_folder_in_downloadlist(folderid)) {
-    psync_del_folder_from_downloadlist(folderid);
+  meta = papi_find_result2(entry, "metadata", PARAM_HASH);
+  folderid = papi_find_result2(meta, "folderid", PARAM_NUM)->num;
+  ppathstatus_fldr_deleted(folderid);
+  if (psyncer_dl_has_folder(folderid)) {
+    psyncer_dl_queue_del(folderid);
     res = psync_sql_query(
         "SELECT syncid, localfolderid FROM syncedfolder WHERE folderid=?");
     psync_sql_bind_uint(res, 1, folderid);
@@ -1252,8 +1250,8 @@ static void process_deletefolder(const binresult *entry) {
       psync_sql_bind_uint(stmt, 2, folderid);
       psync_sql_run_free(stmt);
       if (psync_sql_affected_rows() == 1) {
-        path = psync_get_path_by_folderid(folderid, NULL);
-        psync_task_delete_local_folder(row[0], folderid, row[1], path);
+        path = pfolder_path(folderid, NULL);
+        ptask_ldir_rm(row[0], folderid, row[1], path);
         psync_free(path);
         needdownload = 1;
       }
@@ -1264,9 +1262,9 @@ static void process_deletefolder(const binresult *entry) {
   psync_sql_run(st);
   if (psync_sql_affected_rows()) {
     psync_sql_bind_uint(st2, 1,
-                        psync_find_result(meta, "modified", PARAM_NUM)->num);
+                        papi_find_result2(meta, "modified", PARAM_NUM)->num);
     psync_sql_bind_uint(
-        st2, 2, psync_find_result(meta, "parentfolderid", PARAM_NUM)->num);
+        st2, 2, papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num);
     psync_sql_run(st2);
     psync_fs_folder_deleted(folderid);
   }
@@ -1274,7 +1272,7 @@ static void process_deletefolder(const binresult *entry) {
 
 static void check_for_deletedfileid(const binresult *meta) {
   const binresult *delfileid;
-  delfileid = psync_check_result(meta, "deletedfileid", PARAM_NUM);
+  delfileid = papi_check_result2(meta, "deletedfileid", PARAM_NUM);
   if (likely(!delfileid))
     return;
   else {
@@ -1357,17 +1355,17 @@ static void process_createfile(const binresult *entry) {
         "videocodec, audiocodec, videobitrate, "
         "audiobitrate, audiosamplerate, rotate) VALUES (?, ?, ?, ?, ?, ?, ?, "
         "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-  meta = psync_find_result(entry, "metadata", PARAM_HASH);
-  size = psync_find_result(meta, "size", PARAM_NUM)->num;
-  fileid = psync_find_result(meta, "fileid", PARAM_NUM)->num;
-  parentfolderid = psync_find_result(meta, "parentfolderid", PARAM_NUM)->num;
-  if (psync_find_result(meta, "ismine", PARAM_BOOL)->num) {
+  meta = papi_find_result2(entry, "metadata", PARAM_HASH);
+  size = papi_find_result2(meta, "size", PARAM_NUM)->num;
+  fileid = papi_find_result2(meta, "fileid", PARAM_NUM)->num;
+  parentfolderid = papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num;
+  if (papi_find_result2(meta, "ismine", PARAM_BOOL)->num) {
     userid = psync_my_userid;
     used_quota += size;
   } else
-    userid = psync_find_result(meta, "userid", PARAM_NUM)->num;
-  hash = psync_find_result(meta, "hash", PARAM_NUM)->num;
-  name = psync_find_result(meta, "name", PARAM_STR);
+    userid = papi_find_result2(meta, "userid", PARAM_NUM)->num;
+  hash = papi_find_result2(meta, "hash", PARAM_NUM)->num;
+  name = papi_find_result2(meta, "name", PARAM_STR);
   check_for_deletedfileid(meta);
   psync_sql_bind_uint(st, 1, fileid);
   psync_sql_bind_uint(st, 2, parentfolderid);
@@ -1396,8 +1394,8 @@ static void process_createfile(const binresult *entry) {
     psync_sql_run_free(res);
   }
   insert_revision(fileid, hash,
-                  psync_find_result(meta, "modified", PARAM_NUM)->num, size);
-  if (psync_is_folder_in_downloadlist(parentfolderid) &&
+                  papi_find_result2(meta, "modified", PARAM_NUM)->num, size);
+  if (psyncer_dl_has_folder(parentfolderid) &&
       !psync_is_name_to_ignore(name->str)) {
     res = psync_sql_query("SELECT syncid, localfolderid FROM syncedfolder "
                           "WHERE folderid=? AND " PSYNC_SQL_DOWNLOAD);
@@ -1416,7 +1414,7 @@ static void process_createfile(const binresult *entry) {
       if (!hasit) {
         debug(D_NOTICE, "downloading file %s with hash %ld to local folder %lu",
               name->str, (long)hash, (unsigned long)row[1]);
-        psync_task_download_file_silent(row[0], fileid, row[1], name->str);
+        ptask_download_q(row[0], fileid, row[1], name->str);
         needdownload = 1;
       } else
         debug(D_NOTICE,
@@ -1452,9 +1450,9 @@ static void process_modifyfile(const binresult *entry) {
     process_createfile(NULL);
     return;
   }
-  meta = psync_find_result(entry, "metadata", PARAM_HASH);
-  fileid = psync_find_result(meta, "fileid", PARAM_NUM)->num;
-  name = psync_find_result(meta, "name", PARAM_STR);
+  meta = papi_find_result2(entry, "metadata", PARAM_HASH);
+  fileid = papi_find_result2(meta, "fileid", PARAM_NUM)->num;
+  name = papi_find_result2(meta, "name", PARAM_STR);
   if (sq)
     psync_sql_reset(sq);
   else
@@ -1479,10 +1477,10 @@ static void process_modifyfile(const binresult *entry) {
         "artist=?, album=?, title=?, genre=?, trackno=?, width=?, height=?, "
         "duration=?, fps=?, videocodec=?, audiocodec=?, videobitrate=?, "
         "audiobitrate=?, audiosamplerate=?, rotate=? WHERE id=?");
-  size = psync_find_result(meta, "size", PARAM_NUM)->num;
-  parentfolderid = psync_find_result(meta, "parentfolderid", PARAM_NUM)->num;
-  hash = psync_find_result(meta, "hash", PARAM_NUM)->num;
-  enc = psync_check_result(meta, "encrypted", PARAM_BOOL);
+  size = papi_find_result2(meta, "size", PARAM_NUM)->num;
+  parentfolderid = papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num;
+  hash = papi_find_result2(meta, "hash", PARAM_NUM)->num;
+  enc = papi_check_result2(meta, "encrypted", PARAM_BOOL);
   if (enc && enc->num) {
     res = psync_sql_prep_statement(
         "DELETE FROM cryptofilekey WHERE fileid=? AND hash!=?");
@@ -1490,11 +1488,11 @@ static void process_modifyfile(const binresult *entry) {
     psync_sql_bind_uint(res, 2, hash);
     psync_sql_run_free(res);
   }
-  if (psync_find_result(meta, "ismine", PARAM_BOOL)->num) {
+  if (papi_find_result2(meta, "ismine", PARAM_BOOL)->num) {
     userid = psync_my_userid;
     used_quota += size;
   } else
-    userid = psync_find_result(meta, "userid", PARAM_NUM)->num;
+    userid = papi_find_result2(meta, "userid", PARAM_NUM)->num;
   check_for_deletedfileid(meta);
   psync_sql_bind_uint(st, 1, fileid);
   psync_sql_bind_uint(st, 2, parentfolderid);
@@ -1506,21 +1504,21 @@ static void process_modifyfile(const binresult *entry) {
   psync_sql_bind_uint(st, i, fileid);
   psync_sql_run(st);
   insert_revision(fileid, hash,
-                  psync_find_result(meta, "modified", PARAM_NUM)->num, size);
+                  papi_find_result2(meta, "modified", PARAM_NUM)->num, size);
   oldparentfolderid = psync_get_number(row[0]);
-  oldsync = psync_is_folder_in_downloadlist(oldparentfolderid);
+  oldsync = psyncer_dl_has_folder(oldparentfolderid);
   if (oldparentfolderid == parentfolderid)
     newsync = oldsync;
   else {
-    newsync = psync_is_folder_in_downloadlist(parentfolderid);
+    newsync = psyncer_dl_has_folder(parentfolderid);
     psync_diff_refresh_fs_add_folder(oldparentfolderid);
   }
   if (oldsync || newsync) {
     if (psync_is_name_to_ignore(name->str)) {
       char *path;
-      psync_delete_download_tasks_for_file(fileid, 0, 1);
-      path = psync_get_path_by_fileid(fileid, NULL);
-      psync_task_delete_local_file(fileid, path);
+      pdownload_tasks_delete(fileid, 0, 1);
+      path = pfolder_file_path(fileid, NULL);
+      ptask_lfile_rm(fileid, path);
       psync_free(path);
       needdownload = 1;
       return;
@@ -1528,7 +1526,7 @@ static void process_modifyfile(const binresult *entry) {
     lneeddownload = hash != psync_get_number(row[3]) || size != oldsize;
     oldname = psync_get_lstring(row[4], &oldnamelen);
     if (lneeddownload)
-      psync_delete_download_tasks_for_file(fileid, 0, 0);
+      pdownload_tasks_delete(fileid, 0, 0);
     needrename = oldparentfolderid != parentfolderid ||
                  name->length != oldnamelen ||
                  memcmp(name->str, oldname, oldnamelen);
@@ -1549,7 +1547,7 @@ static void process_modifyfile(const binresult *entry) {
     //    fres2->rows, oldparentfolderid, parentfolderid);
     for (i = 0; i < cnt; i++) {
       if (needrename) {
-        psync_task_rename_local_file(psync_get_result_cell(fres1, i, 0),
+        ptask_lfile_rename(psync_get_result_cell(fres1, i, 0),
                                      psync_get_result_cell(fres2, i, 0), fileid,
                                      psync_get_result_cell(fres1, i, 1),
                                      psync_get_result_cell(fres2, i, 1),
@@ -1571,7 +1569,7 @@ static void process_modifyfile(const binresult *entry) {
                 "ignoring update for file %s, has correct hash in the database",
                 name->str);
         else {
-          psync_task_download_file_silent(
+          ptask_download_q(
               psync_get_result_cell(fres2, i, 0), fileid,
               psync_get_result_cell(fres2, i, 1), name->str);
           needdownload = 1;
@@ -1579,16 +1577,16 @@ static void process_modifyfile(const binresult *entry) {
       }
     }
     for (/*i is already=cnt*/; i < fres2->rows; i++) {
-      psync_task_download_file_silent(
+      ptask_download_q(
           psync_get_result_cell(fres2, i, 0), fileid,
           psync_get_result_cell(fres2, i, 1), name->str);
       needdownload = 1;
     }
     for (/*i is already=cnt*/; i < fres1->rows; i++) {
-      char *path = psync_get_path_by_fileid(fileid, NULL);
-      psync_task_delete_local_file_syncid(psync_get_result_cell(fres1, i, 0),
+      char *path = pfolder_file_path(fileid, NULL);
+      ptask_lfile_rm_id(psync_get_result_cell(fres1, i, 0),
                                           fileid, path);
-      psync_delete_download_tasks_for_file(
+      pdownload_tasks_delete(
           fileid, psync_get_result_cell(fres1, i, 0), 1);
       psync_free(path);
       needdownload = 1;
@@ -1615,14 +1613,14 @@ static void process_deletefile(const binresult *entry) {
     if (!st)
       return;
   }
-  meta = psync_find_result(entry, "metadata", PARAM_HASH);
-  fileid = psync_find_result(meta, "fileid", PARAM_NUM)->num;
-  if (psync_is_folder_in_downloadlist(
-          psync_find_result(meta, "parentfolderid", PARAM_NUM)->num)) {
-    psync_delete_download_tasks_for_file(fileid, 0, 1);
-    path = psync_get_path_by_fileid(fileid, NULL);
+  meta = papi_find_result2(entry, "metadata", PARAM_HASH);
+  fileid = papi_find_result2(meta, "fileid", PARAM_NUM)->num;
+  if (psyncer_dl_has_folder(
+          papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num)) {
+    pdownload_tasks_delete(fileid, 0, 1);
+    path = pfolder_file_path(fileid, NULL);
     if (likely(path)) {
-      psync_task_delete_local_file(fileid, path);
+      ptask_lfile_rm(fileid, path);
       psync_free(path);
       needdownload = 1;
     }
@@ -1630,17 +1628,17 @@ static void process_deletefile(const binresult *entry) {
   psync_sql_bind_uint(st, 1, fileid);
   psync_sql_run(st);
   if (psync_sql_affected_rows()) {
-    if (psync_find_result(meta, "ismine", PARAM_BOOL)->num)
-      used_quota -= psync_find_result(meta, "size", PARAM_NUM)->num;
+    if (papi_find_result2(meta, "ismine", PARAM_BOOL)->num)
+      used_quota -= papi_find_result2(meta, "size", PARAM_NUM)->num;
     psync_fs_file_deleted(fileid);
   }
 }
 
 static void start_download() {
   if (needdownload) {
-    psync_wake_download();
-    psync_status_recalc_to_download();
-    psync_send_status_update();
+    pdownload_wake();
+    pstatus_download_recalc();
+    pstatus_send_status_update();
     needdownload = 0;
   }
 }
@@ -1658,11 +1656,11 @@ static void process_modifyuserinfo(const binresult *entry) {
 
   if (!entry)
     return;
-  res = psync_find_result(entry, "userinfo", PARAM_HASH);
+  res = papi_find_result2(entry, "userinfo", PARAM_HASH);
   q = psync_sql_prep_statement(
       "REPLACE INTO setting (id, value) VALUES (?, ?)");
 
-  cres = psync_check_result(res, "userid", PARAM_NUM);
+  cres = papi_check_result2(res, "userid", PARAM_NUM);
   if (cres) {
     psync_sql_bind_string(q, 1, "userid");
     psync_sql_bind_uint(q, 2, cres->num);
@@ -1670,22 +1668,22 @@ static void process_modifyuserinfo(const binresult *entry) {
   }
 
   psync_sql_bind_string(q, 1, "quota");
-  current_quota = psync_find_result(res, "quota", PARAM_NUM)->num;
+  current_quota = papi_find_result2(res, "quota", PARAM_NUM)->num;
   psync_sql_bind_uint(q, 2, current_quota);
   psync_sql_run(q);
-  cres = psync_check_result(res, "freequota", PARAM_NUM);
+  cres = papi_check_result2(res, "freequota", PARAM_NUM);
   if (cres) {
     free_quota = cres->num;
   }
   psync_sql_bind_string(q, 1, "freequota");
   psync_sql_bind_uint(q, 2, free_quota);
   psync_sql_run(q);
-  u = psync_find_result(res, "premium", PARAM_BOOL)->num;
+  u = papi_find_result2(res, "premium", PARAM_BOOL)->num;
   psync_sql_bind_string(q, 1, "premium");
   psync_sql_bind_uint(q, 2, u);
   psync_sql_run(q);
   if (u)
-    u = psync_find_result(res, "premiumexpires", PARAM_NUM)->num;
+    u = papi_find_result2(res, "premiumexpires", PARAM_NUM)->num;
   else
     u = 0;
   psync_sql_bind_string(q, 1, "premiumexpires");
@@ -1693,44 +1691,44 @@ static void process_modifyuserinfo(const binresult *entry) {
   psync_sql_run(q);
   psync_sql_bind_string(q, 1, "emailverified");
   psync_sql_bind_uint(q, 2,
-                      psync_find_result(res, "emailverified", PARAM_BOOL)->num);
+                      papi_find_result2(res, "emailverified", PARAM_BOOL)->num);
   psync_sql_run(q);
   psync_sql_bind_string(q, 1, "username");
-  psync_sql_bind_string(q, 2, psync_find_result(res, "email", PARAM_STR)->str);
+  psync_sql_bind_string(q, 2, papi_find_result2(res, "email", PARAM_STR)->str);
   psync_sql_run(q);
   psync_sql_bind_string(q, 1, "language");
   psync_sql_bind_string(q, 2,
-                        psync_find_result(res, "language", PARAM_STR)->str);
+                        papi_find_result2(res, "language", PARAM_STR)->str);
   psync_sql_run(q);
   psync_sql_bind_string(q, 1, "plan");
-  psync_sql_bind_uint(q, 2, psync_find_result(res, "plan", PARAM_NUM)->num);
+  psync_sql_bind_uint(q, 2, papi_find_result2(res, "plan", PARAM_NUM)->num);
   psync_sql_run(q);
   psync_sql_bind_string(q, 1, "business");
   psync_sql_bind_uint(q, 2,
-                      psync_find_result(res, "business", PARAM_BOOL)->num);
+                      papi_find_result2(res, "business", PARAM_BOOL)->num);
   psync_sql_run(q);
   psync_sql_bind_string(q, 1, "premiumlifetime");
   psync_sql_bind_uint(
-      q, 2, psync_find_result(res, "premiumlifetime", PARAM_BOOL)->num);
+      q, 2, papi_find_result2(res, "premiumlifetime", PARAM_BOOL)->num);
   psync_sql_run(q);
 
-  cres = psync_check_result(res, "vivapcloud", PARAM_BOOL);
+  cres = papi_check_result2(res, "vivapcloud", PARAM_BOOL);
   if (cres) {
     psync_sql_bind_string(q, 1, "vivapcloud");
     psync_sql_bind_uint(q, 2, cres->num);
     psync_sql_run(q);
   }
 
-  cres = psync_check_result(res, "family", PARAM_HASH);
+  cres = papi_check_result2(res, "family", PARAM_HASH);
   if (cres) {
     psync_sql_bind_string(q, 1, "owner");
     psync_sql_bind_uint(q, 2,
-                        psync_find_result(cres, "owner", PARAM_BOOL)->num);
+                        papi_find_result2(cres, "owner", PARAM_BOOL)->num);
     psync_sql_run(q);
   }
-  cres = psync_check_result(res, "cryptov2isactive", PARAM_BOOL);
+  cres = papi_check_result2(res, "cryptov2isactive", PARAM_BOOL);
   psync_set_bool_setting("cryptov2isactive", cres ? cres->num : 0);
-  u = psync_find_result(res, "cryptosetup", PARAM_BOOL)->num;
+  u = papi_find_result2(res, "cryptosetup", PARAM_BOOL)->num;
   psync_sql_bind_string(q, 1, "cryptosetup");
   psync_sql_bind_uint(q, 2, u);
   psync_sql_run(q);
@@ -1739,10 +1737,10 @@ static void process_modifyuserinfo(const binresult *entry) {
   else
     crst = 1;
   psync_sql_bind_string(q, 1, "cryptosubscription");
-  crsub = psync_find_result(res, "cryptosubscription", PARAM_BOOL)->num;
+  crsub = papi_find_result2(res, "cryptosubscription", PARAM_BOOL)->num;
   psync_sql_bind_uint(q, 2, crsub);
   psync_sql_run(q);
-  cres = psync_check_result(res, "cryptoexpires", PARAM_NUM);
+  cres = papi_check_result2(res, "cryptoexpires", PARAM_NUM);
   crexp = cres ? cres->num : 0;
   psync_sql_bind_string(q, 1, "cryptoexpires");
   psync_sql_bind_uint(q, 2, crexp);
@@ -1766,7 +1764,7 @@ static void process_modifyuserinfo(const binresult *entry) {
   psync_sql_bind_uint(q, 2, crstat);
   psync_sql_run(q);
   psync_sql_free_result(q);
-  psync_send_eventid(PEVENT_USERINFO_CHANGED);
+  pqevent_queue_eventid(PEVENT_USERINFO_CHANGED);
 }
 
 static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
@@ -1789,11 +1787,11 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     return;
   stringslen = 0;
   ctime = 0;
-  if (!(br = psync_check_result(share, "frommail", PARAM_STR)) &&
-      !(br = psync_check_result(share, "tomail", PARAM_STR))) {
-    if (!(br = psync_check_result(share, "touserid", PARAM_NUM)) &&
-        !(br = psync_check_result(share, "fromuserid", PARAM_NUM)) &&
-        !(br = psync_check_result(share, "toteamid", PARAM_NUM))) {
+  if (!(br = papi_check_result2(share, "frommail", PARAM_STR)) &&
+      !(br = papi_check_result2(share, "tomail", PARAM_STR))) {
+    if (!(br = papi_check_result2(share, "touserid", PARAM_NUM)) &&
+        !(br = papi_check_result2(share, "fromuserid", PARAM_NUM)) &&
+        !(br = papi_check_result2(share, "toteamid", PARAM_NUM))) {
       debug(D_WARNING,
             "Neigher frommail or tomail nor buissines share found for "
             "eventtype %u",
@@ -1802,13 +1800,13 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     }
   }
   if (isba) {
-    if ((br = psync_check_result(share, "user", PARAM_BOOL)) && br->num)
-      touserid = psync_find_result(share, "touserid", PARAM_NUM)->num;
+    if ((br = papi_check_result2(share, "user", PARAM_BOOL)) && br->num)
+      touserid = papi_find_result2(share, "touserid", PARAM_NUM)->num;
 
-    if ((br = psync_check_result(share, "team", PARAM_BOOL)) && br->num)
-      teamid = psync_find_result(share, "toteamid", PARAM_NUM)->num;
+    if ((br = papi_check_result2(share, "team", PARAM_BOOL)) && br->num)
+      teamid = papi_find_result2(share, "toteamid", PARAM_NUM)->num;
 
-    if ((br = psync_check_result(share, "fromuserid", PARAM_NUM)))
+    if ((br = papi_check_result2(share, "fromuserid", PARAM_NUM)))
       fromuserid = br->num;
 
     stringslen += ++emaillen;
@@ -1818,7 +1816,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     emaillen = br->length + 1;
     stringslen += 2 * (br->length + 1);
   }
-  if ((br = psync_check_result(share, "message", PARAM_STR))) {
+  if ((br = papi_check_result2(share, "message", PARAM_STR))) {
     message = br->str;
     messagelen = br->length + 1;
     stringslen += br->length + 1;
@@ -1826,8 +1824,8 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     message = NULL;
     messagelen = 0;
   }
-  if ((br = psync_check_result(share, "foldername", PARAM_STR)) ||
-      (br = psync_check_result(share, "sharename", PARAM_STR))) {
+  if ((br = papi_check_result2(share, "foldername", PARAM_STR)) ||
+      (br = papi_check_result2(share, "sharename", PARAM_STR))) {
     sharename = (char *)br->str;
     sharenamelen = br->length + 1;
     stringslen += br->length + 1;
@@ -1837,14 +1835,14 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     psync_variant_row row;
     const char *cstr;
 
-    if ((br = psync_check_result(share, "shareid", PARAM_NUM)))
+    if ((br = papi_check_result2(share, "shareid", PARAM_NUM)))
       if (isba)
         res = psync_sql_query(
             "SELECT name, ctime FROM bsharedfolder WHERE id=? ");
       else
         res =
             psync_sql_query("SELECT name, ctime FROM sharedfolder WHERE id=? ");
-    else if ((br = psync_check_result(share, "sharerequestid", PARAM_NUM)))
+    else if ((br = papi_check_result2(share, "sharerequestid", PARAM_NUM)))
       res = psync_sql_query("SELECT name, ctime FROM sharerequest WHERE id=? ");
     else {
       debug(
@@ -1874,38 +1872,38 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
                                           stringslen);
   str = (char *)(e + 1);
   memset(e, 0, sizeof(psync_share_event_t));
-  e->folderid = psync_find_result(share, "folderid", PARAM_NUM)->num;
+  e->folderid = papi_find_result2(share, "folderid", PARAM_NUM)->num;
   fill_str(e->sharename, sharename, sharenamelen);
   if (freesharename)
     psync_free(sharename);
 
   fill_str(e->message, message, messagelen);
-  if ((br = psync_check_result(share, "userid", PARAM_NUM)))
+  if ((br = papi_check_result2(share, "userid", PARAM_NUM)))
     e->userid = br->num;
-  if ((br = psync_check_result(share, "shareid", PARAM_NUM)))
+  if ((br = papi_check_result2(share, "shareid", PARAM_NUM)))
     e->shareid = br->num;
-  if ((br = psync_check_result(share, "sharerequestid", PARAM_NUM)))
+  if ((br = papi_check_result2(share, "sharerequestid", PARAM_NUM)))
     e->sharerequestid = br->num;
   if (isba) {
-    if ((br = psync_check_result(share, "shared", PARAM_NUM)))
+    if ((br = papi_check_result2(share, "shared", PARAM_NUM)))
       ctime = br->num;
-  } else if ((br = psync_check_result(share, "created", PARAM_NUM)))
+  } else if ((br = papi_check_result2(share, "created", PARAM_NUM)))
     ctime = br->num;
   e->created = ctime;
-  permissions = psync_check_result(share, "permissions", PARAM_HASH);
+  permissions = papi_check_result2(share, "permissions", PARAM_HASH);
   if (isba && permissions) {
-    e->canread = psync_find_result(permissions, "canread", PARAM_BOOL)->num;
-    e->cancreate = psync_find_result(permissions, "cancreate", PARAM_BOOL)->num;
-    e->canmodify = psync_find_result(permissions, "canmodify", PARAM_BOOL)->num;
-    e->candelete = psync_find_result(permissions, "candelete", PARAM_BOOL)->num;
-    e->canmanage = psync_find_result(permissions, "canmanage", PARAM_BOOL)->num;
+    e->canread = papi_find_result2(permissions, "canread", PARAM_BOOL)->num;
+    e->cancreate = papi_find_result2(permissions, "cancreate", PARAM_BOOL)->num;
+    e->canmodify = papi_find_result2(permissions, "canmodify", PARAM_BOOL)->num;
+    e->candelete = papi_find_result2(permissions, "candelete", PARAM_BOOL)->num;
+    e->canmanage = papi_find_result2(permissions, "canmanage", PARAM_BOOL)->num;
   } else {
-    const binresult *canread = psync_check_result(share, "canread", PARAM_BOOL);
+    const binresult *canread = papi_check_result2(share, "canread", PARAM_BOOL);
     if (canread) {
       e->canread = canread->num;
-      e->cancreate = psync_find_result(share, "cancreate", PARAM_BOOL)->num;
-      e->canmodify = psync_find_result(share, "canmodify", PARAM_BOOL)->num;
-      e->candelete = psync_find_result(share, "candelete", PARAM_BOOL)->num;
+      e->cancreate = papi_find_result2(share, "cancreate", PARAM_BOOL)->num;
+      e->canmodify = papi_find_result2(share, "canmodify", PARAM_BOOL)->num;
+      e->candelete = papi_find_result2(share, "candelete", PARAM_BOOL)->num;
     } else {
       e->canread = 0;
       e->cancreate = 0;
@@ -1925,7 +1923,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
   } else {
     fill_str(e->toemail, email, emaillen);
     fill_str(e->fromemail, email, emaillen);
-    psync_send_eventdata(eventid, e);
+    pqevent_queue_event(eventid, e);
   }
 }
 
@@ -1947,9 +1945,9 @@ static void do_send_eventdata(void *param) {
   psync_free(email);
 
   if (email) {
-    psync_diff_lock();
-    psync_send_eventdata(data->eventid, data->event_data);
-    psync_diff_unlock();
+    pdiff_lock();
+    pqevent_queue_event(data->eventid, data->event_data);
+    pdiff_unlock();
   }
 
   psync_free(param);
@@ -1963,8 +1961,8 @@ static void process_requestsharein(const binresult *entry) {
 
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
-  folderid = psync_find_result(share, "folderid", PARAM_NUM)->num;
+  share = papi_find_result2(entry, "share", PARAM_HASH);
+  folderid = papi_find_result2(share, "folderid", PARAM_NUM)->num;
   psync_get_folder_ownerid(folderid, &folderowneruserid);
   psync_get_current_userid(&owneruserid);
   isincomming = (folderowneruserid == owneruserid) ? 0 : 1;
@@ -1977,22 +1975,22 @@ static void process_requestsharein(const binresult *entry) {
       "userid, mail, name, message, isincoming, isba) "
       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   psync_sql_bind_uint(
-      q, 1, psync_find_result(share, "sharerequestid", PARAM_NUM)->num);
+      q, 1, papi_find_result2(share, "sharerequestid", PARAM_NUM)->num);
   psync_sql_bind_uint(q, 2,
-                      psync_find_result(share, "folderid", PARAM_NUM)->num);
+                      papi_find_result2(share, "folderid", PARAM_NUM)->num);
   psync_sql_bind_uint(q, 3,
-                      psync_find_result(share, "created", PARAM_NUM)->num);
+                      papi_find_result2(share, "created", PARAM_NUM)->num);
   psync_sql_bind_uint(q, 4,
-                      psync_find_result(share, "expires", PARAM_NUM)->num);
-  psync_sql_bind_uint(q, 5, psync_get_permissions(share));
+                      papi_find_result2(share, "expires", PARAM_NUM)->num);
+  psync_sql_bind_uint(q, 5, pfileops_get_perms(share));
   psync_sql_bind_uint(q, 6,
-                      psync_find_result(share, "fromuserid", PARAM_NUM)->num);
-  br = psync_find_result(share, "frommail", PARAM_STR);
+                      papi_find_result2(share, "fromuserid", PARAM_NUM)->num);
+  br = papi_find_result2(share, "frommail", PARAM_STR);
   psync_sql_bind_lstring(q, 7, br->str, br->length);
-  if (!(br = psync_check_result(share, "foldername", PARAM_STR)))
-    br = psync_check_result(share, "sharename", PARAM_STR);
+  if (!(br = papi_check_result2(share, "foldername", PARAM_STR)))
+    br = papi_check_result2(share, "sharename", PARAM_STR);
   psync_sql_bind_lstring(q, 8, br->str, br->length);
-  br = psync_check_result(share, "message", PARAM_STR);
+  br = papi_check_result2(share, "message", PARAM_STR);
   if (br)
     psync_sql_bind_lstring(q, 9, br->str, br->length);
   else
@@ -2011,8 +2009,8 @@ static void process_requestshareout(const binresult *entry) {
   if (!entry)
     return;
 
-  share = psync_find_result(entry, "share", PARAM_HASH);
-  folderid = psync_find_result(share, "folderid", PARAM_NUM)->num;
+  share = papi_find_result2(entry, "share", PARAM_HASH);
+  folderid = papi_find_result2(share, "folderid", PARAM_NUM)->num;
   psync_get_folder_ownerid(folderid, &folderowneruserid);
   psync_get_current_userid(&owneruserid);
   isincomming = (folderowneruserid == owneruserid) ? 0 : 1;
@@ -2025,20 +2023,20 @@ static void process_requestshareout(const binresult *entry) {
       "userid, mail, name, message, isincoming, isba) "
       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   psync_sql_bind_uint(
-      q, 1, psync_find_result(share, "sharerequestid", PARAM_NUM)->num);
+      q, 1, papi_find_result2(share, "sharerequestid", PARAM_NUM)->num);
   psync_sql_bind_uint(q, 2, folderid);
   psync_sql_bind_uint(q, 3,
-                      psync_find_result(share, "created", PARAM_NUM)->num);
+                      papi_find_result2(share, "created", PARAM_NUM)->num);
   psync_sql_bind_uint(q, 4,
-                      psync_find_result(share, "expires", PARAM_NUM)->num);
-  psync_sql_bind_uint(q, 5, psync_get_permissions(share));
+                      papi_find_result2(share, "expires", PARAM_NUM)->num);
+  psync_sql_bind_uint(q, 5, pfileops_get_perms(share));
   psync_sql_bind_uint(q, 6, folderowneruserid);
-  br = psync_find_result(share, "tomail", PARAM_STR);
+  br = papi_find_result2(share, "tomail", PARAM_STR);
   psync_sql_bind_lstring(q, 7, br->str, br->length);
-  if (!(br = psync_check_result(share, "foldername", PARAM_STR)))
-    br = psync_check_result(share, "sharename", PARAM_STR);
+  if (!(br = papi_check_result2(share, "foldername", PARAM_STR)))
+    br = papi_check_result2(share, "sharename", PARAM_STR);
   psync_sql_bind_lstring(q, 8, br->str, br->length);
-  br = psync_check_result(share, "message", PARAM_STR);
+  br = papi_check_result2(share, "message", PARAM_STR);
   if (br)
     psync_sql_bind_lstring(q, 9, br->str, br->length);
   else
@@ -2053,31 +2051,31 @@ static void process_acceptedsharein(const binresult *entry) {
   const binresult *share, *br;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_ACCEPTIN, share, 0);
   q = psync_sql_prep_statement("DELETE FROM sharerequest WHERE id=?");
   psync_sql_bind_uint(
-      q, 1, psync_find_result(share, "sharerequestid", PARAM_NUM)->num);
+      q, 1, papi_find_result2(share, "sharerequestid", PARAM_NUM)->num);
   psync_sql_run_free(q);
   q = psync_sql_prep_statement(
       "REPLACE INTO sharedfolder (id, isincoming, folderid, ctime, "
       "permissions, userid, mail, name) "
       "VALUES (?, 1, ?, ?, ?, ?, ?, ?)");
   debug(D_WARNING, "INSERT NORMAL SHARE IN id: %lld",
-        (long long)psync_find_result(share, "shareid", PARAM_NUM)->num);
+        (long long)papi_find_result2(share, "shareid", PARAM_NUM)->num);
   psync_sql_bind_uint(q, 1,
-                      psync_find_result(share, "shareid", PARAM_NUM)->num);
+                      papi_find_result2(share, "shareid", PARAM_NUM)->num);
   psync_sql_bind_uint(q, 2,
-                      psync_find_result(share, "folderid", PARAM_NUM)->num);
+                      papi_find_result2(share, "folderid", PARAM_NUM)->num);
   psync_sql_bind_uint(q, 3,
-                      psync_find_result(share, "created", PARAM_NUM)->num);
-  psync_sql_bind_uint(q, 4, psync_get_permissions(share));
+                      papi_find_result2(share, "created", PARAM_NUM)->num);
+  psync_sql_bind_uint(q, 4, pfileops_get_perms(share));
   psync_sql_bind_uint(q, 5,
-                      psync_find_result(share, "fromuserid", PARAM_NUM)->num);
-  br = psync_find_result(share, "frommail", PARAM_STR);
+                      papi_find_result2(share, "fromuserid", PARAM_NUM)->num);
+  br = papi_find_result2(share, "frommail", PARAM_STR);
   psync_sql_bind_lstring(q, 6, br->str, br->length);
-  if (!(br = psync_check_result(share, "foldername", PARAM_STR)))
-    br = psync_check_result(share, "sharename", PARAM_STR);
+  if (!(br = papi_check_result2(share, "foldername", PARAM_STR)))
+    br = papi_check_result2(share, "sharename", PARAM_STR);
   psync_sql_bind_lstring(q, 7, br->str, br->length);
   psync_sql_run_free(q);
 }
@@ -2088,7 +2086,7 @@ static void process_establishbsharein(const binresult *entry) {
 
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_ACCEPTIN, share, 1);
 
   q = psync_sql_prep_statement(
@@ -2096,49 +2094,49 @@ static void process_establishbsharein(const binresult *entry) {
       "permissions, message, name, isuser, "
       "touserid, isteam, toteamid, fromuserid, folderownerid)"
       "VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-  psync_sql_bind_int(q, 1, psync_find_result(share, "shareid", PARAM_NUM)->num);
+  psync_sql_bind_int(q, 1, papi_find_result2(share, "shareid", PARAM_NUM)->num);
   psync_sql_bind_uint(q, 2,
-                      psync_find_result(share, "folderid", PARAM_NUM)->num);
-  if ((br = psync_check_result(share, "shared", PARAM_NUM)) ||
-      (br = psync_check_result(entry, "time", PARAM_NUM)))
+                      papi_find_result2(share, "folderid", PARAM_NUM)->num);
+  if ((br = papi_check_result2(share, "shared", PARAM_NUM)) ||
+      (br = papi_check_result2(entry, "time", PARAM_NUM)))
     psync_sql_bind_uint(q, 3, br->num);
   else
     psync_sql_bind_uint(q, 3, 0);
   psync_sql_bind_uint(q, 4,
-                      psync_get_permissions(
-                          psync_find_result(share, "permissions", PARAM_HASH)));
-  br = psync_check_result(share, "message", PARAM_STR);
+                      pfileops_get_perms(
+                          papi_find_result2(share, "permissions", PARAM_HASH)));
+  br = papi_check_result2(share, "message", PARAM_STR);
   if (br)
     psync_sql_bind_lstring(q, 5, br->str, br->length);
   else
     psync_sql_bind_null(q, 5);
-  if (!(br = psync_check_result(share, "foldername", PARAM_STR)))
-    br = psync_check_result(share, "sharename", PARAM_STR);
+  if (!(br = papi_check_result2(share, "foldername", PARAM_STR)))
+    br = papi_check_result2(share, "sharename", PARAM_STR);
   psync_sql_bind_lstring(q, 6, br->str, br->length);
-  br = psync_check_result(share, "user", PARAM_BOOL);
+  br = papi_check_result2(share, "user", PARAM_BOOL);
   if (br)
     psync_sql_bind_int(q, 7, br->num);
   else
     psync_sql_bind_int(q, 7, 0);
-  br = psync_check_result(share, "touserid", PARAM_NUM);
+  br = papi_check_result2(share, "touserid", PARAM_NUM);
   if (br)
     psync_sql_bind_int(q, 8, br->num);
   else
     psync_sql_bind_null(q, 8);
-  br = psync_check_result(share, "team", PARAM_BOOL);
+  br = papi_check_result2(share, "team", PARAM_BOOL);
   if (br)
     psync_sql_bind_int(q, 9, br->num);
   else
     psync_sql_bind_int(q, 9, 0);
-  br = psync_check_result(share, "toteamid", PARAM_NUM);
+  br = papi_check_result2(share, "toteamid", PARAM_NUM);
   if (br)
     psync_sql_bind_int(q, 10, br->num);
   else
     psync_sql_bind_null(q, 10);
   psync_sql_bind_int(q, 11,
-                     psync_find_result(share, "fromuserid", PARAM_NUM)->num);
+                     papi_find_result2(share, "fromuserid", PARAM_NUM)->num);
   psync_sql_bind_int(q, 12,
-                     psync_find_result(share, "folderownerid", PARAM_NUM)->num);
+                     papi_find_result2(share, "folderownerid", PARAM_NUM)->num);
 
   psync_sql_run_free(q);
 }
@@ -2152,16 +2150,16 @@ static void process_acceptedshareout(const binresult *entry) {
 
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   q = psync_sql_prep_statement("DELETE FROM sharerequest WHERE id=?");
   psync_sql_bind_uint(
-      q, 1, psync_find_result(share, "sharerequestid", PARAM_NUM)->num);
+      q, 1, papi_find_result2(share, "sharerequestid", PARAM_NUM)->num);
   psync_sql_run(q);
   aff = psync_sql_affected_rows();
   psync_sql_free_result(q);
   if (aff) {
 
-    folderid = psync_find_result(share, "folderid", PARAM_NUM)->num;
+    folderid = papi_find_result2(share, "folderid", PARAM_NUM)->num;
     psync_get_folder_ownerid(folderid, &folderowneruserid);
     psync_get_current_userid(&owneruserid);
     isincomming = (folderowneruserid == owneruserid) ? 0 : 1;
@@ -2175,18 +2173,18 @@ static void process_acceptedshareout(const binresult *entry) {
         "mail, name, isincoming) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     psync_sql_bind_uint(q, 1,
-                        psync_find_result(share, "shareid", PARAM_NUM)->num);
+                        papi_find_result2(share, "shareid", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 2,
-                        psync_find_result(share, "folderid", PARAM_NUM)->num);
+                        papi_find_result2(share, "folderid", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 3,
-                        psync_find_result(share, "created", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 4, psync_get_permissions(share));
+                        papi_find_result2(share, "created", PARAM_NUM)->num);
+    psync_sql_bind_uint(q, 4, pfileops_get_perms(share));
     psync_sql_bind_uint(q, 5,
-                        psync_find_result(share, "touserid", PARAM_NUM)->num);
-    br = psync_find_result(share, "tomail", PARAM_STR);
+                        papi_find_result2(share, "touserid", PARAM_NUM)->num);
+    br = papi_find_result2(share, "tomail", PARAM_STR);
     psync_sql_bind_lstring(q, 6, br->str, br->length);
-    if (!(br = psync_check_result(share, "foldername", PARAM_STR)))
-      br = psync_check_result(share, "sharename", PARAM_STR);
+    if (!(br = papi_check_result2(share, "foldername", PARAM_STR)))
+      br = papi_check_result2(share, "sharename", PARAM_STR);
     psync_sql_bind_lstring(q, 7, br->str, br->length);
     psync_sql_bind_uint(q, 8, isincomming);
     psync_sql_run_free(q);
@@ -2203,12 +2201,12 @@ static void process_establishbshareout(const binresult *entry) {
   if (!entry)
     return;
 
-  share = psync_find_result(entry, "share", PARAM_HASH);
-  ownid = psync_check_result(share, "folderownerid", PARAM_NUM);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
+  ownid = papi_check_result2(share, "folderownerid", PARAM_NUM);
   if (ownid) {
     folderowneruserid = ownid->num;
     psync_get_current_userid(&owneruserid);
-    fromuserid = psync_check_result(share, "fromuserid", PARAM_NUM);
+    fromuserid = papi_check_result2(share, "fromuserid", PARAM_NUM);
     if (fromuserid && fromuserid->num == owneruserid) {
       isincomming = 0;
     } else {
@@ -2224,46 +2222,46 @@ static void process_establishbshareout(const binresult *entry) {
       "name, isuser, "
       "touserid, isteam, toteamid, fromuserid, folderownerid, isincoming)"
       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-  psync_sql_bind_int(q, 1, psync_find_result(share, "shareid", PARAM_NUM)->num);
+  psync_sql_bind_int(q, 1, papi_find_result2(share, "shareid", PARAM_NUM)->num);
   psync_sql_bind_uint(q, 2,
-                      psync_find_result(share, "folderid", PARAM_NUM)->num);
-  if ((br = psync_check_result(share, "shared", PARAM_NUM)) ||
-      (br = psync_check_result(entry, "time", PARAM_NUM)))
+                      papi_find_result2(share, "folderid", PARAM_NUM)->num);
+  if ((br = papi_check_result2(share, "shared", PARAM_NUM)) ||
+      (br = papi_check_result2(entry, "time", PARAM_NUM)))
     psync_sql_bind_uint(q, 3, br->num);
   else
     psync_sql_bind_uint(q, 3, 0);
   psync_sql_bind_uint(q, 4,
-                      psync_get_permissions(
-                          psync_find_result(share, "permissions", PARAM_HASH)));
-  br = psync_find_result(share, "message", PARAM_STR);
+                      pfileops_get_perms(
+                          papi_find_result2(share, "permissions", PARAM_HASH)));
+  br = papi_find_result2(share, "message", PARAM_STR);
   psync_sql_bind_lstring(q, 5, br->str, br->length);
-  if (!(br = psync_check_result(share, "foldername", PARAM_STR)))
-    br = psync_check_result(share, "sharename", PARAM_STR);
+  if (!(br = papi_check_result2(share, "foldername", PARAM_STR)))
+    br = papi_check_result2(share, "sharename", PARAM_STR);
   psync_sql_bind_lstring(q, 6, br->str, br->length);
-  br = psync_check_result(share, "user", PARAM_BOOL);
+  br = papi_check_result2(share, "user", PARAM_BOOL);
   if (br)
     psync_sql_bind_int(q, 7, br->num);
   else
     psync_sql_bind_int(q, 7, 0);
-  br = psync_check_result(share, "touserid", PARAM_NUM);
+  br = papi_check_result2(share, "touserid", PARAM_NUM);
   if (br)
     psync_sql_bind_int(q, 8, br->num);
   else
     psync_sql_bind_null(q, 8);
-  br = psync_check_result(share, "team", PARAM_BOOL);
+  br = papi_check_result2(share, "team", PARAM_BOOL);
   if (br)
     psync_sql_bind_int(q, 9, br->num);
   else
     psync_sql_bind_int(q, 9, 0);
-  br = psync_check_result(share, "toteamid", PARAM_NUM);
+  br = papi_check_result2(share, "toteamid", PARAM_NUM);
   if (br)
     psync_sql_bind_int(q, 10, br->num);
   else
     psync_sql_bind_null(q, 10);
   psync_sql_bind_int(q, 11,
-                     psync_find_result(share, "fromuserid", PARAM_NUM)->num);
+                     papi_find_result2(share, "fromuserid", PARAM_NUM)->num);
   psync_sql_bind_int(q, 12,
-                     psync_find_result(share, "folderownerid", PARAM_NUM)->num);
+                     papi_find_result2(share, "folderownerid", PARAM_NUM)->num);
   psync_sql_bind_int(q, 13, isincomming);
 
   psync_sql_run_free(q);
@@ -2275,7 +2273,7 @@ static void delete_share_request(const binresult *share) {
   psync_sql_res *q;
   q = psync_sql_prep_statement("DELETE FROM sharerequest WHERE id=?");
   psync_sql_bind_uint(
-      q, 1, psync_find_result(share, "sharerequestid", PARAM_NUM)->num);
+      q, 1, papi_find_result2(share, "sharerequestid", PARAM_NUM)->num);
   psync_sql_run_free(q);
 }
 
@@ -2283,7 +2281,7 @@ static void process_declinedsharein(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_DECLINEIN, share, 0);
   delete_share_request(share);
 }
@@ -2292,7 +2290,7 @@ static void process_declinedshareout(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_DECLINEOUT, share, 0);
   delete_share_request(share);
 }
@@ -2301,7 +2299,7 @@ static void process_cancelledsharein(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_CANCELIN, share, 0);
   delete_share_request(share);
 }
@@ -2310,7 +2308,7 @@ static void process_cancelledshareout(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_CANCELOUT, share, 0);
   delete_share_request(share);
 }
@@ -2319,7 +2317,7 @@ static void delete_shared_folder(const binresult *share) {
   psync_sql_res *q;
   uint64_t shareid;
   q = psync_sql_prep_statement("DELETE FROM sharedfolder WHERE id=?");
-  shareid = psync_find_result(share, "shareid", PARAM_NUM)->num;
+  shareid = papi_find_result2(share, "shareid", PARAM_NUM)->num;
   psync_sql_bind_uint(q, 1, shareid);
   psync_sql_run_free(q);
 }
@@ -2327,7 +2325,7 @@ static void delete_shared_folder(const binresult *share) {
 static void delete_bsshared_folder(const binresult *share) {
   psync_sql_res *q;
   uint64_t shareid;
-  shareid = psync_find_result(share, "shareid", PARAM_NUM)->num;
+  shareid = papi_find_result2(share, "shareid", PARAM_NUM)->num;
 
   q = psync_sql_prep_statement("DELETE FROM bsharedfolder WHERE id=?");
   psync_sql_bind_uint(q, 1, shareid);
@@ -2338,7 +2336,7 @@ static void process_removedsharein(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_REMOVEIN, share, 0);
   delete_shared_folder(share);
 }
@@ -2347,7 +2345,7 @@ static void process_removebsharein(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_REMOVEIN, share, 1);
   delete_bsshared_folder(share);
 }
@@ -2356,7 +2354,7 @@ static void process_removedshareout(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_REMOVEOUT, share, 0);
   delete_shared_folder(share);
 }
@@ -2365,7 +2363,7 @@ static void process_removebshareout(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_REMOVEOUT, share, 1);
   delete_bsshared_folder(share);
 }
@@ -2374,7 +2372,7 @@ static void modify_shared_folder(const binresult *perms, uint64_t shareid) {
   psync_sql_res *q;
   q = psync_sql_prep_statement(
       "UPDATE sharedfolder SET permissions=? WHERE id=?");
-  psync_sql_bind_uint(q, 1, psync_get_permissions(perms));
+  psync_sql_bind_uint(q, 1, pfileops_get_perms(perms));
   psync_sql_bind_uint(q, 2, shareid);
   psync_sql_run_free(q);
 }
@@ -2383,7 +2381,7 @@ static void modify_bshared_folder(const binresult *perms, uint64_t shareid) {
   psync_sql_res *q;
   q = psync_sql_prep_statement(
       "UPDATE bsharedfolder SET permissions=? WHERE id=?");
-  psync_sql_bind_uint(q, 1, psync_get_permissions(perms));
+  psync_sql_bind_uint(q, 1, pfileops_get_perms(perms));
   psync_sql_bind_uint(q, 2, shareid);
   psync_sql_run_free(q);
 }
@@ -2392,40 +2390,40 @@ static void process_modifiedsharein(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_MODIFYIN, share, 0);
   modify_shared_folder(share,
-                       psync_find_result(share, "shareid", PARAM_NUM)->num);
+                       papi_find_result2(share, "shareid", PARAM_NUM)->num);
 }
 
 static void process_modifiedshareout(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_MODIFYOUT, share, 0);
   modify_shared_folder(share,
-                       psync_find_result(share, "shareid", PARAM_NUM)->num);
+                       papi_find_result2(share, "shareid", PARAM_NUM)->num);
 }
 
 static void process_modifybsharein(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_MODIFYIN, share, 1);
-  modify_bshared_folder(psync_find_result(share, "permissions", PARAM_HASH),
-                        psync_find_result(share, "shareid", PARAM_NUM)->num);
+  modify_bshared_folder(papi_find_result2(share, "permissions", PARAM_HASH),
+                        papi_find_result2(share, "shareid", PARAM_NUM)->num);
 }
 
 static void process_modifybshareout(const binresult *entry) {
   const binresult *share;
   if (!entry)
     return;
-  share = psync_find_result(entry, "share", PARAM_HASH);
+  share = papi_find_result2(entry, "share", PARAM_HASH);
   send_share_notify(PEVENT_SHARE_MODIFYOUT, share, 1);
-  modify_bshared_folder(psync_find_result(share, "permissions", PARAM_HASH),
-                        psync_find_result(share, "shareid", PARAM_NUM)->num);
+  modify_bshared_folder(papi_find_result2(share, "permissions", PARAM_HASH),
+                        papi_find_result2(share, "shareid", PARAM_NUM)->num);
 }
 
 static void process_cryptopasschange(const binresult *entry) {
@@ -2437,25 +2435,25 @@ static void process_modifyaccountinfo(const binresult *entry) {
   psync_userid_t ret;
   if (!entry)
     return;
-  res = psync_find_result(entry, "metadata", PARAM_HASH);
+  res = papi_find_result2(entry, "metadata", PARAM_HASH);
   psync_set_string_setting(
-      "companyname", psync_find_result(res, "companyname", PARAM_STR)->str);
+      "companyname", papi_find_result2(res, "companyname", PARAM_STR)->str);
   psync_set_uint_setting("owneruserid",
-                         psync_find_result(res, "owneruserid", PARAM_NUM)->num);
+                         papi_find_result2(res, "owneruserid", PARAM_NUM)->num);
   psync_get_current_userid(&ret);
   if (psync_get_uint_setting("owneruserid") == ret) {
     psync_set_bool_value("owner", 1);
   }
   psync_set_string_setting(
       "ownerfirstname",
-      psync_find_result(res, "ownerfirstname", PARAM_STR)->str);
+      papi_find_result2(res, "ownerfirstname", PARAM_STR)->str);
   psync_set_string_setting(
-      "ownerlastname", psync_find_result(res, "ownerlastname", PARAM_STR)->str);
+      "ownerlastname", papi_find_result2(res, "ownerlastname", PARAM_STR)->str);
   psync_set_string_setting(
-      "owneremail", psync_find_result(res, "owneremail", PARAM_STR)->str);
+      "owneremail", papi_find_result2(res, "owneremail", PARAM_STR)->str);
   psync_set_bool_setting(
       "owner_cryptosetup",
-      psync_find_result(res, "cryptosetup", PARAM_BOOL)->num);
+      papi_find_result2(res, "cryptosetup", PARAM_BOOL)->num);
 }
 
 static struct {
@@ -2480,9 +2478,9 @@ static uint64_t process_entries(const binresult *entries, uint64_t newdiffid) {
   uint32_t i, j;
   oused_quota = used_quota;
   needdownload = 0;
-  psync_diff_lock();
-  if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED) {
-    psync_diff_unlock();
+  pdiff_lock();
+  if (pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED) {
+    pdiff_unlock();
     return psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
   }
   psync_sql_start_transaction();
@@ -2490,7 +2488,7 @@ static uint64_t process_entries(const binresult *entries, uint64_t newdiffid) {
     psync_sql_statement("DELETE FROM setting WHERE id='lastanalyze'");
   for (i = 0; i < entries->length; i++) {
     entry = entries->array[i];
-    etype = psync_find_result(entry, "event", PARAM_STR);
+    etype = papi_find_result2(entry, "event", PARAM_STR);
     for (j = 0; j < event_list_size; j++)
       if (etype->length == event_list[j].len &&
           !memcmp(etype->str, event_list[j].name, etype->length)) {
@@ -2505,19 +2503,19 @@ static uint64_t process_entries(const binresult *entries, uint64_t newdiffid) {
   psync_set_uint_value("usedquota", used_quota);
   // update_ba_emails();
   // update_ba_teams();
-  psync_path_status_clear_path_cache();
+  ppathstatus_clear_cache();
   psync_sql_commit_transaction();
-  psync_diff_unlock();
+  pdiff_unlock();
   if (needdownload) {
-    psync_wake_download();
-    psync_status_recalc_to_download();
-    psync_send_status_update();
+    pdownload_wake();
+    pstatus_download_recalc();
+    pstatus_send_status_update();
     needdownload = 0;
   }
   used_quota =
       psync_sql_cellint("SELECT value FROM setting WHERE id='usedquota'", 0);
   if (oused_quota != used_quota)
-    psync_send_eventid(PEVENT_USEDQUOTA_CHANGED);
+    pqevent_queue_eventid(PEVENT_USEDQUOTA_CHANGED);
   return psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
 }
 
@@ -2527,9 +2525,9 @@ static void check_overquota() {
   if (isover != lisover) {
     lisover = isover;
     if (isover) {
-      psync_set_status(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_OVERQUOTA);
+      pstatus_set(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_OVERQUOTA);
     } else
-      psync_set_status(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_QUOTAOK);
+      pstatus_set(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_QUOTAOK);
   }
 }
 
@@ -2544,86 +2542,86 @@ static int setup_exeptions() {
   if (pipe(pfds) == SOCKET_ERROR)
     return INVALID_SOCKET;
   exceptionsockwrite = pfds[1];
-  psync_timer_exception_handler(diff_exception_handler);
+  ptimer_exception_handler(diff_exception_handler);
   return pfds[0];
 }
 
 static int send_diff_command(psock_t *sock, subscribed_ids ids) {
-  if (psync_notifications_running()) {
-    const char *ts = psync_notifications_get_thumb_size();
+  if (pnotify_running()) {
+    const char *ts = pnotify_get_thumb_size();
     if (ts) {
       if (psync_is_business) {
         binparam diffparams[] = {
-            P_STR(
+            PAPI_STR(
                 "subscribefor",
                 "diff,notifications,publinks,uploadlinks,teams,users,contacts"),
-            P_STR("timeformat", "timestamp"),
-            P_NUM("difflimit", PSYNC_DIFF_LIMIT),
-            P_NUM("diffid", ids.diffid),
-            P_NUM("notificationid", ids.notificationid),
-            P_STR("notificationthumbsize", ts),
-            P_NUM("publinkid", ids.publinkid),
-            P_NUM("uploadlinkid", ids.uploadlinkid)};
-        return send_command_no_res(sock, "subscribe", diffparams) ? 0 : -1;
+            PAPI_STR("timeformat", "timestamp"),
+            PAPI_NUM("difflimit", PSYNC_DIFF_LIMIT),
+            PAPI_NUM("diffid", ids.diffid),
+            PAPI_NUM("notificationid", ids.notificationid),
+            PAPI_STR("notificationthumbsize", ts),
+            PAPI_NUM("publinkid", ids.publinkid),
+            PAPI_NUM("uploadlinkid", ids.uploadlinkid)};
+        return papi_send_no_res(sock, "subscribe", diffparams) ? 0 : -1;
       } else {
         binparam diffparams[] = {
-            P_STR("subscribefor",
+            PAPI_STR("subscribefor",
                   "diff,notifications,publinks,uploadlinks,contacts"),
-            P_STR("timeformat", "timestamp"),
-            P_NUM("difflimit", PSYNC_DIFF_LIMIT),
-            P_NUM("diffid", ids.diffid),
-            P_NUM("notificationid", ids.notificationid),
-            P_STR("notificationthumbsize", ts),
-            P_NUM("publinkid", ids.publinkid),
-            P_NUM("uploadlinkid", ids.uploadlinkid)};
-        return send_command_no_res(sock, "subscribe", diffparams) ? 0 : -1;
+            PAPI_STR("timeformat", "timestamp"),
+            PAPI_NUM("difflimit", PSYNC_DIFF_LIMIT),
+            PAPI_NUM("diffid", ids.diffid),
+            PAPI_NUM("notificationid", ids.notificationid),
+            PAPI_STR("notificationthumbsize", ts),
+            PAPI_NUM("publinkid", ids.publinkid),
+            PAPI_NUM("uploadlinkid", ids.uploadlinkid)};
+        return papi_send_no_res(sock, "subscribe", diffparams) ? 0 : -1;
       }
     } else {
       if (psync_is_business) {
         binparam diffparams[] = {
-            P_STR(
+            PAPI_STR(
                 "subscribefor",
                 "diff,notifications,publinks,uploadlinks,teams,users,contacts"),
-            P_STR("timeformat", "timestamp"),
-            P_NUM("difflimit", PSYNC_DIFF_LIMIT),
-            P_NUM("diffid", ids.diffid),
-            P_NUM("notificationid", ids.notificationid),
-            P_NUM("publinkid", ids.publinkid),
-            P_NUM("uploadlinkid", ids.uploadlinkid)};
-        return send_command_no_res(sock, "subscribe", diffparams) ? 0 : -1;
+            PAPI_STR("timeformat", "timestamp"),
+            PAPI_NUM("difflimit", PSYNC_DIFF_LIMIT),
+            PAPI_NUM("diffid", ids.diffid),
+            PAPI_NUM("notificationid", ids.notificationid),
+            PAPI_NUM("publinkid", ids.publinkid),
+            PAPI_NUM("uploadlinkid", ids.uploadlinkid)};
+        return papi_send_no_res(sock, "subscribe", diffparams) ? 0 : -1;
       } else {
         binparam diffparams[] = {
-            P_STR("subscribefor",
+            PAPI_STR("subscribefor",
                   "diff,notifications,publinks,uploadlinks,contacts"),
-            P_STR("timeformat", "timestamp"),
-            P_NUM("difflimit", PSYNC_DIFF_LIMIT),
-            P_NUM("diffid", ids.diffid),
-            P_NUM("notificationid", ids.notificationid),
-            P_NUM("publinkid", ids.publinkid),
-            P_NUM("uploadlinkid", ids.uploadlinkid)};
-        return send_command_no_res(sock, "subscribe", diffparams) ? 0 : -1;
+            PAPI_STR("timeformat", "timestamp"),
+            PAPI_NUM("difflimit", PSYNC_DIFF_LIMIT),
+            PAPI_NUM("diffid", ids.diffid),
+            PAPI_NUM("notificationid", ids.notificationid),
+            PAPI_NUM("publinkid", ids.publinkid),
+            PAPI_NUM("uploadlinkid", ids.uploadlinkid)};
+        return papi_send_no_res(sock, "subscribe", diffparams) ? 0 : -1;
       }
     }
   } else {
     if (psync_is_business) {
       binparam diffparams[] = {
-          P_STR("subscribefor",
+          PAPI_STR("subscribefor",
                 "diff,publinks,uploadlinks,teams,users,contacts"),
-          P_STR("timeformat", "timestamp"),
-          P_NUM("difflimit", PSYNC_DIFF_LIMIT),
-          P_NUM("diffid", ids.diffid),
-          P_NUM("publinkid", ids.publinkid),
-          P_NUM("uploadlinkid", ids.uploadlinkid)};
-      return send_command_no_res(sock, "subscribe", diffparams) ? 0 : -1;
+          PAPI_STR("timeformat", "timestamp"),
+          PAPI_NUM("difflimit", PSYNC_DIFF_LIMIT),
+          PAPI_NUM("diffid", ids.diffid),
+          PAPI_NUM("publinkid", ids.publinkid),
+          PAPI_NUM("uploadlinkid", ids.uploadlinkid)};
+      return papi_send_no_res(sock, "subscribe", diffparams) ? 0 : -1;
     } else {
       binparam diffparams[] = {
-          P_STR("subscribefor", "diff,publinks,uploadlinks,contacts"),
-          P_STR("timeformat", "timestamp"),
-          P_NUM("difflimit", PSYNC_DIFF_LIMIT),
-          P_NUM("diffid", ids.diffid),
-          P_NUM("publinkid", ids.publinkid),
-          P_NUM("uploadlinkid", ids.uploadlinkid)};
-      return send_command_no_res(sock, "subscribe", diffparams) ? 0 : -1;
+          PAPI_STR("subscribefor", "diff,publinks,uploadlinks,contacts"),
+          PAPI_STR("timeformat", "timestamp"),
+          PAPI_NUM("difflimit", PSYNC_DIFF_LIMIT),
+          PAPI_NUM("diffid", ids.diffid),
+          PAPI_NUM("publinkid", ids.publinkid),
+          PAPI_NUM("uploadlinkid", ids.uploadlinkid)};
+      return papi_send_no_res(sock, "subscribe", diffparams) ? 0 : -1;
     }
   }
 }
@@ -2631,19 +2629,19 @@ static int send_diff_command(psock_t *sock, subscribed_ids ids) {
 static void handle_exception(psock_t **sock, subscribed_ids *ids,
                              char ex) {
   if (ex == 'c') {
-    if (last_event >= psync_timer_time() - 1)
+    if (last_event >= ptimer_time() - 1)
       return;
     if (psock_select_in(&(*sock)->sock, 1, 1000) != 0) {
-      debug(D_NOTICE, "got a psync_diff_wake() but no diff events in one "
+      debug(D_NOTICE, "got a pdiff_wake() but no diff events in one "
                       "second, closing socket");
       psock_close(*sock);
-      if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
+      if (pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
         ids->notificationid = 0;
       debug(D_NOTICE, "waiting for new socket");
       *sock = get_connected_socket();
       debug(D_NOTICE, "got new socket");
-      psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
-      psync_syncer_check_delayed_syncs();
+      pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
+      psyncer_check_delayed();
       ids->diffid =
           psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
       send_diff_command(*sock, *ids);
@@ -2651,32 +2649,32 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
     return;
   }
   debug(D_NOTICE, "exception handler %c", ex);
-  if (ex == 'r' || psync_status_get(PSTATUS_TYPE_RUN) == PSTATUS_RUN_STOP ||
-      psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED ||
+  if (ex == 'r' || pstatus_get(PSTATUS_TYPE_RUN) == PSTATUS_RUN_STOP ||
+      pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED ||
       psync_setting_get_bool(_PS(usessl)) != psock_is_ssl(*sock)) {
     psock_close(*sock);
-    if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
+    if (pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
       ids->notificationid = 0;
     debug(D_NOTICE, "waiting for new socket");
     *sock = get_connected_socket();
     debug(D_NOTICE, "got new socket");
-    psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
-    psync_syncer_check_delayed_syncs();
+    pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
+    psyncer_check_delayed();
     ids->diffid =
         psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
     send_diff_command(*sock, *ids);
   } else if (ex == 'e') {
-    binparam diffparams[] = {P_STR("id", "ignore")};
-    if (!send_command_no_res(*sock, "nop", diffparams) ||
+    binparam diffparams[] = {PAPI_STR("id", "ignore")};
+    if (!papi_send_no_res(*sock, "nop", diffparams) ||
         psock_select_in(&(*sock)->sock, 1,
                         PSYNC_SOCK_TIMEOUT_ON_EXCEPTION * 1000) != 0) {
       const char *prefixes[] = {"API:", "HTTP"};
       debug(D_NOTICE, "reconnecting diff");
       psock_close_bad(*sock);
-      psync_cache_clean_starting_with_one_of(prefixes, ARRAY_SIZE(prefixes));
+      pcache_clean_oneof(prefixes, ARRAY_SIZE(prefixes));
       *sock = get_connected_socket();
-      psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
-      psync_syncer_check_delayed_syncs();
+      pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
+      psyncer_check_delayed();
       send_diff_command(*sock, *ids);
     } else {
       debug(D_NOTICE, "diff socket seems to be alive");
@@ -2736,10 +2734,10 @@ static void psync_diff_refresh_fs(const binresult *entries) {
     uint32_t i;
     lastfolderid = (psync_folderid_t)-1;
     for (i = 0; i < entries->length; i++) {
-      meta = psync_check_result(entries->array[i], "metadata", PARAM_HASH);
+      meta = papi_check_result2(entries->array[i], "metadata", PARAM_HASH);
       if (!meta)
         continue;
-      meta = psync_check_result(meta, "parentfolderid", PARAM_NUM);
+      meta = papi_check_result2(meta, "parentfolderid", PARAM_NUM);
       if (!meta)
         continue;
       folderid = meta->num;
@@ -2761,7 +2759,7 @@ static void psync_diff_refresh_fs(const binresult *entries) {
 }
 
 static void psync_run_analyze_if_needed() {
-  if (psync_timer_time() >
+  if (ptimer_time() >
       psync_sql_cellint("SELECT value FROM setting WHERE id='lastanalyze'", 0) +
           24 * 3600) {
     static const char *skiptables[] = {"pagecache", "sqlite_stat1"};
@@ -2807,28 +2805,28 @@ static void psync_run_analyze_if_needed() {
     res = psync_sql_prep_statement(
         "REPLACE INTO setting (id, value) VALUES (?, ?)");
     psync_sql_bind_string(res, 1, "lastanalyze");
-    psync_sql_bind_uint(res, 2, psync_timer_time());
+    psync_sql_bind_uint(res, 2, ptimer_time());
     psync_sql_run_free(res);
     debug(D_NOTICE, "done running ANALYZE on tables");
   }
 }
 
 static int psync_diff_check_quota(psock_t *sock) {
-  binparam diffparams[] = {P_STR("timeformat", "timestamp"),
-                           P_BOOL("getapiserver", 1)};
+  binparam diffparams[] = {PAPI_STR("timeformat", "timestamp"),
+                           PAPI_BOOL("getapiserver", 1)};
   binresult *res;
   const binresult *uq;
   uint64_t oused_quota, result;
   oused_quota = used_quota;
-  res = send_command(sock, "userinfo", diffparams);
+  res = papi_send2(sock, "userinfo", diffparams);
   if (!res)
     return -1;
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result))
     debug(D_WARNING, "userinfo returned error %u: %s", (unsigned)result,
-          psync_find_result(res, "error", PARAM_STR)->str);
+          papi_find_result2(res, "error", PARAM_STR)->str);
   else {
-    uq = psync_check_result(res, "usedquota", PARAM_NUM);
+    uq = papi_check_result2(res, "usedquota", PARAM_NUM);
     if (likely_log(uq))
       used_quota = uq->num;
   }
@@ -2836,9 +2834,9 @@ static int psync_diff_check_quota(psock_t *sock) {
     debug(D_WARNING, "corrected locally calculated quota from %lu to %lu",
           (unsigned long)oused_quota, (unsigned long)used_quota);
     psync_set_uint_value("usedquota", used_quota);
-    psync_send_eventid(PEVENT_USEDQUOTA_CHANGED);
+    pqevent_queue_eventid(PEVENT_USEDQUOTA_CHANGED);
   }
-  uq = psync_find_result(psync_find_result(res, "apiserver", PARAM_HASH),
+  uq = papi_find_result2(papi_find_result2(res, "apiserver", PARAM_HASH),
                          "binapi", PARAM_ARRAY);
   if (uq->length)
     psync_apipool_set_server(uq->array[0]->str);
@@ -2850,10 +2848,10 @@ static void psync_diff_adapter_hash(void *out) {
   psync_fast_hash256_ctx ctx;
   psock_ifaces_t *list;
   list = psock_list_adapters();
-  psync_fast_hash256_init(&ctx);
-  psync_fast_hash256_update(&ctx, list->interfaces,
+  pcrc32c_fast_hash256_init(&ctx);
+  pcrc32c_fast_hash256_update(&ctx, list->interfaces,
                             list->interfacecnt * sizeof(psock_iface_t));
-  psync_fast_hash256_final(out, &ctx);
+  pcrc32c_fast_hash256_final(out, &ctx);
   psync_free(list);
 }
 
@@ -2879,14 +2877,14 @@ static void psync_diff_thread() {
   char *err = NULL;
   int should_free_res = 0;
 
-  psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
-  psync_send_status_update();
+  pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
+  pstatus_send_status_update();
 
 restart:
-  psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
+  pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   sock = get_connected_socket();
   debug(D_NOTICE, "connected");
-  psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_SCANNING);
+  pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_SCANNING);
   ids.diffid =
       psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
   if (ids.diffid == 0) {
@@ -2895,28 +2893,28 @@ restart:
   used_quota =
       psync_sql_cellint("SELECT value FROM setting WHERE id='usedquota'", 0);
   do {
-    binparam diffparams[] = {P_STR("timeformat", "timestamp"),
-                             P_NUM("limit", PSYNC_DIFF_LIMIT),
-                             P_NUM("diffid", ids.diffid)};
+    binparam diffparams[] = {PAPI_STR("timeformat", "timestamp"),
+                             PAPI_NUM("limit", PSYNC_DIFF_LIMIT),
+                             PAPI_NUM("diffid", ids.diffid)};
     if (!psync_do_run)
       goto cleanup;
-    res = send_command(sock, "diff", diffparams);
+    res = papi_send2(sock, "diff", diffparams);
     should_free_res = 1;
     if (!res) {
       psock_close(sock);
       goto restart;
     }
-    result = psync_find_result(res, "result", PARAM_NUM)->num;
+    result = papi_find_result2(res, "result", PARAM_NUM)->num;
     if (unlikely(result)) {
       debug(D_ERROR, "diff returned error %u: %s", (unsigned int)result,
-            psync_find_result(res, "error", PARAM_STR)->str);
+            papi_find_result2(res, "error", PARAM_STR)->str);
       psock_close(sock);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       goto restart;
     }
-    entries = psync_find_result(res, "entries", PARAM_ARRAY);
+    entries = papi_find_result2(res, "entries", PARAM_ARRAY);
     if (entries->length) {
-      newdiffid = psync_find_result(res, "diffid", PARAM_NUM)->num;
+      newdiffid = papi_find_result2(res, "diffid", PARAM_NUM)->num;
       debug(D_NOTICE, "processing diff with %u entries",
             (unsigned)entries->length);
       ids.diffid = process_entries(entries, newdiffid);
@@ -2939,10 +2937,10 @@ restart:
     goto restart;
   }
   check_overquota();
-  psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
+  pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
   initialdownload = 0;
   psync_run_analyze_if_needed();
-  psync_syncer_check_delayed_syncs();
+  psyncer_check_delayed();
   exceptionsock = setup_exeptions();
   if (unlikely(exceptionsock == INVALID_SOCKET)) {
     debug(D_ERROR, "could not create pipe");
@@ -2952,7 +2950,7 @@ restart:
   socks[0] = exceptionsock;
   socks[1] = sock->sock;
   psync_diff_adapter_hash(adapter_hash);
-  psync_timer_register(psync_diff_adapter_timer,
+  ptimer_register(psync_diff_adapter_timer,
                        PSYNC_DIFF_CHECK_ADAPTER_CHANGE_SEC, NULL);
   send_diff_command(sock, ids);
   psys_sleep_milliseconds(50);
@@ -2991,36 +2989,36 @@ restart:
       socks[1] = sock->sock;
     } else if (sel == 1) {
       sock->pending = 1;
-      res = get_result(sock);
+      res = papi_result(sock);
       should_free_res = 1;
       if (unlikely_log(!res)) {
-        psync_timer_notify_exception();
+        ptimer_notify_exception();
         handle_exception(&sock, &ids, 'r');
         socks[1] = sock->sock;
         last_event = 0;
         continue;
       }
-      last_event = psync_timer_time();
-      result = psync_find_result(res, "result", PARAM_NUM)->num;
+      last_event = ptimer_time();
+      result = papi_find_result2(res, "result", PARAM_NUM)->num;
       if (unlikely(result)) {
         if (result == 6003 || result == 6002) { // timeout or cancel
           debug(D_NOTICE, "got \"%s\" from the socket",
-                psync_find_result(res, "error", PARAM_STR)->str);
+                papi_find_result2(res, "error", PARAM_STR)->str);
           send_diff_command(sock, ids);
           continue;
         }
         debug(D_ERROR, "diff returned error %u: %s", (unsigned int)result,
-              psync_find_result(res, "error", PARAM_STR)->str);
+              papi_find_result2(res, "error", PARAM_STR)->str);
         handle_exception(&sock, &ids, 'r');
         socks[1] = sock->sock;
         continue;
       }
-      entries = psync_check_result(res, "from", PARAM_STR);
+      entries = papi_check_result2(res, "from", PARAM_STR);
       if (entries) {
         if (entries->length == 4 && !strcmp(entries->str, "diff")) {
-          entries = psync_find_result(res, "entries", PARAM_ARRAY);
+          entries = papi_find_result2(res, "entries", PARAM_ARRAY);
           if (entries->length) {
-            newdiffid = psync_find_result(res, "diffid", PARAM_NUM)->num;
+            newdiffid = papi_find_result2(res, "diffid", PARAM_NUM)->num;
             ids.diffid = process_entries(entries, newdiffid);
             psync_diff_refresh_fs(entries);
             psync_diff_check_quota(sock);
@@ -3032,11 +3030,11 @@ restart:
         } else if (entries->length == 13 &&
                    !strcmp(entries->str, "notifications")) {
           ids.notificationid =
-              psync_find_result(res, "notificationid", PARAM_NUM)->num;
-          psync_notifications_notify(res);
+              papi_find_result2(res, "notificationid", PARAM_NUM)->num;
+          pnotify_notify(res);
           should_free_res = 0; // Don't free res in this case
         } else if (entries->length == 8 && !strcmp(entries->str, "publinks")) {
-          ids.publinkid = psync_find_result(res, "publinkid", PARAM_NUM)->num;
+          ids.publinkid = papi_find_result2(res, "publinkid", PARAM_NUM)->num;
           ret = cache_links(err, 256);
           if (ret < 0)
             debug(D_ERROR, "Cacheing links failed with err %s", err);
@@ -3045,7 +3043,7 @@ restart:
         } else if (entries->length == 11 &&
                    !strcmp(entries->str, "uploadlinks")) {
           ids.uploadlinkid =
-              psync_find_result(res, "uploadlinkid", PARAM_NUM)->num;
+              papi_find_result2(res, "uploadlinkid", PARAM_NUM)->num;
           ret = cache_upload_links(&err);
           if (ret < 0)
             debug(D_ERROR, "Cacheing upload links failed with err %s", err);
@@ -3090,17 +3088,17 @@ void do_register_account_events_callback(paccount_cache_callback_t callback) {
   psync_cache_callback = callback;
 }
 
-void psync_diff_init() { 
+void pdiff_init() { 
   prun_thread("diff", psync_diff_thread); 
 }
 
-void psync_diff_wake() {
-  if (last_event >= psync_timer_time() - 1)
+void pdiff_wake() {
+  if (last_event >= ptimer_time() - 1)
     return;
   write(exceptionsockwrite, "c", 1);
 }
 
-void psync_diff_create_file(const binresult *meta) {
+void pdiff_file_create(const binresult *meta) {
   psync_sql_res *st;
   const binresult *name;
   uint64_t userid, fileid, hash, size;
@@ -3111,18 +3109,18 @@ void psync_diff_create_file(const binresult *meta) {
       "videocodec, audiocodec, videobitrate, "
       "audiobitrate, audiosamplerate, rotate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, "
       "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-  name = psync_find_result(meta, "name", PARAM_STR);
+  name = papi_find_result2(meta, "name", PARAM_STR);
   check_for_deletedfileid(meta);
-  if (psync_find_result(meta, "ismine", PARAM_BOOL)->num)
+  if (papi_find_result2(meta, "ismine", PARAM_BOOL)->num)
     userid = psync_my_userid;
   else
-    userid = psync_find_result(meta, "userid", PARAM_NUM)->num;
-  fileid = psync_find_result(meta, "fileid", PARAM_NUM)->num;
-  size = psync_find_result(meta, "size", PARAM_NUM)->num;
-  hash = psync_find_result(meta, "hash", PARAM_NUM)->num;
+    userid = papi_find_result2(meta, "userid", PARAM_NUM)->num;
+  fileid = papi_find_result2(meta, "fileid", PARAM_NUM)->num;
+  size = papi_find_result2(meta, "size", PARAM_NUM)->num;
+  hash = papi_find_result2(meta, "hash", PARAM_NUM)->num;
   psync_sql_bind_uint(st, 1, fileid);
   psync_sql_bind_uint(
-      st, 2, psync_find_result(meta, "parentfolderid", PARAM_NUM)->num);
+      st, 2, papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num);
   psync_sql_bind_uint(st, 3, userid);
   psync_sql_bind_uint(st, 4, size);
   psync_sql_bind_uint(st, 5, hash);
@@ -3130,42 +3128,42 @@ void psync_diff_create_file(const binresult *meta) {
   bind_meta(st, meta, 7);
   psync_sql_run_free(st);
   insert_revision(fileid, hash,
-                  psync_find_result(meta, "modified", PARAM_NUM)->num, size);
+                  papi_find_result2(meta, "modified", PARAM_NUM)->num, size);
   insert_revision(0, 0, 0, 0);
 }
 
-void psync_diff_update_file(const binresult *meta) {
+void pdiff_file_update(const binresult *meta) {
   create_entry();
   process_modifyfile(&entry);
   process_modifyfile(NULL);
   start_download();
 }
 
-void psync_diff_delete_file(const binresult *meta) {
+void pdiff_file_delete(const binresult *meta) {
   create_entry();
   process_deletefile(&entry);
   process_deletefile(NULL);
   start_download();
 }
 
-void psync_diff_update_folder(const binresult *meta) {
+void pdiff_fldr_update(const binresult *meta) {
   create_entry();
   process_modifyfolder(&entry);
   process_modifyfolder(NULL);
   start_download();
 }
 
-void psync_diff_delete_folder(const binresult *meta) {
+void pdiff_fldr_delete(const binresult *meta) {
   create_entry();
   process_deletefolder(&entry);
   process_deletefolder(NULL);
   start_download();
 }
 
-void psync_diff_lock() { 
+void pdiff_lock() { 
   pthread_mutex_lock(&diff_mutex); 
 }
 
-void psync_diff_unlock() { 
+void pdiff_unlock() { 
   pthread_mutex_unlock(&diff_mutex); 
 }

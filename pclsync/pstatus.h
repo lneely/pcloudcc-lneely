@@ -33,7 +33,33 @@
 
 #include <stdint.h>
 
+#include "plist.h"
+
 #define PSTATUS_NUM_STATUSES 6
+
+#define PSTATUS_READY 0
+#define PSTATUS_DOWNLOADING 1
+#define PSTATUS_UPLOADING 2
+#define PSTATUS_DOWNLOADINGANDUPLOADING 3
+#define PSTATUS_LOGIN_REQUIRED 4
+#define PSTATUS_BAD_LOGIN_DATA 5
+#define PSTATUS_BAD_LOGIN_TOKEN 6
+#define PSTATUS_ACCOUNT_FULL 7
+#define PSTATUS_DISK_FULL 8
+#define PSTATUS_PAUSED 9
+#define PSTATUS_STOPPED 10
+#define PSTATUS_OFFLINE 11
+#define PSTATUS_CONNECTING 12
+#define PSTATUS_SCANNING 13
+#define PSTATUS_USER_MISMATCH 14
+#define PSTATUS_ACCOUNT_EXPIRED 15
+#define PSTATUS_TFA_REQUIRED 16
+#define PSTATUS_BAD_TFA_CODE 17
+#define PSTATUS_VERIFY_REQUIRED 18
+#define PSTATUS_RELOCATION 19
+#define PSTATUS_RELOCATED 20
+#define PSTATUS_ACCOUT_TFAERR PSTATUS_TFA_REQUIRED
+#define PSTATUS_ACCOUT_EXPIRED PSTATUS_ACCOUNT_EXPIRED
 
 #define PSTATUS_TYPE_RUN 0
 #define PSTATUS_TYPE_ONLINE 1
@@ -74,28 +100,59 @@
 #define PSTATUS_LOCALSCAN_SCANNING 1
 #define PSTATUS_LOCALSCAN_READY 2
 
+typedef struct {
+  psync_list list;
+  char *str;
+} string_list_t;
+
+typedef enum Status { INSYNC, INPROG, NOSYNC, INVSYNC } external_status_t;
+
 #define PSTATUS_COMBINE(type, statuses) (((type) << 24) + (statuses))
 
-void psync_status_init();
-void psync_status_recalc_to_download();
-void psync_status_recalc_to_download_async();
-void psync_status_recalc_to_upload();
-void psync_status_recalc_to_upload_async();
-uint32_t psync_status_get(uint32_t statusid);
-void psync_set_status(uint32_t statusid, uint32_t status);
-void psync_wait_status(uint32_t statusid, uint32_t status);
-void psync_terminate_status_waiters();
-void psync_wait_statuses_array(const uint32_t *combinedstatuses, uint32_t cnt);
-void psync_wait_statuses(uint32_t first, ...);
-int psync_statuses_ok_array(const uint32_t *combinedstatuses, uint32_t cnt);
+typedef struct pstatus_struct_ {
+  const char *downloadstr;          // formatted string with the status of uploads
+  const char *uploadstr;            // formatted string with the status of downloads 
+  uint64_t bytestoupload;           // sum of the sizes of files that need to be uploaded to sync state
+  uint64_t bytestouploadcurrent;    // sum of the sizes of files in filesuploading
+  uint64_t bytesuploaded;           // bytes uploaded in files accounted in filesuploading
+  uint64_t bytestodownload;         // sum of the sizes of files that need to be downloaded to sync state
+  uint64_t bytestodownloadcurrent;  // sum of the sizes of files in filesdownloading
+  uint64_t bytesdownloaded;         // bytes downloaded in files accounted in filesdownloading
+  uint32_t status;                  // current status, one of PSTATUS_ constants
+  uint32_t filestoupload;           // number of files to upload in order to sync state, including filesuploading
+  uint32_t filesuploading;          // number of files currently uploading
+  uint32_t uploadspeed;             // in bytes/sec
+  uint32_t filestodownload;         // number of files to download in order to sync state, including filesdownloading
+  uint32_t filesdownloading;        // number of files currently downloading
+  uint32_t downloadspeed;           // in bytes/sec 
+  uint8_t remoteisfull;             // account is full and no files will be synced upwards
+  uint8_t localisfull;              // (some) local hard drive is full and no files will be synced from the cloud
+} pstatus_t;
 
-void psync_status_set_download_speed(uint32_t speed);
-void psync_status_set_upload_speed(uint32_t speed);
-;
+/* Status change callback is called every time value is changed. It may be
+ * called quite often when there are active uploads/downloads. Callbacks are
+ * issued from a special callback thread (e.g. the same thread all the time) and
+ * are guaranteed not to overlap.
+ */
+typedef void (*pstatus_change_callback_t)(pstatus_t *status);
 
-void psync_status_send_update();
+void pstatus_init();
+void pstatus_download_recalc();
+void pstatus_download_recalc_async();
+void pstatus_upload_recalc();
+void pstatus_upload_recalc_async();
+uint32_t pstatus_get(uint32_t statusid);
+void pstatus_set(uint32_t statusid, uint32_t status);
+void pstatus_wait(uint32_t statusid, uint32_t status);
+void pstatus_wait_term();
+void pstatus_wait_statuses_arr(const uint32_t *combinedstatuses, uint32_t cnt);
+void pstatus_wait_status(uint32_t first, ...);
+int pstatus_ok_status_arr(const uint32_t *combinedstatuses, uint32_t cnt);
+void pstatus_download_set_speed(uint32_t speed);
+void pstatus_upload_set_speed(uint32_t speed);
+void pstatus_send_update();
+void pstatus_get_cb(pstatus_t *status);
+void pstatus_set_cb(pstatus_change_callback_t callback);
+void pstatus_send_status_update();
 
-static inline int psync_status_is_offline() {
-  return psync_status_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_OFFLINE;
-}
 #endif
