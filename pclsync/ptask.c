@@ -890,7 +890,7 @@ void ptask_download_q(psync_syncid_t syncid, psync_fileid_t fileid, psync_folder
 
 void ptask_download(psync_syncid_t syncid, psync_fileid_t fileid, psync_folderid_t localfolderid, const char *name) {
   ptask_download_q(syncid, fileid, localfolderid, name);
-  psync_wake_download();
+  pdownload_wake();
   psync_status_recalc_to_download();
   psync_send_status_update();
 }

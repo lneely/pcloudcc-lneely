@@ -335,7 +335,7 @@ static void psync_sync_newsyncedfolder(psync_syncid_t syncid) {
       if (synctype & PSYNC_DOWNLOAD_ONLY) {
         psync_status_recalc_to_download();
         psync_send_status_update();
-        psync_wake_download();
+        pdownload_wake();
       }
       psync_localnotify_add_sync(syncid);
       psync_restat_sync_folders_add(syncid, localpath);

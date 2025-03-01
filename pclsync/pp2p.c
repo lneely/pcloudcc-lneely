@@ -188,11 +188,11 @@ static int psync_p2p_is_downloading(const unsigned char *hashstart,
                                     const unsigned char *rand,
                                     uint64_t filesize,
                                     unsigned char *realhash) {
-  downloading_files_hashes *hashes;
+  download_hashes_t *hashes;
   unsigned char hashsource[PSYNC_HASH_BLOCK_SIZE],
       hashbin[PSYNC_HASH_DIGEST_LEN], hashhex[PSYNC_HASH_DIGEST_HEXLEN];
   size_t i;
-  hashes = psync_get_downloading_hashes();
+  hashes = pdownload_get_hashes();
   for (i = 0; i < hashes->hashcnt; i++) {
     if (memcmp(hashstart, hashes->hashes[i], PSYNC_P2P_HEXHASH_BYTES))
       continue;

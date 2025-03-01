@@ -1516,7 +1516,7 @@ static void process_modifyfile(const binresult *entry) {
   if (oldsync || newsync) {
     if (psync_is_name_to_ignore(name->str)) {
       char *path;
-      psync_delete_download_tasks_for_file(fileid, 0, 1);
+      pdownload_tasks_delete(fileid, 0, 1);
       path = psync_get_path_by_fileid(fileid, NULL);
       ptask_lfile_rm(fileid, path);
       psync_free(path);
@@ -1526,7 +1526,7 @@ static void process_modifyfile(const binresult *entry) {
     lneeddownload = hash != psync_get_number(row[3]) || size != oldsize;
     oldname = psync_get_lstring(row[4], &oldnamelen);
     if (lneeddownload)
-      psync_delete_download_tasks_for_file(fileid, 0, 0);
+      pdownload_tasks_delete(fileid, 0, 0);
     needrename = oldparentfolderid != parentfolderid ||
                  name->length != oldnamelen ||
                  memcmp(name->str, oldname, oldnamelen);
@@ -1586,7 +1586,7 @@ static void process_modifyfile(const binresult *entry) {
       char *path = psync_get_path_by_fileid(fileid, NULL);
       ptask_lfile_rm_id(psync_get_result_cell(fres1, i, 0),
                                           fileid, path);
-      psync_delete_download_tasks_for_file(
+      pdownload_tasks_delete(
           fileid, psync_get_result_cell(fres1, i, 0), 1);
       psync_free(path);
       needdownload = 1;
@@ -1617,7 +1617,7 @@ static void process_deletefile(const binresult *entry) {
   fileid = papi_find_result2(meta, "fileid", PARAM_NUM)->num;
   if (psync_is_folder_in_downloadlist(
           papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num)) {
-    psync_delete_download_tasks_for_file(fileid, 0, 1);
+    pdownload_tasks_delete(fileid, 0, 1);
     path = psync_get_path_by_fileid(fileid, NULL);
     if (likely(path)) {
       ptask_lfile_rm(fileid, path);
@@ -1636,7 +1636,7 @@ static void process_deletefile(const binresult *entry) {
 
 static void start_download() {
   if (needdownload) {
-    psync_wake_download();
+    pdownload_wake();
     psync_status_recalc_to_download();
     psync_send_status_update();
     needdownload = 0;
@@ -2507,7 +2507,7 @@ static uint64_t process_entries(const binresult *entries, uint64_t newdiffid) {
   psync_sql_commit_transaction();
   pdiff_unlock();
   if (needdownload) {
-    psync_wake_download();
+    pdownload_wake();
     psync_status_recalc_to_download();
     psync_send_status_update();
     needdownload = 0;

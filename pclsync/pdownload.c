@@ -32,32 +32,21 @@
 #include <pthread.h>
 #include <stddef.h>
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/sha1.h>
-#include <mbedtls/ssl.h>
-
-#include "papi.h"
 #include "pqevent.h"
 #include "pdownload.h"
 #include "pfolder.h"
 #include "plibs.h"
-#include "plist.h"
 #include "plocalscan.h"
 #include "pnetlibs.h"
 #include "pp2p.h"
 #include "ppathstatus.h"
 #include "prun.h"
-#include "psettings.h"
 #include "psys.h"
 #include "pstatus.h"
 #include "psyncer.h"
 #include "ptask.h"
 #include "ptimer.h"
 #include "pupload.h"
-#include "putil.h"
 #include "ppath.h"
 
 extern const unsigned char pfile_invalid_chars[];
@@ -1057,7 +1046,7 @@ static void free_task_timer_thread(void *ptr) {
   set_task_inprogress(dt->taskid, 0);
   free_download_task(dt);
   psync_send_status_update();
-  psync_wake_download();
+  pdownload_wake();
 }
 
 static void free_task_timer(psync_timer_t timer, void *ptr) {
@@ -1078,7 +1067,7 @@ static void handle_async_error(download_task_t *dt, psync_async_result_t *res) {
     set_task_inprogress(dt->taskid, 0);
     free_download_task(dt);
     psync_send_status_update();
-    psync_wake_download();
+    pdownload_wake();
   } else if ((res->errorflags & PSYNC_ASYNC_ERR_FLAG_PERM) ||
              !(res->errorflags & PSYNC_ASYNC_ERR_FLAG_RETRY_AS_IS)) {
     delete_task(dt->taskid);
@@ -1143,7 +1132,7 @@ static void task_run_download_file_thread(void *ptr) {
   if (task_download_file(dt)) {
     psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
     set_task_inprogress(dt->taskid, 0);
-    psync_wake_download();
+    pdownload_wake();
   } else {
     delete_task(dt->taskid);
     psync_path_status_sync_folder_task_completed(dt->dwllist.syncid,
@@ -1519,19 +1508,19 @@ static void download_thread() {
   }
 }
 
-void psync_wake_download() {
+void pdownload_wake() {
   pthread_mutex_lock(&download_mutex);
   if (!download_wakes++)
     pthread_cond_signal(&download_cond);
   pthread_mutex_unlock(&download_mutex);
 }
 
-void psync_download_init() {
-  psync_timer_exception_handler(psync_wake_download);
+void pdownload_init() {
+  psync_timer_exception_handler(pdownload_wake);
   prun_thread("download main", download_thread);
 }
 
-void psync_delete_download_tasks_for_file(psync_fileid_t fileid,
+void pdownload_tasks_delete(psync_fileid_t fileid,
                                           psync_syncid_t syncid, int deltemp) {
   psync_sql_res *res;
   download_list_t *dwl;
@@ -1563,7 +1552,7 @@ void psync_delete_download_tasks_for_file(psync_fileid_t fileid,
   pthread_mutex_unlock(&current_downloads_mutex);
 }
 
-void psync_stop_file_download(psync_fileid_t fileid, psync_syncid_t syncid) {
+void pdownload_stop_file(psync_fileid_t fileid, psync_syncid_t syncid) {
   download_list_t *dwl;
   pthread_mutex_lock(&current_downloads_mutex);
   psync_list_for_each_element(dwl, &downloads, download_list_t,
@@ -1572,7 +1561,7 @@ void psync_stop_file_download(psync_fileid_t fileid, psync_syncid_t syncid) {
   pthread_mutex_unlock(&current_downloads_mutex);
 }
 
-void psync_stop_sync_download(psync_syncid_t syncid) {
+void pdownload_stop_sync(psync_syncid_t syncid) {
   download_list_t *dwl;
   psync_sql_res *res;
   res = psync_sql_prep_statement(
@@ -1587,7 +1576,7 @@ void psync_stop_sync_download(psync_syncid_t syncid) {
   pthread_mutex_unlock(&current_downloads_mutex);
 }
 
-void psync_stop_all_download() {
+void pdownload_stop_all() {
   download_list_t *dwl;
   pthread_mutex_lock(&current_downloads_mutex);
   psync_list_for_each_element(dwl, &downloads, download_list_t, list)
@@ -1595,15 +1584,15 @@ void psync_stop_all_download() {
   pthread_mutex_unlock(&current_downloads_mutex);
 }
 
-downloading_files_hashes *psync_get_downloading_hashes() {
+download_hashes_t *pdownload_get_hashes() {
   download_list_t *dwl;
-  downloading_files_hashes *ret;
+  download_hashes_t *ret;
   size_t cnt;
   cnt = 0;
   pthread_mutex_lock(&current_downloads_mutex);
   psync_list_for_each_element(dwl, &downloads, download_list_t, list) cnt++;
-  ret = (downloading_files_hashes *)psync_malloc(
-      offsetof(downloading_files_hashes, hashes) +
+  ret = (download_hashes_t *)psync_malloc(
+      offsetof(download_hashes_t, hashes) +
       sizeof(psync_hex_hash) * cnt);
   cnt = 0;
   psync_list_for_each_element(dwl, &downloads, download_list_t,
