@@ -46,7 +46,7 @@
 #include "pcache.h"
 #include "ptevent.h"
 #include "pqevent.h"
-#include "pcloudcrypto.h"
+#include "pcryptofolder.h"
 #include "pcontacts.h"
 #include "pdevice.h"
 #include "pdevice_monitor.h"
@@ -213,7 +213,7 @@ void psync_set_alloc(psync_malloc_t malloc_call, psync_realloc_t realloc_call,
 static void psync_stop_crypto_on_sleep() {
   if (psync_setting_get_bool(_PS(sleepstopcrypto)) &&
       psync_crypto_isstarted()) {
-    psync_cloud_crypto_stop();
+    pcryptofolder_lock();
     debug(D_NOTICE, "stopped crypto due to sleep");
   }
 }
@@ -437,7 +437,7 @@ void psync_logout2(uint32_t auth_status, int doinvauth) {
   if (doinvauth)
     psync_invalidate_auth(psync_my_auth);
   memset(psync_my_auth, 0, sizeof(psync_my_auth));
-  psync_cloud_crypto_stop();
+  pcryptofolder_lock();
   pthread_mutex_lock(&psync_my_auth_mutex);
   psync_free(psync_my_pass);
   psync_my_pass = NULL;
@@ -552,7 +552,7 @@ void psync_unlink() {
   psync_status_recalc_to_download();
   psync_status_recalc_to_upload();
   psync_invalidate_auth(psync_my_auth);
-  psync_cloud_crypto_stop();
+  pcryptofolder_lock();
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   psys_sleep_milliseconds(20);
   psync_stop_localscan();
@@ -1583,7 +1583,7 @@ int psync_crypto_share_folder(psync_folderid_t folderid, const char *name,
                          PAPI_NUM("strictmode", 1)};
     return psync_run_command("sharefolder", params, err);
   }
-  if ((change_err = psync_crypto_change_passphrase_unlocked(
+  if ((change_err = pcryptofolder_change_pass_unlocked(
            temppass, PSYNC_CRYPTO_FLAG_TEMP_PASS, &priv_key, &signature))) {
     return change_err;
   }
@@ -1633,7 +1633,7 @@ int psync_crypto_account_teamshare(psync_folderid_t folderid, const char *name,
     return psync_run_command("account_teamshare", params, err);
   }
 
-  if ((change_err = psync_crypto_change_passphrase_unlocked(
+  if ((change_err = pcryptofolder_change_pass_unlocked(
            temppass, PSYNC_CRYPTO_FLAG_TEMP_PASS, &priv_key, &signature))) {
     return change_err;
   }
@@ -2185,30 +2185,30 @@ int psync_crypto_setup(const char *password, const char *hint) {
   if (psync_status_is_offline())
     return PSYNC_CRYPTO_SETUP_CANT_CONNECT;
   else
-    return psync_cloud_crypto_setup(password, hint);
+    return pcryptofolder_setup(password, hint);
 }
 
 int psync_crypto_get_hint(char **hint) {
   if (psync_status_is_offline())
     return PSYNC_CRYPTO_HINT_CANT_CONNECT;
   else
-    return psync_cloud_crypto_get_hint(hint);
+    return pcryptofolder_get_hint(hint);
 }
 
 int psync_crypto_start(const char *password) {
-  return psync_cloud_crypto_start(password);
+  return pcryptofolder_unlock(password);
 }
 
-int psync_crypto_stop() { return psync_cloud_crypto_stop(); }
+int psync_crypto_stop() { return pcryptofolder_lock(); }
 
-int psync_crypto_isstarted() { return psync_cloud_crypto_isstarted(); }
+int psync_crypto_isstarted() { return pcryptofolder_is_unlocked(); }
 
 int psync_crypto_mkdir(psync_folderid_t folderid, const char *name,
                        const char **err, psync_folderid_t *newfolderid) {
   if (psync_status_is_offline())
     return PSYNC_CRYPTO_CANT_CONNECT;
   else
-    return psync_cloud_crypto_mkdir(folderid, name, err, newfolderid);
+    return pcryptofolder_mkdir(folderid, name, err, newfolderid);
 }
 
 int psync_crypto_issetup() {
@@ -2237,7 +2237,7 @@ int psync_crypto_reset() {
   if (psync_status_is_offline())
     return PSYNC_CRYPTO_RESET_CANT_CONNECT;
   else
-    return psync_cloud_crypto_reset();
+    return pcryptofolder_reset();
 }
 
 psync_folderid_t psync_crypto_folderid() {
@@ -2302,7 +2302,7 @@ int psync_crypto_change_crypto_pass(const char *oldpass, const char *newpass,
   char *priv_key = NULL;
   char *signature = NULL;
 
-  if ((err = psync_crypto_change_passphrase(oldpass, newpass, 0, &priv_key,
+  if ((err = pcryptofolder_change_pass(oldpass, newpass, 0, &priv_key,
                                             &signature))) {
     return err;
   }
@@ -2349,7 +2349,7 @@ int psync_crypto_change_crypto_pass_unlocked(const char *newpass,
   char *priv_key = NULL;
   char *signature = NULL;
 
-  if ((err = psync_crypto_change_passphrase_unlocked(newpass, 0, &priv_key,
+  if ((err = pcryptofolder_change_pass_unlocked(newpass, 0, &priv_key,
                                                      &signature))) {
     return err;
   }
@@ -3238,7 +3238,7 @@ void psync_delete_cached_crypto_keys() {
       "'crypto_private_salt', 'crypto_private_sha1', 'crypto_public_sha1')");
   if (psync_sql_affected_rows()) {
     debug(D_NOTICE, "deleted cached crypto keys");
-    psync_cloud_crypto_clean_cache();
+    pcryptofolder_clean_cache();
   }
   psync_sql_statement("DELETE FROM cryptofolderkey");
   psync_sql_statement("DELETE FROM cryptofilekey");

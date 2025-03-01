@@ -208,6 +208,14 @@ static int flush_pages(int nosleep);
 
 static void flush_pages_noret() { flush_pages(0); }
 
+static inline int psync_crypto_is_error(const void *ptr) {
+  return (uintptr_t)ptr <= PSYNC_CRYPTO_MAX_ERROR;
+}
+
+static inline int psync_crypto_to_error(const void *ptr) {
+  return -((int)(uintptr_t)ptr);
+}
+
 static psync_cache_page_t *psync_pagecache_get_free_page_if_available() {
   psync_cache_page_t *page;
   int runthread;
@@ -599,7 +607,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
         psync_process_api_error(result);
         goto err4;
       }
-      enc = psync_cloud_crypto_get_file_encoder_from_binresult(request->fileid,
+      enc = pcryptofolder_filencoder_from_binresult(request->fileid,
                                                                ret);
       if (unlikely_log(psync_crypto_is_error(enc)))
         goto err4;
@@ -611,7 +619,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
         request->of->encoder = enc;
         pthread_cond_broadcast(&enc_key_cond);
       } else
-        psync_cloud_crypto_release_file_encoder(request->fileid, request->hash,
+        pcryptofolder_filencoder_release(request->fileid, request->hash,
                                                 enc);
       pthread_mutex_unlock(&request->of->mutex);
       request->needkey = 0;
@@ -2090,7 +2098,7 @@ retry:
   }
   if (unlikely(request->needkey)) {
     enc =
-        psync_cloud_crypto_get_file_encoder(request->fileid, request->hash, 0);
+        pcryptofolder_filencoder_get(request->fileid, request->hash, 0);
     if (psync_crypto_to_error(enc)) {
       psync_pagecache_send_error(request, -EIO);
       return;
@@ -2101,7 +2109,7 @@ retry:
       request->of->encoder = enc;
       pthread_cond_broadcast(&enc_key_cond);
     } else
-      psync_cloud_crypto_release_file_encoder(request->fileid, request->hash,
+      pcryptofolder_filencoder_release(request->fileid, request->hash,
                                               enc);
     pthread_mutex_unlock(&request->of->mutex);
     request->needkey = 0;

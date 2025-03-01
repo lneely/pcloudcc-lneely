@@ -36,7 +36,7 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 
-#include "pcloudcrypto.h"
+#include "pcryptofolder.h"
 #include "pfolder.h"
 #include "pfs.h"
 #include "pfsfolder.h"
@@ -47,18 +47,26 @@
 
 static PSYNC_THREAD int cryptoerr = 0;
 
+static inline int psync_crypto_is_error(const void *ptr) {
+  return (uintptr_t)ptr <= PSYNC_CRYPTO_MAX_ERROR;
+}
+
+static inline int psync_crypto_to_error(const void *ptr) {
+  return -((int)(uintptr_t)ptr);
+}
+
 static char *get_encname_for_folder(psync_fsfolderid_t folderid,
                                     const char *path, size_t len) {
   char *name, *encname;
   psync_crypto_aes256_text_encoder_t enc;
-  enc = psync_cloud_crypto_get_folder_encoder(folderid);
+  enc = pcryptofolder_fldencoder_get(folderid);
   if (psync_crypto_is_error(enc)) {
     cryptoerr = psync_crypto_to_error(enc);
     return NULL;
   }
   name = psync_strndup(path, len);
-  encname = psync_cloud_crypto_encode_filename(enc, name);
-  psync_cloud_crypto_release_folder_encoder(folderid, enc);
+  encname = pcryptofolder_fldencode_filename(enc, name);
+  pcryptofolder_fldencoder_release(folderid, enc);
   psync_free(name);
   return encname;
 }
@@ -72,13 +80,13 @@ static psync_fspath_t *ret_folder_data(psync_fsfolderid_t folderid,
     psync_crypto_aes256_text_encoder_t enc;
     char *encname;
     size_t len;
-    enc = psync_cloud_crypto_get_folder_encoder(folderid);
+    enc = pcryptofolder_fldencoder_get(folderid);
     if (psync_crypto_is_error(enc)) {
       cryptoerr = psync_crypto_to_error(enc);
       return NULL;
     }
-    encname = psync_cloud_crypto_encode_filename(enc, name);
-    psync_cloud_crypto_release_folder_encoder(folderid, enc);
+    encname = pcryptofolder_fldencode_filename(enc, name);
+    pcryptofolder_fldencoder_release(folderid, enc);
     len = strlen(encname);
     ret = (psync_fspath_t *)psync_malloc(sizeof(psync_fspath_t) + len + 1);
     memcpy(ret + 1, encname, len + 1);
@@ -103,14 +111,14 @@ char *get_decname_for_folder(psync_fsfolderid_t folderid, const char *path,
                              size_t len) {
   char *name, *decname;
   psync_crypto_aes256_text_decoder_t dec;
-  dec = psync_cloud_crypto_get_folder_decoder(folderid);
+  dec = pcryptofolder_flddecoder_get(folderid);
   if (psync_crypto_is_error(dec)) {
     cryptoerr = psync_crypto_to_error(dec);
     return NULL;
   }
   name = psync_strndup(path, len);
-  decname = psync_cloud_crypto_decode_filename(dec, name);
-  psync_cloud_crypto_release_folder_decoder(folderid, dec);
+  decname = pcryptofolder_flddecode_filename(dec, name);
+  pcryptofolder_flddecoder_release(folderid, dec);
   psync_free(name);
   return decname;
 }

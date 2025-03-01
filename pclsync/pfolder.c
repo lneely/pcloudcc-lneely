@@ -38,7 +38,7 @@
 #include <stddef.h>
 
 #include "papi.h"
-#include "pcloudcrypto.h"
+#include "pcryptofolder.h"
 #include "pdiff.h"
 #include "pfolder.h"
 #include "pfsfolder.h"
@@ -72,6 +72,14 @@ typedef struct _string_list {
   char *str;
   size_t len;
 } string_list;
+
+static inline int psync_crypto_is_error(const void *ptr) {
+  return (uintptr_t)ptr <= PSYNC_CRYPTO_MAX_ERROR;
+}
+
+static inline int psync_crypto_to_error(const void *ptr) {
+  return -((int)(uintptr_t)ptr);
+}
 
 psync_folderid_t psync_get_folderid_by_path(const char *path) {
   psync_folderid_t cfolderid;
@@ -275,15 +283,15 @@ static int psync_add_path_to_list(psync_list *lst, psync_folderid_t folderid) {
 static string_list *str_list_decode(psync_folderid_t folderid, string_list *e) {
   psync_crypto_aes256_text_decoder_t dec;
   char *fn;
-  dec = psync_cloud_crypto_get_folder_decoder(folderid);
+  dec = pcryptofolder_flddecoder_get(folderid);
   if (psync_crypto_is_error(dec)) {
     psync_free(e);
     debug(D_WARNING, "got error %d getting decoder for folderid %lu",
           psync_crypto_to_error(dec), (unsigned long)folderid);
     return NULL;
   }
-  fn = psync_cloud_crypto_decode_filename(dec, e->str);
-  psync_cloud_crypto_release_folder_decoder(folderid, dec);
+  fn = pcryptofolder_flddecode_filename(dec, e->str);
+  pcryptofolder_flddecoder_release(folderid, dec);
   psync_free(e);
   if (unlikely_log(!fn))
     return NULL;

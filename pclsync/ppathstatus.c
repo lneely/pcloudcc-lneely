@@ -36,7 +36,7 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 
-#include "pcloudcrypto.h"
+#include "pcryptofolder.h"
 #include "pfolder.h"
 #include "pfs.h"
 #include "plibs.h"
@@ -45,7 +45,6 @@
 #include "pstatus.h"
 #include "ptask.h"
 #include "ptree.h"
-#include <ctype.h>
 #include <string.h>
 
 #define PATH_CACHE_SIZE 512
@@ -139,6 +138,14 @@ static psync_tree *folder_tasks = PSYNC_TREE_EMPTY;
 
 static void sync_data_free(sync_data_t *sd);
 static void load_sync_tasks();
+
+static inline int psync_crypto_is_error(const void *ptr) {
+  return (uintptr_t)ptr <= PSYNC_CRYPTO_MAX_ERROR;
+}
+
+static inline int psync_crypto_to_error(const void *ptr) {
+  return -((int)(uintptr_t)ptr);
+}
 
 void psync_path_status_init() {
   size_t i;
@@ -884,11 +891,11 @@ static int move_encname_to_buff(psync_folderid_t folderid, char *buff,
     return -1;
   memcpy(buff, name, namelen);
   buff[namelen] = 0;
-  enc = psync_cloud_crypto_get_folder_encoder(folderid);
+  enc = pcryptofolder_fldencoder_get(folderid);
   if (unlikely(psync_crypto_is_error(enc)))
     return -1;
-  encname = psync_cloud_crypto_encode_filename(enc, buff);
-  psync_cloud_crypto_release_folder_encoder(folderid, enc);
+  encname = pcryptofolder_fldencode_filename(enc, buff);
+  pcryptofolder_fldencoder_release(folderid, enc);
   len = strlen(encname);
   if (unlikely(len >= sizeof(buff)))
     return -1;

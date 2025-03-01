@@ -39,7 +39,7 @@
 #include <mbedtls/pkcs5.h>
 #include <mbedtls/ssl.h>
 
-#include "pcloudcrypto.h"
+#include "pcryptofolder.h"
 #include "pfile.h"
 #include "pfscrypto.h"
 #include "plibs.h"

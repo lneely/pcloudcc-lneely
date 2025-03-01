@@ -32,7 +32,7 @@
 #ifndef _PSYNC_FSCRYPTO_H
 #define _PSYNC_FSCRYPTO_H
 
-#include "pcloudcrypto.h"
+#include "pcryptofolder.h"
 #include "pfs.h"
 
 #define PSYNC_CRYPTO_MAX_SECTORID (UINT32_MAX - 1)

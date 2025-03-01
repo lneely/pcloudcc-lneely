@@ -42,7 +42,7 @@
 #include <mbedtls/ssl.h>
 
 #include "pcache.h"
-#include "pcloudcrypto.h"
+#include "pcryptofolder.h"
 #include "putil.h"
 #include "pfolder.h"
 #include "pfs.h"
@@ -61,6 +61,14 @@ typedef struct {
 
 static psync_tree *folders = PSYNC_TREE_EMPTY;
 static uint64_t psync_local_taskid = UINT64_MAX;
+
+static inline int psync_crypto_is_error(const void *ptr) {
+  return (uintptr_t)ptr <= PSYNC_CRYPTO_MAX_ERROR;
+}
+
+static inline int psync_crypto_to_error(const void *ptr) {
+  return -((int)(uintptr_t)ptr);
+}
 
 psync_fstask_folder_t *
 psync_fstask_get_or_create_folder_tasks(psync_fsfolderid_t folderid) {
@@ -410,7 +418,7 @@ int psync_fstask_mkdir(psync_fsfolderid_t folderid, const char *name,
   }
   ctime = psync_timer_time();
   if (folderflags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
-    key = psync_cloud_crypto_get_new_encoded_key(PSYNC_CRYPTO_SYM_FLAG_ISDIR,
+    key = pcryptofolder_filencoder_key_new(PSYNC_CRYPTO_SYM_FLAG_ISDIR,
                                                  &klen);
     if (psync_crypto_is_error(key)) {
       psync_fstask_release_folder_tasks_locked(folder);

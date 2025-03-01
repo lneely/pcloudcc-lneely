@@ -36,7 +36,7 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 
-#include "pcloudcrypto.h"
+#include "pcryptofolder.h"
 #include "pintervaltree.h"
 #include "plibs.h"
 #include "pmem.h"
@@ -123,7 +123,7 @@ retry:
         tryn++;
         pthread_mutex_unlock(&page_mutex);
         debug(D_NOTICE, "mlock failed, trying to clean cache");
-        psync_cloud_crypto_clean_cache();
+        pcryptofolder_clean_cache();
         goto retry;
       } else {
         debug(D_WARNING, "mlock for page %lx failed even after cache clean",
@@ -248,7 +248,7 @@ void *pmemlock_malloc(size_t size) {
   bestsize = ~((size_t)0);
   brange = NULL;
   boffset = 0; // just to make compilers happy
-  // psync_mem_lock may call psync_cloud_crypto_clean_cache(), which in turn can
+  // psync_mem_lock may call pcryptofolder_clean_cache(), which in turn can
   // call pmemlock_free() on few pointers, therefore allocator_mutex is
   // recursive
   pthread_mutex_lock(&allocator_mutex);
