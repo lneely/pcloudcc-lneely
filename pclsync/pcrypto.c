@@ -492,7 +492,7 @@ static int memcmp_const(const unsigned char *s1, const unsigned char *s2,
   return (((r - 1) >> 8) & 1) ^ 1;
 }
 
-void pcrypto_encode_sector(
+void pcrypto_encode_sec(
     pcrypto_sector_encdec_t enc, const unsigned char *data,
     size_t datalen, unsigned char *out, pcrypto_sector_auth_t authout,
     uint64_t sectorid) {

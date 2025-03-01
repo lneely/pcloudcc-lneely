@@ -88,7 +88,7 @@ void pcrypto_ctr_encdec_decode(pcrypto_ctr_encdec_t enc, void *data, size_t data
 void pcrypto_ctr_encdec_free(pcrypto_ctr_encdec_t enc);
 int pcrypto_decode_sector(pcrypto_sector_encdec_t enc, const unsigned char *data, size_t datalen, unsigned char *out, const pcrypto_sector_auth_t auth, uint64_t sectorid);
 unsigned char * pcrypto_decode_text(pcrypto_textdec_t enc, const unsigned char *data, size_t datalen);
-void pcrypto_encode_sector(pcrypto_sector_encdec_t enc, const unsigned char *data, size_t datalen, unsigned char *out, pcrypto_sector_auth_t authout, uint64_t sectorid);
+void pcrypto_encode_sec(pcrypto_sector_encdec_t enc, const unsigned char *data, size_t datalen, unsigned char *out, pcrypto_sector_auth_t authout, uint64_t sectorid);
 void pcrypto_encode_text(pcrypto_textenc_t enc, const unsigned char *txt, size_t txtlen, unsigned char **out, size_t *outlen);
 psync_symmetric_key_t pcrypto_key();
 psync_symmetric_key_t pcrypto_key_len(size_t len);

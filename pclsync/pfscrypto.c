@@ -1186,7 +1186,7 @@ psync_fs_crypto_write_newfile_full_sector(psync_openfile_t *of, const char *buf,
   assert(size <= PSYNC_CRYPTO_SECTOR_SIZE);
   assert(sizeof(psync_crypto_log_data_record) ==
          sizeof(psync_crypto_log_header) + PSYNC_CRYPTO_SECTOR_SIZE);
-  pcrypto_encode_sector(of->encoder, (const unsigned char *)buf,
+  pcrypto_encode_sec(of->encoder, (const unsigned char *)buf,
                                     size, rec.data, auth, sectorid);
   memset(&rec.header, 0, sizeof(psync_crypto_log_header));
   rec.header.type = PSYNC_CRYPTO_LOG_DATA;
