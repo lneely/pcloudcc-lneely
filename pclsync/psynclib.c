@@ -326,7 +326,7 @@ void psync_start_sync(pstatus_change_callback_t status_callback,
   if (event_callback)
     pqevent_process(event_callback);
   psync_syncer_init();
-  psync_diff_init();
+  pdiff_init();
   psync_upload_init();
   psync_download_init();
   psync_netlibs_init();
@@ -540,7 +540,7 @@ void psync_unlink() {
   deviceid = psync_sql_cellstr("SELECT value FROM setting WHERE id='deviceid'");
   debug(D_NOTICE, "unlink");
 
-  psync_diff_lock();
+  pdiff_lock();
   unlinked = 1;
   tfa = 0;
   psync_stop_all_download();
@@ -597,7 +597,7 @@ void psync_unlink() {
   pcache_clean();
   psync_notifications_clean();
   psync_pagecache_reopen_read_cache();
-  psync_diff_unlock();
+  pdiff_unlock();
   psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   psync_set_status(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_QUOTAOK);
   psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
@@ -1258,7 +1258,7 @@ int psync_create_remote_folder_by_path(const char *path, char **err) {
     return ret;
   psync_ops_create_folder_in_db(papi_find_result2(res, "metadata", PARAM_HASH));
   psync_free(res);
-  psync_diff_wake();
+  pdiff_wake();
   return 0;
 }
 
@@ -1274,7 +1274,7 @@ int psync_create_remote_folder(psync_folderid_t parentfolderid,
     return ret;
   psync_ops_create_folder_in_db(papi_find_result2(res, "metadata", PARAM_HASH));
   psync_free(res);
-  psync_diff_wake();
+  pdiff_wake();
   return 0;
 }
 
@@ -2026,7 +2026,7 @@ static int psync_upload_result(binresult *res, psync_fileid_t *fileid) {
         papi_find_result2(res, "metadata", PARAM_ARRAY)->array[0];
     *fileid = papi_find_result2(meta, "fileid", PARAM_NUM)->num;
     psync_free(res);
-    psync_diff_wake();
+    pdiff_wake();
     return 0;
   } else {
     debug(D_WARNING, "uploadfile returned error %u: %s", (unsigned)result,
@@ -2927,7 +2927,7 @@ int psync_create_backup(char *path, char **errMsg) {
                      &optPar, &retData, errMsg);
 
   if (res == 0) {
-    psync_diff_update_folder(retData);
+    pdiff_fldr_update(retData);
 
     folId = (binresult *)papi_find_result2(retData, FOLDER_ID, PARAM_NUM);
 

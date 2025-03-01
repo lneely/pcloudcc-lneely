@@ -68,21 +68,21 @@ void psync_ops_create_folder_in_db(const binresult *meta) {
 }
 
 void psync_ops_update_folder_in_db(const binresult *meta) {
-  psync_diff_update_folder(meta);
+  pdiff_fldr_update(meta);
 }
 
 void psync_ops_delete_folder_from_db(const binresult *meta) {
-  psync_diff_delete_folder(meta);
+  pdiff_fldr_delete(meta);
 }
 
 void psync_ops_create_file_in_db(const binresult *meta) {
-  psync_diff_create_file(meta);
+  pdiff_file_create(meta);
 }
 
 void psync_ops_update_file_in_db(const binresult *meta) {
-  psync_diff_update_file(meta);
+  pdiff_file_update(meta);
 }
 
 void psync_ops_delete_file_from_db(const binresult *meta) {
-  psync_diff_delete_file(meta);
+  pdiff_file_delete(meta);
 }

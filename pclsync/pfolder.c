@@ -211,7 +211,7 @@ psync_folderid_t psync_get_folderid_by_path_or_create(const char *path) {
                               "folderid", PARAM_NUM)
                 ->num;
         if (papi_find_result2(bres, "created", PARAM_BOOL)->num)
-          psync_diff_wake();
+          pdiff_wake();
         psync_free(bres);
       } else {
         psync_free(bres);

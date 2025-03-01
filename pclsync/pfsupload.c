@@ -582,7 +582,7 @@ static int large_upload_save(psock_t *api, uint64_t uploadid,
   ret = save_meta(papi_find_result2(res, "metadata", PARAM_HASH), folderid,
                   name, taskid, writeid, newfile, oldhash, key);
   psync_free(res);
-  psync_diff_wake();
+  pdiff_wake();
   return ret;
 }
 
@@ -697,7 +697,7 @@ static int copy_file_if_exists(psock_t *api, const char *filename,
               ->num,
           papi_find_result2(meta, "name", PARAM_STR)->str,
           (long unsigned)folderid, name);
-    psync_diff_wake();
+    pdiff_wake();
   }
   psync_free(res);
   return ret;
@@ -1939,7 +1939,7 @@ static void psync_fsupload_process_tasks(psync_list *tasks) {
     psync_status_recalc_to_upload_async();
 
   if (dels)
-    psync_diff_wake();
+    pdiff_wake();
 }
 
 static void psync_fsupload_run_tasks(psync_list *tasks) {

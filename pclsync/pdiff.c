@@ -162,6 +162,7 @@ int unlinked = 0;
 int tfa = 0;
 
 static void psync_diff_refresh_fs_add_folder(psync_folderid_t folderid);
+
 static void do_send_eventdata(void *param);
 
 static void psync_notify_cache_change(psync_changetype_t event) {
@@ -175,8 +176,7 @@ static void psync_notify_cache_change(psync_changetype_t event) {
     psync_free(chtype);
 }
 
-static binresult *
-get_userinfo_user_digest(psock_t *sock, const char *username,
+static binresult *get_userinfo_user_digest(psock_t *sock, const char *username,
                          size_t userlen, const char *pwddig, const char *digest,
                          uint32_t diglen, const char *osversion,
                          const char *appversion, const char *deviceid,
@@ -198,8 +198,7 @@ get_userinfo_user_digest(psock_t *sock, const char *username,
   return papi_send2(sock, "login", params);
 }
 
-static binresult *
-get_userinfo_user_pass(psock_t *sock, const char *username,
+static binresult *get_userinfo_user_pass(psock_t *sock, const char *username,
                        const char *password, const char *osversion,
                        const char *appversion, const char *deviceid,
                        const char *devicestring) {
@@ -1946,9 +1945,9 @@ static void do_send_eventdata(void *param) {
   psync_free(email);
 
   if (email) {
-    psync_diff_lock();
+    pdiff_lock();
     pqevent_queue_event(data->eventid, data->event_data);
-    psync_diff_unlock();
+    pdiff_unlock();
   }
 
   psync_free(param);
@@ -2479,9 +2478,9 @@ static uint64_t process_entries(const binresult *entries, uint64_t newdiffid) {
   uint32_t i, j;
   oused_quota = used_quota;
   needdownload = 0;
-  psync_diff_lock();
+  pdiff_lock();
   if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED) {
-    psync_diff_unlock();
+    pdiff_unlock();
     return psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
   }
   psync_sql_start_transaction();
@@ -2506,7 +2505,7 @@ static uint64_t process_entries(const binresult *entries, uint64_t newdiffid) {
   // update_ba_teams();
   psync_path_status_clear_path_cache();
   psync_sql_commit_transaction();
-  psync_diff_unlock();
+  pdiff_unlock();
   if (needdownload) {
     psync_wake_download();
     psync_status_recalc_to_download();
@@ -2633,7 +2632,7 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
     if (last_event >= psync_timer_time() - 1)
       return;
     if (psock_select_in(&(*sock)->sock, 1, 1000) != 0) {
-      debug(D_NOTICE, "got a psync_diff_wake() but no diff events in one "
+      debug(D_NOTICE, "got a pdiff_wake() but no diff events in one "
                       "second, closing socket");
       psock_close(*sock);
       if (psync_status_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
@@ -3089,17 +3088,17 @@ void do_register_account_events_callback(paccount_cache_callback_t callback) {
   psync_cache_callback = callback;
 }
 
-void psync_diff_init() { 
+void pdiff_init() { 
   prun_thread("diff", psync_diff_thread); 
 }
 
-void psync_diff_wake() {
+void pdiff_wake() {
   if (last_event >= psync_timer_time() - 1)
     return;
   write(exceptionsockwrite, "c", 1);
 }
 
-void psync_diff_create_file(const binresult *meta) {
+void pdiff_file_create(const binresult *meta) {
   psync_sql_res *st;
   const binresult *name;
   uint64_t userid, fileid, hash, size;
@@ -3133,38 +3132,38 @@ void psync_diff_create_file(const binresult *meta) {
   insert_revision(0, 0, 0, 0);
 }
 
-void psync_diff_update_file(const binresult *meta) {
+void pdiff_file_update(const binresult *meta) {
   create_entry();
   process_modifyfile(&entry);
   process_modifyfile(NULL);
   start_download();
 }
 
-void psync_diff_delete_file(const binresult *meta) {
+void pdiff_file_delete(const binresult *meta) {
   create_entry();
   process_deletefile(&entry);
   process_deletefile(NULL);
   start_download();
 }
 
-void psync_diff_update_folder(const binresult *meta) {
+void pdiff_fldr_update(const binresult *meta) {
   create_entry();
   process_modifyfolder(&entry);
   process_modifyfolder(NULL);
   start_download();
 }
 
-void psync_diff_delete_folder(const binresult *meta) {
+void pdiff_fldr_delete(const binresult *meta) {
   create_entry();
   process_deletefolder(&entry);
   process_deletefolder(NULL);
   start_download();
 }
 
-void psync_diff_lock() { 
+void pdiff_lock() { 
   pthread_mutex_lock(&diff_mutex); 
 }
 
-void psync_diff_unlock() { 
+void pdiff_unlock() { 
   pthread_mutex_unlock(&diff_mutex); 
 }
