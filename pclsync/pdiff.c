@@ -63,7 +63,7 @@
 #include "psynclib.h"
 #include "psyncer.h"
 #include "psys.h"
-#include "ptasks.h"
+#include "ptask.h"
 #include "ptimer.h"
 #include "ptools.h"
 #include "publiclinks.h"
@@ -949,7 +949,7 @@ static void process_createfolder(const binresult *entry) {
       psync_sql_bind_uint(stmt, 4, row[2]);
       psync_sql_run(stmt);
       if (psync_sql_affected_rows() == 1) {
-        psync_task_create_local_folder(syncid, folderid, localfolderid);
+        ptask_ldir_mk(syncid, folderid, localfolderid);
         needdownload = 1;
       } else {
         stmt2 = psync_sql_prep_statement("UPDATE syncedfolder SET folderid=? "
@@ -1156,7 +1156,7 @@ static void process_modifyfolder(const binresult *entry) {
       }
       localfolderid = row[0];
       psync_sql_free_result(res);
-      psync_task_rename_local_folder(
+      ptask_ldir_rename(
           psync_get_result_cell(fres2, i, 0), folderid, localfolderid,
           psync_get_result_cell(fres2, i, 1), name->str);
       needdownload = 1;
@@ -1188,7 +1188,7 @@ static void process_modifyfolder(const binresult *entry) {
       localfolderid = row[0];
       psync_sql_free_result(res);
       del_synced_folder_rec(folderid, syncid);
-      psync_task_delete_local_folder_recursive(syncid, folderid, localfolderid);
+      ptask_ldir_rm_r(syncid, folderid, localfolderid);
       needdownload = 1;
     }
     for (/*i is already=cnt*/; i < fres2->rows; i++) {
@@ -1199,7 +1199,7 @@ static void process_modifyfolder(const binresult *entry) {
             (unsigned long)folderid, (unsigned long)parentfolderid);
       localfolderid = psync_create_local_folder_in_db(
           syncid, folderid, psync_get_result_cell(fres2, i, 1), name->str);
-      psync_task_create_local_folder(syncid, folderid, localfolderid);
+      ptask_ldir_mk(syncid, folderid, localfolderid);
       psync_add_folder_for_downloadsync(
           syncid, psync_get_result_cell(fres2, i, 2), folderid, localfolderid);
       needdownload = 1;
@@ -1253,7 +1253,7 @@ static void process_deletefolder(const binresult *entry) {
       psync_sql_run_free(stmt);
       if (psync_sql_affected_rows() == 1) {
         path = psync_get_path_by_folderid(folderid, NULL);
-        psync_task_delete_local_folder(row[0], folderid, row[1], path);
+        ptask_ldir_rm(row[0], folderid, row[1], path);
         psync_free(path);
         needdownload = 1;
       }
@@ -1416,7 +1416,7 @@ static void process_createfile(const binresult *entry) {
       if (!hasit) {
         debug(D_NOTICE, "downloading file %s with hash %ld to local folder %lu",
               name->str, (long)hash, (unsigned long)row[1]);
-        psync_task_download_file_silent(row[0], fileid, row[1], name->str);
+        ptask_download_q(row[0], fileid, row[1], name->str);
         needdownload = 1;
       } else
         debug(D_NOTICE,
@@ -1520,7 +1520,7 @@ static void process_modifyfile(const binresult *entry) {
       char *path;
       psync_delete_download_tasks_for_file(fileid, 0, 1);
       path = psync_get_path_by_fileid(fileid, NULL);
-      psync_task_delete_local_file(fileid, path);
+      ptask_lfile_rm(fileid, path);
       psync_free(path);
       needdownload = 1;
       return;
@@ -1549,7 +1549,7 @@ static void process_modifyfile(const binresult *entry) {
     //    fres2->rows, oldparentfolderid, parentfolderid);
     for (i = 0; i < cnt; i++) {
       if (needrename) {
-        psync_task_rename_local_file(psync_get_result_cell(fres1, i, 0),
+        ptask_lfile_rename(psync_get_result_cell(fres1, i, 0),
                                      psync_get_result_cell(fres2, i, 0), fileid,
                                      psync_get_result_cell(fres1, i, 1),
                                      psync_get_result_cell(fres2, i, 1),
@@ -1571,7 +1571,7 @@ static void process_modifyfile(const binresult *entry) {
                 "ignoring update for file %s, has correct hash in the database",
                 name->str);
         else {
-          psync_task_download_file_silent(
+          ptask_download_q(
               psync_get_result_cell(fres2, i, 0), fileid,
               psync_get_result_cell(fres2, i, 1), name->str);
           needdownload = 1;
@@ -1579,14 +1579,14 @@ static void process_modifyfile(const binresult *entry) {
       }
     }
     for (/*i is already=cnt*/; i < fres2->rows; i++) {
-      psync_task_download_file_silent(
+      ptask_download_q(
           psync_get_result_cell(fres2, i, 0), fileid,
           psync_get_result_cell(fres2, i, 1), name->str);
       needdownload = 1;
     }
     for (/*i is already=cnt*/; i < fres1->rows; i++) {
       char *path = psync_get_path_by_fileid(fileid, NULL);
-      psync_task_delete_local_file_syncid(psync_get_result_cell(fres1, i, 0),
+      ptask_lfile_rm_id(psync_get_result_cell(fres1, i, 0),
                                           fileid, path);
       psync_delete_download_tasks_for_file(
           fileid, psync_get_result_cell(fres1, i, 0), 1);
@@ -1622,7 +1622,7 @@ static void process_deletefile(const binresult *entry) {
     psync_delete_download_tasks_for_file(fileid, 0, 1);
     path = psync_get_path_by_fileid(fileid, NULL);
     if (likely(path)) {
-      psync_task_delete_local_file(fileid, path);
+      ptask_lfile_rm(fileid, path);
       psync_free(path);
       needdownload = 1;
     }

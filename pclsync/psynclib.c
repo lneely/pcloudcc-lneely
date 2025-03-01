@@ -31,28 +31,27 @@
 
 #include <ctype.h>
 #include <execinfo.h>
+#include <pthread.h>
+#include <stddef.h>
+#include <string.h>
+
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/pkcs5.h>
 #include <mbedtls/ssl.h>
-#include <pthread.h>
-#include <stddef.h>
 
 #include "papi.h"
-#include "pasyncnet.h"
 #include "pbusinessaccount.h"
 #include "pcache.h"
 #include "pcallbacks.h"
 #include "pcloudcrypto.h"
-#include "pfile.h"
 #include "pcontacts.h"
 #include "pdevice.h"
 #include "pdevice_monitor.h"
 #include "pdiff.h"
-#include "ppath.h"
 #include "pdownload.h"
-#include "psys.h"
+#include "pfile.h"
 #include "pfileops.h"
 #include "pfolder.h"
 #include "pfsfolder.h"
@@ -63,12 +62,11 @@
 #include "pmemlock.h"
 #include "pnetlibs.h"
 #include "pnotifications.h"
-#include "putil.h"
-
 #include "poverlay.h"
 #include "pp2p.h"
 #include "ppagecache.h"
 #include "ppassword.h"
+#include "ppath.h"
 #include "ppathstatus.h"
 #include "prun.h"
 #include "pscanner.h"
@@ -78,13 +76,14 @@
 #include "pstatus.h"
 #include "psyncer.h"
 #include "psynclib.h"
+#include "psys.h"
+#include "ptask.h"
 #include "ptimer.h"
 #include "ptools.h"
 #include "publiclinks.h"
 #include "pupload.h"
-#include <ctype.h>
-#include <stddef.h>
-#include <string.h>
+#include "putil.h"
+
 
 #define BUGHUNT 0
 
@@ -356,7 +355,7 @@ void psync_destroy() {
   psync_fs_stop();
   psync_terminate_status_waiters();
   psync_send_status_update();
-  psync_async_stop();
+  ptask_stop_async();
   psync_timer_wake();
   psync_timer_notify_exception();
   psync_sql_sync();
@@ -447,7 +446,7 @@ void psync_logout2(uint32_t auth_status, int doinvauth) {
   psync_fs_pause_until_login();
   psync_stop_all_download();
   psync_stop_all_upload();
-  psync_async_stop();
+  ptask_stop_async();
   psync_cache_clean_all();
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   psync_restart_localscan();

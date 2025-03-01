@@ -51,7 +51,7 @@
 #include "pssl.h"
 #include "pstatus.h"
 #include "psys.h"
-#include "ptasks.h"
+#include "ptask.h"
 #include "ptimer.h"
 #include "pupload.h"
 #include "ppath.h"
@@ -657,7 +657,7 @@ static void scan_rename_file(sync_folderlist *rnfr, sync_folderlist *rnto) {
   psync_sql_bind_string(res, 3, rnto->name);
   psync_sql_bind_uint(res, 4, rnfr->localid);
   psync_sql_run_free(res);
-  psync_task_rename_remote_file(rnfr->syncid, rnto->syncid, rnfr->localid,
+  ptask_rfile_rename(rnfr->syncid, rnto->syncid, rnfr->localid,
                                 rnto->localparentfolderid, rnto->name);
   if (filetoupload) {
     psync_path_status_sync_folder_task_added_locked(rnto->syncid,
@@ -690,7 +690,7 @@ static void scan_upload_file(sync_folderlist *fl) {
   if (unlikely_log(!psync_sql_affected_rows()))
     return;
   localfileid = psync_sql_insertid();
-  psync_task_upload_file_silent(fl->syncid, localfileid, fl->name);
+  ptask_upload_q(fl->syncid, localfileid, fl->name);
   psync_path_status_sync_folder_task_added(fl->syncid, fl->localparentfolderid);
 }
 
@@ -707,7 +707,7 @@ static void scan_upload_modified_file(sync_folderlist *fl) {
   psync_sql_bind_uint(res, 4, fl->mtimenat);
   psync_sql_bind_uint(res, 5, fl->localid);
   psync_sql_run_free(res);
-  psync_task_upload_file_silent(fl->syncid, fl->localid, fl->name);
+  ptask_upload_q(fl->syncid, fl->localid, fl->name);
   psync_path_status_sync_folder_task_added(fl->syncid, fl->localparentfolderid);
 }
 
@@ -737,7 +737,7 @@ static void scan_delete_file(sync_folderlist *fl) {
   psync_sql_bind_uint(res, 1, fl->localid);
   psync_sql_run_free(res);
   if (fileid)
-    psync_task_delete_remote_file(fl->syncid, fileid);
+    ptask_rfile_rm(fl->syncid, fileid);
   psync_path_status_sync_folder_task_completed(syncid, localparentfolderid);
 }
 
@@ -796,7 +796,7 @@ static void scan_create_folder(sync_folderlist *fl) {
   psync_sql_run_free(res);
   if (unlikely_log(!psync_sql_affected_rows()))
     return;
-  psync_task_create_remote_folder(fl->syncid, localfolderid, fl->name);
+  ptask_rdir_mk(fl->syncid, localfolderid, fl->name);
   return;
 hasfolder:
   return;
@@ -879,7 +879,7 @@ static void scan_rename_folder(sync_folderlist *rnfr, sync_folderlist *rnto) {
           (unsigned)rnfr->syncid, (unsigned)rnto->syncid);
     update_syncid_rec(rnfr->localid, rnto->syncid);
   }
-  psync_task_rename_remote_folder(rnfr->syncid, rnto->syncid, rnfr->localid,
+  ptask_rdir_rename(rnfr->syncid, rnto->syncid, rnfr->localid,
                                   rnto->localparentfolderid, rnto->name);
 }
 
@@ -952,7 +952,7 @@ retry:
   }
   delete_local_folder_rec(fl->localid);
   if (folderid)
-    psync_task_delete_remote_folder(fl->syncid, folderid);
+    ptask_rdir_rm(fl->syncid, folderid);
 }
 
 #define check_for_query_cnt()                                                  \

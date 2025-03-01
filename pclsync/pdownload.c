@@ -39,9 +39,7 @@
 #include <mbedtls/sha1.h>
 #include <mbedtls/ssl.h>
 
-
 #include "papi.h"
-#include "pasyncnet.h"
 #include "pcallbacks.h"
 #include "pdownload.h"
 #include "pfolder.h"
@@ -56,7 +54,7 @@
 #include "psys.h"
 #include "pstatus.h"
 #include "psyncer.h"
-#include "ptasks.h"
+#include "ptask.h"
 #include "ptimer.h"
 #include "pupload.h"
 #include "putil.h"
@@ -973,7 +971,7 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
   }
   psync_sql_free_result(res);
   if (unlikely_log(!lfileid)) {
-    psync_task_download_file(newsyncid, fileid, newlocalfolderid, newname);
+    ptask_download(newsyncid, fileid, newlocalfolderid, newname);
     return 0;
   }
   newfolder =
@@ -993,7 +991,7 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
     if (errno == ENOENT) {
       debug(D_WARNING, "renamed from %s to %s failed, downloading", oldpath,
             newpath);
-      psync_task_download_file(newsyncid, fileid, newlocalfolderid, newname);
+      ptask_download(newsyncid, fileid, newlocalfolderid, newname);
     } else
       ret = -1;
   } else {
@@ -1315,11 +1313,11 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
   set_task_inprogress(taskid, 1);
   if (size <= PSYNC_MAX_SIZE_FOR_ASYNC_DOWNLOAD) {
     if (dt->localexists)
-      ret = psync_async_download_file_if_changed(
+      ret = ptask_download_needed_async(
           fileid, dt->tmpname, dt->localsize, dt->checksum,
           finish_async_download_existing, dt);
     else
-      ret = psync_async_download_file(fileid, dt->tmpname,
+      ret = ptask_download_async(fileid, dt->tmpname,
                                       finish_async_download, dt);
     if (ret) {
       debug(D_WARNING, "async download start failed for %s", dt->localname);

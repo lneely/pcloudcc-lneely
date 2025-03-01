@@ -43,7 +43,7 @@
 #include "plist.h"
 #include "ppathstatus.h"
 #include "pstatus.h"
-#include "ptasks.h"
+#include "ptask.h"
 #include "ptree.h"
 #include <ctype.h>
 #include <string.h>

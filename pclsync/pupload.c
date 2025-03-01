@@ -52,7 +52,7 @@
 #include "psettings.h"
 #include "psys.h"
 #include "pstatus.h"
-#include "ptasks.h"
+#include "ptask.h"
 #include "ptimer.h"
 #include "ptools.h"
 #include "pupload.h"

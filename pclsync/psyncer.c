@@ -48,7 +48,7 @@
 #include "prun.h"
 #include "pstatus.h"
 #include "psyncer.h"
-#include "ptasks.h"
+#include "ptask.h"
 #include "ptree.h"
 #include "putil.h"
 #include <string.h>
@@ -275,7 +275,7 @@ void psync_add_folder_for_downloadsync(psync_syncid_t syncid,
       cfolderid = psync_get_number(row[0]);
       clfolderid =
           psync_create_local_folder_in_db(syncid, cfolderid, lfoiderid, name);
-      psync_task_create_local_folder(syncid, cfolderid, clfolderid);
+      ptask_ldir_mk(syncid, cfolderid, clfolderid);
       psync_add_folder_for_downloadsync(syncid, synctype, cfolderid,
                                         clfolderid /*, path*/);
     }
@@ -287,7 +287,7 @@ void psync_add_folder_for_downloadsync(psync_syncid_t syncid,
     name = psync_get_string(row[1]);
     if (psync_is_name_to_ignore(name))
       continue;
-    psync_task_download_file_silent(syncid, psync_get_number(row[0]), lfoiderid,
+    ptask_download_q(syncid, psync_get_number(row[0]), lfoiderid,
                                     name);
   }
   psync_sql_free_result(res);
