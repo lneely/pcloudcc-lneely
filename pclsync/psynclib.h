@@ -1750,7 +1750,7 @@ userinfo_t *psync_get_userinfo();
  * label - string representing label of the event
  * eventParams - list of binparams(optional)
  */
-int psync_create_backend_event(const char *category, const char *action,
+int psync_ptools_create_backend_event(const char *category, const char *action,
                                const char *label, eventParams params,
                                char *err);
 

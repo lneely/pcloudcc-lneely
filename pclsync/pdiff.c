@@ -772,17 +772,17 @@ static psock_t *get_connected_socket() {
       time(&rawtime);
 
       char *macAddr;
-      macAddr = getMACaddr();
+      macAddr = ptools_get_mac_addr();
 
       eventParams params = {1, // Number of parameters we are passing below.
                             {PAPI_STR(EPARAM_MAC, macAddr)}};
-      create_backend_event(apiserver, INST_EVENT_CATEG, INST_EVENT_FLOGIN,
+      ptools_create_backend_event(apiserver, INST_EVENT_CATEG, INST_EVENT_FLOGIN,
                            INST_EVENT_CATEG, psync_my_auth, P_OS_ID, rawtime,
                            &params, (char **)res);
     } else {
       debug(D_NOTICE, "Not a first login. Run sync event.");
 
-      send_psyncs_event(apiserver, psync_my_auth);
+      ptools_send_psyncs_event(apiserver, psync_my_auth);
     }
 
     if (isbusiness) {

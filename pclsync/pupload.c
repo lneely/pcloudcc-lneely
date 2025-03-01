@@ -357,9 +357,9 @@ int handle_api_errors(sync_err_struct *err_struct) {
   case BEAPI_ERR_MV_TOO_MANY_IN_SHA:
     debug(D_NOTICE, "Critical sync error. Stopping the sync.");
 
-    syncId = get_sync_id_from_fid(err_struct->folderid);
-    syncFolder = get_sync_folder_by_syncid(syncId);
-    folder = get_folder_name_from_path(syncFolder);
+    syncId = ptools_syncid_from_fid(err_struct->folderid);
+    syncFolder = ptools_sfldr_by_syncid(syncId);
+    folder = ptools_fldr_name_by_path(syncFolder);
 
     debug(D_NOTICE, "Got sync path: [%s] Sync folder: [%s]", syncFolder,
           folder);
@@ -577,7 +577,7 @@ static int check_file_if_exists(const unsigned char *hashhex, uint64_t fsize,
               (unsigned long)folderid, name);
         set_local_file_remote_id(localfileid, fileid, hash);
 
-        set_be_file_dates(fileid, pfile_stat_ctime(st), pfile_stat_mtime(st));
+        ptools_set_backend_file_dates(fileid, pfile_stat_ctime(st), pfile_stat_mtime(st));
 
         return 1;
       } else

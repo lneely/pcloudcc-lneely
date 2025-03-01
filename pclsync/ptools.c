@@ -48,7 +48,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-char *getMACaddr() {
+char *ptools_get_mac_addr() {
   char buffer[128];
 
   memset(buffer, 0, sizeof(buffer));
@@ -81,7 +81,7 @@ char *getMACaddr() {
   }
 }
 
-int create_backend_event(const char *binapi, const char *category,
+int ptools_create_backend_event(const char *binapi, const char *category,
                          const char *action, const char *label,
                          const char *auth, int os, time_t etime,
                          eventParams *params, char **err) {
@@ -208,7 +208,7 @@ int create_backend_event(const char *binapi, const char *category,
   return result;
 }
 
-int backend_call(const char *binapi, const char *wsPath,
+int ptools_backend_call(const char *binapi, const char *wsPath,
                  const char *payloadName, eventParams *requiredParams,
                  eventParams *optionalParams, binresult **resData, char **err) {
   int reqParCnt = requiredParams->paramCnt;
@@ -339,7 +339,7 @@ int backend_call(const char *binapi, const char *wsPath,
   return result;
 }
 
-char *get_machine_name() {
+char *ptools_get_machine_name() {
   int nameSize = 1024;
   char pcName[1024];
 
@@ -354,7 +354,7 @@ char *get_machine_name() {
   return psync_strdup(pcName);
 }
 
-void parse_os_path(char *path, folderPath *folders, char *delim, int mode) {
+void ptools_parse_os_path(char *path, folderPath *folders, char *delim, int mode) {
   char fName[255];
   char *buff;
   int i = 0, j = 0, k = 0;
@@ -401,7 +401,7 @@ void parse_os_path(char *path, folderPath *folders, char *delim, int mode) {
   folders->cnt = j;
 }
 
-void send_psyncs_event(const char *binapi, const char *auth) {
+void ptools_send_psyncs_event(const char *binapi, const char *auth) {
   psync_folderid_t syncEventFlag = 0;
   time_t rawtime;
   char *errMsg;
@@ -431,7 +431,7 @@ void send_psyncs_event(const char *binapi, const char *auth) {
     eventParams params = {1, // Number of parameters passed below
                           {PAPI_NUM(PSYNC_SYNCS_COUNT, syncCnt)}};
 
-    intRes = create_backend_event(binapi,
+    intRes = ptools_create_backend_event(binapi,
                                   PSYNC_EVENT_CATEG,  // "SYNCS_EVENTS"
                                   PSYNC_EVENT_ACTION, // "SYNCS_LOG_COUNT"
                                   PSYNC_EVENT_LABEL,  // "SYNCS_COUNT"
@@ -449,7 +449,7 @@ void send_psyncs_event(const char *binapi, const char *auth) {
   psync_free(errMsg);
 }
 
-int set_be_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
+int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
   int callRes;
   char msgErr[1024];
   binresult *retData;
@@ -468,7 +468,7 @@ int set_be_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
                                   PAPI_NUM("newtm", ctime), PAPI_BOOL("isctime", 1)}};
 
   callRes =
-      backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams1,
+      ptools_backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams1,
                    &optionalParams, &retData, (char **)msgErr);
 
   debug(D_NOTICE, "cTime res: [%d]", callRes);
@@ -480,7 +480,7 @@ int set_be_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
                                  PAPI_NUM("newtm", mtime), PAPI_BOOL("isctime", 0)}};
 
   callRes =
-      backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams,
+      ptools_backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams,
                    &optionalParams, &retData, (char **)msgErr);
 
   debug(D_NOTICE, "mTime res: [%d]", callRes);
@@ -488,7 +488,7 @@ int set_be_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
   return callRes;
 }
 
-psync_syncid_t get_sync_id_from_fid(psync_folderid_t fid) {
+psync_syncid_t ptools_syncid_from_fid(psync_folderid_t fid) {
   psync_sql_res *res;
   psync_variant_row row;
   psync_syncid_t syncId = -1;
@@ -506,7 +506,7 @@ psync_syncid_t get_sync_id_from_fid(psync_folderid_t fid) {
   return syncId;
 }
 
-char *get_sync_folder_by_syncid(uint64_t syncId) {
+char *ptools_sfldr_by_syncid(uint64_t syncId) {
   psync_sql_res *res;
   psync_variant_row row;
   const char *syncName;
@@ -530,7 +530,7 @@ char *get_sync_folder_by_syncid(uint64_t syncId) {
   return retName;
 }
 
-char *get_folder_name_from_path(char *path) {
+char *ptools_fldr_name_by_path(char *path) {
   char *folder;
 
   folder = "";

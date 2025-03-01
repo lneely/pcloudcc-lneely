@@ -2804,7 +2804,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
 
   // Check if folder is not a child of an igrnored folder
   ignorePaths = psync_setting_get_string(_PS(ignorepaths));
-  parse_os_path((char *)ignorePaths, &folders, (char *)DELIM_SEMICOLON, 0);
+  ptools_parse_os_path((char *)ignorePaths, &folders, (char *)DELIM_SEMICOLON, 0);
 
   for (i = 0; i < folders.cnt; i++) {
     debug(D_NOTICE, "Check ignored folder: [%s]=[%s]", folders.folders[i],
@@ -2850,7 +2850,7 @@ psync_folderid_t create_bup_mach_folder(char **msgErr) {
   eventParams optionalParams = {0};
 
   debug(D_NOTICE, "Call backend [backup/createdevice].");
-  res = backend_call(apiserver, "backup/createdevice", FOLDER_META,
+  res = ptools_backend_call(apiserver, "backup/createdevice", FOLDER_META,
                      &requiredParams, &optionalParams, &retData, msgErr);
 
   if (res == 0) {
@@ -2907,7 +2907,7 @@ int psync_create_backup(char *path, char **errMsg) {
     }
   }
 
-  parse_os_path(path, &folders, (char *)DELIM_DIR, 1);
+  ptools_parse_os_path(path, &folders, (char *)DELIM_DIR, 1);
 
   if (folders.cnt > 1) {
     oParCnt = 1;
@@ -2927,7 +2927,7 @@ int psync_create_backup(char *path, char **errMsg) {
 
   debug(D_NOTICE, "Call backend [backup/createbackup].");
 
-  res = backend_call(apiserver, "backup/createbackup", FOLDER_META, &reqPar,
+  res = ptools_backend_call(apiserver, "backup/createbackup", FOLDER_META, &reqPar,
                      &optPar, &retData, errMsg);
 
   if (res == 0) {
@@ -2995,7 +2995,7 @@ int psync_delete_backup(psync_syncid_t syncId, char **errMsg) {
 
     debug(D_NOTICE, "Call backend [backup/stopbackup].");
 
-    res = backend_call(apiserver, "backup/stopbackup", NO_PAYLOAD, &reqPar,
+    res = ptools_backend_call(apiserver, "backup/stopbackup", NO_PAYLOAD, &reqPar,
                        &optPar, &retData, errMsg);
 
     if (res == 0) {
@@ -3029,7 +3029,7 @@ void psync_stop_device(psync_folderid_t folderId, char **errMsg) {
 
     debug(D_NOTICE, "Call backend [backup/stopdevice].");
 
-    res = backend_call(apiserver, "backup/stopdevice", NO_PAYLOAD, &reqPar,
+    res = ptools_backend_call(apiserver, "backup/stopdevice", NO_PAYLOAD, &reqPar,
                        &optPar, &retData, errMsg);
 
     if (res != 0) {
@@ -3046,7 +3046,7 @@ char *get_backup_root_name() {
                            "s.value = f.id AND s.id = 'BackupRootFoId'");
 }
 
-char *get_pc_name() { return get_machine_name(); }
+char *get_pc_name() { return ptools_get_machine_name(); }
 
 void psync_async_delete_sync(void *ptr) {
   psync_syncid_t syncId = (psync_syncid_t)(uintptr_t)ptr;
@@ -3223,12 +3223,12 @@ userinfo_t *psync_get_userinfo() {
   return NULL;
 }
 
-int psync_create_backend_event(const char *category, const char *action,
+int psync_ptools_create_backend_event(const char *category, const char *action,
                                const char *label, eventParams params,
                                char *err) {
   time_t rawtime;
   time(&rawtime);
-  return create_backend_event(apiserver, category, action, label, psync_my_auth,
+  return ptools_create_backend_event(apiserver, category, action, label, psync_my_auth,
                               P_OS_ID, rawtime, &params, &err);
 }
 
