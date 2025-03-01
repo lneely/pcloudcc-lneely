@@ -54,7 +54,7 @@
 #include "pfsxattr.h"
 #include "plibs.h"
 #include "pnetlibs.h"
-#include "pnotifications.h"
+#include "pnotify.h"
 #include "ppathstatus.h"
 #include "prun.h"
 #include "psettings.h"
@@ -2547,8 +2547,8 @@ static int setup_exeptions() {
 }
 
 static int send_diff_command(psock_t *sock, subscribed_ids ids) {
-  if (psync_notifications_running()) {
-    const char *ts = psync_notifications_get_thumb_size();
+  if (pnotify_running()) {
+    const char *ts = pnotify_get_thumb_size();
     if (ts) {
       if (psync_is_business) {
         binparam diffparams[] = {
@@ -3031,7 +3031,7 @@ restart:
                    !strcmp(entries->str, "notifications")) {
           ids.notificationid =
               papi_find_result2(res, "notificationid", PARAM_NUM)->num;
-          psync_notifications_notify(res);
+          pnotify_notify(res);
           should_free_res = 0; // Don't free res in this case
         } else if (entries->length == 8 && !strcmp(entries->str, "publinks")) {
           ids.publinkid = papi_find_result2(res, "publinkid", PARAM_NUM)->num;

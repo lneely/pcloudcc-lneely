@@ -62,7 +62,7 @@
 #include "plocalscan.h"
 #include "pmemlock.h"
 #include "pnetlibs.h"
-#include "pnotifications.h"
+#include "pnotify.h"
 #include "poverlay.h"
 #include "pp2p.h"
 #include "ppagecache.h"
@@ -343,11 +343,11 @@ void psync_start_sync(pstatus_change_callback_t status_callback,
 
 void psync_set_notification_callback(
     pnotification_callback_t notification_callback, const char *thumbsize) {
-  psync_notifications_set_callback(notification_callback, thumbsize);
+  pnotify_set_callback(notification_callback, thumbsize);
 }
 
 psync_notification_list_t *psync_get_notifications() {
-  return psync_notifications_get();
+  return pnotify_get();
 }
 
 uint32_t psync_download_state() { return 0; }
@@ -599,7 +599,7 @@ void psync_unlink() {
   psync_sql_checkpoint_unlock();
   psync_settings_reset();
   pcache_clean();
-  psync_notifications_clean();
+  pnotify_clean();
   psync_pagecache_reopen_read_cache();
   pdiff_unlock();
   pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);

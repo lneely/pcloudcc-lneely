@@ -29,7 +29,7 @@
    DAMAGE.
 */
 
-#include "pnotifications.h"
+#include "pnotify.h"
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "psettings.h"
@@ -53,11 +53,11 @@ static int ntf_processing = 0;
 static binresult *ntf_result = NULL;
 static binresult *ntf_processed_result = NULL;
 
-int psync_notifications_running() { return ntf_thread_running; }
+int pnotify_running() { return ntf_thread_running; }
 
-const char *psync_notifications_get_thumb_size() { return ntf_thumb_size; }
+const char *pnotify_get_thumb_size() { return ntf_thumb_size; }
 
-void psync_notifications_notify(binresult *res) {
+void pnotify_notify(binresult *res) {
   pthread_mutex_lock(&ntf_mutex);
   if (ntf_result)
     psync_free(ntf_result);
@@ -181,7 +181,7 @@ static void psync_notifications_thread() {
   psync_free(thumbpath);
 }
 
-void psync_notifications_set_callback(
+void pnotify_set_callback(
     pnotification_callback_t notification_callback, const char *thumbsize) {
   char *ts;
   pthread_mutex_lock(&ntf_mutex);
@@ -284,7 +284,7 @@ static void psync_notification_remove_from_list(psync_tree **tree,
   }
 }
 
-psync_notification_list_t *psync_notifications_get() {
+psync_notification_list_t *pnotify_get() {
   psync_list_builder_t *builder;
   psync_notification_list_t *res;
   const binresult *ntf_res, *notifications, *ntf, *br;
@@ -376,7 +376,7 @@ static void psync_notifications_del_thumb(void *ptr, ppath_stat *st) {
   pfile_delete(st->path);
 }
 
-void psync_notifications_clean() {
+void pnotify_clean() {
   char *thumbpath;
   pthread_mutex_lock(&ntf_mutex);
   thumbpath = ppath_private(PSYNC_DEFAULT_NTF_THUMB_DIR);

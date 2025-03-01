@@ -35,12 +35,12 @@
 #include "papi.h"
 #include "psynclib.h"
 
-int psync_notifications_running();
-const char *psync_notifications_get_thumb_size();
-void psync_notifications_notify(binresult *res);
-void psync_notifications_set_callback(
+int pnotify_running();
+const char *pnotify_get_thumb_size();
+void pnotify_notify(binresult *res);
+void pnotify_set_callback(
     pnotification_callback_t notification_callback, const char *thumbsize);
-psync_notification_list_t *psync_notifications_get();
-void psync_notifications_clean();
+psync_notification_list_t *pnotify_get();
+void pnotify_clean();
 
 #endif
