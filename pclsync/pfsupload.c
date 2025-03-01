@@ -458,13 +458,13 @@ static int save_meta(const binresult *meta, psync_folderid_t folderid,
   if (newfile) {
     pfileops_create_file(meta);
     if (!deleted)
-      psync_pagecache_creat_to_pagecache(taskid, hash, 0);
+      ppagecache_creat(taskid, hash, 0);
     psync_fstask_file_created(folderid, taskid, name, fileid);
     psync_fs_task_to_file(taskid, fileid);
   } else {
     pfileops_update_file(meta);
     if (!deleted)
-      psync_pagecache_modify_to_pagecache(taskid, hash, oldhash);
+      ppagecache_modify(taskid, hash, oldhash);
     psync_fstask_file_modified(folderid, taskid, name, fileid);
   }
   if (key)
@@ -1367,7 +1367,7 @@ static int psync_process_task_creat(fsupload_task_t *task) {
   debug(D_NOTICE, "file %lu/%s uploaded", (unsigned long)task->folderid,
         task->text1);
   psync_sql_commit_transaction();
-  psync_pagecache_creat_to_pagecache(task->id, hash, 1);
+  ppagecache_creat(task->id, hash, 1);
   psync_sql_start_transaction();
   return 0;
 }

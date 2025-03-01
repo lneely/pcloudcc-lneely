@@ -1404,7 +1404,7 @@ int pfscrypto_read_mod(psync_openfile_t *of, char *buf,
   } else if (rfr == 2) {
     debug(D_NOTICE, "doing read at offset %lu size %lu from remote only",
           (unsigned long)offset, (unsigned long)size);
-    return psync_pagecache_read_unmodified_encrypted_locked(of, buf, size,
+    return ppagecache_read_unmod_enc_locked(of, buf, size,
                                                             offset);
   } else {
     assert(rfr == 3);
@@ -1412,7 +1412,7 @@ int pfscrypto_read_mod(psync_openfile_t *of, char *buf,
           "doing read at offset %lu size %lu from remote and local merge",
           (unsigned long)offset, (unsigned long)size);
   }
-  rfr = psync_pagecache_read_unmodified_encrypted_locked(of, buf, size, offset);
+  rfr = ppagecache_read_unmod_enc_locked(of, buf, size, offset);
   if (unlikely(rfr < 0)) {
     debug(D_WARNING, "reading from remote failed with error %d", rfr);
     return rfr;
@@ -1622,7 +1622,7 @@ retry:
         itr = psync_interval_tree_get_next(itr);
       } while (itr);
       psync_interval_tree_free(needtodwl);
-      ret = psync_pagecache_readv_locked(of, ranges, icnt);
+      ret = ppagecache_readv_locked(of, ranges, icnt);
       // we are unlocked now
       psync_fs_lock_file(of);
       if (unlikely(ret)) {
@@ -1639,7 +1639,7 @@ retry:
         if (unlikely(itr && itr->from < ranges[l].offset + ranges[l].size &&
                      ranges[l].offset < itr->to)) {
           // we were not supposed to have intersection, some write happened
-          // while we were unlocked in psync_pagecache_readv_locked
+          // while we were unlocked in ppagecache_readv_locked
           debug(D_NOTICE,
                 "restarting write as range %lu to %lu downloaded and %lu to "
                 "%lu local intersect",

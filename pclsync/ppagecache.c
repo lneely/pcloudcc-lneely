@@ -1529,14 +1529,14 @@ static int flush_pages(int nosleep) {
   }
 }
 
-int psync_pagecache_flush() {
+int ppagecache_flush() {
   if (flush_pages(1))
     return -EIO;
   else
     return 0;
 }
 
-static void psync_pagecache_flush_timer(psync_timer_t timer, void *ptr) {
+static void ppagecache_flush_timer(psync_timer_t timer, void *ptr) {
   if (!flushedbetweentimers &&
       (cache_pages_in_hash || cachepages_to_update_cnt))
     prun_thread("flush pages timer", flush_pages_noret);
@@ -1831,7 +1831,7 @@ static long check_page_in_database_by_hash_and_cache(uint64_t hash,
   return ret;
 }
 
-int psync_pagecache_read_modified_locked(psync_openfile_t *of, char *buf,
+int ppagecache_read_mod_locked(psync_openfile_t *of, char *buf,
                                          uint64_t size, uint64_t offset) {
   psync_interval_tree_t *fi;
   uint64_t isize, ioffset;
@@ -1849,7 +1849,7 @@ int psync_pagecache_read_modified_locked(psync_openfile_t *of, char *buf,
     else
       return br;
   }
-  rd = psync_pagecache_read_unmodified_locked(of, buf, size, offset);
+  rd = ppagecache_read_unmod_locked(of, buf, size, offset);
   if (rd < 0)
     return rd;
   psync_fs_lock_file(of);
@@ -2548,7 +2548,7 @@ static void wait_waiter(psync_page_waiter_t *pwt, uint64_t hash,
     debug(D_WARNING, "reading of page failed with error %d", pwt->error);
 }
 
-int psync_pagecache_read_unmodified_locked(psync_openfile_t *of, char *buf,
+int ppagecache_read_unmod_locked(psync_openfile_t *of, char *buf,
                                            uint64_t size, uint64_t offset) {
   unsigned char dbread[256];
   uint64_t poffset, psize, first_page_id, initialsize, hash;
@@ -2744,7 +2744,7 @@ static int request_auth_page(psync_crypto_auth_page *ap, psync_request_t *rq,
   return 0;
 }
 
-int psync_pagecache_read_unmodified_encrypted_locked(psync_openfile_t *of,
+int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
                                                      char *buf, uint64_t size,
                                                      uint64_t offset) {
   psync_crypto_offsets_t offsets;
@@ -3028,7 +3028,7 @@ err0:
   goto ret0;
 }
 
-int psync_pagecache_readv_locked(psync_openfile_t *of,
+int ppagecache_readv_locked(psync_openfile_t *of,
                                  psync_pagecache_read_range *ranges, int cnt) {
   uint64_t initialsize, hash, poffset, psize, first_page_id;
   unsigned long pageoff, copyoff, copysize, pagecnt, j;
@@ -3575,7 +3575,7 @@ static void psync_pagecache_add_task(uint32_t type, uint64_t taskid,
     prun_thread("upload to cache", psync_pagecache_upload_to_cache);
 }
 
-void psync_pagecache_creat_to_pagecache(uint64_t taskid, uint64_t hash,
+void ppagecache_creat(uint64_t taskid, uint64_t hash,
                                         int onthisthread) {
   if (onthisthread)
     psync_pagecache_new_upload_to_cache(taskid, hash, 0);
@@ -3583,12 +3583,12 @@ void psync_pagecache_creat_to_pagecache(uint64_t taskid, uint64_t hash,
     psync_pagecache_add_task(PAGE_TASK_TYPE_CREAT, taskid, hash, 0);
 }
 
-void psync_pagecache_modify_to_pagecache(uint64_t taskid, uint64_t hash,
+void ppagecache_modify(uint64_t taskid, uint64_t hash,
                                          uint64_t oldhash) {
   psync_pagecache_add_task(PAGE_TASK_TYPE_MODIFY, taskid, hash, oldhash);
 }
 
-int psync_pagecache_have_all_pages_in_cache(uint64_t hash, uint64_t size) {
+int ppagecache_have_all_pages(uint64_t hash, uint64_t size) {
   unsigned char *db;
   uint32_t i, pagecnt;
   pagecnt = (size + PSYNC_FS_PAGE_SIZE - 1) / PSYNC_FS_PAGE_SIZE;
@@ -3600,7 +3600,7 @@ int psync_pagecache_have_all_pages_in_cache(uint64_t hash, uint64_t size) {
   return i == pagecnt;
 }
 
-int psync_pagecache_copy_all_pages_from_cache_to_file_locked(
+int ppagecache_copy_to_file_locked(
     psync_openfile_t *of, uint64_t hash, uint64_t size) {
   char buff[PSYNC_FS_PAGE_SIZE];
   uint64_t i, pagecnt;
@@ -3626,7 +3626,7 @@ int psync_pagecache_copy_all_pages_from_cache_to_file_locked(
   }
 }
 
-int psync_pagecache_lock_pages_in_cache() {
+int ppagecache_lock_pages() {
   if (pthread_mutex_trylock(&clean_cache_mutex))
     return -1;
   clean_cache_stoppers++;
@@ -3634,14 +3634,14 @@ int psync_pagecache_lock_pages_in_cache() {
   return 0;
 }
 
-void psync_pagecache_unlock_pages_from_cache() {
+void ppagecache_unlock_pages() {
   pthread_mutex_lock(&clean_cache_mutex);
   if (--clean_cache_stoppers == 0 && clean_cache_waiters)
     pthread_cond_broadcast(&clean_cache_cond);
   pthread_mutex_unlock(&clean_cache_mutex);
 }
 
-void psync_pagecache_resize_cache() {
+void ppagecache_resize() {
   pthread_mutex_lock(&flush_cache_mutex);
   db_cache_in_pages =
       psync_setting_get_uint(_PS(fscachesize)) / PSYNC_FS_PAGE_SIZE;
@@ -3751,7 +3751,7 @@ static int psync_pagecache_free_page_from_read_cache() {
   return ret;
 }
 
-uint64_t psync_pagecache_free_from_read_cache(uint64_t size) {
+uint64_t ppagecache_free_read(uint64_t size) {
   uint64_t i;
   size = size_round_up_to_page(size) / PSYNC_FS_PAGE_SIZE;
   for (i = 0; i < size; i++)
@@ -3763,7 +3763,7 @@ uint64_t psync_pagecache_free_from_read_cache(uint64_t size) {
   return i * PSYNC_FS_PAGE_SIZE;
 }
 
-void psync_pagecache_init() {
+void ppagecache_init() {
   uint64_t i;
   char *page_data, *cache_file;
   const char *cache_dir;
@@ -3833,7 +3833,7 @@ void psync_pagecache_init() {
                                  SEEK_SET) != -1))
     assertw(pfile_truncate(readcache) == 0);
   if (db_cache_max_page > db_cache_in_pages)
-    psync_pagecache_resize_cache();
+    ppagecache_resize();
   pthread_mutex_lock(&flush_cache_mutex);
   check_disk_full();
   pthread_mutex_unlock(&flush_cache_mutex);
@@ -3843,7 +3843,7 @@ void psync_pagecache_init() {
     upload_to_cache_thread_run = 1;
   }
   psync_sql_unlock();
-  psync_timer_register(psync_pagecache_flush_timer, PSYNC_FS_DISK_FLUSH_SEC,
+  psync_timer_register(ppagecache_flush_timer, PSYNC_FS_DISK_FLUSH_SEC,
                        NULL);
 }
 
@@ -3857,7 +3857,7 @@ void clean_cache_del(void *delcache, ppath_stat *st) {
   }
 }
 
-void psync_pagecache_clean_cache() {
+void ppagecache_clean() {
   const char *cache_dir;
   cache_dir = psync_setting_get_string(_PS(fscachepath));
   if (readcache != INVALID_HANDLE_VALUE) {
@@ -3867,7 +3867,7 @@ void psync_pagecache_clean_cache() {
   ppath_ls(cache_dir, clean_cache_del, (void *)1);
 }
 
-void psync_pagecache_reopen_read_cache() {
+void ppagecache_reopen_read() {
   char *cache_file;
   const char *cache_dir;
   struct stat st;
@@ -3881,7 +3881,7 @@ void psync_pagecache_reopen_read_cache() {
   psync_free(cache_file);
 }
 
-void psync_pagecache_clean_read_cache() {
+void ppagecache_clean_read() {
   uint32_t i, cnt;
   psync_sql_res *res;
   debug(D_NOTICE, "start");
@@ -3916,7 +3916,7 @@ void psync_pagecache_clean_read_cache() {
   debug(D_NOTICE, "end");
 }
 
-int psync_pagecache_move_cache(const char *path) {
+int ppagecache_move(const char *path) {
   struct stat st;
   psync_sql_res *res;
   char *rdpath, *opath;

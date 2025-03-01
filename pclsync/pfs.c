@@ -2026,7 +2026,7 @@ static int psync_fs_read(const char *path, char *buf, size_t size,
     else if (of->modified)
       return pfscrypto_read_mod(of, buf, size, offset);
     else
-      return psync_pagecache_read_unmodified_encrypted_locked(of, buf, size,
+      return ppagecache_read_unmod_enc_locked(of, buf, size,
                                                               offset);
   } else {
     if (of->newfile)
@@ -2035,9 +2035,9 @@ static int psync_fs_read(const char *path, char *buf, size_t size,
       if (unlikely(of->staticfile))
         return psync_read_staticfile(of, buf, size, offset);
       else
-        return psync_pagecache_read_modified_locked(of, buf, size, offset);
+        return ppagecache_read_mod_locked(of, buf, size, offset);
     } else
-      return psync_pagecache_read_unmodified_locked(of, buf, size, offset);
+      return ppagecache_read_unmod_locked(of, buf, size, offset);
   }
 }
 
@@ -2150,8 +2150,8 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
     size = of->initialsize;
   }
   if (size == 0 || (size <= PSYNC_FS_MAX_SIZE_CONVERT_NEWFILE &&
-                    psync_pagecache_have_all_pages_in_cache(of->hash, size) &&
-                    !psync_pagecache_lock_pages_in_cache())) {
+                    ppagecache_have_all_pages(of->hash, size) &&
+                    !ppagecache_lock_pages())) {
     debug(D_NOTICE,
           "we have all pages of file %s, convert it to new file as they are "
           "cheaper to work with",
@@ -2160,7 +2160,7 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
                                 encsymkey, encsymkeylen);
     if (unlikely_log(!cr)) {
       psync_sql_unlock();
-      psync_pagecache_unlock_pages_from_cache();
+      ppagecache_unlock_pages();
       psync_free(encsymkey);
       return -EIO;
     }
@@ -2171,16 +2171,16 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
     of->modified = 1;
     ret = open_write_files(of, 0);
     if (unlikely_log(ret)) {
-      psync_pagecache_unlock_pages_from_cache();
+      ppagecache_unlock_pages();
       psync_free(encsymkey);
       return ret;
     }
     if (of->origctime)
       pfile_set_creation(of->datafile, of->origctime);
     if (size) {
-      ret = psync_pagecache_copy_all_pages_from_cache_to_file_locked(
+      ret = ppagecache_copy_to_file_locked(
           of, of->hash, size);
-      psync_pagecache_unlock_pages_from_cache();
+      ppagecache_unlock_pages();
       if (unlikely_log(ret)) {
         psync_free(encsymkey);
         return -EIO;
@@ -2356,7 +2356,7 @@ PSYNC_NOINLINE static int psync_fs_do_check_write_space(psync_openfile_t *of,
   psync_set_local_full(1);
   if ((freespc <= minlocal / 2 || minlocal <= PSYNC_FS_PAGE_SIZE ||
        freespc <= size)) {
-    if (psync_pagecache_free_from_read_cache(size * 2) < size * 2) {
+    if (ppagecache_free_read(size * 2) < size * 2) {
       debug(D_WARNING,
             "free space is %lu, less than half of minimum %lu+%lu, returning "
             "error",
@@ -2378,11 +2378,11 @@ PSYNC_NOINLINE static int psync_fs_do_check_write_space(psync_openfile_t *of,
           "free space is %lu, less than 3/4 of minimum %lu+%lu, will try to "
           "free read cache pages",
           (unsigned long)freespc, (unsigned long)minlocal, (unsigned long)size);
-    freed = psync_pagecache_free_from_read_cache(size) >= size;
+    freed = ppagecache_free_read(size) >= size;
   } else
     freed = 0;
   if (psync_status.uploadspeed == 0) {
-    if (freed || psync_pagecache_free_from_read_cache(size) >= size) {
+    if (freed || ppagecache_free_read(size) >= size) {
       debug(D_NOTICE, "there is no active upload and we managed to free from "
                       "cache, not throttling write");
       psync_fs_lock_file(of);
@@ -3500,7 +3500,7 @@ static void psync_fs_do_stop(void) {
     fuse_exit(psync_fuse);
     started = 2;
     debug(D_NOTICE, "fuse_exit exited, flushing cache");
-    psync_pagecache_flush();
+    ppagecache_flush();
     debug(D_NOTICE, "cache flushed, waiting for fuse to exit");
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += 2;
@@ -3572,7 +3572,7 @@ static void psync_fs_init_once() {
   psync_fake_prefix_len = strlen(psync_fake_prefix);
 #endif
   psync_fstask_init();
-  psync_pagecache_init();
+  ppagecache_init();
   atexit(psync_fs_do_stop);
   psync_setup_signals();
   psync_fsstatic_add_files();

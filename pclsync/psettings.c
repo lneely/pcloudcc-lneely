@@ -91,7 +91,7 @@ static psync_setting_t settings[] = {
     {"fsroot", fsroot_change, NULL, {0}, PSYNC_TSTRING},
     {"autostartfs", NULL, NULL, {PSYNC_AUTOSTARTFS_DEFAULT}, PSYNC_TBOOL},
     {"fscachesize",
-     psync_pagecache_resize_cache,
+     ppagecache_resize,
      NULL,
      {PSYNC_FS_DEFAULT_CACHE_SIZE},
      PSYNC_TNUMBER},

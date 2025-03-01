@@ -575,7 +575,7 @@ void psync_unlink() {
     debug(D_ERROR, "failed to close database, exiting");
     exit(1);
   }
-  psync_pagecache_clean_cache();
+  ppagecache_clean();
   psync_sql_connect(psync_database);
   if (deviceid) {
     res = psync_sql_prep_statement(
@@ -600,7 +600,7 @@ void psync_unlink() {
   psync_settings_reset();
   pcache_clean();
   pnotify_clean();
-  psync_pagecache_reopen_read_cache();
+  ppagecache_reopen_read();
   pdiff_unlock();
   pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   pstatus_set(PSTATUS_TYPE_ACCFULL, PSTATUS_ACCFULL_QUOTAOK);
@@ -2625,10 +2625,10 @@ int psync_setlanguage(const char *language, char **err) {
   return psync_run_command("setlanguage", params, err);
 }
 
-void psync_fs_clean_read_cache() { psync_pagecache_clean_read_cache(); }
+void psync_fs_clean_read_cache() { ppagecache_clean_read(); }
 
 int psync_fs_move_cache(const char *path) {
-  return psync_pagecache_move_cache(path);
+  return ppagecache_move(path);
 }
 
 char *psync_get_token() {
