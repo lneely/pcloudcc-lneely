@@ -82,7 +82,7 @@ PSYNC_NOINLINE static void timer_sleep_detected(time_t lt) {
     e = e->next;
   }
   pthread_mutex_unlock(&timer_ex_mutex);
-  psync_cache_clean_all();
+  pcache_clean();
   psync_timer_notify_exception();
 }
 

@@ -478,7 +478,7 @@ int psync_sql_close() {
   while (1) {
     code = sqlite3_close(psync_db);
     if (code == SQLITE_BUSY) {
-      psync_cache_clean_all();
+      pcache_clean();
       tries++;
       if (tries > 100) {
         psys_sleep_milliseconds_fast(tries - 90);
@@ -1225,7 +1225,7 @@ psync_sql_res *psync_sql_do_query(const char *sql, const char *file,
 psync_sql_res *psync_sql_query(const char *sql) {
 #endif
   psync_sql_res *ret;
-  ret = (psync_sql_res *)psync_cache_get(sql);
+  ret = (psync_sql_res *)pcache_get(sql);
   if (ret) {
     //    debug(D_NOTICE, "got query %s from cache", sql);
     ret->locked = SQL_WRITE_LOCK;
@@ -1293,7 +1293,7 @@ psync_sql_res *psync_sql_do_query_rdlock(const char *sql, const char *file,
 psync_sql_res *psync_sql_query_rdlock(const char *sql) {
 #endif
   psync_sql_res *ret;
-  ret = (psync_sql_res *)psync_cache_get(sql);
+  ret = (psync_sql_res *)pcache_get(sql);
   if (ret) {
     //    debug(D_NOTICE, "got query %s from cache", sql);
     ret->locked = SQL_READ_LOCK;
@@ -1372,7 +1372,7 @@ psync_sql_res *psync_sql_query_nolock(const char *sql) {
     abort();
   }
 #endif
-  ret = (psync_sql_res *)psync_cache_get(sql);
+  ret = (psync_sql_res *)pcache_get(sql);
   if (ret) {
     //    debug(D_NOTICE, "got query %s from cache", sql);
     ret->locked = SQL_NO_LOCK;
@@ -1420,7 +1420,7 @@ void psync_sql_free_result(psync_sql_res *res) {
   memset(res->row, 0xff, res->column_count * sizeof(psync_variant));
 #endif
   if (code == SQLITE_OK)
-    psync_cache_add(res->sql, res, PSYNC_QUERY_CACHE_SEC, psync_sql_free_cache,
+    pcache_add(res->sql, res, PSYNC_QUERY_CACHE_SEC, psync_sql_free_cache,
                     PSYNC_QUERY_MAX_CNT);
   else
     psync_sql_free_cache(res);
@@ -1484,7 +1484,7 @@ psync_sql_res *psync_sql_do_prep_statement(const char *sql, const char *file,
 psync_sql_res *psync_sql_prep_statement(const char *sql) {
 #endif
   psync_sql_res *ret;
-  ret = psync_cache_get(sql);
+  ret = pcache_get(sql);
   if (ret) {
     //    debug(D_NOTICE, "got statement %s from cache", sql);
     ret->locked = SQL_WRITE_LOCK;
@@ -1570,7 +1570,7 @@ int psync_sql_run_free(psync_sql_res *res) {
     return -1;
   } else {
     psync_sql_res_unlock(res);
-    psync_cache_add(res->sql, res, PSYNC_QUERY_CACHE_SEC, psync_sql_free_cache,
+    pcache_add(res->sql, res, PSYNC_QUERY_CACHE_SEC, psync_sql_free_cache,
                     PSYNC_QUERY_MAX_CNT);
     return 0;
   }
@@ -2526,7 +2526,7 @@ void psync_qpartition(void *base, size_t cnt, size_t sort_first, size_t size,
 
 void psync_try_free_memory() {
   sqlite3_db_release_memory(psync_db);
-  psync_cache_clean_all();
+  pcache_clean();
 }
 
 static void time_format(time_t tm, unsigned long ns, char *result) {

@@ -193,7 +193,7 @@ void psync_apipool_set_server(const char *binapi) {
 psock_t *psync_apipool_get() {
   psock_t *ret;
   while (1) {
-    ret = (psock_t *)psync_cache_get(apikey);
+    ret = (psock_t *)pcache_get(apikey);
     if (!ret)
       break;
     if (!api_sock_is_broken(ret))
@@ -208,7 +208,7 @@ psock_t *psync_apipool_get() {
 psock_t *psync_apipool_get_from_cache() {
   psock_t *ret;
   while (1) {
-    ret = (psock_t *)psync_cache_get(apikey);
+    ret = (psock_t *)pcache_get(apikey);
     if (!ret)
       break;
     if (!api_sock_is_broken(ret))
@@ -218,7 +218,7 @@ psock_t *psync_apipool_get_from_cache() {
 }
 
 void psync_apipool_prepare() {
-  if (psync_cache_has(apikey))
+  if (pcache_has(apikey))
     return;
   else {
     psock_t *ret;
@@ -337,7 +337,7 @@ void psync_apipool_release(psock_t *api) {
   }
 #endif
   if (hash_func(apiserver) == api->misc)
-    psync_cache_add(apikey, api, PSYNC_APIPOOL_MAXIDLESEC, psync_ret_api,
+    pcache_add(apikey, api, PSYNC_APIPOOL_MAXIDLESEC, psync_ret_api,
                     PSYNC_APIPOOL_MAXIDLE);
   else
     psync_ret_api(api);
@@ -925,7 +925,7 @@ psync_http_socket *psync_http_connect(const char *host, const char *path,
   usessl = psync_setting_get_bool(_PS(usessl));
   cl = snprintf(cachekey, sizeof(cachekey) - 1, "HTTP%d-%s", usessl, host) + 1;
   cachekey[sizeof(cachekey) - 1] = 0;
-  sock = (psock_t *)psync_cache_get(cachekey);
+  sock = (psock_t *)pcache_get(cachekey);
   if (!sock) {
     sock = psync_socket_connect_download(host, usessl ? 443 : 80, usessl);
     if (!sock)
@@ -1043,8 +1043,8 @@ void psync_http_close(psync_http_socket *http) {
     //    contentlength=%lu", http->cachekey, (unsigned)http->keepalive,
     //                    (unsigned long)http->readbytes, (unsigned
     //                    long)http->contentlength);
-    psync_cache_add(http->cachekey, http->sock, http->keepalive - 5,
-                    (psync_cache_free_callback)psync_socket_close_download,
+    pcache_add(http->cachekey, http->sock, http->keepalive - 5,
+                    (pcache_free_cb)psync_socket_close_download,
                     PSYNC_MAX_IDLE_HTTP_CONNS);
   } else {
     debug(D_NOTICE,
@@ -1129,8 +1129,8 @@ static void connect_cache_thread(void *ptr) {
       snprintf(cachekey, sizeof(cachekey) - 1, "HTTP%d-%s", node->usessl,
                node->host);
       cachekey[sizeof(cachekey) - 1] = 0;
-      psync_cache_add(cachekey, sock, 25,
-                      (psync_cache_free_callback)psync_socket_close_download,
+      pcache_add(cachekey, sock, 25,
+                      (pcache_free_cb)psync_socket_close_download,
                       PSYNC_MAX_IDLE_HTTP_CONNS);
     }
     pthread_mutex_unlock(&connect_cache_mutex);
@@ -1290,7 +1290,7 @@ psync_http_socket *psync_http_connect_multihost(const binresult *hosts,
                   hosts->array[i]->str) +
          1;
     cachekey[sizeof(cachekey) - 1] = 0;
-    sock = (psock_t *)psync_cache_get(cachekey);
+    sock = (psock_t *)pcache_get(cachekey);
     if (sock) {
       if (unlikely_log(psock_is_broken(sock->sock))) {
         psock_close_bad(sock);
@@ -1361,7 +1361,7 @@ psync_http_connect_multihost_from_cache(const binresult *hosts,
                   hosts->array[i]->str) +
          1;
     cachekey[sizeof(cachekey) - 1] = 0;
-    sock = (psock_t *)psync_cache_get(cachekey);
+    sock = (psock_t *)pcache_get(cachekey);
     if (sock) {
       if (unlikely_log(psock_is_broken(sock->sock))) {
         psock_close_bad(sock);

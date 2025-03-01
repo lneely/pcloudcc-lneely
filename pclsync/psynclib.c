@@ -260,7 +260,7 @@ int psync_init() {
     }
   }
   pmemlock_init();
-  psync_cache_init();
+  pcache_init();
   psys_init();
 
   if (!psync_database) {
@@ -361,7 +361,7 @@ void psync_destroy() {
   psync_sql_sync();
   psys_sleep_milliseconds(20);
   psync_sql_lock();
-  psync_cache_clean_all();
+  pcache_clean();
   psync_sql_close();
 }
 
@@ -447,7 +447,7 @@ void psync_logout2(uint32_t auth_status, int doinvauth) {
   psync_stop_all_download();
   psync_stop_all_upload();
   ptask_stop_async();
-  psync_cache_clean_all();
+  pcache_clean();
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   psync_restart_localscan();
   psync_timer_notify_exception();
@@ -562,7 +562,7 @@ void psync_unlink() {
   psync_timer_notify_exception();
   psync_sql_lock();
   debug(D_NOTICE, "clearing database, locked");
-  psync_cache_clean_all();
+  pcache_clean();
   ret = psync_sql_close();
   pfile_delete(psync_database);
   if (ret) {
@@ -593,7 +593,7 @@ void psync_unlink() {
   psync_sql_unlock();
   psync_sql_checkpoint_unlock();
   psync_settings_reset();
-  psync_cache_clean_all();
+  pcache_clean();
   psync_notifications_clean();
   psync_pagecache_reopen_read_cache();
   psync_diff_unlock();

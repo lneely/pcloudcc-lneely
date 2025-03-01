@@ -2673,7 +2673,7 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
       const char *prefixes[] = {"API:", "HTTP"};
       debug(D_NOTICE, "reconnecting diff");
       psock_close_bad(*sock);
-      psync_cache_clean_starting_with_one_of(prefixes, ARRAY_SIZE(prefixes));
+      pcache_clean_oneof(prefixes, ARRAY_SIZE(prefixes));
       *sock = get_connected_socket();
       psync_set_status(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
       psync_syncer_check_delayed_syncs();

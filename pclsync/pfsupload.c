@@ -418,7 +418,7 @@ static void set_key_for_fileid(psync_fileid_t fileid, uint64_t hash,
     psync_free(enckey);
   }
   psync_get_string_id(buff, "DKEY", fileid);
-  psync_cache_del(buff);
+  pcache_del(buff);
 }
 
 static int save_meta(const binresult *meta, psync_folderid_t folderid,

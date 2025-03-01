@@ -98,7 +98,7 @@ void sha1_hex_null_term(const void *data, size_t len, char *out);
 
 void psync_cloud_crypto_clean_cache() {
   const char *prefixes[] = {"DKEY", "FKEY", "FLDE", "FLDD", "SEEN"};
-  psync_cache_clean_starting_with_one_of(prefixes, ARRAY_SIZE(prefixes));
+  pcache_clean_oneof(prefixes, ARRAY_SIZE(prefixes));
 }
 
 static void psync_cloud_crypto_setup_save_to_db(
@@ -968,7 +968,7 @@ psync_crypto_get_folder_symkey_locked(psync_folderid_t folderid) {
   psync_encrypted_symmetric_key_t enckey;
   psync_symmetric_key_t symkey;
   psync_get_string_id(buff, "FKEY", folderid);
-  symkey = (psync_symmetric_key_t)psync_cache_get(buff);
+  symkey = (psync_symmetric_key_t)pcache_get(buff);
   if (symkey)
     return symkey;
   enckey = psync_crypto_get_folder_enc_key(folderid);
@@ -991,7 +991,7 @@ psync_crypto_get_file_symkey_locked(psync_fileid_t fileid, uint64_t hash,
   psync_encrypted_symmetric_key_t enckey;
   psync_symmetric_key_t symkey;
   psync_get_string_id2(buff, "DKEY", fileid, hash);
-  symkey = (psync_symmetric_key_t)psync_cache_get(buff);
+  symkey = (psync_symmetric_key_t)pcache_get(buff);
   if (symkey) {
     debug(D_NOTICE, "got key for file %lu from cache", (unsigned long)fileid);
     return symkey;
@@ -1022,7 +1022,7 @@ psync_crypto_release_folder_symkey_locked(psync_folderid_t folderid,
                                           psync_symmetric_key_t key) {
   char buff[16];
   psync_get_string_id(buff, "FKEY", folderid);
-  psync_cache_add(buff, key, PSYNC_CRYPTO_CACHE_DIR_SYM_KEY,
+  pcache_add(buff, key, PSYNC_CRYPTO_CACHE_DIR_SYM_KEY,
                   psync_crypto_release_symkey_ptr, 2);
 }
 
@@ -1031,7 +1031,7 @@ static void psync_crypto_release_file_symkey_locked(psync_fileid_t fileid,
                                                     psync_symmetric_key_t key) {
   char buff[32];
   psync_get_string_id2(buff, "DKEY", fileid, hash);
-  psync_cache_add(buff, key, PSYNC_CRYPTO_CACHE_FILE_SYM_KEY,
+  pcache_add(buff, key, PSYNC_CRYPTO_CACHE_FILE_SYM_KEY,
                   psync_crypto_release_symkey_ptr, 2);
 }
 
@@ -1089,7 +1089,7 @@ psync_crypto_get_folder_encoder_check_cache_locked(psync_folderid_t folderid) {
   char buff[16];
   psync_crypto_aes256_text_encoder_t enc;
   psync_get_string_id(buff, "FLDE", folderid);
-  enc = (psync_crypto_aes256_text_encoder_t)psync_cache_get(buff);
+  enc = (psync_crypto_aes256_text_encoder_t)pcache_get(buff);
   if (enc)
     return enc;
   else
@@ -1254,7 +1254,7 @@ psync_cloud_crypto_get_folder_decoder(psync_fsfolderid_t folderid) {
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   if (folderid >= 0) {
     psync_get_string_id(buff, "FLDD", folderid);
-    dec = (psync_crypto_aes256_text_decoder_t)psync_cache_get(buff);
+    dec = (psync_crypto_aes256_text_decoder_t)pcache_get(buff);
     if (dec)
       return dec;
   }
@@ -1284,7 +1284,7 @@ void psync_cloud_crypto_release_folder_decoder(
   char buff[16];
   if (crypto_started_un && folderid >= 0) {
     psync_get_string_id(buff, "FLDD", folderid);
-    psync_cache_add(buff, decoder, PSYNC_CRYPTO_CACHE_DIR_ECODER_SEC,
+    pcache_add(buff, decoder, PSYNC_CRYPTO_CACHE_DIR_ECODER_SEC,
                     psync_crypto_free_folder_decoder, 2);
   } else
     psync_crypto_aes256_text_decoder_free(decoder);
@@ -1314,7 +1314,7 @@ static void psync_crypto_release_folder_encoder_locked(
     psync_folderid_t folderid, psync_crypto_aes256_text_encoder_t enc) {
   char buff[16];
   psync_get_string_id(buff, "FLDE", folderid);
-  psync_cache_add(buff, enc, PSYNC_CRYPTO_CACHE_DIR_ECODER_SEC,
+  pcache_add(buff, enc, PSYNC_CRYPTO_CACHE_DIR_ECODER_SEC,
                   psync_crypto_free_folder_encoder, 2);
 }
 
@@ -1329,7 +1329,7 @@ psync_cloud_crypto_get_folder_encoder(psync_fsfolderid_t folderid) {
 
   if (folderid >= 0) {
     psync_get_string_id(buff, "FLDE", folderid);
-    if ((enc = (psync_crypto_aes256_text_encoder_t)psync_cache_get(buff)) !=
+    if ((enc = (psync_crypto_aes256_text_encoder_t)pcache_get(buff)) !=
         NULL) {
       return enc;
     }
@@ -1356,7 +1356,7 @@ void psync_cloud_crypto_release_folder_encoder(
   char buff[16];
   if (crypto_started_un && folderid >= 0) {
     psync_get_string_id(buff, "FLDE", folderid);
-    psync_cache_add(buff, encoder, PSYNC_CRYPTO_CACHE_DIR_ECODER_SEC,
+    pcache_add(buff, encoder, PSYNC_CRYPTO_CACHE_DIR_ECODER_SEC,
                     psync_crypto_free_folder_encoder, 2);
   } else
     psync_crypto_aes256_text_encoder_free(encoder);
@@ -1494,7 +1494,7 @@ psync_cloud_crypto_get_file_encoder(psync_fsfileid_t fileid, uint64_t hash,
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   if (fileid >= 0) {
     psync_get_string_id2(buff, "SEEN", fileid, hash);
-    enc = (psync_crypto_aes256_sector_encoder_decoder_t)psync_cache_get(buff);
+    enc = (psync_crypto_aes256_sector_encoder_decoder_t)pcache_get(buff);
     if (enc)
       return enc;
   }
@@ -1564,7 +1564,7 @@ void psync_cloud_crypto_release_file_encoder(
   if (crypto_started_un && fileid >= 0) {
     char buff[32];
     psync_get_string_id2(buff, "SEEN", fileid, hash);
-    psync_cache_add(buff, encoder, PSYNC_CRYPTO_CACHE_FILE_ECODER_SEC,
+    pcache_add(buff, encoder, PSYNC_CRYPTO_CACHE_FILE_ECODER_SEC,
                     psync_crypto_free_file_encoder, 2);
   } else
     psync_crypto_aes256_sector_encoder_decoder_free(encoder);

@@ -898,7 +898,7 @@ static psync_fsfileid_t get_file_at_old_location(psync_fsfileid_t fileid) {
   if (fileid < 0)
     return 0;
   psync_get_string_id(key, "HLOC", fileid);
-  rec = (file_history_record *)psync_cache_get(key);
+  rec = (file_history_record *)pcache_get(key);
   if (!rec)
     return 0;
   folder = psync_fstask_get_folder_tasks_locked(rec->folderid);
@@ -1085,14 +1085,14 @@ static void add_history_record(psync_fileid_t fileid, psync_folderid_t folderid,
   size_t len;
   char key[16];
   psync_get_string_id(key, "HLOC", fileid);
-  while ((rec = (file_history_record *)psync_cache_get(key)))
+  while ((rec = (file_history_record *)pcache_get(key)))
     psync_free(rec);
   len = strlen(name) + 1;
   rec = (file_history_record *)psync_malloc(
       offsetof(file_history_record, name) + len);
   rec->folderid = folderid;
   memcpy(rec->name, name, len);
-  psync_cache_add(key, rec, PSYNC_FS_FILE_LOC_HIST_SEC, psync_free, 1);
+  pcache_add(key, rec, PSYNC_FS_FILE_LOC_HIST_SEC, psync_free, 1);
 }
 
 int psync_fstask_rename_file(psync_fsfileid_t fileid,

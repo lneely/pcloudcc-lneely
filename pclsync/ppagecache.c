@@ -695,7 +695,7 @@ static psync_urls_t *get_urls_for_request(psync_request_t *req) {
   psync_tree_added_at(&url_cache_tree, el, &urls->tree);
   pthread_mutex_unlock(&url_cache_mutex);
   psync_get_string_id(buff, "URLS", req->hash);
-  res = (binresult *)psync_cache_get(buff);
+  res = (binresult *)pcache_get(buff);
   if (res) {
     set_urls(urls, res);
     return urls;
@@ -718,7 +718,7 @@ static void release_urls(psync_urls_t *urls) {
       etime = papi_find_result2(urls->urls, "expires", PARAM_NUM)->num;
       if (etime > ctime + 3600) {
         psync_get_string_id(buff, "URLS", urls->hash);
-        psync_cache_add(buff, urls->urls, etime - ctime - 3600, psync_free, 2);
+        pcache_add(buff, urls->urls, etime - ctime - 3600, psync_free, 2);
         urls->urls = NULL;
       }
     }
