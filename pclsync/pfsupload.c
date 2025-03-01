@@ -159,7 +159,7 @@ static int psync_process_task_mkdir(fsupload_task_t *task) {
   meta = papi_find_result2(task->res, "metadata", PARAM_HASH);
   folderid = papi_find_result2(meta, "folderid", PARAM_NUM)->num;
   task->int2 = folderid;
-  psync_ops_create_folder_in_db(meta);
+  pfileops_create_fldr(meta);
   psync_fstask_folder_created(task->folderid, task->id, folderid, task->text1);
   psync_fs_task_to_folder(task->id, folderid);
   if (task->text2 && papi_find_result2(task->res, "created", PARAM_BOOL)->num) {
@@ -197,7 +197,7 @@ static int handle_rmdir_api_error(uint64_t result, fsupload_task_t *task) {
   psync_process_api_error(result);
   switch (result) {
   case 2005: /* folder does not exist, kind of success */
-    // psync_ops_delete_folder_from_db(task->sfolderid);
+    // pfileops_delete_fldr(task->sfolderid);
     psync_fstask_folder_deleted(task->folderid, task->id, task->text1);
     return 0;
   case 2003: /* access denied, skip*/
@@ -217,7 +217,7 @@ static int psync_process_task_rmdir(fsupload_task_t *task) {
   result = papi_find_result2(task->res, "result", PARAM_NUM)->num;
   if (result)
     return handle_rmdir_api_error(result, task);
-  psync_ops_delete_folder_from_db(
+  pfileops_delete_fldr(
       papi_find_result2(task->res, "metadata", PARAM_HASH));
   psync_fstask_folder_deleted(task->folderid, task->id, task->text1);
   debug(D_NOTICE, "folder %lu/%s deleted", (unsigned long)task->folderid,
@@ -456,13 +456,13 @@ static int save_meta(const binresult *meta, psync_folderid_t folderid,
     }
   }
   if (newfile) {
-    psync_ops_create_file_in_db(meta);
+    pfileops_create_file(meta);
     if (!deleted)
       psync_pagecache_creat_to_pagecache(taskid, hash, 0);
     psync_fstask_file_created(folderid, taskid, name, fileid);
     psync_fs_task_to_file(taskid, fileid);
   } else {
-    psync_ops_update_file_in_db(meta);
+    pfileops_update_file(meta);
     if (!deleted)
       psync_pagecache_modify_to_pagecache(taskid, hash, oldhash);
     psync_fstask_file_modified(folderid, taskid, name, fileid);
@@ -1358,7 +1358,7 @@ static int psync_process_task_creat(fsupload_task_t *task) {
           (unsigned long)task->folderid, task->text1);
     return -1;
   }
-  psync_ops_create_file_in_db(meta);
+  pfileops_create_file(meta);
   psync_fstask_file_created(task->folderid, task->id, task->text1, fileid);
   if (task->text2)
     set_key_for_fileid(fileid, hash, task->text2);
@@ -1440,7 +1440,7 @@ static int handle_unlink_api_error(uint64_t result, fsupload_task_t *task) {
   psync_process_api_error(result);
   switch (result) {
   case 2009: /* file does not exist, kind of success */
-    // psync_ops_delete_file_from_db(task->fileid);
+    // pfileops_delete_file(task->fileid);
     psync_fstask_file_deleted(task->folderid, task->id, task->text1);
     return 0;
   case 2003: /* access denied, skip*/
@@ -1456,7 +1456,7 @@ static int psync_process_task_unlink(fsupload_task_t *task) {
   result = papi_find_result2(task->res, "result", PARAM_NUM)->num;
   if (result)
     return handle_unlink_api_error(result, task);
-  psync_ops_delete_file_from_db(
+  pfileops_delete_file(
       papi_find_result2(task->res, "metadata", PARAM_HASH));
   psync_fstask_file_deleted(task->folderid, task->id, task->text1);
   debug(D_NOTICE, "file %lu/%s deleted", (unsigned long)task->folderid,
@@ -1578,7 +1578,7 @@ static int psync_process_task_rename_file(fsupload_task_t *task) {
   if (result && result != 2049)
     return handle_rename_file_api_error(result, task);
   meta = papi_find_result2(task->res, "metadata", PARAM_HASH);
-  psync_ops_update_file_in_db(meta);
+  pfileops_update_file(meta);
   psync_fstask_file_renamed(task->folderid, task->id, task->text1, task->int1);
   debug(D_NOTICE, "file %lu/%s renamed", (unsigned long)task->folderid,
         task->text1);
@@ -1667,7 +1667,7 @@ static int psync_process_task_rename_folder(fsupload_task_t *task) {
     return handle_rename_folder_api_error(result, task);
 
   meta = papi_find_result2(task->res, "metadata", PARAM_HASH);
-  psync_ops_update_folder_in_db(meta);
+  pfileops_update_fldr(meta);
   psync_fstask_folder_renamed(task->folderid, task->id, task->text1,
                               task->int1);
   debug(D_NOTICE, "folder %lu/%s renamed", (unsigned long)task->folderid,

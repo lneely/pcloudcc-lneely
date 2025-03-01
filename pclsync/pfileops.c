@@ -34,7 +34,7 @@
 #include "pfolder.h"
 #include "plibs.h"
 
-void psync_ops_create_folder_in_db(const binresult *meta) {
+void pfileops_create_fldr(const binresult *meta) {
   psync_sql_res *res;
   const binresult *name;
   uint64_t userid, perms, flags;
@@ -49,7 +49,7 @@ void psync_ops_create_folder_in_db(const binresult *meta) {
     perms = PSYNC_PERM_ALL;
   } else {
     userid = papi_find_result2(meta, "userid", PARAM_NUM)->num;
-    perms = psync_get_permissions(meta);
+    perms = pfileops_get_perms(meta);
   }
   name = papi_find_result2(meta, "name", PARAM_STR);
   psync_sql_bind_uint(res, 1,
@@ -67,22 +67,39 @@ void psync_ops_create_folder_in_db(const binresult *meta) {
   psync_sql_run_free(res);
 }
 
-void psync_ops_update_folder_in_db(const binresult *meta) {
+void pfileops_update_fldr(const binresult *meta) {
   pdiff_fldr_update(meta);
 }
 
-void psync_ops_delete_folder_from_db(const binresult *meta) {
+void pfileops_delete_fldr(const binresult *meta) {
   pdiff_fldr_delete(meta);
 }
 
-void psync_ops_create_file_in_db(const binresult *meta) {
+void pfileops_create_file(const binresult *meta) {
   pdiff_file_create(meta);
 }
 
-void psync_ops_update_file_in_db(const binresult *meta) {
+void pfileops_update_file(const binresult *meta) {
   pdiff_file_update(meta);
 }
 
-void psync_ops_delete_file_from_db(const binresult *meta) {
+void pfileops_delete_file(const binresult *meta) {
   pdiff_file_delete(meta);
+}
+
+uint64_t pfileops_get_perms(const binresult *meta) {
+  const binresult *canmanage =
+      papi_check_result2(meta, "canmanage", PARAM_BOOL);
+  return (papi_find_result2(meta, "canread", PARAM_BOOL)->num ? PSYNC_PERM_READ
+                                                              : 0) +
+         (papi_find_result2(meta, "canmodify", PARAM_BOOL)->num
+              ? PSYNC_PERM_MODIFY
+              : 0) +
+         (papi_find_result2(meta, "candelete", PARAM_BOOL)->num
+              ? PSYNC_PERM_DELETE
+              : 0) +
+         (papi_find_result2(meta, "cancreate", PARAM_BOOL)->num
+              ? PSYNC_PERM_CREATE
+              : 0) +
+         (canmanage && canmanage->num ? PSYNC_PERM_MANAGE : 0);
 }

@@ -1260,7 +1260,7 @@ int psync_create_remote_folder_by_path(const char *path, char **err) {
   ret = run_command_get_res("createfolder", params, err, &res);
   if (ret)
     return ret;
-  psync_ops_create_folder_in_db(papi_find_result2(res, "metadata", PARAM_HASH));
+  pfileops_create_fldr(papi_find_result2(res, "metadata", PARAM_HASH));
   psync_free(res);
   pdiff_wake();
   return 0;
@@ -1276,7 +1276,7 @@ int psync_create_remote_folder(psync_folderid_t parentfolderid,
   ret = run_command_get_res("createfolder", params, err, &res);
   if (ret)
     return ret;
-  psync_ops_create_folder_in_db(papi_find_result2(res, "metadata", PARAM_HASH));
+  pfileops_create_fldr(papi_find_result2(res, "metadata", PARAM_HASH));
   psync_free(res);
   pdiff_wake();
   return 0;

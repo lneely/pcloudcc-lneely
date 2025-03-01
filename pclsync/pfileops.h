@@ -33,35 +33,21 @@
 #define _PSYNC_FILEOPS_H
 
 #include "papi.h"
-#include "pcompiler.h"
-#include "psettings.h"
-#include "psynclib.h"
 
 #define PSYNC_INVALID_FOLDERID ((psync_folderid_t) - 1)
 #define PSYNC_INVALID_PATH NULL
 
-static inline uint64_t psync_get_permissions(const binresult *meta) {
-  const binresult *canmanage =
-      papi_check_result2(meta, "canmanage", PARAM_BOOL);
-  return (papi_find_result2(meta, "canread", PARAM_BOOL)->num ? PSYNC_PERM_READ
-                                                              : 0) +
-         (papi_find_result2(meta, "canmodify", PARAM_BOOL)->num
-              ? PSYNC_PERM_MODIFY
-              : 0) +
-         (papi_find_result2(meta, "candelete", PARAM_BOOL)->num
-              ? PSYNC_PERM_DELETE
-              : 0) +
-         (papi_find_result2(meta, "cancreate", PARAM_BOOL)->num
-              ? PSYNC_PERM_CREATE
-              : 0) +
-         (canmanage && canmanage->num ? PSYNC_PERM_MANAGE : 0);
-}
 
-void psync_ops_create_folder_in_db(const binresult *meta);
-void psync_ops_update_folder_in_db(const binresult *meta);
-void psync_ops_delete_folder_from_db(const binresult *meta);
-void psync_ops_create_file_in_db(const binresult *meta);
-void psync_ops_update_file_in_db(const binresult *meta);
-void psync_ops_delete_file_from_db(const binresult *meta);
+
+// FIXME: find a better place for this to "live". it's not really a fileop as
+// far as I can tell.
+uint64_t pfileops_get_perms(const binresult *meta); 
+
+void pfileops_create_fldr(const binresult *meta);
+void pfileops_update_fldr(const binresult *meta);
+void pfileops_delete_fldr(const binresult *meta);
+void pfileops_create_file(const binresult *meta);
+void pfileops_update_file(const binresult *meta);
+void pfileops_delete_file(const binresult *meta);
 
 #endif

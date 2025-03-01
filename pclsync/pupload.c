@@ -251,7 +251,7 @@ static int task_createfolder(psync_syncid_t syncid,
     debug(D_NOTICE, "remote folder %lu %lu/%s created", (long unsigned)folderid,
           (long unsigned)parentfolderid, name);
     psync_sql_start_transaction();
-    psync_ops_create_folder_in_db(meta);
+    pfileops_create_fldr(meta);
     res = psync_sql_prep_statement(
         "UPDATE localfolder SET folderid=? WHERE id=? AND syncid=?");
     psync_sql_bind_uint(res, 1, folderid);
@@ -415,7 +415,7 @@ static int task_renameremotefolder(psync_folderid_t folderid,
           (long unsigned)folderid, (long unsigned)newparentfolderid, newname);
 
     if (!psync_sql_start_transaction()) {
-      psync_ops_update_folder_in_db(
+      pfileops_update_fldr(
           papi_find_result2(res, "metadata", PARAM_HASH));
       psync_sql_commit_transaction();
     }

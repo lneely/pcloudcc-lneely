@@ -180,7 +180,7 @@ static void process_shares_out(const binresult *shares_out, int shcnt) {
                         papi_find_result2(share, "folderid", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 3,
                         papi_find_result2(share, "created", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 4, psync_get_permissions(share));
+    psync_sql_bind_uint(q, 4, pfileops_get_perms(share));
     psync_sql_bind_uint(q, 5,
                         papi_find_result2(share, "touserid", PARAM_NUM)->num);
     br = papi_find_result2(share, "tomail", PARAM_STR);
@@ -214,7 +214,7 @@ static void process_shares_in(const binresult *shares_in, int shcnt) {
                         papi_find_result2(share, "folderid", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 3,
                         papi_find_result2(share, "created", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 4, psync_get_permissions(share));
+    psync_sql_bind_uint(q, 4, pfileops_get_perms(share));
     psync_sql_bind_uint(q, 5,
                         papi_find_result2(share, "fromuserid", PARAM_NUM)->num);
     br = papi_find_result2(share, "frommail", PARAM_STR);
@@ -253,7 +253,7 @@ static void process_shares_req_out(const binresult *shares_out, int shcnt) {
                         papi_find_result2(share, "created", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 4,
                         papi_find_result2(share, "expires", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 5, psync_get_permissions(share));
+    psync_sql_bind_uint(q, 5, pfileops_get_perms(share));
     psync_sql_bind_uint(q, 6, folderowneruserid);
     br = papi_find_result2(share, "tomail", PARAM_STR);
     psync_sql_bind_lstring(q, 7, br->str, br->length);
@@ -299,7 +299,7 @@ static void process_shares_req_in(const binresult *shares_in, int shcnt) {
                         papi_find_result2(share, "created", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 4,
                         papi_find_result2(share, "expires", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 5, psync_get_permissions(share));
+    psync_sql_bind_uint(q, 5, pfileops_get_perms(share));
     psync_sql_bind_uint(q, 6,
                         papi_find_result2(share, "fromuserid", PARAM_NUM)->num);
     br = papi_find_result2(share, "frommail", PARAM_STR);

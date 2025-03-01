@@ -1692,7 +1692,7 @@ int psync_cloud_crypto_send_mkdir(psync_folderid_t folderid, const char *name,
   if (newfolderid)
     *newfolderid = papi_find_result2(meta, "folderid", PARAM_NUM)->num;
   psync_sql_start_transaction();
-  psync_ops_create_folder_in_db(meta);
+  pfileops_create_fldr(meta);
   save_folder_key_to_db(papi_find_result2(meta, "folderid", PARAM_NUM)->num,
                         encsym);
   psync_sql_commit_transaction();
