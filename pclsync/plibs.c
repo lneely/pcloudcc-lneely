@@ -948,24 +948,24 @@ static void psync_sql_check_query_plan_locked(const char *sql) {
   psync_tree *node;
   int cmp;
   if (!sql_tree) {
-    psync_tree_add_after(&sql_tree, NULL, psync_sql_new_tree_node(sql));
+    ptree_add_after(&sql_tree, NULL, psync_sql_new_tree_node(sql));
     return;
   }
   node = sql_tree;
   while (1) {
-    cmp = strcmp(sql, psync_tree_element(node, psync_sql_tree_t, tree)->sql);
+    cmp = strcmp(sql, ptree_element(node, psync_sql_tree_t, tree)->sql);
     if (cmp < 0) {
       if (node->left)
         node = node->left;
       else {
-        psync_tree_add_before(&sql_tree, node, psync_sql_new_tree_node(sql));
+        ptree_add_before(&sql_tree, node, psync_sql_new_tree_node(sql));
         break;
       }
     } else if (cmp > 0) {
       if (node->right)
         node = node->right;
       else {
-        psync_tree_add_after(&sql_tree, node, psync_sql_new_tree_node(sql));
+        ptree_add_after(&sql_tree, node, psync_sql_new_tree_node(sql));
         break;
       }
     } else

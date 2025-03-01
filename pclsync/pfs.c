@@ -168,13 +168,13 @@ int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
   psync_sql_lock();
   tr = openfiles;
   while (tr) {
-    d = fileid - psync_tree_element(tr, psync_openfile_t, tree)->fileid;
+    d = fileid - ptree_element(tr, psync_openfile_t, tree)->fileid;
     if (d < 0)
       tr = tr->left;
     else if (d > 0)
       tr = tr->right;
     else {
-      fl = psync_tree_element(tr, psync_openfile_t, tree);
+      fl = ptree_element(tr, psync_openfile_t, tree);
       psync_fs_lock_file(fl);
       if (fl->writeid == writeid) {
         if (fl->encrypted) {
@@ -209,12 +209,12 @@ int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
           pfile_close(fl->indexfile);
           fl->indexfile = INVALID_HANDLE_VALUE;
         }
-        psync_tree_del(&openfiles, &fl->tree);
+        ptree_del(&openfiles, &fl->tree);
         tr = openfiles;
         d = -1;
         while (tr) {
           d = newfileid -
-              psync_tree_element(tr, psync_openfile_t, tree)->fileid;
+              ptree_element(tr, psync_openfile_t, tree)->fileid;
           if (d < 0) {
             if (tr->left)
               tr = tr->left;
@@ -232,9 +232,9 @@ int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
           }
         }
         if (d < 0)
-          psync_tree_add_before(&openfiles, tr, &fl->tree);
+          ptree_add_before(&openfiles, tr, &fl->tree);
         else
-          psync_tree_add_after(&openfiles, tr, &fl->tree);
+          ptree_add_after(&openfiles, tr, &fl->tree);
         ret = 0;
       } else {
         debug(D_NOTICE, "writeid of fileid %ld (%s) differs %lu!=%lu",
@@ -278,13 +278,13 @@ int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
   psync_sql_lock();
   tr=openfiles;
   while (tr){
-    d=fileid-psync_tree_element(tr, psync_openfile_t, tree)->fileid;
+    d=fileid-ptree_element(tr, psync_openfile_t, tree)->fileid;
     if (d<0)
       tr=tr->left;
     else if (d>0)
       tr=tr->right;
     else{
-      fl=psync_tree_element(tr, psync_openfile_t, tree);
+      fl=ptree_element(tr, psync_openfile_t, tree);
       psync_fs_lock_file(fl);
       fl->uploading=1;
       pthread_mutex_unlock(&fl->mutex);
@@ -302,13 +302,13 @@ int psync_fs_rename_openfile_locked(psync_fsfileid_t fileid,
   int64_t d;
   tr = openfiles;
   while (tr) {
-    d = fileid - psync_tree_element(tr, psync_openfile_t, tree)->fileid;
+    d = fileid - ptree_element(tr, psync_openfile_t, tree)->fileid;
     if (d < 0)
       tr = tr->left;
     else if (d > 0)
       tr = tr->right;
     else {
-      fl = psync_tree_element(tr, psync_openfile_t, tree);
+      fl = ptree_element(tr, psync_openfile_t, tree);
       psync_fs_lock_file(fl);
       if (fl->currentfolder->folderid != folderid) {
         psync_fstask_release_folder_tasks_locked(fl->currentfolder);
@@ -334,13 +334,13 @@ void psync_fs_mark_openfile_deleted(uint64_t taskid) {
   psync_sql_lock();
   tr = openfiles;
   while (tr) {
-    d = fileid - psync_tree_element(tr, psync_openfile_t, tree)->fileid;
+    d = fileid - ptree_element(tr, psync_openfile_t, tree)->fileid;
     if (d < 0)
       tr = tr->left;
     else if (d > 0)
       tr = tr->right;
     else {
-      fl = psync_tree_element(tr, psync_openfile_t, tree);
+      fl = ptree_element(tr, psync_openfile_t, tree);
       debug(D_NOTICE, "file being deleted %s is still open, marking as deleted",
             fl->currentname);
       psync_fs_lock_file(fl);
@@ -366,13 +366,13 @@ int64_t psync_fs_get_file_writeid(uint64_t taskid) {
   psync_sql_rdlock();
   tr = openfiles;
   while (tr) {
-    d = fileid - psync_tree_element(tr, psync_openfile_t, tree)->fileid;
+    d = fileid - ptree_element(tr, psync_openfile_t, tree)->fileid;
     if (d < 0)
       tr = tr->left;
     else if (d > 0)
       tr = tr->right;
     else {
-      fl = psync_tree_element(tr, psync_openfile_t, tree);
+      fl = ptree_element(tr, psync_openfile_t, tree);
       psync_fs_lock_file(fl);
       d = fl->writeid;
       pthread_mutex_unlock(&fl->mutex);
@@ -396,12 +396,12 @@ void psync_fs_update_openfile_fileid_locked(psync_openfile_t *of,
   psync_tree *tr;
   int64_t d;
   assertw(of->fileid != fileid);
-  psync_tree_del(&openfiles, &of->tree);
+  ptree_del(&openfiles, &of->tree);
   of->fileid = fileid;
   tr = openfiles;
   if (tr)
     while (1) {
-      d = fileid - psync_tree_element(tr, psync_openfile_t, tree)->fileid;
+      d = fileid - ptree_element(tr, psync_openfile_t, tree)->fileid;
       if (d < 0) {
         if (tr->left)
           tr = tr->left;
@@ -421,7 +421,7 @@ void psync_fs_update_openfile_fileid_locked(psync_openfile_t *of,
     }
   else
     openfiles = &of->tree;
-  psync_tree_added_at(&openfiles, tr, &of->tree);
+  ptree_added_at(&openfiles, tr, &of->tree);
 }
 
 #define folderid_to_inode(folderid) ((folderid) * 3)
@@ -552,13 +552,13 @@ static int fill_stat_from_open_file(psync_fsfileid_t fileid,
   psync_sql_rdlock();
   tr = openfiles;
   while (tr) {
-    d = fileid - psync_tree_element(tr, psync_openfile_t, tree)->fileid;
+    d = fileid - ptree_element(tr, psync_openfile_t, tree)->fileid;
     if (d < 0)
       tr = tr->left;
     else if (d > 0)
       tr = tr->right;
     else {
-      fl = psync_tree_element(tr, psync_openfile_t, tree);
+      fl = ptree_element(tr, psync_openfile_t, tree);
       psync_fs_lock_file(fl);
       stbuf->st_size = fl->currentsize;
       debug(D_NOTICE, "found open file with size %lu",
@@ -596,13 +596,13 @@ static int psync_creat_local_to_file_stat(psync_fstask_creat_t *cr,
   psync_sql_rdlock();
   tr = openfiles;
   while (tr) {
-    d = cr->fileid - psync_tree_element(tr, psync_openfile_t, tree)->fileid;
+    d = cr->fileid - ptree_element(tr, psync_openfile_t, tree)->fileid;
     if (d < 0)
       tr = tr->left;
     else if (d > 0)
       tr = tr->right;
     else {
-      fl = psync_tree_element(tr, psync_openfile_t, tree);
+      fl = ptree_element(tr, psync_openfile_t, tree);
       psync_fs_lock_file(fl);
       break;
     }
@@ -935,36 +935,36 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     psync_sql_free_result(res);
   }
   if (folder) {
-    psync_tree_for_each(trel, folder->mkdirs) {
+    ptree_for_each(trel, folder->mkdirs) {
 #if defined(FS_MAX_ACCEPTABLE_FILENAME_LEN)
       if (unlikely_log(
               strlen(
-                  psync_tree_element(trel, psync_fstask_mkdir_t, tree)->name) >
+                  ptree_element(trel, psync_fstask_mkdir_t, tree)->name) >
               FS_MAX_ACCEPTABLE_FILENAME_LEN))
         continue;
 #endif
-      if (psync_tree_element(trel, psync_fstask_mkdir_t, tree)->flags &
+      if (ptree_element(trel, psync_fstask_mkdir_t, tree)->flags &
           PSYNC_FOLDER_FLAG_INVISIBLE)
         continue;
       psync_mkdir_to_folder_stat(
-          psync_tree_element(trel, psync_fstask_mkdir_t, tree), &st);
+          ptree_element(trel, psync_fstask_mkdir_t, tree), &st);
       filler_decoded(dec, filler, buf,
-                     psync_tree_element(trel, psync_fstask_mkdir_t, tree)->name,
+                     ptree_element(trel, psync_fstask_mkdir_t, tree)->name,
                      &st, 0);
     }
-    psync_tree_for_each(trel, folder->creats) {
+    ptree_for_each(trel, folder->creats) {
 #if defined(FS_MAX_ACCEPTABLE_FILENAME_LEN)
       if (unlikely_log(
               strlen(
-                  psync_tree_element(trel, psync_fstask_creat_t, tree)->name) >
+                  ptree_element(trel, psync_fstask_creat_t, tree)->name) >
               FS_MAX_ACCEPTABLE_FILENAME_LEN))
         continue;
 #endif
       if (!psync_creat_to_file_stat(
-              psync_tree_element(trel, psync_fstask_creat_t, tree), &st, flags))
+              ptree_element(trel, psync_fstask_creat_t, tree), &st, flags))
         filler_decoded(
             dec, filler, buf,
-            psync_tree_element(trel, psync_fstask_creat_t, tree)->name, &st, 0);
+            ptree_element(trel, psync_fstask_creat_t, tree)->name, &st, 0);
     }
   }
   psync_sql_rdunlock();
@@ -985,7 +985,7 @@ psync_fs_create_file(psync_fsfileid_t fileid, psync_fsfileid_t remotefileid,
   tr = openfiles;
   d = -1;
   while (tr) {
-    d = fileid - psync_tree_element(tr, psync_openfile_t, tree)->fileid;
+    d = fileid - ptree_element(tr, psync_openfile_t, tree)->fileid;
     if (d < 0) {
       if (tr->left)
         tr = tr->left;
@@ -997,7 +997,7 @@ psync_fs_create_file(psync_fsfileid_t fileid, psync_fsfileid_t remotefileid,
       else
         break;
     } else {
-      fl = psync_tree_element(tr, psync_openfile_t, tree);
+      fl = ptree_element(tr, psync_openfile_t, tree);
       if (lock) {
         psync_fs_lock_file(fl);
         psync_fs_inc_of_refcnt_locked(fl);
@@ -1025,9 +1025,9 @@ psync_fs_create_file(psync_fsfileid_t fileid, psync_fsfileid_t remotefileid,
     size = pfscrypto_plain_size(size);
   }
   if (d < 0)
-    psync_tree_add_before(&openfiles, tr, &fl->tree);
+    ptree_add_before(&openfiles, tr, &fl->tree);
   else
-    psync_tree_add_after(&openfiles, tr, &fl->tree);
+    ptree_add_after(&openfiles, tr, &fl->tree);
 #if IS_DEBUG
   {
     pthread_mutexattr_t mattr;
@@ -1227,7 +1227,7 @@ static void psync_fs_del_creat(psync_fspath_t *fpath, psync_openfile_t *of) {
   folder = psync_fstask_get_or_create_folder_tasks_locked(fpath->folderid);
   if (likely(folder)) {
     if (likely((cr = psync_fstask_find_creat(folder, fpath->name, 0)))) {
-      psync_tree_del(&folder->creats, &cr->tree);
+      ptree_del(&folder->creats, &cr->tree);
       folder->taskscnt--;
       psync_free(cr);
     }
@@ -1716,7 +1716,7 @@ static void psync_fs_free_openfile(psync_openfile_t *of) {
       pcrypto_sec_encdec_free(of->encoder);
     }
     close_if_valid(of->logfile);
-    psync_tree_for_each_element_call_safe(
+    ptree_for_each_element_call_safe(
         of->sectorsinlog, psync_sector_inlog_t, tree, psync_free);
     delete_log_files(of);
     if (of->authenticatedints)
@@ -1733,7 +1733,7 @@ static void psync_fs_free_openfile(psync_openfile_t *of) {
     psync_sql_lock();
     cr = psync_fstask_find_creat(of->currentfolder, of->currentname, 0);
     if (cr) {
-      psync_tree_del(&of->currentfolder->creats, &cr->tree);
+      ptree_del(&of->currentfolder->creats, &cr->tree);
       of->currentfolder->taskscnt--;
       psync_free(cr);
     }
@@ -1763,7 +1763,7 @@ void psync_fs_dec_of_refcnt(psync_openfile_t *of) {
   psync_fs_get_both_locks(of);
   refcnt = --of->refcnt;
   if (!refcnt)
-    psync_tree_del(&openfiles, &of->tree);
+    ptree_del(&openfiles, &of->tree);
   psync_sql_unlock();
   pthread_mutex_unlock(&of->mutex);
   if (!refcnt)
@@ -1783,7 +1783,7 @@ void psync_fs_dec_of_refcnt_and_readers(psync_openfile_t *of) {
   of->runningreads--;
   refcnt = --of->refcnt;
   if (refcnt == 0)
-    psync_tree_del(&openfiles, &of->tree);
+    ptree_del(&openfiles, &of->tree);
   psync_sql_unlock();
   pthread_mutex_unlock(&of->mutex);
   if (!refcnt)
@@ -2246,13 +2246,13 @@ psync_fs_reopen_static_file_for_writing(psync_openfile_t *of) {
   psync_fs_static_to_task(taskid, cr->taskid);
   cr = psync_fstask_find_creat(of->currentfolder, of->currentname, taskid);
   if (likely_log(cr)) {
-    psync_tree_del(&of->currentfolder->creats, &cr->tree);
+    ptree_del(&of->currentfolder->creats, &cr->tree);
     of->currentfolder->taskscnt--;
     psync_free(cr);
   }
   un = psync_fstask_find_unlink(of->currentfolder, of->currentname, taskid);
   if (likely_log(un)) {
-    psync_tree_del(&of->currentfolder->unlinks, &un->tree);
+    ptree_del(&of->currentfolder->unlinks, &un->tree);
     of->currentfolder->taskscnt--;
     psync_free(un);
   }
@@ -2640,11 +2640,11 @@ static int psync_fs_rename_static_file(psync_fstask_folder_t *srcfolder,
           (long)to_folderid);
     un = psync_fstask_find_unlink(dstfolder, new_name, cr->taskid);
     if (un) {
-      psync_tree_del(&dstfolder->unlinks, &un->tree);
+      ptree_del(&dstfolder->unlinks, &un->tree);
       psync_free(un);
       dstfolder->taskscnt--;
     }
-    psync_tree_del(&dstfolder->creats, &cr->tree);
+    ptree_del(&dstfolder->creats, &cr->tree);
     psync_free(cr);
     dstfolder->taskscnt--;
   }
@@ -2668,11 +2668,11 @@ static int psync_fs_rename_static_file(psync_fstask_folder_t *srcfolder,
   psync_fstask_release_folder_tasks_locked(dstfolder);
   un = psync_fstask_find_unlink(srcfolder, srccr->name, srccr->taskid);
   if (likely_log(un)) {
-    psync_tree_del(&srcfolder->unlinks, &un->tree);
+    ptree_del(&srcfolder->unlinks, &un->tree);
     psync_free(un);
     srcfolder->taskscnt--;
   }
-  psync_tree_del(&srcfolder->creats, &srccr->tree);
+  ptree_del(&srcfolder->creats, &srccr->tree);
   psync_free(srccr);
   srcfolder->taskscnt--;
   return 0;
@@ -3055,13 +3055,13 @@ static int psync_fs_set_filetime_locked(psync_fsfileid_t fileid,
     tr = openfiles;
     fl = NULL;
     while (tr) {
-      d = fileid - psync_tree_element(tr, psync_openfile_t, tree)->fileid;
+      d = fileid - ptree_element(tr, psync_openfile_t, tree)->fileid;
       if (d < 0)
         tr = tr->left;
       else if (d > 0)
         tr = tr->right;
       else {
-        fl = psync_tree_element(tr, psync_openfile_t, tree);
+        fl = ptree_element(tr, psync_openfile_t, tree);
         break;
       }
     }
@@ -3450,7 +3450,7 @@ static void psync_fs_dump_internals() {
   psync_openfile_t *of;
   debug(D_NOTICE, "dumping internal state");
   psync_sql_rdlock();
-  psync_tree_for_each_element(of, openfiles, psync_openfile_t, tree)
+  ptree_for_each_element(of, openfiles, psync_openfile_t, tree)
       debug(D_NOTICE, "open file %s fileid %ld folderid %ld", of->currentname,
             (long)of->fileid, (long)of->currentfolder->folderid);
   psync_fstask_dump_state();

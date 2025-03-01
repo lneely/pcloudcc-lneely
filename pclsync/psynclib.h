@@ -1446,7 +1446,7 @@ external_status_t psync_status_folder(const char *path);
  * if any is returned.
  *
  *
- * psync_tree_public_link() creates public link for a tree. Tree is define by
+ * ptree_public_link() creates public link for a tree. Tree is define by
  * root folder and arrays of folders and file paths. Each entry in the arrays
  *  describes a path to file or folder. Number of entries in the arrays is
  * passed separately. The API constructs a virtual folder of this files and
@@ -1504,7 +1504,7 @@ int64_t psync_folder_public_link_full(const char *path, char **link /*OUT*/,
                                       const char *password);
 int64_t psync_folder_updownlink_link(int canupload, unsigned long long folderid,
                                      const char *mail, char **err /*OUT*/);
-int64_t psync_tree_public_link(const char *linkname, const char *root,
+int64_t ptree_public_link(const char *linkname, const char *root,
                                char **folders, int numfolders, char **files,
                                int numfiles, char **link /*OUT*/,
                                char **err /*OUT*/);

@@ -2484,11 +2484,11 @@ int64_t psync_folder_updownlink_link(int canupload, unsigned long long folderid,
   return do_psync_folder_updownlink_link(canupload, folderid, mail, err);
 }
 
-int64_t psync_tree_public_link(const char *linkname, const char *root,
+int64_t ptree_public_link(const char *linkname, const char *root,
                                char **folders, int numfolders, char **files,
                                int numfiles, char **link /*OUT*/,
                                char **err /*OUT*/) {
-  return do_psync_tree_public_link(linkname, root, folders, numfolders, files,
+  return do_ptree_public_link(linkname, root, folders, numfolders, files,
                                    numfiles, link, err, 0, 0, 0);
 }
 

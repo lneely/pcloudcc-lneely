@@ -1116,7 +1116,7 @@ static void connect_cache_thread(void *ptr) {
   sock =
       psock_connect(node->host, node->usessl ? 443 : 80, node->usessl);
   pthread_mutex_lock(&connect_cache_mutex);
-  psync_tree_del(&connect_cache_tree, &node->tree);
+  ptree_del(&connect_cache_tree, &node->tree);
   if (node->haswaiter) {
     *node->res = sock;
     node->ready = 1;
@@ -1157,23 +1157,23 @@ static connect_cache_tree_node_t *
 connect_cache_neighbour_is_free_duplicate(psync_tree *e, const char *host) {
   connect_cache_tree_node_t *node;
   psync_tree *n;
-  n = psync_tree_get_next(e);
+  n = ptree_get_next(e);
   while (n) {
-    node = psync_tree_element(n, connect_cache_tree_node_t, tree);
+    node = ptree_element(n, connect_cache_tree_node_t, tree);
     if (strcmp(node->host, host))
       break;
     if (!node->haswaiter)
       return node;
-    n = psync_tree_get_next(n);
+    n = ptree_get_next(n);
   }
-  n = psync_tree_get_prev(e);
+  n = ptree_get_prev(e);
   while (n) {
-    node = psync_tree_element(n, connect_cache_tree_node_t, tree);
+    node = ptree_element(n, connect_cache_tree_node_t, tree);
     if (strcmp(node->host, host))
       break;
     if (!node->haswaiter)
       return node;
-    n = psync_tree_get_prev(n);
+    n = ptree_get_prev(n);
   }
   return NULL;
 }
@@ -1186,18 +1186,18 @@ void psync_http_connect_and_cache_host(const char *host) {
   pthread_mutex_lock(&connect_cache_mutex);
   if (!connect_cache_tree) {
     node = connect_cache_create_node(host);
-    psync_tree_add_after(&connect_cache_tree, NULL, &node->tree);
+    ptree_add_after(&connect_cache_tree, NULL, &node->tree);
   } else {
     e = connect_cache_tree;
     while (1) {
-      node = psync_tree_element(e, connect_cache_tree_node_t, tree);
+      node = ptree_element(e, connect_cache_tree_node_t, tree);
       c = strcmp(host, node->host);
       if (c < 0) {
         if (e->left)
           e = e->left;
         else {
           node = connect_cache_create_node(host);
-          psync_tree_add_before(&connect_cache_tree, e, &node->tree);
+          ptree_add_before(&connect_cache_tree, e, &node->tree);
           break;
         }
       } else if (c > 0) {
@@ -1205,7 +1205,7 @@ void psync_http_connect_and_cache_host(const char *host) {
           e = e->right;
         else {
           node = connect_cache_create_node(host);
-          psync_tree_add_after(&connect_cache_tree, e, &node->tree);
+          ptree_add_after(&connect_cache_tree, e, &node->tree);
           break;
         }
       } else {
@@ -1215,7 +1215,7 @@ void psync_http_connect_and_cache_host(const char *host) {
           break;
         } else {
           node = connect_cache_create_node(host);
-          psync_tree_add_after(&connect_cache_tree, e, &node->tree);
+          ptree_add_after(&connect_cache_tree, e, &node->tree);
           break;
         }
       }
@@ -1237,7 +1237,7 @@ psock_t *connect_cache_wait_for_http_connection(const char *host,
   if (connect_cache_tree) {
     e = connect_cache_tree;
     while (1) {
-      node = psync_tree_element(e, connect_cache_tree_node_t, tree);
+      node = ptree_element(e, connect_cache_tree_node_t, tree);
       c = strcmp(host, node->host);
       if (c < 0) {
         if (e->left)
@@ -2528,7 +2528,7 @@ psync_file_lock_t *psync_lock_file(const char *path) {
   at = &file_lock_tree;
   while (tr) {
     cmp = strcmp(
-        path, psync_tree_element(tr, psync_file_lock_t, tree)->filename);
+        path, ptree_element(tr, psync_file_lock_t, tree)->filename);
     if (cmp < 0) {
       if (tr->left)
         tr = tr->left;
@@ -2550,14 +2550,14 @@ psync_file_lock_t *psync_lock_file(const char *path) {
     }
   }
   *at = &lock->tree;
-  psync_tree_added_at(&file_lock_tree, tr, &lock->tree);
+  ptree_added_at(&file_lock_tree, tr, &lock->tree);
   pthread_mutex_unlock(&file_lock_mutex);
   return lock;
 }
 
 void psync_unlock_file(psync_file_lock_t *lock) {
   pthread_mutex_lock(&file_lock_mutex);
-  psync_tree_del(&file_lock_tree, &lock->tree);
+  ptree_del(&file_lock_tree, &lock->tree);
   pthread_mutex_unlock(&file_lock_mutex);
   psync_free(lock);
 }

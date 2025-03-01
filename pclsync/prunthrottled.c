@@ -60,7 +60,7 @@ static void ratelimit_timer(psync_timer_t timer, void *ptr) {
     name = node->name;
   } else {
     run = 0;
-    psync_tree_del(&tasks, &node->tree);
+    ptree_del(&tasks, &node->tree);
   }
   pthread_mutex_unlock(&task_mutex);
   if (run) {
@@ -82,7 +82,7 @@ void prun_throttled(const char *name, prun_throttle_cb call,
   tr = tasks;
   if (tr) {
     while (1) {
-      node = psync_tree_element(tr, psync_rr_tree_node, tree);
+      node = ptree_element(tr, psync_rr_tree_node, tree);
       if (call < node->call) {
         if (tr->left)
           tr = tr->left;
@@ -117,7 +117,7 @@ void prun_throttled(const char *name, prun_throttle_cb call,
     node->name = name;
     node->scheduled = 0;
     *addto = &node->tree;
-    psync_tree_added_at(&tasks, tr, &node->tree);
+    ptree_added_at(&tasks, tr, &node->tree);
   }
   pthread_mutex_unlock(&task_mutex);
   if (!found) {

@@ -510,7 +510,7 @@ static void set_urls(psync_urls_t *urls, binresult *res) {
     if (urls->refcnt++ > 0)
       pthread_cond_broadcast(&url_cache_cond);
   } else {
-    psync_tree_del(&url_cache_tree, &urls->tree);
+    ptree_del(&url_cache_tree, &urls->tree);
     if (urls->refcnt) {
       urls->status = 2;
       pthread_cond_broadcast(&url_cache_cond);
@@ -662,7 +662,7 @@ static psync_urls_t *get_urls_for_request(psync_request_t *req) {
   pel = &url_cache_tree;
   d = -1;
   while (el) {
-    urls = psync_tree_element(el, psync_urls_t, tree);
+    urls = ptree_element(el, psync_urls_t, tree);
     d = req->hash - urls->hash;
     if (d == 0)
       break;
@@ -700,7 +700,7 @@ static psync_urls_t *get_urls_for_request(psync_request_t *req) {
   urls->refcnt = 0;
   urls->status = 0;
   *pel = &urls->tree;
-  psync_tree_added_at(&url_cache_tree, el, &urls->tree);
+  ptree_added_at(&url_cache_tree, el, &urls->tree);
   pthread_mutex_unlock(&url_cache_mutex);
   psync_get_string_id(buff, "URLS", req->hash);
   res = (binresult *)pcache_get(buff);
@@ -721,7 +721,7 @@ static void release_urls(psync_urls_t *urls) {
     if (likely(urls->status == 1)) {
       char buff[16];
       time_t ctime, etime;
-      psync_tree_del(&url_cache_tree, &urls->tree);
+      ptree_del(&url_cache_tree, &urls->tree);
       ctime = ptimer_time();
       etime = papi_find_result2(urls->urls, "expires", PARAM_NUM)->num;
       if (etime > ctime + 3600) {
@@ -742,7 +742,7 @@ static void release_bad_urls(psync_urls_t *urls) {
   pthread_mutex_lock(&url_cache_mutex);
   if (urls->status == 1) {
     urls->status = 2;
-    psync_tree_del(&url_cache_tree, &urls->tree);
+    ptree_del(&url_cache_tree, &urls->tree);
   }
   if (--urls->refcnt)
     urls = NULL;

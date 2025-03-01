@@ -439,13 +439,13 @@ psync_fs_crypto_read_newfile_full_sector(psync_openfile_t *of, char *buf,
                                          psync_crypto_sectorid_t sectorid) {
   psync_crypto_sectorid_diff_t d;
   psync_sector_inlog_t *tr;
-  tr = psync_tree_element(of->sectorsinlog, psync_sector_inlog_t, tree);
+  tr = ptree_element(of->sectorsinlog, psync_sector_inlog_t, tree);
   while (tr) {
     d = sectorid - tr->sectorid;
     if (d < 0)
-      tr = psync_tree_element(tr->tree.left, psync_sector_inlog_t, tree);
+      tr = ptree_element(tr->tree.left, psync_sector_inlog_t, tree);
     else if (d > 0)
-      tr = psync_tree_element(tr->tree.right, psync_sector_inlog_t, tree);
+      tr = ptree_element(tr->tree.right, psync_sector_inlog_t, tree);
     else
       return psync_fs_crypto_read_newfile_full_sector_from_log(of, buf, tr);
   }
@@ -549,20 +549,20 @@ psync_fs_crypto_set_sector_log_offset(psync_openfile_t *of,
   psync_crypto_sectorid_diff_t d;
   psync_sector_inlog_t *tr, *ntr;
   psync_tree **pe;
-  tr = psync_tree_element(of->sectorsinlog, psync_sector_inlog_t, tree);
+  tr = ptree_element(of->sectorsinlog, psync_sector_inlog_t, tree);
   pe = &of->sectorsinlog;
   while (tr) {
     d = sectorid - tr->sectorid;
     if (d < 0) {
       if (tr->tree.left)
-        tr = psync_tree_element(tr->tree.left, psync_sector_inlog_t, tree);
+        tr = ptree_element(tr->tree.left, psync_sector_inlog_t, tree);
       else {
         pe = &tr->tree.left;
         break;
       }
     } else if (d > 0) {
       if (tr->tree.right)
-        tr = psync_tree_element(tr->tree.right, psync_sector_inlog_t, tree);
+        tr = ptree_element(tr->tree.right, psync_sector_inlog_t, tree);
       else {
         pe = &tr->tree.right;
         break;
@@ -578,7 +578,7 @@ psync_fs_crypto_set_sector_log_offset(psync_openfile_t *of,
   ntr->sectorid = sectorid;
   ntr->logoffset = offset;
   memcpy(ntr->auth, auth, PSYNC_CRYPTO_AUTH_SIZE);
-  psync_tree_added_at(&of->sectorsinlog, &tr->tree, &ntr->tree);
+  ptree_added_at(&of->sectorsinlog, &tr->tree, &ntr->tree);
 }
 
 static int psync_fs_crypto_switch_sectors(psync_openfile_t *of,
@@ -730,7 +730,7 @@ static int psync_fs_write_auth_tree_to_log(psync_openfile_t *of,
   VAR_ARRAY(authsect, psync_crypto_auth_sector_t,
                     offsets->treelevels + 1);
   lastsect = PSYNC_CRYPTO_INVALID_SECTORID;
-  sect = psync_tree_element(psync_tree_get_first(of->sectorsinlog),
+  sect = ptree_element(ptree_get_first(of->sectorsinlog),
                             psync_sector_inlog_t, tree);
   while (sect) {
     if (lastsect / PSYNC_CRYPTO_HASH_TREE_SECTORS !=
@@ -743,7 +743,7 @@ static int psync_fs_write_auth_tree_to_log(psync_openfile_t *of,
     memcpy(authsect[0][sect->sectorid % PSYNC_CRYPTO_HASH_TREE_SECTORS],
            sect->auth, PSYNC_CRYPTO_AUTH_SIZE);
     lastsect = sect->sectorid;
-    sect = psync_tree_element(psync_tree_get_next(&sect->tree),
+    sect = ptree_element(ptree_get_next(&sect->tree),
                               psync_sector_inlog_t, tree);
   }
   ret = psync_fs_crypto_switch_sectors(
@@ -1104,7 +1104,7 @@ static int psync_fs_crypto_do_finalize_log(psync_openfile_t *of, int fullsync) {
     psync_free(flog);
     return -EIO;
   }
-  psync_tree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t,
+  ptree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t,
                                         tree, psync_free);
   of->sectorsinlog = PSYNC_TREE_EMPTY;
   ret = psync_fs_crypto_log_flush_and_process(of, flog, 0, 1);
@@ -1702,7 +1702,7 @@ static int pfscrypto_truncate_to_zero(psync_openfile_t *of) {
     psync_interval_tree_add(&of->writeintervals, 0,
                             pfscrypto_crypto_size(of->initialsize));
   }
-  psync_tree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t,
+  ptree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t,
                                         tree, psync_free);
   of->sectorsinlog = PSYNC_TREE_EMPTY;
   of->currentsize = 0;
@@ -1783,14 +1783,14 @@ retry:
     }
   }
   of->currentsize = lastsectoff;
-  tr = psync_tree_get_last(of->sectorsinlog);
-  while (tr && psync_tree_element(tr, psync_sector_inlog_t, tree)->sectorid >=
+  tr = ptree_get_last(of->sectorsinlog);
+  while (tr && ptree_element(tr, psync_sector_inlog_t, tree)->sectorid >=
                    lastsectorid) {
-    ntr = psync_tree_get_prev(tr);
+    ntr = ptree_get_prev(tr);
     assert(!ntr ||
-           psync_tree_element(tr, psync_sector_inlog_t, tree)->sectorid >
-               psync_tree_element(ntr, psync_sector_inlog_t, tree)->sectorid);
-    psync_tree_del(&of->sectorsinlog, tr);
+           ptree_element(tr, psync_sector_inlog_t, tree)->sectorid >
+               ptree_element(ntr, psync_sector_inlog_t, tree)->sectorid);
+    ptree_del(&of->sectorsinlog, tr);
     psync_free(tr);
     tr = ntr;
   }

@@ -165,10 +165,10 @@ void ppathstatus_init() {
     psync_list_add_tail(&parent_cache_lru, &parent_cache_entries[i].list_lru);
     psync_list_add_tail(&cache_free, &parent_cache_entries[i].list_hash);
   }
-  psync_tree_for_each_element_call_safe(folder_tasks, folder_tasks_t, tree,
+  ptree_for_each_element_call_safe(folder_tasks, folder_tasks_t, tree,
                                         psync_free);
   folder_tasks = PSYNC_TREE_EMPTY;
-  psync_tree_for_each_element_call_safe(sync_data, sync_data_t, tree,
+  ptree_for_each_element_call_safe(sync_data, sync_data_t, tree,
                                         sync_data_free);
   sync_data = PSYNC_TREE_EMPTY;
   ppathstatus_reload_syncs();
@@ -265,7 +265,7 @@ static folder_tasks_t *get_folder_tasks(psync_folderid_t folderid, int create) {
   tr = folder_tasks;
   atr = &folder_tasks;
   while (tr) {
-    ft = psync_tree_element(tr, folder_tasks_t, tree);
+    ft = ptree_element(tr, folder_tasks_t, tree);
     if (folderid < ft->folderid) {
       if (tr->left) {
         tr = tr->left;
@@ -287,7 +287,7 @@ static folder_tasks_t *get_folder_tasks(psync_folderid_t folderid, int create) {
   if (create) {
     ft = psync_new(folder_tasks_t);
     *atr = &ft->tree;
-    psync_tree_added_at(&folder_tasks, tr, &ft->tree);
+    ptree_added_at(&folder_tasks, tr, &ft->tree);
     ft->folderid = folderid;
     ft->child_task_cnt = 0;
     ft->own_tasks = 0;
@@ -301,7 +301,7 @@ static folder_tasks_t *get_folder_tasks(psync_folderid_t folderid, int create) {
 
 static void free_folder_tasks(folder_tasks_t *ft) {
   debug(D_NOTICE, "marking folderid %lu as clean", (unsigned long)ft->folderid);
-  psync_tree_del(&folder_tasks, &ft->tree);
+  ptree_del(&folder_tasks, &ft->tree);
   psync_free(ft);
 }
 
@@ -451,7 +451,7 @@ void ppathstatus_fldr_deleted(psync_folderid_t folderid) {
 }
 
 static void sync_data_free(sync_data_t *sd) {
-  psync_tree_for_each_element_call_safe(sd->folder_tasks, folder_tasks_t, tree,
+  ptree_for_each_element_call_safe(sd->folder_tasks, folder_tasks_t, tree,
                                         psync_free);
   psync_free(sd);
 }
@@ -462,7 +462,7 @@ static sync_data_t *get_sync_data(psync_syncid_t syncid, int create) {
   tr = sync_data;
   atr = &sync_data;
   while (tr) {
-    sd = psync_tree_element(tr, sync_data_t, tree);
+    sd = ptree_element(tr, sync_data_t, tree);
     if (syncid < sd->syncid) {
       if (tr->left) {
         tr = tr->left;
@@ -488,7 +488,7 @@ static sync_data_t *get_sync_data(psync_syncid_t syncid, int create) {
     sd = psync_new(sync_data_t);
     sd->syncid = syncid;
     *atr = &sd->tree;
-    psync_tree_added_at(&sync_data, tr, &sd->tree);
+    ptree_added_at(&sync_data, tr, &sd->tree);
     psync_list_init(&sd->cache_free);
     psync_list_init(&sd->parent_cache_lru);
     for (i = 0; i < SYNC_PARENT_HASH_SIZE; i++)
@@ -511,7 +511,7 @@ get_sync_folder_tasks(sync_data_t *sd, psync_folderid_t folderid, int create) {
   tr = sd->folder_tasks;
   atr = &sd->folder_tasks;
   while (tr) {
-    ft = psync_tree_element(tr, folder_tasks_t, tree);
+    ft = ptree_element(tr, folder_tasks_t, tree);
     if (folderid < ft->folderid) {
       if (tr->left) {
         tr = tr->left;
@@ -533,7 +533,7 @@ get_sync_folder_tasks(sync_data_t *sd, psync_folderid_t folderid, int create) {
   if (create) {
     ft = psync_new(folder_tasks_t);
     *atr = &ft->tree;
-    psync_tree_added_at(&sd->folder_tasks, tr, &ft->tree);
+    ptree_added_at(&sd->folder_tasks, tr, &ft->tree);
     ft->folderid = folderid;
     ft->child_task_cnt = 0;
     ft->own_tasks = 0;
@@ -661,7 +661,7 @@ static int local_folder_has_tasks(psync_syncid_t syncid,
 static void free_sync_folder_tasks(sync_data_t *sd, folder_tasks_t *ft) {
   debug(D_NOTICE, "marking folderid %lu from syncid %u as clean",
         (unsigned long)ft->folderid, (unsigned)sd->syncid);
-  psync_tree_del(&sd->folder_tasks, &ft->tree);
+  ptree_del(&sd->folder_tasks, &ft->tree);
   psync_free(ft);
 }
 
@@ -699,7 +699,7 @@ void ppathstatus_syncfldr_delete(psync_syncid_t syncid) {
   psync_sql_lock();
   sd = get_sync_data(syncid, 0);
   if (sd)
-    psync_tree_del(&sync_data, &sd->tree);
+    ptree_del(&sync_data, &sd->tree);
   psync_sql_unlock();
   if (sd)
     sync_data_free(sd);

@@ -251,7 +251,7 @@ static int download_send_error(stream_t *s, async_params_t *prms,
   s->cb(s->cbext, &r);
 
   debug(D_NOTICE, "closing stream %u", (unsigned)s->streamid);
-  psync_tree_del(&prms->streams, &s->tree);
+  ptree_del(&prms->streams, &s->tree);
   if (s->free)
     s->free(s, error);
   psync_free(s);
@@ -597,7 +597,7 @@ static void proc_async_transfer(void *ptr) {
   psync_apipool_release_bad(prms->api);
   pdeflate_destroy(prms->enc);
   pdeflate_destroy(prms->dec);
-  psync_tree_for_each_element_call_safe(prms->streams, stream_t, tree,
+  ptree_for_each_element_call_safe(prms->streams, stream_t, tree,
                                         stream_destroy);
   psync_free(prms);
 }
@@ -727,12 +727,12 @@ static stream_t *stream_create(async_params_t *prms, size_t addsize) {
   ret->streamid = ++prms->laststreamid;
   ret->flags = 0;
   ret->free = NULL;
-  parent = psync_tree_get_last(prms->streams);
+  parent = ptree_get_last(prms->streams);
   if (parent)
     parent->right = &ret->tree;
   else
     prms->streams = &ret->tree;
-  psync_tree_added_at(&prms->streams, parent, &ret->tree);
+  ptree_added_at(&prms->streams, parent, &ret->tree);
   return ret;
 }
 
@@ -756,7 +756,7 @@ static int stream_process_data(async_params_t *prms) {
   int ret;
   tr = prms->streams;
   while (tr) {
-    s = psync_tree_element(tr, stream_t, tree);
+    s = ptree_element(tr, stream_t, tree);
     if (prms->currentstreamid < s->streamid)
       tr = tr->left;
     else if (prms->currentstreamid > s->streamid)

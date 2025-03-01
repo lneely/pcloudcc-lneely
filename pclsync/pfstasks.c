@@ -109,7 +109,7 @@ psync_fstask_get_or_create_folder_tasks_locked(psync_fsfolderid_t folderid) {
   d = -1;
 
   while (tr) {
-    folder = psync_tree_element(tr, psync_fstask_folder_t, tree);
+    folder = ptree_element(tr, psync_fstask_folder_t, tree);
     d = folderid - folder->folderid;
     if (d < 0) {
       if (tr->left)
@@ -131,9 +131,9 @@ psync_fstask_get_or_create_folder_tasks_locked(psync_fsfolderid_t folderid) {
   memset(folder, 0, sizeof(psync_fstask_folder_t));
 
   if (d < 0)
-    psync_tree_add_before(&folders, tr, &folder->tree);
+    ptree_add_before(&folders, tr, &folder->tree);
   else
-    psync_tree_add_after(&folders, tr, &folder->tree);
+    ptree_add_after(&folders, tr, &folder->tree);
 
   folder->folderid = folderid;
   folder->refcnt = 1;
@@ -149,7 +149,7 @@ psync_fstask_get_folder_tasks_locked(psync_fsfolderid_t folderid) {
   tr = folders;
 
   while (tr) {
-    folder = psync_tree_element(tr, psync_fstask_folder_t, tree);
+    folder = ptree_element(tr, psync_fstask_folder_t, tree);
 
     if (folderid < folder->folderid)
       tr = tr->left;
@@ -171,7 +171,7 @@ psync_fstask_get_folder_tasks_rdlocked(psync_fsfolderid_t folderid) {
   psync_tree *tr;
   tr = folders;
   while (tr) {
-    folder = psync_tree_element(tr, psync_fstask_folder_t, tree);
+    folder = ptree_element(tr, psync_fstask_folder_t, tree);
     if (folderid < folder->folderid)
       tr = tr->left;
     else if (folderid > folder->folderid)
@@ -192,7 +192,7 @@ void psync_fstask_release_folder_tasks_locked(psync_fstask_folder_t *folder) {
 #endif
   if (--folder->refcnt == 0 && !folder->taskscnt) {
     debug(D_NOTICE, "releasing folder id %ld", (long int)folder->folderid);
-    psync_tree_del(&folders, &folder->tree);
+    ptree_del(&folders, &folder->tree);
     psync_free(folder);
   }
 }
@@ -214,21 +214,21 @@ static psync_tree *psync_fstask_search_tree(psync_tree *tree, size_t nameoff,
     return tree;
   else {
     psync_tree *tn;
-    tn = psync_tree_get_prev(tree);
+    tn = ptree_get_prev(tree);
     while (tn) {
       if (strcmp(name, ((char *)tn) + nameoff))
         break;
       if (*((uint64_t *)(((char *)tn) + taskidoff)) == taskid)
         return tn;
-      tn = psync_tree_get_prev(tn);
+      tn = ptree_get_prev(tn);
     }
-    tn = psync_tree_get_next(tree);
+    tn = ptree_get_next(tree);
     while (tn) {
       if (strcmp(name, ((char *)tn) + nameoff))
         break;
       if (*((uint64_t *)(((char *)tn) + taskidoff)) == taskid)
         return tn;
-      tn = psync_tree_get_next(tn);
+      tn = ptree_get_next(tn);
     }
     return NULL;
   }
@@ -236,11 +236,11 @@ static psync_tree *psync_fstask_search_tree(psync_tree *tree, size_t nameoff,
 
 static psync_tree *psync_fstask_walk_tree(psync_tree *tree, uint64_t taskid,
                                           size_t taskidoff) {
-  tree = psync_tree_get_first(tree);
+  tree = ptree_get_first(tree);
   while (tree) {
     if (*((uint64_t *)(((char *)tree) + taskidoff)) == taskid)
       return tree;
-    tree = psync_tree_get_next(tree);
+    tree = ptree_get_next(tree);
   }
   return NULL;
 }
@@ -252,7 +252,7 @@ static void psync_fstask_insert_into_tree(psync_tree **tree, size_t nameoff,
   int c;
 
   if (!*tree) {
-    psync_tree_add_after(tree, NULL, element);
+    ptree_add_after(tree, NULL, element);
     return;
   }
 
@@ -266,7 +266,7 @@ static void psync_fstask_insert_into_tree(psync_tree **tree, size_t nameoff,
       if (node->left)
         node = node->left;
       else {
-        psync_tree_add_before(tree, node, element);
+        ptree_add_before(tree, node, element);
         return;
       }
     } else {
@@ -276,7 +276,7 @@ static void psync_fstask_insert_into_tree(psync_tree **tree, size_t nameoff,
       if (node->right)
         node = node->right;
       else {
-        psync_tree_add_after(tree, node, element);
+        ptree_add_after(tree, node, element);
         return;
       }
     }
@@ -286,7 +286,7 @@ static void psync_fstask_insert_into_tree(psync_tree **tree, size_t nameoff,
 psync_fstask_mkdir_t *psync_fstask_find_mkdir(psync_fstask_folder_t *folder,
                                               const char *name,
                                               uint64_t taskid) {
-  return psync_tree_element(
+  return ptree_element(
       psync_fstask_search_tree(folder->mkdirs,
                                offsetof(psync_fstask_mkdir_t, name), name,
                                taskid, offsetof(psync_fstask_mkdir_t, taskid)),
@@ -296,7 +296,7 @@ psync_fstask_mkdir_t *psync_fstask_find_mkdir(psync_fstask_folder_t *folder,
 psync_fstask_rmdir_t *psync_fstask_find_rmdir(psync_fstask_folder_t *folder,
                                               const char *name,
                                               uint64_t taskid) {
-  return psync_tree_element(
+  return ptree_element(
       psync_fstask_search_tree(folder->rmdirs,
                                offsetof(psync_fstask_rmdir_t, name), name,
                                taskid, offsetof(psync_fstask_rmdir_t, taskid)),
@@ -306,7 +306,7 @@ psync_fstask_rmdir_t *psync_fstask_find_rmdir(psync_fstask_folder_t *folder,
 psync_fstask_creat_t *psync_fstask_find_creat(psync_fstask_folder_t *folder,
                                               const char *name,
                                               uint64_t taskid) {
-  return psync_tree_element(
+  return ptree_element(
       psync_fstask_search_tree(folder->creats,
                                offsetof(psync_fstask_creat_t, name), name,
                                taskid, offsetof(psync_fstask_creat_t, taskid)),
@@ -316,7 +316,7 @@ psync_fstask_creat_t *psync_fstask_find_creat(psync_fstask_folder_t *folder,
 psync_fstask_unlink_t *psync_fstask_find_unlink(psync_fstask_folder_t *folder,
                                                 const char *name,
                                                 uint64_t taskid) {
-  return psync_tree_element(
+  return ptree_element(
       psync_fstask_search_tree(folder->unlinks,
                                offsetof(psync_fstask_unlink_t, name), name,
                                taskid, offsetof(psync_fstask_unlink_t, taskid)),
@@ -326,7 +326,7 @@ psync_fstask_unlink_t *psync_fstask_find_unlink(psync_fstask_folder_t *folder,
 psync_fstask_mkdir_t *
 psync_fstask_find_mkdir_by_folderid(psync_fstask_folder_t *folder,
                                     psync_fsfolderid_t folderid) {
-  return psync_tree_element(
+  return ptree_element(
       psync_fstask_walk_tree(folder->mkdirs, folderid,
                              offsetof(psync_fstask_mkdir_t, folderid)),
       psync_fstask_mkdir_t, tree);
@@ -335,7 +335,7 @@ psync_fstask_find_mkdir_by_folderid(psync_fstask_folder_t *folder,
 psync_fstask_creat_t *
 psync_fstask_find_creat_by_fileid(psync_fstask_folder_t *folder,
                                   psync_fsfileid_t fileid) {
-  return psync_tree_element(
+  return ptree_element(
       psync_fstask_walk_tree(folder->creats, fileid,
                              offsetof(psync_fstask_creat_t, fileid)),
       psync_fstask_creat_t, tree);
@@ -626,7 +626,7 @@ int psync_fstask_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
     psync_sql_free_result(res);
   }
   if (mk) {
-    psync_tree_del(&folder->mkdirs, &mk->tree);
+    ptree_del(&folder->mkdirs, &mk->tree);
     psync_free(mk);
   }
   if (cfolder)
@@ -770,7 +770,7 @@ psync_fstask_add_modified_file(psync_fstask_folder_t *folder, const char *name,
   task = psync_fstask_find_creat(folder, name, 0);
   if (task) {
     psync_fstask_depend(taskid, task->taskid);
-    psync_tree_del(&folder->creats, &task->tree);
+    ptree_del(&folder->creats, &task->tree);
     psync_free(task);
     folder->taskscnt--;
   }
@@ -1016,11 +1016,11 @@ int psync_fstask_unlink(psync_fsfolderid_t folderid, const char *name) {
     if (unlikely(cr->fileid == 0)) {
       task = psync_fstask_find_unlink(folder, cr->name, cr->taskid);
       if (likely_log(task)) {
-        psync_tree_del(&folder->unlinks, &task->tree);
+        ptree_del(&folder->unlinks, &task->tree);
         folder->taskscnt--;
         psync_free(task);
       }
-      psync_tree_del(&folder->creats, &cr->tree);
+      ptree_del(&folder->creats, &cr->tree);
       psync_free(cr);
       folder->taskscnt--;
       psync_fstask_release_folder_tasks_locked(folder);
@@ -1028,7 +1028,7 @@ int psync_fstask_unlink(psync_fsfolderid_t folderid, const char *name) {
     }
     depend = cr->taskid;
     fileid = cr->fileid;
-    psync_tree_del(&folder->creats, &cr->tree);
+    ptree_del(&folder->creats, &cr->tree);
     psync_free(cr);
     folder->taskscnt--;
     if (folder->folderid >= 0)
@@ -1168,7 +1168,7 @@ int psync_fstask_rename_file(psync_fsfileid_t fileid,
     return -EIO;
   }
   if (cr) {
-    psync_tree_del(&folder->creats, &cr->tree);
+    ptree_del(&folder->creats, &cr->tree);
     psync_free(cr);
     folder->taskscnt--;
     if (folder->folderid >= 0)
@@ -1194,7 +1194,7 @@ int psync_fstask_rename_file(psync_fsfileid_t fileid,
           new_name, (long)cr->fileid, (unsigned long)to_folderid);
     if (cr->fileid < 0)
       psync_fstask_stop_and_delete_file(cr->fileid);
-    psync_tree_del(&folder->creats, &cr->tree);
+    ptree_del(&folder->creats, &cr->tree);
     psync_free(cr);
     folder->taskscnt--;
   }
@@ -1393,7 +1393,7 @@ int psync_fstask_rename_folder(psync_fsfolderid_t folderid,
   }
 
   if (mk) {
-    psync_tree_del(&folder->mkdirs, &mk->tree);
+    ptree_del(&folder->mkdirs, &mk->tree);
     psync_free(mk);
     folder->taskscnt--;
   }
@@ -1415,7 +1415,7 @@ int psync_fstask_rename_folder(psync_fsfolderid_t folderid,
 
   if (mk) {
     debug(D_NOTICE, "renaming over mkdir %s", name);
-    psync_tree_del(&folder->mkdirs, &mk->tree);
+    ptree_del(&folder->mkdirs, &mk->tree);
     psync_free(mk);
     folder->taskscnt--;
   }
@@ -1451,8 +1451,8 @@ int psync_fstask_rename_folder(psync_fsfolderid_t folderid,
 }
 
 static int folder_cmp(const psync_tree *t1, const psync_tree *t2) {
-  int64_t d = psync_tree_element(t1, psync_fstask_folder_t, tree)->folderid -
-              psync_tree_element(t2, psync_fstask_folder_t, tree)->folderid;
+  int64_t d = ptree_element(t1, psync_fstask_folder_t, tree)->folderid -
+              ptree_element(t2, psync_fstask_folder_t, tree)->folderid;
   if (d < 0)
     return -1;
   else if (d > 0)
@@ -1472,7 +1472,7 @@ void psync_fstask_folder_created(psync_folderid_t parentfolderid,
   if (folder) {
     mk = psync_fstask_find_mkdir(folder, name, taskid);
     if (mk) {
-      psync_tree_del(&folder->mkdirs, &mk->tree);
+      ptree_del(&folder->mkdirs, &mk->tree);
       psync_free(mk);
       folder->taskscnt--;
       pchg = 1;
@@ -1512,9 +1512,9 @@ void psync_fstask_folder_created(psync_folderid_t parentfolderid,
   if (folder) {
     debug(D_NOTICE, "re-inserting into tree folder diffs of folder %ld as %lu",
           (long)folder->folderid, (unsigned long)folderid);
-    psync_tree_del(&folders, &folder->tree);
+    ptree_del(&folders, &folder->tree);
     folder->folderid = folderid;
-    psync_tree_add(&folders, &folder->tree, folder_cmp);
+    ptree_add(&folders, &folder->tree, folder_cmp);
     psync_fstask_release_folder_tasks_locked(folder);
     ppathstatus_drive_fldr_changed(folderid);
   }
@@ -1530,7 +1530,7 @@ void psync_fstask_folder_deleted(psync_folderid_t parentfolderid,
   if (folder) {
     rm = psync_fstask_find_rmdir(folder, name, taskid);
     if (rm) {
-      psync_tree_del(&folder->rmdirs, &rm->tree);
+      ptree_del(&folder->rmdirs, &rm->tree);
       psync_free(rm);
       folder->taskscnt--;
     }
@@ -1583,13 +1583,13 @@ void psync_fstask_file_created(psync_folderid_t parentfolderid, uint64_t taskid,
   if (folder) {
     cr = psync_fstask_find_creat(folder, name, taskid);
     if (cr) {
-      psync_tree_del(&folder->creats, &cr->tree);
+      ptree_del(&folder->creats, &cr->tree);
       psync_free(cr);
       folder->taskscnt--;
     }
     un = psync_fstask_find_unlink(folder, name, taskid);
     if (un) {
-      psync_tree_del(&folder->unlinks, &un->tree);
+      ptree_del(&folder->unlinks, &un->tree);
       psync_free(un);
       folder->taskscnt--;
     } else
@@ -1615,13 +1615,13 @@ void psync_fstask_file_modified(psync_folderid_t parentfolderid,
   if (folder) {
     cr = psync_fstask_find_creat(folder, name, taskid);
     if (cr) {
-      psync_tree_del(&folder->creats, &cr->tree);
+      ptree_del(&folder->creats, &cr->tree);
       psync_free(cr);
       folder->taskscnt--;
     }
     un = psync_fstask_find_unlink(folder, name, taskid);
     if (un) {
-      psync_tree_del(&folder->unlinks, &un->tree);
+      ptree_del(&folder->unlinks, &un->tree);
       psync_free(un);
       folder->taskscnt--;
     }
@@ -1641,7 +1641,7 @@ void psync_fstask_file_deleted(psync_folderid_t parentfolderid, uint64_t taskid,
   if (folder) {
     un = psync_fstask_find_unlink(folder, name, taskid);
     if (un) {
-      psync_tree_del(&folder->unlinks, &un->tree);
+      ptree_del(&folder->unlinks, &un->tree);
       psync_free(un);
       folder->taskscnt--;
     }
@@ -1660,13 +1660,13 @@ void psync_fstask_file_renamed(psync_folderid_t folderid, uint64_t taskid,
   if (folder) {
     un = psync_fstask_find_unlink(folder, name, taskid);
     if (un) {
-      psync_tree_del(&folder->unlinks, &un->tree);
+      ptree_del(&folder->unlinks, &un->tree);
       psync_free(un);
       folder->taskscnt--;
     }
     cr = psync_fstask_find_creat(folder, name, taskid);
     if (cr) {
-      psync_tree_del(&folder->creats, &cr->tree);
+      ptree_del(&folder->creats, &cr->tree);
       psync_free(cr);
       folder->taskscnt--;
     }
@@ -1682,7 +1682,7 @@ void psync_fstask_file_renamed(psync_folderid_t folderid, uint64_t taskid,
       un = psync_fstask_find_unlink(folder, psync_get_string(row[2]),
                                     psync_get_number(row[0]));
       if (un) {
-        psync_tree_del(&folder->unlinks, &un->tree);
+        ptree_del(&folder->unlinks, &un->tree);
         psync_free(un);
         folder->taskscnt--;
       }
@@ -1713,13 +1713,13 @@ void psync_fstask_folder_renamed(psync_folderid_t parentfolderid,
   if (folder) {
     mk = psync_fstask_find_mkdir(folder, name, taskid);
     if (mk) {
-      psync_tree_del(&folder->mkdirs, &mk->tree);
+      ptree_del(&folder->mkdirs, &mk->tree);
       psync_free(mk);
       folder->taskscnt--;
     }
     rm = psync_fstask_find_rmdir(folder, name, taskid);
     if (rm) {
-      psync_tree_del(&folder->rmdirs, &rm->tree);
+      ptree_del(&folder->rmdirs, &rm->tree);
       psync_free(rm);
       folder->taskscnt--;
     }
@@ -1735,7 +1735,7 @@ void psync_fstask_folder_renamed(psync_folderid_t parentfolderid,
       rm = psync_fstask_find_rmdir(folder, psync_get_string(row[2]),
                                    psync_get_number(row[0]));
       if (rm) {
-        psync_tree_del(&folder->rmdirs, &rm->tree);
+        ptree_del(&folder->rmdirs, &rm->tree);
         psync_free(rm);
         folder->taskscnt--;
       }
@@ -1799,7 +1799,7 @@ static void psync_init_task_rmdir(psync_variant_row row) {
   folder = psync_fstask_get_or_create_folder_tasks_locked(folderid);
   mk = psync_fstask_find_mkdir(folder, name, 0);
   if (mk) {
-    psync_tree_del(&folder->mkdirs, &mk->tree);
+    ptree_del(&folder->mkdirs, &mk->tree);
     psync_free(mk);
     folder->taskscnt--;
   }
@@ -1859,7 +1859,7 @@ static void psync_init_do_task_unlink(uint64_t taskid,
   folder = psync_fstask_get_or_create_folder_tasks_locked(folderid);
   cr = psync_fstask_find_creat(folder, name, 0);
   if (cr) {
-    psync_tree_del(&folder->creats, &cr->tree);
+    ptree_del(&folder->creats, &cr->tree);
     psync_free(cr);
     folder->taskscnt--;
   }
@@ -1901,7 +1901,7 @@ static void psync_init_task_renfile_from(psync_variant_row row) {
   folder =
       psync_fstask_get_or_create_folder_tasks_locked(psync_get_number(row[2]));
   if ((cr = psync_fstask_find_creat(folder, name, 0))) {
-    psync_tree_del(&folder->creats, &cr->tree);
+    ptree_del(&folder->creats, &cr->tree);
     psync_free(cr);
     folder->taskscnt--;
   }
@@ -1931,7 +1931,7 @@ static void psync_init_task_renfile_to(psync_variant_row row) {
   folder = psync_fstask_get_or_create_folder_tasks_locked(folderid);
   cr = psync_fstask_find_creat(folder, name, 0);
   if (cr) {
-    psync_tree_del(&folder->creats, &cr->tree);
+    ptree_del(&folder->creats, &cr->tree);
     folder->taskscnt--;
     psync_free(cr);
   }
@@ -1970,7 +1970,7 @@ static void psync_init_task_renfolder_from(psync_variant_row row) {
   folder =
       psync_fstask_get_or_create_folder_tasks_locked(psync_get_number(row[2]));
   if ((mk = psync_fstask_find_mkdir(folder, name, 0))) {
-    psync_tree_del(&folder->mkdirs, &mk->tree);
+    ptree_del(&folder->mkdirs, &mk->tree);
     psync_free(mk);
     folder->taskscnt--;
   }
@@ -2035,7 +2035,7 @@ static void psync_init_task_modify(psync_variant_row row) {
   taskid = psync_get_number(row[0]);
   cr = psync_fstask_find_creat(folder, name, 0);
   if (cr) {
-    psync_tree_del(&folder->creats, &cr->tree);
+    ptree_del(&folder->creats, &cr->tree);
     psync_free(cr);
     folder->taskscnt--;
   }
@@ -2078,9 +2078,9 @@ static psync_init_task_ptr psync_init_task_func[] = {
 
 static void psync_fstask_free_tree(psync_tree *tr) {
   psync_tree *ntr;
-  tr = psync_tree_get_first_safe(tr);
+  tr = ptree_get_first_safe(tr);
   while (tr) {
-    ntr = psync_tree_get_next_safe(tr);
+    ntr = ptree_get_next_safe(tr);
     psync_free(tr);
     tr = ntr;
   }
@@ -2090,16 +2090,16 @@ void psync_fstask_clean() {
   psync_fstask_folder_t *folder;
   psync_tree *tr;
   psync_sql_lock();
-  tr = psync_tree_get_first(folders);
+  tr = ptree_get_first(folders);
   while (tr) {
-    folder = psync_tree_element(tr, psync_fstask_folder_t, tree);
-    tr = psync_tree_get_next(tr);
+    folder = ptree_element(tr, psync_fstask_folder_t, tree);
+    tr = ptree_get_next(tr);
     psync_fstask_free_tree(folder->creats);
     psync_fstask_free_tree(folder->unlinks);
     psync_fstask_free_tree(folder->mkdirs);
     psync_fstask_free_tree(folder->rmdirs);
     if (folder->refcnt == 0) {
-      psync_tree_del(&folders, &folder->tree);
+      ptree_del(&folders, &folder->tree);
       psync_free(folder);
     } else {
       folder->creats = PSYNC_TREE_EMPTY;
@@ -2180,30 +2180,30 @@ void psync_fstask_dump_state() {
   psync_fstask_creat_t *cr;
   psync_fstask_unlink_t *un;
   uint32_t cnt;
-  psync_tree_for_each_element(folder, folders, psync_fstask_folder_t, tree) {
+  ptree_for_each_element(folder, folders, psync_fstask_folder_t, tree) {
     debug(D_NOTICE, "open folderid %ld taskcnt %u refcnt %u",
           (long)folder->folderid, (unsigned)folder->taskscnt,
           (unsigned)folder->refcnt);
     cnt = 0;
-    psync_tree_for_each_element(mk, folder->mkdirs, psync_fstask_mkdir_t,
+    ptree_for_each_element(mk, folder->mkdirs, psync_fstask_mkdir_t,
                                 tree) {
       debug(D_NOTICE, "  mkdir %s folderid %ld taskid %lu", mk->name,
             (long)mk->folderid, (unsigned long)mk->taskid);
       cnt++;
     }
-    psync_tree_for_each_element(rm, folder->rmdirs, psync_fstask_rmdir_t,
+    ptree_for_each_element(rm, folder->rmdirs, psync_fstask_rmdir_t,
                                 tree) {
       debug(D_NOTICE, "  mkdir %s folderid %ld taskid %lu", rm->name,
             (long)rm->folderid, (unsigned long)rm->taskid);
       cnt++;
     }
-    psync_tree_for_each_element(cr, folder->creats, psync_fstask_creat_t,
+    ptree_for_each_element(cr, folder->creats, psync_fstask_creat_t,
                                 tree) {
       debug(D_NOTICE, "  creat %s fileid %ld taskid %lu", cr->name,
             (long)cr->fileid, (unsigned long)cr->taskid);
       cnt++;
     }
-    psync_tree_for_each_element(un, folder->unlinks, psync_fstask_unlink_t,
+    ptree_for_each_element(un, folder->unlinks, psync_fstask_unlink_t,
                                 tree) {
       debug(D_NOTICE, "  unlink %s fileid %ld taskid %lu", un->name,
             (long)un->fileid, (unsigned long)un->taskid);

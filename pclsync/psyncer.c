@@ -72,26 +72,26 @@ static psync_tree *psync_new_sd_folder(psync_folderid_t folderid) {
 static void psync_add_folder_to_downloadlist_locked(psync_folderid_t folderid) {
   synced_down_folder *f;
   if (!synced_down_folders) {
-    psync_tree_add_after(&synced_down_folders, NULL,
+    ptree_add_after(&synced_down_folders, NULL,
                          psync_new_sd_folder(folderid));
     return;
   }
-  f = psync_tree_element(synced_down_folders, synced_down_folder, tree);
+  f = ptree_element(synced_down_folders, synced_down_folder, tree);
   while (1) {
     if (folderid < f->folderid) {
       if (f->tree.left)
-        f = psync_tree_element(f->tree.left, synced_down_folder, tree);
+        f = ptree_element(f->tree.left, synced_down_folder, tree);
       else {
         f->tree.left = psync_new_sd_folder(folderid);
-        psync_tree_added_at(&synced_down_folders, &f->tree, f->tree.left);
+        ptree_added_at(&synced_down_folders, &f->tree, f->tree.left);
         break;
       }
     } else if (folderid > f->folderid) {
       if (f->tree.right)
-        f = psync_tree_element(f->tree.right, synced_down_folder, tree);
+        f = ptree_element(f->tree.right, synced_down_folder, tree);
       else {
         f->tree.right = psync_new_sd_folder(folderid);
-        psync_tree_added_at(&synced_down_folders, &f->tree, f->tree.right);
+        ptree_added_at(&synced_down_folders, &f->tree, f->tree.right);
         break;
       }
     } else {
@@ -112,14 +112,14 @@ void psyncer_dl_queue_add(psync_folderid_t folderid) {
 void psyncer_dl_queue_del(psync_folderid_t folderid) {
   synced_down_folder *f;
   pthread_mutex_lock(&sync_down_mutex);
-  f = psync_tree_element(synced_down_folders, synced_down_folder, tree);
+  f = ptree_element(synced_down_folders, synced_down_folder, tree);
   while (f) {
     if (folderid < f->folderid)
-      f = psync_tree_element(f->tree.left, synced_down_folder, tree);
+      f = ptree_element(f->tree.left, synced_down_folder, tree);
     else if (folderid > f->folderid)
-      f = psync_tree_element(f->tree.right, synced_down_folder, tree);
+      f = ptree_element(f->tree.right, synced_down_folder, tree);
     else {
-      psync_tree_del(&synced_down_folders, &f->tree);
+      ptree_del(&synced_down_folders, &f->tree);
       psync_free(f);
       break;
     }
@@ -129,7 +129,7 @@ void psyncer_dl_queue_del(psync_folderid_t folderid) {
 
 void psyncer_dl_queue_clear() {
   pthread_mutex_lock(&sync_down_mutex);
-  psync_tree_for_each_element_call_safe(synced_down_folders, synced_down_folder,
+  ptree_for_each_element_call_safe(synced_down_folders, synced_down_folder,
                                         tree, psync_free);
   synced_down_folders = PSYNC_TREE_EMPTY;
   pthread_mutex_unlock(&sync_down_mutex);
@@ -138,12 +138,12 @@ void psyncer_dl_queue_clear() {
 int psyncer_dl_has_folder(psync_folderid_t folderid) {
   synced_down_folder *f;
   pthread_mutex_lock(&sync_down_mutex);
-  f = psync_tree_element(synced_down_folders, synced_down_folder, tree);
+  f = ptree_element(synced_down_folders, synced_down_folder, tree);
   while (f) {
     if (folderid < f->folderid)
-      f = psync_tree_element(f->tree.left, synced_down_folder, tree);
+      f = ptree_element(f->tree.left, synced_down_folder, tree);
     else if (folderid > f->folderid)
-      f = psync_tree_element(f->tree.right, synced_down_folder, tree);
+      f = ptree_element(f->tree.right, synced_down_folder, tree);
     else
       break;
   }

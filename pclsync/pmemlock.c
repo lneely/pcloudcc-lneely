@@ -87,7 +87,7 @@ retry:
   tr = locked_pages;
   if (tr) {
     while (1) {
-      node = psync_tree_element(tr, locked_page_t, tree);
+      node = ptree_element(tr, locked_page_t, tree);
       if (pageid < node->pageid) {
         if (tr->left)
           tr = tr->left;
@@ -136,7 +136,7 @@ retry:
       node->pageid = pageid;
       node->refcnt = 1;
       *addto = &node->tree;
-      psync_tree_added_at(&locked_pages, tr, &node->tree);
+      ptree_added_at(&locked_pages, tr, &node->tree);
     }
   }
   pthread_mutex_unlock(&page_mutex);
@@ -150,7 +150,7 @@ static int unlock_page(pageid_t pageid, int page_size) {
   pthread_mutex_lock(&page_mutex);
   tr = locked_pages;
   while (tr) {
-    node = psync_tree_element(tr, locked_page_t, tree);
+    node = ptree_element(tr, locked_page_t, tree);
     if (pageid < node->pageid)
       tr = tr->left;
     else if (pageid > node->pageid)
@@ -164,7 +164,7 @@ static int unlock_page(pageid_t pageid, int page_size) {
             (unsigned long)pageid * page_size, (unsigned)node->refcnt);
       ret = 0;
     } else {
-      psync_tree_del(&locked_pages, tr);
+      ptree_del(&locked_pages, tr);
       psync_free(node);
       // do not move out of the mutex, will create race conditions
       if (unlikely(pmem_munlock((void *)(pageid * page_size), page_size)))
@@ -252,7 +252,7 @@ void *pmemlock_malloc(size_t size) {
   // call pmemlock_free() on few pointers, therefore allocator_mutex is
   // recursive
   pthread_mutex_lock(&allocator_mutex);
-  psync_tree_for_each_element(range, allocator_ranges, allocator_range, tree)
+  ptree_for_each_element(range, allocator_ranges, allocator_range, tree)
       psync_interval_tree_for_each(interval, range->freeintervals) {
     intsize = interval->to - interval->from;
     if (intsize >= size && intsize < bestsize) {
@@ -319,7 +319,7 @@ void *pmemlock_malloc(size_t size) {
   tr = allocator_ranges;
   if (tr) {
     while (1) {
-      range = psync_tree_element(tr, allocator_range, tree);
+      range = ptree_element(tr, allocator_range, tree);
       if (brange->mem < range->mem) {
         assert(brange->mem + brange->size <= range->mem);
         if (tr->left)
@@ -341,7 +341,7 @@ void *pmemlock_malloc(size_t size) {
   } else
     addto = &allocator_ranges;
   *addto = &brange->tree;
-  psync_tree_added_at(&allocator_ranges, tr, &brange->tree);
+  ptree_added_at(&allocator_ranges, tr, &brange->tree);
   pthread_mutex_unlock(&allocator_mutex);
   return ret;
 }
@@ -370,7 +370,7 @@ void pmemlock_free(void *ptr) {
   pthread_mutex_lock(&allocator_mutex);
   tr = allocator_ranges;
   while (tr) {
-    range = psync_tree_element(tr, allocator_range, tree);
+    range = ptree_element(tr, allocator_range, tree);
     if (cptr < range->mem)
       tr = tr->left;
     else if (cptr >= range->mem + range->size)
@@ -385,7 +385,7 @@ found:
                           cptr - range->mem + size);
   if (range->freeintervals->from == LM_RANGE_OVERHEAD &&
       range->freeintervals->to == range->size)
-    psync_tree_del(&allocator_ranges, &range->tree);
+    ptree_del(&allocator_ranges, &range->tree);
   else
     range = NULL;
   pthread_mutex_unlock(&allocator_mutex);

@@ -49,7 +49,7 @@ int64_t do_psync_folder_public_link_full(const char *path, char **link /*OUT*/,
                                          char **err /*OUT*/, uint64_t expire,
                                          int maxdownloads, int maxtraffic,
                                          const char *password);
-int64_t do_psync_tree_public_link(const char *linkname, const char *root,
+int64_t do_ptree_public_link(const char *linkname, const char *root,
                                   char **folders, int numfolders, char **files,
                                   int numfiles, char **link /*OUT*/,
                                   char **err /*OUT*/, uint64_t expire,

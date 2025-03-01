@@ -234,7 +234,7 @@ static void psync_notifications_thumb_dir_list(void *ptr,
   if (tr) {
     while (1) {
       cmp = strcmp(
-          st->name, psync_tree_element(tr, psync_thumb_list_t, tree)->name);
+          st->name, ptree_element(tr, psync_thumb_list_t, tree)->name);
       if (cmp < 0) {
         if (tr->left)
           tr = tr->left;
@@ -262,7 +262,7 @@ static void psync_notifications_thumb_dir_list(void *ptr,
                                           len);
   memcpy(tl->name, st->name, len);
   *addto = &tl->tree;
-  psync_tree_added_at(tree, tr, &tl->tree);
+  ptree_added_at(tree, tr, &tl->tree);
 }
 
 static void psync_notification_remove_from_list(psync_tree **tree,
@@ -272,13 +272,13 @@ static void psync_notification_remove_from_list(psync_tree **tree,
   tr = *tree;
   while (tr) {
     cmp = strcmp(
-        name, psync_tree_element(tr, psync_thumb_list_t, tree)->name);
+        name, ptree_element(tr, psync_thumb_list_t, tree)->name);
     if (cmp < 0)
       tr = tr->left;
     else if (cmp > 0)
       tr = tr->right;
     else {
-      psync_tree_del(tree, tr);
+      ptree_del(tree, tr);
       break;
     }
   }
@@ -350,17 +350,17 @@ psync_notification_list_t *pnotify_get() {
     }
   }
   pthread_mutex_unlock(&ntf_mutex);
-  thumbs = psync_tree_get_first_safe(thumbs);
+  thumbs = ptree_get_first_safe(thumbs);
   while (thumbs) {
-    nx = psync_tree_get_next_safe(thumbs);
+    nx = ptree_get_next_safe(thumbs);
     debug(D_NOTICE, "deleting unused thumb %s",
-          psync_tree_element(thumbs, psync_thumb_list_t, tree)->name);
+          ptree_element(thumbs, psync_thumb_list_t, tree)->name);
     filepath = psync_strcat(
         thumbpath, "/",
-        psync_tree_element(thumbs, psync_thumb_list_t, tree)->name, NULL);
+        ptree_element(thumbs, psync_thumb_list_t, tree)->name, NULL);
     pfile_delete(filepath);
     psync_free(filepath);
-    psync_free(psync_tree_element(thumbs, psync_thumb_list_t, tree));
+    psync_free(ptree_element(thumbs, psync_thumb_list_t, tree));
     thumbs = nx;
   }
   psync_free(thumbpath);

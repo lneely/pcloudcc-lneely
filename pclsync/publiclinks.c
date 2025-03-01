@@ -402,7 +402,7 @@ int64_t do_psync_folder_updownlink_link(int canupload,
   return result;
 }
 
-int64_t do_psync_tree_public_link(const char *linkname, const char *root,
+int64_t do_ptree_public_link(const char *linkname, const char *root,
                                   char **folders, int numfolders, char **files,
                                   int numfiles, char **link /*OUT*/,
                                   char **err /*OUT*/, uint64_t expire,
