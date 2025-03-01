@@ -44,57 +44,13 @@
 #include "paccountevents.h"
 #include "ptools.h"
 #include "pstatus.h"
+#include "pfoldersync.h"
 
-typedef uint64_t psync_folderid_t;
-typedef uint64_t psync_fileid_t;
-typedef uint64_t psync_fileorfolderid_t;
 typedef uint64_t psync_userid_t;
 typedef uint64_t psync_shareid_t;
 typedef uint64_t psync_sharerequestid_t;
 typedef uint64_t psync_teamid_t;
-typedef uint32_t psync_syncid_t;
 typedef uint32_t psync_eventtype_t;
-typedef uint32_t psync_synctype_t;
-typedef uint32_t psync_listtype_t;
-
-typedef struct {
-  psync_fileid_t fileid;
-  uint64_t size;
-} pfile_t;
-
-typedef struct {
-  psync_folderid_t folderid;
-  uint8_t cansyncup;
-  uint8_t cansyncdown;
-  uint8_t canshare;
-  uint8_t isencrypted;
-} pfolder_t;
-
-typedef struct {
-  const char *name;
-  union {
-    pfolder_t folder;
-    pfile_t file;
-  };
-  uint16_t namelen;
-  uint8_t isfolder;
-} pentry_t;
-
-typedef struct {
-  size_t entrycnt;
-  pentry_t entries[];
-} pfolder_list_t;
-
-typedef struct {
-  const char *localpath;
-  const char *name;
-  const char *description;
-} psuggested_folder_t;
-
-typedef struct {
-  size_t entrycnt;
-  psuggested_folder_t entries[];
-} psuggested_folders_t;
 
 typedef struct {
   const char *label;
@@ -329,9 +285,6 @@ typedef struct {
 #define PSYNC_CRYPTO_STATUS_ACTIVE 4
 #define PSYNC_CRYPTO_STATUS_SETUP 5
 
-// limitation: path length of 255, plus null terminator.
-#define PSYNC_MAX_PATH_LENGTH 256
-
 #define PSYNC_CRYPTO_INVALID_FOLDERID ((psync_folderid_t) - 1)
 
 #define PSYNC_CRYPTO_FLAG_TEMP_PASS 1
@@ -352,20 +305,6 @@ typedef struct {
 // Backup errors end
 
 // Lib error codes end
-typedef struct {
-  char localname[PSYNC_MAX_PATH_LENGTH];
-  char localpath[PSYNC_MAX_PATH_LENGTH];
-  char remotename[PSYNC_MAX_PATH_LENGTH];
-  char remotepath[PSYNC_MAX_PATH_LENGTH];
-  psync_folderid_t folderid;
-  psync_syncid_t syncid;
-  psync_synctype_t synctype;
-} psync_folder_t;
-
-typedef struct {
-  size_t foldercnt;
-  psync_folder_t folders[];
-} psync_folder_list_t;
 
 typedef struct {
   psync_fileid_t fileid;
@@ -1312,7 +1251,7 @@ int psync_upload_file_as(const char *remote_path, const char *remote_filename,
  * full path (including mountpoint) of a given folderid on the filesystem or
  *                            NULL if it is not mounted or folder could not be
  * found. You are supposed to free the returned pointer.
- * psync_get_path_by_fileid() - returns path (without mountpoint) of a given
+ * pfolder_file_path() - returns path (without mountpoint) of a given
  * fileid on the filesystem or NULL if it is not mounted or parent folder could
  * not be found. You are supposed to free the returned pointer.
  *
@@ -1342,7 +1281,6 @@ void psync_fs_stop();
 char *psync_fs_getmountpoint();
 void psync_fs_register_start_callback(psync_generic_callback_t callback);
 char *psync_fs_get_path_by_folderid(psync_folderid_t folderid);
-char *psync_get_path_by_fileid(psync_fileid_t fileid, size_t *retlen);
 
 void psync_fs_clean_read_cache();
 int psync_fs_move_cache(const char *path);

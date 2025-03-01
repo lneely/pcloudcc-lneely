@@ -43,7 +43,7 @@
 #include "pcompiler.h"
 #include "pdiff.h"
 #include "pfileops.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "plibs.h"
 #include "plist.h"
 #include "pnetlibs.h"
@@ -500,7 +500,7 @@ static void set_local_file_conflicted(psync_fileid_t localfileid,
   psync_sql_bind_string(res, 1, newname);
   psync_sql_bind_uint(res, 2, taskid);
   psync_sql_run_free(res);
-  newpath = psync_local_path_for_local_file(localfileid, NULL);
+  newpath = pfolder_lpath_lfile(localfileid, NULL);
   if (unlikely_log(pfile_rename_overwrite(localpath, newpath)))
     psync_sql_rollback_transaction();
   else
@@ -1341,7 +1341,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
   pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
   if (upload->stop)
     return -1;
-  localpath = psync_local_path_for_local_file(localfileid, NULL);
+  localpath = pfolder_lpath_lfile(localfileid, NULL);
   if (unlikely(!localpath)) {
     debug(D_WARNING, "could not find local file %s (id %lu)", name,
           (unsigned long)localfileid);

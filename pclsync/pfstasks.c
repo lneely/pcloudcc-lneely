@@ -44,7 +44,7 @@
 #include "pcache.h"
 #include "pcryptofolder.h"
 #include "putil.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "pfs.h"
 #include "pfstasks.h"
 #include "pfsupload.h"

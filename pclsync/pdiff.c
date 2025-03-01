@@ -49,7 +49,7 @@
 #include "pdiff.h"
 #include "pdownload.h"
 #include "pfileops.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "pfs.h"
 #include "pfsxattr.h"
 #include "plibs.h"
@@ -60,7 +60,7 @@
 #include "psettings.h"
 #include "pstatus.h"
 #include "psynclib.h"
-#include "psyncer.h"
+#include "pfoldersync.h"
 #include "psys.h"
 #include "ptask.h"
 #include "ptimer.h"
@@ -923,9 +923,9 @@ static void process_createfolder(const binresult *entry) {
   psync_sql_bind_uint(st2, 1, mtime);
   psync_sql_bind_uint(st2, 2, parentfolderid);
   psync_sql_run(st2);
-  if (psync_is_folder_in_downloadlist(parentfolderid) &&
+  if (psyncer_dl_has_folder(parentfolderid) &&
       !psync_is_name_to_ignore(name->str)) {
-    psync_add_folder_to_downloadlist(folderid);
+    psyncer_dl_queue_add(folderid);
     res = psync_sql_query(
         "SELECT syncid, localfolderid, synctype FROM syncedfolder WHERE "
         "folderid=? AND " PSYNC_SQL_DOWNLOAD);
@@ -940,7 +940,7 @@ static void process_createfolder(const binresult *entry) {
             (unsigned long)row[1], name->str, (unsigned long)folderid,
             (unsigned long)parentfolderid);
       localfolderid =
-          psync_create_local_folder_in_db(syncid, folderid, row[1], name->str);
+          psyncer_db_folder_create(syncid, folderid, row[1], name->str);
       psync_sql_bind_uint(stmt, 1, syncid);
       psync_sql_bind_uint(stmt, 2, folderid);
       psync_sql_bind_uint(stmt, 3, localfolderid);
@@ -1107,23 +1107,23 @@ static void process_modifyfolder(const binresult *entry) {
    * parentfolderid is not in and folderid is in, it means that folder that is a
    * "root" of a syncid is modified, we do not care about that.
    */
-  oldsync = psync_is_folder_in_downloadlist(oldparentfolderid);
+  oldsync = psyncer_dl_has_folder(oldparentfolderid);
   if (oldparentfolderid == parentfolderid)
     newsync = oldsync;
   else {
-    newsync = psync_is_folder_in_downloadlist(parentfolderid);
+    newsync = psyncer_dl_has_folder(parentfolderid);
     psync_diff_refresh_fs_add_folder(oldparentfolderid);
   }
   if ((oldsync || newsync) &&
       (oldparentfolderid != parentfolderid || strcmp(name->str, oldname))) {
     if (!oldsync)
-      psync_add_folder_to_downloadlist(folderid);
+      psyncer_dl_queue_add(folderid);
     else if (!newsync) {
       res = psync_sql_query(
           "SELECT id FROM syncfolder WHERE folderid=? AND " PSYNC_SQL_DOWNLOAD);
       psync_sql_bind_uint(res, 1, folderid);
       if (!psync_sql_fetch_rowint(res))
-        psync_del_folder_from_downloadlist(folderid);
+        psyncer_dl_queue_del(folderid);
       psync_sql_free_result(res);
     }
     res = psync_sql_query(
@@ -1195,10 +1195,10 @@ static void process_modifyfolder(const binresult *entry) {
             "creating local folder %lu/%s for folderid %lu, parentfolderid %lu",
             (unsigned long)psync_get_result_cell(fres2, i, 1), name->str,
             (unsigned long)folderid, (unsigned long)parentfolderid);
-      localfolderid = psync_create_local_folder_in_db(
+      localfolderid = psyncer_db_folder_create(
           syncid, folderid, psync_get_result_cell(fres2, i, 1), name->str);
       ptask_ldir_mk(syncid, folderid, localfolderid);
-      psync_add_folder_for_downloadsync(
+      psyncer_dl_folder_add(
           syncid, psync_get_result_cell(fres2, i, 2), folderid, localfolderid);
       needdownload = 1;
     }
@@ -1238,8 +1238,8 @@ static void process_deletefolder(const binresult *entry) {
   meta = papi_find_result2(entry, "metadata", PARAM_HASH);
   folderid = papi_find_result2(meta, "folderid", PARAM_NUM)->num;
   psync_path_status_folder_deleted(folderid);
-  if (psync_is_folder_in_downloadlist(folderid)) {
-    psync_del_folder_from_downloadlist(folderid);
+  if (psyncer_dl_has_folder(folderid)) {
+    psyncer_dl_queue_del(folderid);
     res = psync_sql_query(
         "SELECT syncid, localfolderid FROM syncedfolder WHERE folderid=?");
     psync_sql_bind_uint(res, 1, folderid);
@@ -1250,7 +1250,7 @@ static void process_deletefolder(const binresult *entry) {
       psync_sql_bind_uint(stmt, 2, folderid);
       psync_sql_run_free(stmt);
       if (psync_sql_affected_rows() == 1) {
-        path = psync_get_path_by_folderid(folderid, NULL);
+        path = pfolder_path(folderid, NULL);
         ptask_ldir_rm(row[0], folderid, row[1], path);
         psync_free(path);
         needdownload = 1;
@@ -1395,7 +1395,7 @@ static void process_createfile(const binresult *entry) {
   }
   insert_revision(fileid, hash,
                   papi_find_result2(meta, "modified", PARAM_NUM)->num, size);
-  if (psync_is_folder_in_downloadlist(parentfolderid) &&
+  if (psyncer_dl_has_folder(parentfolderid) &&
       !psync_is_name_to_ignore(name->str)) {
     res = psync_sql_query("SELECT syncid, localfolderid FROM syncedfolder "
                           "WHERE folderid=? AND " PSYNC_SQL_DOWNLOAD);
@@ -1506,18 +1506,18 @@ static void process_modifyfile(const binresult *entry) {
   insert_revision(fileid, hash,
                   papi_find_result2(meta, "modified", PARAM_NUM)->num, size);
   oldparentfolderid = psync_get_number(row[0]);
-  oldsync = psync_is_folder_in_downloadlist(oldparentfolderid);
+  oldsync = psyncer_dl_has_folder(oldparentfolderid);
   if (oldparentfolderid == parentfolderid)
     newsync = oldsync;
   else {
-    newsync = psync_is_folder_in_downloadlist(parentfolderid);
+    newsync = psyncer_dl_has_folder(parentfolderid);
     psync_diff_refresh_fs_add_folder(oldparentfolderid);
   }
   if (oldsync || newsync) {
     if (psync_is_name_to_ignore(name->str)) {
       char *path;
       pdownload_tasks_delete(fileid, 0, 1);
-      path = psync_get_path_by_fileid(fileid, NULL);
+      path = pfolder_file_path(fileid, NULL);
       ptask_lfile_rm(fileid, path);
       psync_free(path);
       needdownload = 1;
@@ -1583,7 +1583,7 @@ static void process_modifyfile(const binresult *entry) {
       needdownload = 1;
     }
     for (/*i is already=cnt*/; i < fres1->rows; i++) {
-      char *path = psync_get_path_by_fileid(fileid, NULL);
+      char *path = pfolder_file_path(fileid, NULL);
       ptask_lfile_rm_id(psync_get_result_cell(fres1, i, 0),
                                           fileid, path);
       pdownload_tasks_delete(
@@ -1615,10 +1615,10 @@ static void process_deletefile(const binresult *entry) {
   }
   meta = papi_find_result2(entry, "metadata", PARAM_HASH);
   fileid = papi_find_result2(meta, "fileid", PARAM_NUM)->num;
-  if (psync_is_folder_in_downloadlist(
+  if (psyncer_dl_has_folder(
           papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num)) {
     pdownload_tasks_delete(fileid, 0, 1);
-    path = psync_get_path_by_fileid(fileid, NULL);
+    path = pfolder_file_path(fileid, NULL);
     if (likely(path)) {
       ptask_lfile_rm(fileid, path);
       psync_free(path);
@@ -2641,7 +2641,7 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
       *sock = get_connected_socket();
       debug(D_NOTICE, "got new socket");
       pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
-      psync_syncer_check_delayed_syncs();
+      psyncer_check_delayed();
       ids->diffid =
           psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
       send_diff_command(*sock, *ids);
@@ -2659,7 +2659,7 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
     *sock = get_connected_socket();
     debug(D_NOTICE, "got new socket");
     pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
-    psync_syncer_check_delayed_syncs();
+    psyncer_check_delayed();
     ids->diffid =
         psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
     send_diff_command(*sock, *ids);
@@ -2674,7 +2674,7 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
       pcache_clean_oneof(prefixes, ARRAY_SIZE(prefixes));
       *sock = get_connected_socket();
       pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
-      psync_syncer_check_delayed_syncs();
+      psyncer_check_delayed();
       send_diff_command(*sock, *ids);
     } else {
       debug(D_NOTICE, "diff socket seems to be alive");
@@ -2940,7 +2940,7 @@ restart:
   pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
   initialdownload = 0;
   psync_run_analyze_if_needed();
-  psync_syncer_check_delayed_syncs();
+  psyncer_check_delayed();
   exceptionsock = setup_exeptions();
   if (unlikely(exceptionsock == INVALID_SOCKET)) {
     debug(D_ERROR, "could not create pipe");

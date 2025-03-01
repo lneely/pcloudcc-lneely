@@ -39,7 +39,7 @@
 #include "pcompiler.h"
 #include "pcryptofolder.h"
 #include "pfile.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 
 #include "pfs.h"
 #include "pfscrypto.h"
@@ -3364,7 +3364,7 @@ void psync_fs_refresh_folder(psync_folderid_t folderid) {
   int fd;
 
   path =
-      psync_get_path_by_folderid_sep(folderid, "/", NULL);
+      pfolder_path_sep(folderid, "/", NULL);
   if (path == PSYNC_INVALID_PATH)
     return;
   psync_ssl_rand_weak(rndbuff, sizeof(rndbuff));
@@ -3433,7 +3433,7 @@ char *psync_fs_get_path_by_folderid(psync_folderid_t folderid) {
   if (!mp || folderid == 0)
     return mp;
   path =
-      psync_get_path_by_folderid_sep(folderid, "/", NULL);
+      pfolder_path_sep(folderid, "/", NULL);
   if (path == PSYNC_INVALID_PATH) {
     psync_free(mp);
     return NULL;

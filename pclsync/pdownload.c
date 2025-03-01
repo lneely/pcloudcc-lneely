@@ -34,7 +34,7 @@
 
 #include "pqevent.h"
 #include "pdownload.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "plibs.h"
 #include "plocalscan.h"
 #include "pnetlibs.h"
@@ -43,7 +43,7 @@
 #include "prun.h"
 #include "psys.h"
 #include "pstatus.h"
-#include "psyncer.h"
+#include "pfoldersync.h"
 #include "ptask.h"
 #include "ptimer.h"
 #include "pupload.h"
@@ -229,14 +229,14 @@ static int call_func_for_folder(psync_folderid_t localfolderid,
                                 const char *debug) {
   char *localpath;
   int res;
-  localpath = psync_local_path_for_local_folder(localfolderid, syncid, NULL);
+  localpath = pfolder_lpath_lfldr(localfolderid, syncid, NULL);
   if (likely(localpath)) {
     res = func(localpath);
     if (!res) {
       pqevent_queue_sync_event_id(event, syncid, localpath, folderid);
       if (updatemtime)
         update_local_folder_mtime(localpath, localfolderid);
-      psync_decrease_local_folder_taskcnt(localfolderid);
+      psyncer_folder_dec_tasks(localfolderid);
       debug(D_NOTICE, "%s %s", debug, localpath);
     }
     psync_free(localpath);
@@ -256,14 +256,14 @@ static int call_func_for_folder_name(psync_folderid_t localfolderid,
                                      const char *debug) {
   char *localpath;
   int res;
-  localpath = psync_local_path_for_local_folder(localfolderid, syncid, NULL);
+  localpath = pfolder_lpath_lfldr(localfolderid, syncid, NULL);
   if (likely(localpath)) {
     res = func(localpath);
     if (!res) {
       pqevent_queue_sync_event_path(event, syncid, localpath, folderid, name);
       if (updatemtime)
         update_local_folder_mtime(localpath, localfolderid);
-      psync_decrease_local_folder_taskcnt(localfolderid);
+      psyncer_folder_dec_tasks(localfolderid);
       debug(D_NOTICE, "%s %s", debug, localpath);
     }
     psync_free(localpath);
@@ -342,7 +342,7 @@ static int task_renamefolder(psync_syncid_t newsyncid,
     return 0;
   }
   psync_sql_free_result(res);
-  oldpath = psync_local_path_for_local_folder(localfolderid, oldsyncid, NULL);
+  oldpath = pfolder_lpath_lfldr(localfolderid, oldsyncid, NULL);
   if (unlikely(!oldpath)) {
     debug(D_ERROR, "could not get local path for folder id %lu",
           (unsigned long)localfolderid);
@@ -369,7 +369,7 @@ static int task_renamefolder(psync_syncid_t newsyncid,
   psync_sql_bind_string(res, 3, newname);
   psync_sql_bind_uint(res, 4, localfolderid);
   psync_sql_run_free(res);
-  newpath = psync_local_path_for_local_folder(localfolderid, newsyncid, NULL);
+  newpath = pfolder_lpath_lfldr(localfolderid, newsyncid, NULL);
   if (unlikely(!newpath)) {
     psync_sql_rollback_transaction();
     psync_free(oldpath);
@@ -381,7 +381,7 @@ static int task_renamefolder(psync_syncid_t newsyncid,
   if (ret)
     psync_sql_rollback_transaction();
   else {
-    psync_decrease_local_folder_taskcnt(localfolderid);
+    psyncer_folder_dec_tasks(localfolderid);
     psync_sql_commit_transaction();
     pqevent_queue_sync_event_id(PEVENT_LOCAL_FOLDER_RENAMED, newsyncid, newpath,
                            folderid);
@@ -466,7 +466,7 @@ static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
   sql = psync_sql_query_nolock("SELECT parentfolderid FROM file WHERE id=?");
   psync_sql_bind_uint(sql, 1, fileid);
   row = psync_sql_fetch_rowint(sql);
-  if (!row || !psync_is_folder_in_downloadlist(row[0])) {
+  if (!row || !psyncer_dl_has_folder(row[0])) {
     psync_sql_free_result(sql);
     if (localfileid) {
       sql = psync_sql_prep_statement("DELETE FROM localfile WHERE id=?");
@@ -650,7 +650,7 @@ static int task_download_file(download_task_t *dt) {
   psync_sql_bind_lstring(sql, 2, (char *)serverhashhex,
                          PSYNC_HASH_DIGEST_HEXLEN);
   while ((row = psync_sql_fetch_rowint(sql))) {
-    tmpold = psync_local_path_for_local_file(row[0], NULL);
+    tmpold = pfolder_lpath_lfile(row[0], NULL);
     if (unlikely_log(!tmpold))
       continue;
     psync_sql_free_result(sql);
@@ -900,7 +900,7 @@ static int task_delete_file(psync_syncid_t syncid, psync_fileid_t fileid,
   psync_sql_bind_uint(res, 1, fileid);
   psync_restart_localscan();
   while ((row = psync_sql_fetch_rowint(res))) {
-    name = psync_local_path_for_local_file(row[0], NULL);
+    name = pfolder_lpath_lfile(row[0], NULL);
     if (likely_log(name)) {
       if (unlikely(pfile_delete(name))) {
         debug(D_WARNING, "error deleting local file %s error %d", name,
@@ -964,10 +964,10 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
     return 0;
   }
   newfolder =
-      psync_local_path_for_local_folder(newlocalfolderid, newsyncid, NULL);
+      pfolder_lpath_lfldr(newlocalfolderid, newsyncid, NULL);
   if (unlikely_log(!newfolder))
     return 0;
-  oldpath = psync_local_path_for_local_file(lfileid, NULL);
+  oldpath = pfolder_lpath_lfile(lfileid, NULL);
   if (unlikely_log(!oldpath)) {
     psync_free(newfolder);
     return 0;
@@ -1191,7 +1191,7 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
   } else
     hastargetchecksum = 0;
   psync_sql_free_result(res);
-  localpath = psync_local_path_for_local_folder(localfolderid, syncid, NULL);
+  localpath = pfolder_lpath_lfldr(localfolderid, syncid, NULL);
   if (unlikely_log(!localpath))
     return 0;
   localname =
@@ -1378,7 +1378,7 @@ static int task_del_folder_rec(psync_folderid_t localfolderid,
   psync_sql_res *res;
   task_wait_no_downloads();
   psync_stop_localscan();
-  localpath = psync_local_path_for_local_folder(localfolderid, syncid, NULL);
+  localpath = pfolder_lpath_lfldr(localfolderid, syncid, NULL);
   if (unlikely_log(!localpath)) {
     psync_resume_localscan();
     return 0;

@@ -54,7 +54,7 @@
 #include "pdownload.h"
 #include "pfile.h"
 #include "pfileops.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "pfsfolder.h"
 #include "plibs.h"
 #include "plist.h"
@@ -75,7 +75,7 @@
 #include "pshm.h"
 #include "pssl.h"
 #include "pstatus.h"
-#include "psyncer.h"
+#include "pfoldersync.h"
 #include "psynclib.h"
 #include "psys.h"
 #include "ptask.h"
@@ -329,7 +329,7 @@ void psync_start_sync(pstatus_change_callback_t status_callback,
     pstatus_set_cb(status_callback);
   if (event_callback)
     pqevent_process(event_callback);
-  psync_syncer_init();
+  psyncer_init();
   pdiff_init();
   psync_upload_init();
   pdownload_init();
@@ -594,7 +594,7 @@ void psync_unlink() {
   psync_fs_pause_until_login();
   psync_fs_clean_tasks();
   psync_path_status_init();
-  psync_clear_downloadlist();
+  psyncer_dl_queue_clear();
   psync_sql_unlock();
   psync_sql_checkpoint_unlock();
   psync_settings_reset();
@@ -739,7 +739,7 @@ void psync_tfa_set_code(const char *code, int trusted, int is_recovery) {
 psync_syncid_t psync_add_sync_by_path(const char *localpath,
                                       const char *remotepath,
                                       psync_synctype_t synctype) {
-  psync_folderid_t folderid = psync_get_folderid_by_path(remotepath);
+  psync_folderid_t folderid = pfolder_id(remotepath);
   if (likely_log(folderid != PSYNC_INVALID_FOLDERID))
     return psync_add_sync_by_folderid(localpath, folderid, synctype);
   else
@@ -787,7 +787,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   if (unlikely_log(!res))
     return_isyncid(PERROR_DATABASE_ERROR);
   while ((srow = psync_sql_fetch_rowstr(res)))
-    if (psync_str_is_prefix(srow[0], localpath)) {
+    if (psyncer_str_has_prefix(srow[0], localpath)) {
       psync_sql_free_result(res);
       return_isyncid(PERROR_PARENT_OR_SUBFOLDER_ALREADY_SYNCING);
     } else if (!strcmp(srow[0], localpath)) {
@@ -834,7 +834,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
     return_isyncid(PERROR_FOLDER_ALREADY_SYNCING);
   psync_sql_sync();
   psync_path_status_reload_syncs();
-  psync_syncer_new(ret);
+  psyncer_create(ret);
   return ret;
 }
 
@@ -864,7 +864,7 @@ int psync_add_sync_by_path_delayed(const char *localpath,
   psync_sql_run_free(res);
   psync_sql_sync();
   if (pstatus_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_ONLINE)
-    prun_thread("check delayed syncs", psync_syncer_check_delayed_syncs);
+    prun_thread("check delayed syncs", psyncer_check_delayed);
   return 0;
 }
 
@@ -942,7 +942,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   res = psync_sql_query("SELECT folderid FROM syncedfolder WHERE syncid=?");
   psync_sql_bind_uint(res, 1, syncid);
   while ((urow = psync_sql_fetch_rowint(res)))
-    psync_del_folder_from_downloadlist(urow[0]);
+    psyncer_dl_queue_del(urow[0]);
   psync_sql_free_result(res);
   res = psync_sql_prep_statement("DELETE FROM syncedfolder WHERE syncid=?");
   psync_sql_bind_uint(res, 1, syncid);
@@ -961,7 +961,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   psync_stop_sync_upload(syncid);
   psync_sql_sync();
   psync_path_status_reload_syncs();
-  psync_syncer_new(syncid);
+  psyncer_create(syncid);
   return 0;
 }
 
@@ -1020,7 +1020,7 @@ int psync_delete_sync(psync_syncid_t syncid) {
 }
 
 psync_folder_list_t *psync_get_sync_list() {
-  return psync_list_get_list(PSYNC_STR_ALLSYNCS);
+  return pfolder_sync_folders(PSYNC_STR_ALLSYNCS);
 }
 
 psuggested_folders_t *psync_get_sync_suggestions() {
@@ -1039,14 +1039,14 @@ psuggested_folders_t *psync_get_sync_suggestions() {
 
 pfolder_list_t *psync_list_local_folder_by_path(const char *localpath,
                                                 psync_listtype_t listtype) {
-  return psync_list_local_folder(localpath, listtype);
+  return pfolder_local_folders(localpath, listtype);
 }
 
 pfolder_list_t *psync_list_remote_folder_by_path(const char *remotepath,
                                                  psync_listtype_t listtype) {
-  psync_folderid_t folderid = psync_get_folderid_by_path(remotepath);
+  psync_folderid_t folderid = pfolder_id(remotepath);
   if (folderid != PSYNC_INVALID_FOLDERID)
-    return psync_list_remote_folder(folderid, listtype);
+    return pfolder_remote_folders(folderid, listtype);
   else
     return NULL;
 }
@@ -1054,11 +1054,11 @@ pfolder_list_t *psync_list_remote_folder_by_path(const char *remotepath,
 pfolder_list_t *
 psync_list_remote_folder_by_folderid(psync_folderid_t folderid,
                                      psync_listtype_t listtype) {
-  return psync_list_remote_folder(folderid, listtype);
+  return pfolder_remote_folders(folderid, listtype);
 }
 
 pentry_t *psync_stat_path(const char *remotepath) {
-  return psync_folder_stat_path(remotepath);
+  return pfolder_stat(remotepath);
 }
 
 int psync_is_lname_to_ignore(const char *name, size_t namelen) {
@@ -2766,7 +2766,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
   }
 
   while ((srow = psync_sql_fetch_rowstr(sql))) {
-    if (psync_str_is_prefix(srow[0], localPath)) {
+    if (psyncer_str_has_prefix(srow[0], localPath)) {
       psync_sql_free_result(sql);
 
       *errMsg = psync_strdup("There is already an active sync or backup for a "
@@ -2810,7 +2810,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
     debug(D_NOTICE, "Check ignored folder: [%s]=[%s]", folders.folders[i],
           localPath);
 
-    if (psync_left_str_is_prefix(folders.folders[i], localPath)) {
+    if (psyncer_str_starts_with(folders.folders[i], localPath)) {
       *errMsg = psync_strdup(
           "This folder is a child  of a folder in your ignore folders list.");
       return PERROR_PARENT_IS_IGNORED;
@@ -2823,7 +2823,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
 psync_folder_list_t *psync_get_syncs_bytype(const char *syncType) {
   debug(D_NOTICE, "Get syncs type: [%s]", syncType);
 
-  return psync_list_get_list((char *)syncType);
+  return pfolder_sync_folders((char *)syncType);
 }
 
 psync_folderid_t create_bup_mach_folder(char **msgErr) {

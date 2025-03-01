@@ -37,7 +37,7 @@
 #include <pthread.h>
 
 #include "pcryptofolder.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "pfs.h"
 #include "pfsfolder.h"
 #include "pfstasks.h"

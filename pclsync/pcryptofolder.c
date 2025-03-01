@@ -43,7 +43,7 @@
 #include "pcryptofolder.h"
 #include "pcrypto.h"
 #include "pfileops.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "pfs.h"
 #include "plibs.h"
 #include "pmemlock.h"

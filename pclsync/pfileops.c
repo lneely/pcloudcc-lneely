@@ -31,7 +31,7 @@
 
 #include "pfileops.h"
 #include "pdiff.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "plibs.h"
 
 void pfileops_create_fldr(const binresult *meta) {

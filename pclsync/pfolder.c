@@ -29,18 +29,13 @@
    DAMAGE.
 */
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
 #include <pthread.h>
 #include <stddef.h>
 
 #include "papi.h"
 #include "pcryptofolder.h"
 #include "pdiff.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "pfsfolder.h"
 #include "plibs.h"
 #include "plist.h"
@@ -50,22 +45,9 @@
 
 #include <stddef.h>
 #include <string.h>
+
 #define INITIAL_NAME_BUFF 2000
 #define INITIAL_ENTRY_CNT 128
-
-typedef struct {
-  pentry_t *entries;
-  char *namebuff;
-  size_t nameoff;
-  size_t namealloc;
-  uint32_t entriescnt;
-  uint32_t entriesalloc;
-} folder_list;
-
-typedef struct {
-  folder_list *folderlist;
-  psync_listtype_t listtype;
-} flist_ltype;
 
 typedef struct _string_list {
   psync_list list;
@@ -81,7 +63,7 @@ static inline int psync_crypto_to_error(const void *ptr) {
   return -((int)(uintptr_t)ptr);
 }
 
-psync_folderid_t psync_get_folderid_by_path(const char *path) {
+psync_folderid_t pfolder_id(const char *path) {
   psync_folderid_t cfolderid;
   const char *sl;
   psync_sql_res *res;
@@ -146,11 +128,11 @@ static psync_folderid_t wait_folder_id_in_db(psync_folderid_t folderid) {
   return PSYNC_INVALID_FOLDERID;
 }
 
-psync_folderid_t psync_wait_folder_in_local_db(psync_folderid_t folderid) {
+psync_folderid_t pfolder_db_wait(psync_folderid_t folderid) {
   return wait_folder_id_in_db(folderid);
 }
 
-psync_folderid_t psync_get_folderid_by_path_or_create(const char *path) {
+psync_folderid_t pfolder_id_create(const char *path) {
   psync_folderid_t cfolderid;
   const char *sl;
   psync_sql_res *res;
@@ -374,7 +356,7 @@ char *psync_join_string_list(const char *sep, psync_list *lst, size_t *retlen) {
   return ret;
 }
 
-char *psync_get_path_by_folderid(psync_folderid_t folderid, size_t *retlen) {
+char *pfolder_path(psync_folderid_t folderid, size_t *retlen) {
   psync_list folderlist;
   char *ret;
   int res;
@@ -397,7 +379,7 @@ char *psync_get_path_by_folderid(psync_folderid_t folderid, size_t *retlen) {
   return ret;
 }
 
-char *psync_get_path_by_folderid_sep(psync_folderid_t folderid, const char *sep,
+char *pfolder_path_sep(psync_folderid_t folderid, const char *sep,
                                      size_t *retlen) {
   psync_list folderlist;
   char *ret;
@@ -419,7 +401,7 @@ char *psync_get_path_by_folderid_sep(psync_folderid_t folderid, const char *sep,
   return ret;
 }
 
-char *psync_get_path_by_fileid(psync_fileid_t fileid, size_t *retlen) {
+char *pfolder_file_path(psync_fileid_t fileid, size_t *retlen) {
   psync_list folderlist;
   char *ret;
   psync_sql_res *res;
@@ -497,7 +479,7 @@ static int psync_add_local_path_to_list_by_localfolderid(
   return -1;
 }
 
-char *psync_local_path_for_local_folder(psync_folderid_t localfolderid,
+char *pfolder_lpath_lfldr(psync_folderid_t localfolderid,
                                         psync_syncid_t syncid, size_t *retlen) {
   psync_list folderlist;
   char *ret;
@@ -516,7 +498,7 @@ char *psync_local_path_for_local_folder(psync_folderid_t localfolderid,
   return ret;
 }
 
-char *psync_local_path_for_local_file(psync_fileid_t localfileid,
+char *pfolder_lpath_lfile(psync_fileid_t localfileid,
                                       size_t *retlen) {
   psync_list folderlist;
   char *ret;
@@ -616,7 +598,7 @@ static pfolder_list_t *folder_list_finalize(folder_list *list) {
   return ret;
 }
 
-pfolder_list_t *psync_list_remote_folder(psync_folderid_t folderid,
+pfolder_list_t *pfolder_remote_folders(psync_folderid_t folderid,
                                          psync_listtype_t listtype) {
   folder_list *list;
   psync_sql_res *res;
@@ -724,7 +706,7 @@ static void add_to_folderlist(void *ptr, ppath_stat *stat) {
   }
 }
 
-pfolder_list_t *psync_list_local_folder(const char *path,
+pfolder_list_t *pfolder_local_folders(const char *path,
                                         psync_listtype_t listtype) {
   flist_ltype ft;
   ft.folderlist = folder_list_init();
@@ -736,7 +718,7 @@ pfolder_list_t *psync_list_local_folder(const char *path,
     return folder_list_finalize(ft.folderlist);
 }
 
-pentry_t *psync_folder_stat_path(const char *remotepath) {
+pentry_t *pfolder_stat(const char *remotepath) {
   psync_folderid_t folderid;
   psync_sql_res *res;
   psync_uint_row row;
@@ -764,7 +746,7 @@ pentry_t *psync_folder_stat_path(const char *remotepath) {
     cremotepath = psync_new_cnt(char, len + 1);
     memcpy(cremotepath, remotepath, len + 1);
     cremotepath[len] = 0;
-    folderid = psync_get_folderid_by_path(cremotepath);
+    folderid = pfolder_id(cremotepath);
     psync_free(cremotepath);
     if (folderid == PSYNC_INVALID_FOLDERID)
       return NULL;
@@ -819,7 +801,7 @@ typedef struct {
   psync_synctype_t synctype;
 } psync_tmp_folder_t;
 
-psync_folder_list_t *psync_list_get_list(char *syncTypes) {
+psync_folder_list_t *pfolder_sync_folders(char *syncTypes) {
   psync_sql_res *res;
   psync_variant_row row;
   psync_tmp_folder_t *folders;
@@ -864,7 +846,7 @@ psync_folder_list_t *psync_list_get_list(char *syncTypes) {
     folders[lastfolder].localpath = str;
     folders[lastfolder].locallen = l;
     folderid = psync_get_number(row[1]);
-    str = psync_get_path_by_folderid(folderid, &l);
+    str = pfolder_path(folderid, &l);
     if (unlikely(!str)) {
       str = psync_strdup("/Invalid/Path");
       l = strlen(str);

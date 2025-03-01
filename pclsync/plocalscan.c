@@ -39,7 +39,7 @@
 
 #include "pdevice.h"
 #include "pfile.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "plibs.h"
 #include "prun.h"
 #include "plist.h"
@@ -808,7 +808,7 @@ static void scan_created_folder(sync_folderlist *fl) {
     debug(D_WARNING, "local folder %s does not have localid", fl->name);
     return;
   }
-  localpath = psync_local_path_for_local_folder(fl->localid, fl->syncid, NULL);
+  localpath = pfolder_lpath_lfldr(fl->localid, fl->syncid, NULL);
   if (likely_log(localpath)) {
     debug(D_NOTICE, "scanning just created folder %s localid %lu name %s",
           localpath, (unsigned long)fl->localid, fl->name);

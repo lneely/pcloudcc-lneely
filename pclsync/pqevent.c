@@ -28,7 +28,7 @@
 */
 
 #include "pqevent.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "plibs.h"
 #include "plist.h"
 #include "prun.h"
@@ -354,9 +354,9 @@ void pqevent_queue_sync_event_id(psync_eventtype_t eventid, psync_syncid_t synci
   if (eventthreadrunning) {
     char *remotepath;
     if (eventid & PEVENT_TYPE_FOLDER)
-      remotepath = psync_get_path_by_folderid(remoteid, NULL);
+      remotepath = pfolder_path(remoteid, NULL);
     else
-      remotepath = psync_get_path_by_fileid(remoteid, NULL);
+      remotepath = pfolder_file_path(remoteid, NULL);
     if (unlikely_log(!remotepath))
       return;
     pqevent_queue_sync_event_path(eventid, syncid, localpath, remoteid, remotepath);

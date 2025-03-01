@@ -42,7 +42,7 @@
 #include "pfile.h"
 #include "pcrypto.h"
 #include "pdownload.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "pp2p.h"
@@ -371,7 +371,7 @@ static void psync_p2p_tcphandler(void *ptr) {
   psync_free(binpubrsa);
   if (unlikely_log(pubrsa == PSYNC_INVALID_RSA))
     goto err0;
-  localpath = psync_local_path_for_local_file(localfileid, NULL);
+  localpath = pfolder_lpath_lfile(localfileid, NULL);
   if (unlikely_log(!localpath))
     goto err0;
   fd = pfile_open(localpath, O_RDONLY, 0);

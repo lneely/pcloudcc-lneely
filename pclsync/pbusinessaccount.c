@@ -27,7 +27,7 @@
 
 #include "pbusinessaccount.h"
 #include "papi.h"
-#include "pfolder.h"
+#include "pfoldersync.h"
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "psys.h"
@@ -745,7 +745,7 @@ static psync_folderid_t create_index_folder(const char *path) {
     snprintf(buff, bufflen - 1, "%s (%d)", path, ind);
     if (psync_create_remote_folder_by_path(buff, &err) != 0)
       debug(D_NOTICE, "Unable to create folder %s error is %s.", buff, err);
-    folderid = psync_get_folderid_by_path(buff);
+    folderid = pfolder_id(buff);
     if ((folderid != PSYNC_INVALID_FOLDERID) &&
         check_write_permissions(folderid)) {
       psync_free(buff);
@@ -759,7 +759,7 @@ static psync_folderid_t create_index_folder(const char *path) {
   return folderid;
 }
 psync_folderid_t psync_check_and_create_folder(const char *path) {
-  psync_folderid_t folderid = psync_get_folderid_by_path(path);
+  psync_folderid_t folderid = pfolder_id(path);
   char *err;
 
   if (folderid == PSYNC_INVALID_FOLDERID) {
