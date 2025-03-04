@@ -32,7 +32,7 @@
 #ifndef _PSYNC_TASKS_H
 #define _PSYNC_TASKS_H
 
-#include "psynclib.h"
+#include "pfoldersync.h"
 
 #define PSYNC_ASYNC_ERR_FLAG_PERM                                              \
   0x01 // the error is permanent(ish) and there is no reason to retry
