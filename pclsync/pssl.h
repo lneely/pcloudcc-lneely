@@ -97,6 +97,15 @@ extern PSYNC_THREAD int psync_ssl_errno;
 #define PSYMKEY_INVALID_ENC NULL
 
 typedef struct {
+  mbedtls_net_context srv;
+  mbedtls_ssl_context ssl;
+  mbedtls_ssl_config cfg;
+  int sock;
+  int isbroken;
+  char cachekey[];
+} pssl_connection_t;
+
+typedef struct {
   size_t datalen;
   unsigned char data[];
 } pssl_enc_data_t;
@@ -115,15 +124,6 @@ typedef mbedtls_aes_context *pssl_decoder_t;
 typedef pssl_enc_data_t *pssl_enc_symkey_t;
 typedef pssl_enc_data_t *pssl_rsabinkey_t;
 typedef pssl_enc_data_t *pssl_signature_t;
-
-typedef struct {
-  mbedtls_net_context srv;
-  mbedtls_ssl_context ssl;
-  mbedtls_ssl_config cfg;
-  int sock;
-  int isbroken;
-  char cachekey[];
-} pssl_connection_t;
 
 typedef void (*psync_ssl_debug_callback_t)(void *ctx, int level, const char *msg, int, const char *);
 
