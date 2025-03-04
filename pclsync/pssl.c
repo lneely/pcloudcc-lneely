@@ -97,12 +97,12 @@ static const int psync_mbed_ciphersuite[] = {
     MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CBC_SHA256,
     0};
 
-static void psync_ssl_free_psync_encrypted_data_t(psync_encrypted_data_t e) {
+static void encdata_free(psync_encrypted_data_t e) {
   pssl_memclean(e->data, e->datalen);
   pmemlock_free(e);
 }
 
-static ssl_connection_t *psync_ssl_alloc_conn(const char *hostname) {
+static ssl_connection_t *conn_alloc(const char *hostname) {
   ssl_connection_t *conn;
   size_t len;
   len = strlen(hostname) + 1;
@@ -114,7 +114,7 @@ static ssl_connection_t *psync_ssl_alloc_conn(const char *hostname) {
   return conn;
 }
 
-static void psync_set_ssl_error(ssl_connection_t *conn, int err) {
+static void set_errno(ssl_connection_t *conn, int err) {
   if (err == MBEDTLS_ERR_SSL_WANT_READ)
     psync_ssl_errno = PSYNC_SSL_ERR_WANT_READ;
   else if (err == MBEDTLS_ERR_SSL_WANT_WRITE)
@@ -131,7 +131,7 @@ static void psync_set_ssl_error(ssl_connection_t *conn, int err) {
   }
 }
 
-static int psync_mbed_read(void *ptr, unsigned char *buf, size_t len) {
+static int mbed_read(void *ptr, unsigned char *buf, size_t len) {
   ssl_connection_t *conn;
   ssize_t ret;
   int err;
@@ -147,7 +147,7 @@ static int psync_mbed_read(void *ptr, unsigned char *buf, size_t len) {
     return (int)ret;
 }
 
-static int psync_mbed_write(void *ptr, const unsigned char *buf, size_t len) {
+static int mbed_write(void *ptr, const unsigned char *buf, size_t len) {
   ssl_connection_t *conn;
   ssize_t ret;
   int err;
@@ -163,12 +163,12 @@ static int psync_mbed_write(void *ptr, const unsigned char *buf, size_t len) {
     return (int)ret;
 }
 
-static void psync_ssl_free_session(void *ptr) {
+static void free_session(void *ptr) {
   mbedtls_ssl_session_free((mbedtls_ssl_session *)ptr);
   psync_free(ptr);
 }
 
-static void psync_ssl_save_session(ssl_connection_t *conn) {
+static void save_session(ssl_connection_t *conn) {
   mbedtls_ssl_session *sess;
   sess = psync_new(mbedtls_ssl_session);
   // mbedtls_ssl_get_session seems to copy all elements, instead of referencing
@@ -178,10 +178,10 @@ static void psync_ssl_save_session(ssl_connection_t *conn) {
     psync_free(sess);
   else
     pcache_add(conn->cachekey, sess, PSYNC_SSL_SESSION_CACHE_TIMEOUT,
-                    psync_ssl_free_session, PSYNC_MAX_SSL_SESSIONS_PER_DOMAIN);
+                    free_session, PSYNC_MAX_SSL_SESSIONS_PER_DOMAIN);
 }
 
-static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
+static int check_peer_pubkey(ssl_connection_t *conn) {
   const mbedtls_x509_crt *cert;
   unsigned char buff[1024], sigbin[32];
   char sighex[66];
@@ -215,16 +215,7 @@ static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
   return -1;
 }
 
-void pssl_set_log_threshold(int threshold) {
-  mbedtls_debug_set_threshold(threshold);
-}
-
-void pssl_set_debug_cb(psync_ssl_debug_callback_t cb, void *ctx) {
-  debug_cb = cb;
-  debug_ctx = ctx;
-}
-
-int ctr_drbg_random_locked(void *p_rng, unsigned char *output, size_t output_len) {
+static int ctr_drbg_random_locked(void *p_rng, unsigned char *output, size_t output_len) {
   ctr_drbg_context_locked *rng;
   int ret;
   rng = (ctr_drbg_context_locked *)p_rng;
@@ -234,8 +225,17 @@ int ctr_drbg_random_locked(void *p_rng, unsigned char *output, size_t output_len
   return ret;
 }
 
+void pssl_set_log_threshold(int threshold) {
+  mbedtls_debug_set_threshold(threshold);
+}
+
+void pssl_set_debug_cb(psync_ssl_debug_callback_t cb, void *ctx) {
+  debug_cb = cb;
+  debug_ctx = ctx;
+}
+
 void pssl_rsa_bin_free(psync_binary_rsa_key_t bin) {
-  psync_ssl_free_psync_encrypted_data_t(bin);
+  encdata_free(bin);
 }
 
 void pssl_symkey_free(psync_symmetric_key_t key) {
@@ -319,7 +319,7 @@ int pssl_connect(int sock, void **sslconn, const char *hostname) {
 
   debug(D_NOTICE, "Starting SSL connection to %s", hostname);
 
-  conn = psync_ssl_alloc_conn(hostname);
+  conn = conn_alloc(hostname);
   mbedtls_ssl_init(&conn->ssl);
   mbedtls_ssl_config_init(&conn->cfg);
   
@@ -352,7 +352,7 @@ int pssl_connect(int sock, void **sslconn, const char *hostname) {
 
   debug(D_NOTICE, "Configured SSL parameters");
 
-  mbedtls_ssl_set_bio(&conn->ssl, &conn->srv, psync_mbed_write, psync_mbed_read, NULL);
+  mbedtls_ssl_set_bio(&conn->ssl, &conn->srv, mbed_write, mbed_read, NULL);
   mbedtls_ssl_set_hostname(&conn->ssl, hostname);
 
   debug(D_NOTICE, "Set SSL bio and hostname");
@@ -379,18 +379,18 @@ int pssl_connect(int sock, void **sslconn, const char *hostname) {
   ret = mbedtls_ssl_handshake(&conn->ssl);
   if (ret == 0) {
     debug(D_NOTICE, "SSL handshake completed successfully");
-    if ((psync_ssl_check_peer_public_key(conn))) {
+    if ((check_peer_pubkey(conn))) {
       debug(D_ERROR, "Peer public key check failed");
       goto err1;
     }
     *sslconn = conn;
 
-    psync_ssl_save_session(conn);
+    save_session(conn);
     debug(D_NOTICE, "SSL connection established successfully");
     return PSYNC_SSL_SUCCESS;
   }
 
-  psync_set_ssl_error(conn, ret);
+  set_errno(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE)) {
     *sslconn = conn;
     return PSYNC_SSL_NEED_FINISH;
@@ -411,15 +411,15 @@ int pssl_connect_finish(void *sslconn, const char *hostname) {
   conn = (ssl_connection_t *)sslconn;
   ret = mbedtls_ssl_handshake(&conn->ssl);
   if (ret == 0) {
-    if ((psync_ssl_check_peer_public_key(conn))) {
+    if ((check_peer_pubkey(conn))) {
       goto fail;
     }
-    psync_ssl_save_session(conn);
+    save_session(conn);
     return PSYNC_SSL_SUCCESS;
   } else {
     debug(D_ERROR, "handshake failed, return code was %d", ret);
   }
-  psync_set_ssl_error(conn, ret);
+  set_errno(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
                  ret == MBEDTLS_ERR_SSL_WANT_WRITE))
     return PSYNC_SSL_NEED_FINISH;
@@ -438,7 +438,7 @@ int pssl_shutdown(void *sslconn) {
   ret = mbedtls_ssl_close_notify(&conn->ssl);
   if (ret == 0)
     goto noshutdown;
-  psync_set_ssl_error(conn, ret);
+  set_errno(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
                  ret == MBEDTLS_ERR_SSL_WANT_WRITE))
     return PSYNC_SSL_NEED_FINISH;
@@ -466,7 +466,7 @@ int pssl_read(void *sslconn, void *buf, int num) {
   res = mbedtls_ssl_read(&conn->ssl, (unsigned char *)buf, num);
   if (res >= 0)
     return res;
-  psync_set_ssl_error(conn, res);
+  set_errno(conn, res);
   return PSYNC_SSL_FAIL;
 }
 
@@ -477,7 +477,7 @@ int pssl_write(void *sslconn, const void *buf, int num) {
   res = mbedtls_ssl_write(&conn->ssl, (const unsigned char *)buf, num);
   if (res >= 0)
     return res;
-  psync_set_ssl_error(conn, res);
+  set_errno(conn, res);
   return PSYNC_SSL_FAIL;
 }
 
