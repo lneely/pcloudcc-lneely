@@ -41,49 +41,17 @@
 
 #include "pcompiler.h"
 
-// AES256
-#define PSYNC_AES256_BLOCK_SIZE 16
-#define PSYNC_AES256_KEY_SIZE 32
-
-// SHA1
-#define PSYNC_SHA1_BLOCK_LEN 64
-#define PSYNC_SHA1_DIGEST_LEN 20
-#define PSYNC_SHA1_DIGEST_HEXLEN 40
-#define psync_sha1_ctx mbedtls_sha1_context
-#define psync_sha1(data, datalen, checksum)                                    \
-  mbedtls_sha1(data, datalen, checksum)
-#define psync_sha1_init(pctx) mbedtls_sha1_starts(pctx)
-#define psync_sha1_update(pctx, data, datalen)                                 \
-  mbedtls_sha1_update(pctx, (const unsigned char *)data, datalen)
-#define psync_sha1_final(checksum, pctx) mbedtls_sha1_finish(pctx, checksum)
-
-// SHA256
-#define PSYNC_SHA256_BLOCK_LEN 64
-#define PSYNC_SHA256_DIGEST_LEN 32
-#define PSYNC_SHA256_DIGEST_HEXLEN 64
-#define psync_sha256_ctx mbedtls_sha256_context
-#define psync_sha256(data, datalen, checksum)                                  \
-  mbedtls_sha256(data, datalen, checksum, 0)
-#define psync_sha256_init(pctx) mbedtls_sha256_starts(pctx, 0)
-#define psync_sha256_update(pctx, data, datalen)                               \
-  mbedtls_sha256_update(pctx, (const unsigned char *)data, datalen)
-#define psync_sha256_final(checksum, pctx) mbedtls_sha256_finish(pctx, checksum)
-
-// SHA512
-#define PSYNC_SHA512_BLOCK_LEN 128
-#define PSYNC_SHA512_DIGEST_LEN 64
-#define PSYNC_SHA512_DIGEST_HEXLEN 128
-#define psync_sha512_ctx mbedtls_sha512_context
-#define psync_sha512(data, datalen, checksum)                                  \
-  mbedtls_sha512(data, datalen, checksum, 0)
-#define psync_sha512_init(pctx) mbedtls_sha512_starts(pctx, 0)
-#define psync_sha512_update(pctx, data, datalen)                               \
-  mbedtls_sha512_update(pctx, (const unsigned char *)data, datalen)
-#define psync_sha512_final(checksum, pctx) mbedtls_sha512_finish(pctx, checksum)
-
-// externs
-extern PSYNC_THREAD int psync_ssl_errno;
-
+#define PAES_BLOCK_SIZE 16
+#define PAES_KEY_SIZE 32
+#define PSSL_SHA1_BLOCK_LEN 64
+#define PSSL_SHA1_DIGEST_LEN 20
+#define PSSL_SHA1_DIGEST_HEXLEN 40
+#define PSSL_SHA256_BLOCK_LEN 64
+#define PSSL_SHA256_DIGEST_LEN 32
+#define PSSL_SHA256_DIGEST_HEXLEN 64
+#define PSSL_SHA512_BLOCK_LEN 128
+#define PSSL_SHA512_DIGEST_LEN 64
+#define PSSL_SHA512_DIGEST_HEXLEN 128
 #define PAES_INVALID_ENCODER NULL
 #define PRSA_INVALID NULL
 #define PRSA_INVALID_BIN_KEY NULL
@@ -95,6 +63,31 @@ extern PSYNC_THREAD int psync_ssl_errno;
 #define PSSL_SUCCESS 0
 #define PSYMKEY_INVALID NULL
 #define PSYMKEY_INVALID_ENC NULL
+
+// FIXME: fucking macros...
+#define psync_sha1(data, datalen, checksum)                                    \
+  mbedtls_sha1(data, datalen, checksum)
+#define psync_sha1_init(pctx) mbedtls_sha1_starts(pctx)
+#define psync_sha1_update(pctx, data, datalen)                                 \
+  mbedtls_sha1_update(pctx, (const unsigned char *)data, datalen)
+#define psync_sha1_final(checksum, pctx) mbedtls_sha1_finish(pctx, checksum)
+
+#define psync_sha256(data, datalen, checksum)                                  \
+  mbedtls_sha256(data, datalen, checksum, 0)
+#define psync_sha256_init(pctx) mbedtls_sha256_starts(pctx, 0)
+#define psync_sha256_update(pctx, data, datalen)                               \
+  mbedtls_sha256_update(pctx, (const unsigned char *)data, datalen)
+#define psync_sha256_final(checksum, pctx) mbedtls_sha256_finish(pctx, checksum)
+
+#define psync_sha512(data, datalen, checksum)                                  \
+  mbedtls_sha512(data, datalen, checksum, 0)
+#define psync_sha512_init(pctx) mbedtls_sha512_starts(pctx, 0)
+#define psync_sha512_update(pctx, data, datalen)                               \
+  mbedtls_sha512_update(pctx, (const unsigned char *)data, datalen)
+#define psync_sha512_final(checksum, pctx) mbedtls_sha512_finish(pctx, checksum)
+
+// externs
+extern PSYNC_THREAD int psync_ssl_errno;
 
 typedef struct {
   mbedtls_net_context srv;
@@ -110,7 +103,6 @@ typedef struct {
   unsigned char data[];
 } pssl_enc_data_t;
 
-
 typedef struct {
   size_t keylen;
   unsigned char key[];
@@ -121,6 +113,11 @@ typedef mbedtls_rsa_context *pssl_rsapubkey_t;
 typedef mbedtls_rsa_context *pssl_rsaprivkey_t;
 typedef mbedtls_aes_context *pssl_encoder_t;
 typedef mbedtls_aes_context *pssl_decoder_t;
+
+typedef mbedtls_sha1_context pssl_sha1_ctx;
+typedef mbedtls_sha256_context pssl_sha256_ctx;
+typedef mbedtls_sha512_context pssl_sha512_ctx;
+
 typedef pssl_enc_data_t *pssl_enc_symkey_t;
 typedef pssl_enc_data_t *pssl_rsabinkey_t;
 typedef pssl_enc_data_t *pssl_signature_t;
@@ -174,6 +171,5 @@ char *psymkey_derive_passphrase(const char *username, const char *passphrase);
 pssl_enc_symkey_t psymkey_encrypt(pssl_rsapubkey_t rsa, const unsigned char *data, size_t datalen);
 void psymkey_free(pssl_symkey_t *key);
 pssl_symkey_t *psymkey_generate_passphrase(const char *password, size_t keylen, const unsigned char *salt, size_t saltlen, size_t iterations);
-
 
 #endif

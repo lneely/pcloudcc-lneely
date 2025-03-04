@@ -102,7 +102,7 @@ static device_inode_t *ignored_paths = NULL;
 static uint32_t ign_paths_cnt = 0;
 static uint32_t ign_paths_alloc = 0;
 static time_t ign_last_check = 0;
-static unsigned char ign_checksum[PSYNC_SHA256_DIGEST_LEN];
+static unsigned char ign_checksum[PSSL_SHA256_DIGEST_LEN];
 
 static pthread_mutex_t scan_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t scan_cond = PTHREAD_COND_INITIALIZER;
@@ -211,7 +211,7 @@ static void add_ignored_dir(const char *path) {
 }
 
 static void reload_ignored_folders() {
-  unsigned char checkcurr[PSYNC_SHA256_DIGEST_LEN];
+  unsigned char checkcurr[PSSL_SHA256_DIGEST_LEN];
   const char *ign, *start, *end, *next;
   char *dir, *home;
   size_t ignlen, dirlen, homelen;
@@ -221,11 +221,11 @@ static void reload_ignored_folders() {
 
   psync_sha256((const unsigned char *)ign, ignlen, checkcurr);
 
-  if (!memcmp(ign_checksum, checkcurr, PSYNC_SHA256_DIGEST_LEN) &&
+  if (!memcmp(ign_checksum, checkcurr, PSSL_SHA256_DIGEST_LEN) &&
       ign_last_check + 3600 < ptimer_time())
     return;
 
-  memcpy(ign_checksum, checkcurr, PSYNC_SHA256_DIGEST_LEN);
+  memcpy(ign_checksum, checkcurr, PSSL_SHA256_DIGEST_LEN);
   ign_last_check = ptimer_time();
   ign_paths_cnt = 0;
   next = ign;

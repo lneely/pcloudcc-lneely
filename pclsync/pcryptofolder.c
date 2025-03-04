@@ -90,7 +90,7 @@ typedef struct {
 typedef struct {
   uint32_t type;
   uint32_t flags;
-  unsigned char aeskey[PSYNC_AES256_KEY_SIZE];
+  unsigned char aeskey[PAES_KEY_SIZE];
   unsigned char hmackey[PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN];
 } sym_key_ver1;
 
@@ -368,8 +368,8 @@ psync_cloud_crypto_setup_upload(const unsigned char *rsapriv, size_t rsaprivlen,
 
 int pcryptofolder_setup(const char *password, const char *hint) {
   unsigned char salt[PSYNC_CRYPTO_PBKDF2_SALT_LEN];
-  char publicsha1[PSYNC_SHA1_DIGEST_HEXLEN + 2],
-      privatesha1[PSYNC_SHA1_DIGEST_HEXLEN + 2];
+  char publicsha1[PSSL_SHA1_DIGEST_HEXLEN + 2],
+      privatesha1[PSSL_SHA1_DIGEST_HEXLEN + 2];
   pssl_symkey_t *aeskey;
   pcrypto_ctr_encdec_t enc;
   pssl_context_t rsa;
@@ -382,7 +382,7 @@ int pcryptofolder_setup(const char *password, const char *hint) {
   pssl_random(salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN);
   debug(D_NOTICE, "generating AES key from password and setting up encoder");
   aeskey = psymkey_generate_passphrase(
-      password, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE, salt,
+      password, PAES_KEY_SIZE + PAES_BLOCK_SIZE, salt,
       PSYNC_CRYPTO_PBKDF2_SALT_LEN, PSYNC_CRYPTO_PASS_TO_KEY_ITERATIONS);
   enc = pcrypto_ctr_encdec_create(aeskey);
   psymkey_free(aeskey);
@@ -526,8 +526,8 @@ static int crypto_keys_match() {
 }
 
 int pcryptofolder_unlock(const char *password) {
-  char publicsha1[PSYNC_SHA1_DIGEST_HEXLEN + 2],
-      privatesha1[PSYNC_SHA1_DIGEST_HEXLEN + 2];
+  char publicsha1[PSSL_SHA1_DIGEST_HEXLEN + 2],
+      privatesha1[PSSL_SHA1_DIGEST_HEXLEN + 2];
   psync_sql_res *res;
   psync_variant_row row;
   const char *id;
@@ -619,7 +619,7 @@ retry:
 
   debug(D_NOTICE, "generating symmetric key");
   aeskey = psymkey_generate_passphrase(
-      password, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE, salt, saltlen,
+      password, PAES_KEY_SIZE + PAES_BLOCK_SIZE, salt, saltlen,
       iterations);
   enc = pcrypto_ctr_encdec_create(aeskey);
   psymkey_free(aeskey);
@@ -1063,11 +1063,11 @@ static pssl_symkey_t
 *psync_crypto_sym_key_ver1_to_sym_key(sym_key_ver1 *v1) {
   pssl_symkey_t *key;
   key = (pssl_symkey_t *)pmemlock_malloc(
-      offsetof(pssl_symkey_t, key) + PSYNC_AES256_KEY_SIZE +
+      offsetof(pssl_symkey_t, key) + PAES_KEY_SIZE +
       PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN);
-  key->keylen = PSYNC_AES256_KEY_SIZE + PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN;
-  memcpy(key->key, v1->aeskey, PSYNC_AES256_KEY_SIZE);
-  memcpy(key->key + PSYNC_AES256_KEY_SIZE, v1->hmackey,
+  key->keylen = PAES_KEY_SIZE + PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN;
+  memcpy(key->key, v1->aeskey, PAES_KEY_SIZE);
+  memcpy(key->key + PAES_KEY_SIZE, v1->hmackey,
          PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN);
   return key;
 }
@@ -1739,7 +1739,7 @@ char *pcryptofolder_filencoder_key_new(uint32_t flags, size_t *keylen) {
   sym.type = PSYNC_CRYPTO_SYM_AES256_1024BIT_HMAC;
   sym.flags = flags;
   pssl_random(sym.hmackey, PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN);
-  pssl_random(sym.aeskey, PSYNC_AES256_KEY_SIZE);
+  pssl_random(sym.aeskey, PAES_KEY_SIZE);
   pthread_rwlock_rdlock(&crypto_lock);
   if (!crypto_started_l) {
     pthread_rwlock_unlock(&crypto_lock);
@@ -1768,7 +1768,7 @@ char *pcryptofolder_filencoder_key_newplain(
   sym.type = PSYNC_CRYPTO_SYM_AES256_1024BIT_HMAC;
   sym.flags = flags;
   pssl_random(sym.hmackey, PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN);
-  pssl_random(sym.aeskey, PSYNC_AES256_KEY_SIZE);
+  pssl_random(sym.aeskey, PAES_KEY_SIZE);
   pthread_rwlock_rdlock(&crypto_lock);
   if (!crypto_started_l) {
     pthread_rwlock_unlock(&crypto_lock);
@@ -1802,7 +1802,7 @@ int pcryptofolder_mkdir(psync_folderid_t folderid, const char *name,
   sym.type = PSYNC_CRYPTO_SYM_AES256_1024BIT_HMAC;
   sym.flags = PSYNC_CRYPTO_SYM_FLAG_ISDIR;
   pssl_random(sym.hmackey, PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN);
-  pssl_random(sym.aeskey, PSYNC_AES256_KEY_SIZE);
+  pssl_random(sym.aeskey, PAES_KEY_SIZE);
   pthread_rwlock_rdlock(&crypto_lock);
   if (!crypto_started_l) {
     pthread_rwlock_unlock(&crypto_lock);
@@ -1839,7 +1839,7 @@ int psync_pcloud_crypto_reencode_key(
   pssl_rsapubkey_t pub;
   pssl_rsaprivkey_t priv;
   unsigned char *newpriv;
-  unsigned char newprivsha[PSYNC_SHA256_DIGEST_LEN];
+  unsigned char newprivsha[PSSL_SHA256_DIGEST_LEN];
   pssl_signature_t rsasign;
   size_t newprivlen, dummy;
   if (unlikely(rsapublen <= sizeof(uint32_t) || rsaprivlen <= sizeof(uint32_t)))
@@ -1870,7 +1870,7 @@ int psync_pcloud_crypto_reencode_key(
       goto err_bk_1;
     rsapriv_struct = (priv_key_ver1 *)rsapriv;
     aeskey = psymkey_generate_passphrase(
-        oldpassphrase, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE,
+        oldpassphrase, PAES_KEY_SIZE + PAES_BLOCK_SIZE,
         rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN, 20000);
     if (unlikely(aeskey == PSYMKEY_INVALID))
       goto err_nm_1;
@@ -1897,7 +1897,7 @@ int psync_pcloud_crypto_reencode_key(
     rsapriv_struct->flags = flags;
     pssl_random(rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN);
     aeskey = psymkey_generate_passphrase(
-        newpassphrase, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE,
+        newpassphrase, PAES_KEY_SIZE + PAES_BLOCK_SIZE,
         rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN, 20000);
     if (unlikely(aeskey == PSYMKEY_INVALID))
       goto err_nm_1;
@@ -1970,7 +1970,7 @@ int psync_pcloud_crypto_encode_key(const char *newpassphrase, uint32_t flags,
   pcrypto_ctr_encdec_t enc;
   pssl_symkey_t *aeskey;
   size_t rsaprivlen, dummy;
-  unsigned char newprivsha[PSYNC_SHA256_DIGEST_LEN];
+  unsigned char newprivsha[PSSL_SHA256_DIGEST_LEN];
   pssl_signature_t rsasign;
   rsapriv = prsa_binary_private(crypto_privkey);
   if (rsapriv == PRSA_INVALID)
@@ -1985,7 +1985,7 @@ int psync_pcloud_crypto_encode_key(const char *newpassphrase, uint32_t flags,
   rsapriv_struct->flags = flags;
   pssl_random(rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN);
   aeskey = psymkey_generate_passphrase(
-      newpassphrase, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE,
+      newpassphrase, PAES_KEY_SIZE + PAES_BLOCK_SIZE,
       rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN, 20000);
   if (unlikely(aeskey == PSYMKEY_INVALID))
     goto err_nm_1;
@@ -2166,8 +2166,8 @@ int pcryptofolder_change_pass_unlocked(const char *newpassphrase,
 }
 
 void sha1_hex_null_term(const void *data, size_t len, char *out) {
-  unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
+  unsigned char sha1bin[PSSL_SHA1_DIGEST_LEN];
   psync_sha1((const unsigned char *)data, len, (unsigned char *)sha1bin);
-  psync_binhex(out, sha1bin, PSYNC_SHA1_DIGEST_LEN);
-  out[PSYNC_SHA1_DIGEST_HEXLEN] = 0;
+  psync_binhex(out, sha1bin, PSSL_SHA1_DIGEST_LEN);
+  out[PSSL_SHA1_DIGEST_HEXLEN] = 0;
 }

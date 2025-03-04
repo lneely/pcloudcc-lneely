@@ -218,28 +218,28 @@ static void set_errno(pssl_connection_t *conn, int err) {
 
 void paes_2blk_encode(pssl_decoder_t enc, const unsigned char *src, unsigned char *dst) {
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src + PSYNC_AES256_BLOCK_SIZE,
-                        dst + PSYNC_AES256_BLOCK_SIZE);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src + PAES_BLOCK_SIZE,
+                        dst + PAES_BLOCK_SIZE);
 }
 
 void paes_2blk_decode(pssl_decoder_t enc, const unsigned char *src, unsigned char *dst) {
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
-                        dst + PSYNC_AES256_BLOCK_SIZE);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PAES_BLOCK_SIZE,
+                        dst + PAES_BLOCK_SIZE);
 }
 
 void paes_4blk_xor_decode(pssl_decoder_t enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor) {
   unsigned long i;
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
-                        dst + PSYNC_AES256_BLOCK_SIZE);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PAES_BLOCK_SIZE,
+                        dst + PAES_BLOCK_SIZE);
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT,
-                        src + PSYNC_AES256_BLOCK_SIZE * 2,
-                        dst + PSYNC_AES256_BLOCK_SIZE * 2);
+                        src + PAES_BLOCK_SIZE * 2,
+                        dst + PAES_BLOCK_SIZE * 2);
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT,
-                        src + PSYNC_AES256_BLOCK_SIZE * 3,
-                        dst + PSYNC_AES256_BLOCK_SIZE * 3);
-  for (i = 0; i < PSYNC_AES256_BLOCK_SIZE * 4 / sizeof(unsigned long); i++)
+                        src + PAES_BLOCK_SIZE * 3,
+                        dst + PAES_BLOCK_SIZE * 3);
+  for (i = 0; i < PAES_BLOCK_SIZE * 4 / sizeof(unsigned long); i++)
     ((unsigned long *)dst)[i] ^= ((unsigned long *)bxor)[i];
 }
 
@@ -253,7 +253,7 @@ void paes_blk_decode(pssl_decoder_t enc, const unsigned char *src, unsigned char
 
 pssl_encoder_t paes_decoder_create(pssl_symkey_t *key) {
   mbedtls_aes_context *aes;
-  assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
+  assert(key->keylen >= PAES_KEY_SIZE);
   aes = psync_new(mbedtls_aes_context);
   mbedtls_aes_setkey_dec(aes, key->key, 256);
   return aes;
@@ -266,7 +266,7 @@ void paes_decoder_free(pssl_encoder_t aes) {
 
 pssl_encoder_t paes_encoder_create(pssl_symkey_t *key) {
   mbedtls_aes_context *aes;
-  assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
+  assert(key->keylen >= PAES_KEY_SIZE);
   aes = psync_new(mbedtls_aes_context);
   mbedtls_aes_setkey_enc(aes, key->key, 256);
   return aes;
@@ -447,7 +447,7 @@ pssl_signature_t prsa_signature(pssl_rsaprivkey_t rsa, const unsigned char *data
   mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
   if (mbedtls_rsa_rsassa_pss_sign(rsa, drbg_random_safe, &psync_mbed_rng,
                                   MBEDTLS_MD_SHA256,
-                                  PSYNC_SHA256_DIGEST_LEN, data, ret->data)) {
+                                  PSSL_SHA256_DIGEST_LEN, data, ret->data)) {
     free(ret);
     mbedtls_rsa_set_padding(rsa, padding, hash_id);
     return (pssl_signature_t)(void *)PSYNC_CRYPTO_NOT_STARTED;
@@ -728,7 +728,7 @@ pssl_symkey_t *psymkey_decrypt_lock(pssl_rsaprivkey_t *rsa, const pssl_enc_symke
 
 char *psymkey_derive_passphrase(const char *username, const char *passphrase) {
   unsigned char *usercopy;
-  unsigned char usersha512[PSYNC_SHA512_DIGEST_LEN], passwordbin[32];
+  unsigned char usersha512[PSSL_SHA512_DIGEST_LEN], passwordbin[32];
   mbedtls_md_context_t ctx;
   size_t userlen, i;
   userlen = strlen(username);
@@ -746,7 +746,7 @@ char *psymkey_derive_passphrase(const char *username, const char *passphrase) {
   const mbedtls_md_info_t *md_info = mbedtls_md_info_from_ctx(&ctx);
   mbedtls_md_type_t md_type = mbedtls_md_get_type(md_info);
   mbedtls_pkcs5_pbkdf2_hmac_ext(md_type, (const unsigned char *)passphrase, strlen(passphrase), usersha512, 
-    PSYNC_SHA512_DIGEST_LEN, 5000, sizeof(passwordbin), passwordbin);
+    PSSL_SHA512_DIGEST_LEN, 5000, sizeof(passwordbin), passwordbin);
   mbedtls_md_free(&ctx);
   usercopy = psync_base64_encode(passwordbin, sizeof(passwordbin), &userlen);
   return (char *)usercopy;

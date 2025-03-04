@@ -71,7 +71,7 @@ struct _psync_file_lock_t {
 };
 
 typedef struct {
-  unsigned char mbedtls_sha1[PSYNC_SHA1_DIGEST_LEN];
+  unsigned char mbedtls_sha1[PSSL_SHA1_DIGEST_LEN];
   uint32_t adler;
 } psync_block_checksum;
 
@@ -1741,7 +1741,7 @@ static int psync_sha1_cmp(const void *p1, const void *p2){
   psync_block_checksum **b1=(psync_block_checksum **)p1;
   psync_block_checksum **b2=(psync_block_checksum **)p2;
   return memcmp((*b1)->mbedtls_sha1, (*b2)->mbedtls_sha1,
-PSYNC_SHA1_DIGEST_LEN);
+PSSL_SHA1_DIGEST_LEN);
 }
 
 static psync_block_checksum
@@ -1796,7 +1796,7 @@ psync_net_create_hash(const psync_file_checksums *checksums) {
       do {
         if (!memcmp(checksums->blocks[i].mbedtls_sha1,
                     checksums->blocks[h->elements[o] - 1].mbedtls_sha1,
-                    PSYNC_SHA1_DIGEST_LEN)) {
+                    PSSL_SHA1_DIGEST_LEN)) {
           checksums->next[i] = h->elements[o];
           break;
         }
@@ -1828,7 +1828,7 @@ static void psync_net_hash_remove(psync_file_checksum_hash *restrict hash,
       return;
     else if (checksums->blocks[idx - 1].adler == adler &&
              !memcmp(checksums->blocks[idx - 1].mbedtls_sha1, mbedtls_sha1,
-                     PSYNC_SHA1_DIGEST_LEN))
+                     PSSL_SHA1_DIGEST_LEN))
       break;
     else if (++o >= hash->elementcnt)
       o = 0;
@@ -1910,7 +1910,7 @@ static uint32_t psync_net_hash_has_adler_and_sha1(
       return 0;
     else if (checksums->blocks[idx - 1].adler == adler &&
              !memcmp(checksums->blocks[idx - 1].mbedtls_sha1, mbedtls_sha1,
-                     PSYNC_SHA1_DIGEST_LEN))
+                     PSSL_SHA1_DIGEST_LEN))
       return idx;
     else if (++o >= hash->elementcnt)
       o = 0;
@@ -1992,8 +1992,8 @@ static void psync_net_check_file_for_blocks(
   ssize_t rd;
   int fd;
   uint32_t adler, off;
-  psync_sha1_ctx ctx;
-  unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
+  pssl_sha1_ctx ctx;
+  unsigned char sha1bin[PSSL_SHA1_DIGEST_LEN];
   debug(D_NOTICE, "scanning file %s for blocks", name);
   fd = pfile_open(name, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE)
@@ -2159,8 +2159,8 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
   ssize_t rd;
   uint32_t adler, blockidx;
   int32_t skipbytes;
-  psync_sha1_ctx ctx;
-  unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
+  pssl_sha1_ctx ctx;
+  unsigned char sha1bin[PSSL_SHA1_DIGEST_LEN];
   if (unlikely_log(pfile_seek(fd, off, SEEK_SET) == -1))
     return PSYNC_NET_TEMPFAIL;
   debug(D_NOTICE, "scanning in range starting %lu, length %lu, blocksize %u",

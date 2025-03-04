@@ -34,7 +34,7 @@
 
 #include "pssl.h"
 
-#define PSYNC_CRYPTO_AUTH_SIZE (PSYNC_AES256_BLOCK_SIZE * 2)
+#define PSYNC_CRYPTO_AUTH_SIZE (PAES_BLOCK_SIZE * 2)
 
 #define PSYNC_CRYPTO_MAX_HASH_TREE_LEVEL 6
 
@@ -53,7 +53,7 @@ typedef struct {
   pssl_encoder_t encoder;
   union {
     long unsigned __aligner;
-    unsigned char iv[PSYNC_AES256_BLOCK_SIZE];
+    unsigned char iv[PAES_BLOCK_SIZE];
   };
 } pcrypto_key_t;
 

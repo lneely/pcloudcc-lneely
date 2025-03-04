@@ -185,7 +185,7 @@ static binresult *get_userinfo_user_digest(psock_t *sock, const char *username,
       PAPI_STR("timeformat", "timestamp"),
       PAPI_LSTR("username", username, userlen),
       PAPI_LSTR("digest", digest, diglen),
-      PAPI_LSTR("passworddigest", pwddig, PSYNC_SHA1_DIGEST_HEXLEN),
+      PAPI_LSTR("passworddigest", pwddig, PSSL_SHA1_DIGEST_HEXLEN),
       PAPI_STR("osversion", osversion),
       PAPI_STR("appversion", appversion),
       PAPI_STR("deviceid", deviceid),
@@ -203,13 +203,13 @@ static binresult *get_userinfo_user_pass(psock_t *sock, const char *username,
                        const char *appversion, const char *deviceid,
                        const char *devicestring) {
   binparam empty_params[] = {PAPI_STR("MS", "sucks")};
-  psync_sha1_ctx ctx;
+  pssl_sha1_ctx ctx;
   binresult *res, *ret;
   const binresult *dig;
   unsigned char *uc;
   size_t ul, i;
-  unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
-  char sha1hex[PSYNC_SHA1_DIGEST_HEXLEN];
+  unsigned char sha1bin[PSSL_SHA1_DIGEST_LEN];
+  char sha1hex[PSSL_SHA1_DIGEST_HEXLEN];
 
   res = papi_send2(sock, "getdigest", empty_params);
 
@@ -233,13 +233,13 @@ static binresult *get_userinfo_user_pass(psock_t *sock, const char *username,
 
   psync_sha1(uc, ul, sha1bin);
   psync_free(uc);
-  psync_binhex(sha1hex, sha1bin, PSYNC_SHA1_DIGEST_LEN);
+  psync_binhex(sha1hex, sha1bin, PSSL_SHA1_DIGEST_LEN);
   psync_sha1_init(&ctx);
   psync_sha1_update(&ctx, password, strlen(password));
-  psync_sha1_update(&ctx, sha1hex, PSYNC_SHA1_DIGEST_HEXLEN);
+  psync_sha1_update(&ctx, sha1hex, PSSL_SHA1_DIGEST_HEXLEN);
   psync_sha1_update(&ctx, dig->str, dig->length);
   psync_sha1_final(sha1bin, &ctx);
-  psync_binhex(sha1hex, sha1bin, PSYNC_SHA1_DIGEST_LEN);
+  psync_binhex(sha1hex, sha1bin, PSSL_SHA1_DIGEST_LEN);
 
   ret = get_userinfo_user_digest(sock, username, ul, sha1hex, dig->str,
                                  dig->length, osversion, appversion, deviceid,
