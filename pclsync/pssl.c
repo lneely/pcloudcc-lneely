@@ -88,6 +88,13 @@ static const int psync_mbed_ciphersuite[] = {
     MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CBC_SHA256,
     0};
 
+static void ssl_debug(int loglevel, int errnum, const char *msg) {
+    char ebuf[100];
+    mbedtls_strerror(errnum, ebuf, sizeof(ebuf));
+    debug(loglevel, "%s: %s (-0x%04x)", msg, ebuf, (unsigned int)-errnum);
+}
+
+
 static int check_peer_pubkey(pssl_connection_t *conn) {
   const mbedtls_x509_crt *cert;
   unsigned char buff[1024], sigbin[32];
@@ -207,21 +214,15 @@ static void set_errno(pssl_connection_t *conn, int err) {
   else {
     psync_ssl_errno = PSSL_ERR_UNKNOWN;
     conn->isbroken = 1;
-    if (err == MBEDTLS_ERR_NET_RECV_FAILED)
-      debug(D_NOTICE, "got MBEDTLS_ERR_NET_RECV_FAILED");
-    else if (err == MBEDTLS_ERR_NET_SEND_FAILED)
-      debug(D_NOTICE, "got MBEDTLS_ERR_NET_SEND_FAILED");
-    else
-      debug(D_NOTICE, "got error %d", err);
+    if (err == MBEDTLS_ERR_NET_RECV_FAILED) {
+      ssl_debug(D_NOTICE, err, "got MBEDTLS_ERR_NET_RECV_FAILED");
+    } else if (err == MBEDTLS_ERR_NET_SEND_FAILED) {
+      ssl_debug(D_NOTICE, err, "got MBEDTLS_ERR_NET_SEND_FAILED");
+    } else {
+      ssl_debug(D_NOTICE, err, "got unknown error");
+    }
   }
 }
-
-static void log_ssl_err(int loglevel, int errnum, const char *fmt, ...) {
-  char ebuf[100];
-  mbedtls_strerror(errnum, ebuf, sizeof(ebuf));
-  debug(D_ERROR, "%s", fmt);
-}
-
 
 void paes_2blk_encode(pssl_decoder_t enc, const unsigned char *src, unsigned char *dst) {
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
@@ -385,13 +386,11 @@ pssl_rsaprivkey_t prsa_load_private(const unsigned char *keydata, size_t keylen)
   mbedtls_pk_context pkctx;
   mbedtls_rsa_context *rsactx;
   int ret;
+  
   mbedtls_pk_init(&pkctx);
-
   ret = mbedtls_pk_parse_key(&pkctx, keydata, keylen, NULL, 0, mbedtls_ctr_drbg_random, &psync_mbed_rng.rnd);
   if (unlikely(ret)) {
-      char ebuf[100];
-      mbedtls_strerror(ret, ebuf, sizeof(ebuf));
-      debug(D_WARNING, "failed to parse private key: %s (-0x%04x)", ebuf, (unsigned int) -ret);
+      ssl_debug(D_NOTICE, ret, "failed to parse private key");
       return PRSA_INVALID;
   }
 
@@ -401,7 +400,7 @@ pssl_rsaprivkey_t prsa_load_private(const unsigned char *keydata, size_t keylen)
   ret = mbedtls_rsa_copy(rsactx, mbedtls_pk_rsa(pkctx));
   mbedtls_pk_free(&pkctx);
   if (unlikely(ret)) {
-    debug(D_WARNING, "rsa_copy failed with code %d", ret);
+    ssl_debug(D_WARNING, ret, "rsa_copy failed");
     mbedtls_rsa_free(rsactx);
     psync_free(rsactx);
     return PRSA_INVALID;
@@ -418,9 +417,7 @@ pssl_rsaprivkey_t prsa_load_private2(const unsigned char *keydata, size_t keylen
 
   ret = mbedtls_pk_parse_key(&pkctx, keydata, keylen, symkey->key, symkey->keylen, mbedtls_ctr_drbg_random, &psync_mbed_rng.rnd);
   if (unlikely(ret)) {
-      char ebuf[100];
-      mbedtls_strerror(ret, ebuf, sizeof(ebuf));
-      debug(D_WARNING, "failed to parse private key: %s (-0x%04x)", ebuf, (unsigned int) -ret);
+      ssl_debug(D_WARNING, ret, "failed to parse private key");
       return PRSA_INVALID;
   }
 
@@ -430,7 +427,7 @@ pssl_rsaprivkey_t prsa_load_private2(const unsigned char *keydata, size_t keylen
   ret = mbedtls_rsa_copy(rsactx, mbedtls_pk_rsa(pkctx));
   mbedtls_pk_free(&pkctx);
   if (unlikely(ret)) {
-    debug(D_WARNING, "rsa_copy failed with code %d", ret);
+    ssl_debug(D_WARNING, ret, "rsa_copy failed");
     mbedtls_rsa_free(rsactx);
     psync_free(rsactx);
     return PRSA_INVALID;
@@ -447,7 +444,7 @@ pssl_rsapubkey_t prsa_load_public(const unsigned char *keydata, size_t keylen) {
   mbedtls_pk_init(&ctx);
   ret = mbedtls_pk_parse_public_key(&ctx, keydata, keylen);
   if (unlikely(ret)) {
-    debug(D_ERROR, "failed to parse public key with code %d", ret);
+    ssl_debug(D_ERROR, ret, "failed to parse public key with code");
     return PRSA_INVALID;
   }
 
@@ -457,7 +454,7 @@ pssl_rsapubkey_t prsa_load_public(const unsigned char *keydata, size_t keylen) {
   ret = mbedtls_rsa_copy(rsa, mbedtls_pk_rsa(ctx));
   mbedtls_pk_free(&ctx);
   if (unlikely(ret)) {
-    debug(D_WARNING, "rsa_copy failed with code %d", ret);
+    ssl_debug(D_WARNING, ret, "rsa_copy failed");
     mbedtls_rsa_free(rsa);
     psync_free(rsa);
     return PRSA_INVALID;
@@ -539,7 +536,7 @@ int pssl_finish(pssl_connection_t *sslconn, const char *hostname) {
     save_session(conn);
     return PSSL_SUCCESS;
   } else {
-    log_ssl_err(D_WARNING, ret, "handshake failed: %s (-0x%04x)", (unsigned int) -ret);
+    ssl_debug(D_WARNING, ret, "handshake failed");
   }
   set_errno(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
@@ -568,12 +565,14 @@ int pssl_init() {
 
   mbedtls_entropy_init(&psync_mbed_entropy);
   prand_seed(seed, seed, sizeof(seed), 0);
-  mbedtls_entropy_update_manual(&psync_mbed_entropy, seed, sizeof(seed));
+  result = mbedtls_entropy_update_manual(&psync_mbed_entropy, seed, sizeof(seed));
+  ssl_debug(D_NOTICE, result, "generating entropy data");
 
   mbedtls_ctr_drbg_init(&psync_mbed_rng.rnd);
-  if ((result = mbedtls_ctr_drbg_seed(&psync_mbed_rng.rnd, mbedtls_entropy_func,
-                                      &psync_mbed_entropy, NULL, 0))) {
-    log_ssl_err(D_ERROR, result, "mbedtls_ctr_drbg_seed failed with return code %d", result);
+  result = mbedtls_ctr_drbg_seed(&psync_mbed_rng.rnd, mbedtls_entropy_func, &psync_mbed_entropy, NULL, 0);
+  ssl_debug(D_NOTICE, result, "seeding deterministic random bit generator");
+  if (result) {
+    ssl_debug(D_ERROR, result, "failed to seed drbg");
     return PRINT_RETURN(-1);
   }
 
@@ -582,10 +581,15 @@ int pssl_init() {
     result = mbedtls_x509_crt_parse(&psync_mbed_trusted_certs_x509,
                                     (unsigned char *)psync_ssl_trusted_certs[i],
                                     1 + strlen(psync_ssl_trusted_certs[i]));
+    char buf[64];
+    snprintf(buf, sizeof(buf), "loading certificate %lu", i+1);
+    ssl_debug(D_NOTICE, result, buf);
     if (result) {
-      log_ssl_err(D_ERROR, result, "failed to load certificate %lu, got result %d", (unsigned long)i, result);
+      snprintf(buf, sizeof(buf), "failed to load certificate %lu", i);
+      ssl_debug(D_ERROR, result, buf);
     }
   }
+  debug(D_NOTICE, "all certificates loaded successfully");
 
   return 0;
 }
@@ -600,30 +604,28 @@ int pssl_open(int sock, pssl_connection_t **sslconn, const char *hostname) {
   int ret;
 
   debug(D_NOTICE, "Starting SSL connection to %s", hostname);
-
   conn = conn_alloc(hostname);
   mbedtls_ssl_init(&conn->ssl);
   mbedtls_ssl_config_init(&conn->cfg);
-  
   mbedtls_net_init(&conn->srv);
   conn->sock = sock;
-  
   debug(D_NOTICE, "Initialized SSL structures");
 
+  debug(D_NOTICE, "Setting SSL config defaults");
   if ((ret = mbedtls_ssl_config_defaults(&conn->cfg, MBEDTLS_SSL_IS_CLIENT,
                                          MBEDTLS_SSL_TRANSPORT_STREAM,
                                          MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
-    log_ssl_err(D_ERROR, ret, "Failed to set SSL config defaults");
+    ssl_debug(D_ERROR, ret, "Failed to set SSL config defaults");
     goto err0;
   }
-
   debug(D_NOTICE, "Set SSL config defaults successfully");
 
   // force tls 1.2
+  debug(D_NOTICE, "Forcing TLS version to 1.2");
   mbedtls_ssl_conf_max_tls_version(&conn->cfg, MBEDTLS_SSL_VERSION_TLS1_2);
-  mbedtls_ssl_conf_min_tls_version(&conn->cfg, MBEDTLS_SSL_VERSION_TLS1_2);                              
-  debug(D_NOTICE, "Set TLS version to 1.2 only");
+  mbedtls_ssl_conf_min_tls_version(&conn->cfg, MBEDTLS_SSL_VERSION_TLS1_2);
 
+  debug(D_NOTICE, "Configuring SSL parameters");
   mbedtls_ssl_conf_endpoint(&conn->cfg, MBEDTLS_SSL_IS_CLIENT);
   mbedtls_ssl_conf_dbg(&conn->cfg, debug_cb, debug_ctx);
   mbedtls_ssl_conf_authmode(&conn->cfg, MBEDTLS_SSL_VERIFY_REQUIRED);
@@ -631,18 +633,15 @@ int pssl_open(int sock, pssl_connection_t **sslconn, const char *hostname) {
   mbedtls_ssl_conf_ciphersuites(&conn->cfg, psync_mbed_ciphersuite);
   mbedtls_ssl_conf_rng(&conn->cfg, drbg_random_safe, &psync_mbed_rng);
 
-  debug(D_NOTICE, "Configured SSL parameters");
-
+  debug(D_NOTICE, "Setting SSL bio and hostname");
   mbedtls_ssl_set_bio(&conn->ssl, &conn->srv, mbed_write, mbed_read, NULL);
   mbedtls_ssl_set_hostname(&conn->ssl, hostname);
 
-  debug(D_NOTICE, "Set SSL bio and hostname");
-
+  debug(D_NOTICE, "Finalizing SSL setup");
   if (mbedtls_ssl_setup(&conn->ssl, &conn->cfg) != 0) {
     debug(D_ERROR, "Failed to setup SSL");
     goto err0;
   }
-
   debug(D_NOTICE, "SSL setup complete");
 
   if ((sess = (mbedtls_ssl_session *)pcache_get(conn->cachekey))) {
@@ -676,7 +675,7 @@ int pssl_open(int sock, pssl_connection_t **sslconn, const char *hostname) {
     *sslconn = conn;
     return PSSL_NEED_FINISH;
   }
-  debug(D_ERROR, "SSL handshake failed with error code %d", ret);
+  ssl_debug(D_ERROR, ret, "SSL handshake failed");
 
 err1:
   mbedtls_ssl_free(&conn->ssl);
@@ -697,8 +696,9 @@ int pssl_read(pssl_connection_t *sslconn, void *buf, int num) {
   int res;
   conn = (pssl_connection_t *)sslconn;
   res = mbedtls_ssl_read(&conn->ssl, (unsigned char *)buf, num);
-  if (res >= 0)
+  if (res >= 0) {
     return res;
+  }
   set_errno(conn, res);
   return PSSL_FAIL;
 }
@@ -708,8 +708,9 @@ int pssl_write(pssl_connection_t *sslconn, const void *buf, int num) {
   int res;
   conn = (pssl_connection_t *)sslconn;
   res = mbedtls_ssl_write(&conn->ssl, (const unsigned char *)buf, num);
-  if (res >= 0)
+  if (res >= 0) {
     return res;
+  }
   set_errno(conn, res);
   return PSSL_FAIL;
 }

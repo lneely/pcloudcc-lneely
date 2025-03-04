@@ -190,9 +190,7 @@ void prpc_cb_init() {
   memset(callbacks, 0, sizeof(poverlay_callback) * callbacks_size);
 }
 
-static void psync_overlay_get_status_response(rpc_message_t *request,
-                                              rpc_message_t *response,
-                                              size_t available_space) {
+static void get_status_response(rpc_message_t *request, rpc_message_t *response, size_t available_space) {
   psync_path_status_t stat;
 
   stat = PSYNC_PATH_STATUS_NOT_OURS;
@@ -218,9 +216,7 @@ static void psync_overlay_get_status_response(rpc_message_t *request,
   }
 }
 
-static void psync_overlay_get_overlay_response(rpc_message_t *request,
-                                               rpc_message_t *response,
-                                               size_t available_space) {
+static void get_rpc_response(rpc_message_t *request, rpc_message_t *response, size_t available_space) {
   int cbidx; // callback index (based on message type)
   int cbret; // callback return value
 
@@ -270,9 +266,9 @@ void prpc_get_response(rpc_message_t *request, rpc_message_t *response) {
         request->type, request->length, dbgmsg);
 
   if (request->type < 20) {
-    psync_overlay_get_status_response(request, response, value_avail);
+    get_status_response(request, response, value_avail);
   } else {
-    psync_overlay_get_overlay_response(request, response, value_avail);
+    get_rpc_response(request, response, value_avail);
   }
 
   // a message with a type != 13 and a null string value after
