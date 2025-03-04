@@ -780,7 +780,7 @@ void psymkey_free(pssl_symkey_t *key) {
   pmemlock_free(key);
 }
 
-pssl_symkey_t *psymkey_generate_passphrase(const char *password, size_t keylen, const unsigned char *salt, size_t saltlen, size_t iterations) {
+pssl_symkey_t *psymkey_generate(const char *password, size_t keylen, const unsigned char *salt, size_t saltlen, size_t iterations) {
   pssl_symkey_t *key = (pssl_symkey_t *)pmemlock_malloc(
       keylen + offsetof(pssl_symkey_t, key));
   mbedtls_md_context_t ctx;

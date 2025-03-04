@@ -1144,7 +1144,7 @@ int pcryptofolder_setup(const char *password, const char *hint) {
   debug(D_NOTICE, "generating salt");
   pssl_random(salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN);
   debug(D_NOTICE, "generating AES key from password and setting up encoder");
-  aeskey = psymkey_generate_passphrase(
+  aeskey = psymkey_generate(
       password, PAES_KEY_SIZE + PAES_BLOCK_SIZE, salt,
       PSYNC_CRYPTO_PBKDF2_SALT_LEN, PSYNC_CRYPTO_PASS_TO_KEY_ITERATIONS);
   enc = pcrypto_ctr_encdec_create(aeskey);
@@ -1316,26 +1316,25 @@ int pcryptofolder_unlock(const char *password) {
   }
   psync_sql_free_result(res);
   psync_sql_unlock();
-  if (rowcnt < 4) {
+
+  // if we couldn't get the keys from the database, then download them.
+  if (rowcnt == 4) {
+    debug(D_NOTICE, "got keys from the database");
+  } else {
     if (unlikely(rowcnt != 0)) {
-      debug(D_BUG,
-            "only some of records found in the database, should not happen");
+      debug(D_BUG, "only some of records found in the database, should not happen");
       psync_free(rsapriv);
       psync_free(rsapub);
       psync_free(salt);
     }
-    ret = dl_keys(
-        &rsapriv, &rsaprivlen, &rsapub, &rsapublen, &salt, &saltlen,
-        &iterations, publicsha1, privatesha1, &flags);
-    if (ret != PSYNC_CRYPTO_START_SUCCESS) {
+    ret = dl_keys(&rsapriv, &rsaprivlen, &rsapub, &rsapublen, &salt, &saltlen, &iterations, publicsha1, privatesha1, &flags);
+    if (ret != 0) {
       pthread_rwlock_unlock(&rwlock);
-      debug(D_WARNING, "downloading key failed, error %d", ret);
+      debug(D_WARNING, "failed to download keys, error %d", ret);
       return ret;
-    } else
-      debug(D_NOTICE, "downloaded keys");
-  } else {
-    debug(D_NOTICE, "got keys from the database");
-    assert(rowcnt == 4);
+    } else {
+      debug(D_NOTICE, "successfully downloaded keys");
+    }
   }
 
   debug(D_NOTICE, "trying to load public key");
@@ -1350,11 +1349,10 @@ int pcryptofolder_unlock(const char *password) {
   }
   debug(D_NOTICE, "successfully loaded public key");
 
-
+  // generate the symmetric key based on the given password and the downloaded
+  // private key
   debug(D_NOTICE, "generating symmetric key");
-  aeskey = psymkey_generate_passphrase(
-      password, PAES_KEY_SIZE + PAES_BLOCK_SIZE, salt, saltlen,
-      iterations);
+  aeskey = psymkey_generate(password, PAES_KEY_SIZE + PAES_BLOCK_SIZE, salt, saltlen, iterations);
   enc = pcrypto_ctr_encdec_create(aeskey);
   psymkey_free(aeskey);
   rsaprivdec = (unsigned char *)pmemlock_malloc(rsaprivlen);
@@ -1805,7 +1803,7 @@ int psync_pcloud_crypto_reencode_key(const unsigned char *rsapub, size_t rsapubl
     if (offsetof(priv_key_ver1, key) >= rsaprivlen)
       goto err_bk_1;
     rsapriv_struct = (priv_key_ver1 *)rsapriv;
-    aeskey = psymkey_generate_passphrase(
+    aeskey = psymkey_generate(
         oldpassphrase, PAES_KEY_SIZE + PAES_BLOCK_SIZE,
         rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN, 20000);
     if (unlikely(aeskey == PSYMKEY_INVALID))
@@ -1832,7 +1830,7 @@ int psync_pcloud_crypto_reencode_key(const unsigned char *rsapub, size_t rsapubl
     rsapriv_struct->type = PSYNC_CRYPTO_TYPE_RSA4096_64BYTESALT_20000IT;
     rsapriv_struct->flags = flags;
     pssl_random(rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN);
-    aeskey = psymkey_generate_passphrase(
+    aeskey = psymkey_generate(
         newpassphrase, PAES_KEY_SIZE + PAES_BLOCK_SIZE,
         rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN, 20000);
     if (unlikely(aeskey == PSYMKEY_INVALID))
@@ -1920,7 +1918,7 @@ int psync_pcloud_crypto_encode_key(const char *newpassphrase, uint32_t flags, ch
   rsapriv_struct->type = PSYNC_CRYPTO_TYPE_RSA4096_64BYTESALT_20000IT;
   rsapriv_struct->flags = flags;
   pssl_random(rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN);
-  aeskey = psymkey_generate_passphrase(
+  aeskey = psymkey_generate(
       newpassphrase, PAES_KEY_SIZE + PAES_BLOCK_SIZE,
       rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN, 20000);
   if (unlikely(aeskey == PSYMKEY_INVALID))

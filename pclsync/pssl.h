@@ -170,6 +170,6 @@ pssl_symkey_t *psymkey_decrypt_lock(pssl_rsaprivkey_t *rsa, const pssl_enc_symke
 char *psymkey_derive_passphrase(const char *username, const char *passphrase);
 pssl_enc_symkey_t psymkey_encrypt(pssl_rsapubkey_t rsa, const unsigned char *data, size_t datalen);
 void psymkey_free(pssl_symkey_t *key);
-pssl_symkey_t *psymkey_generate_passphrase(const char *password, size_t keylen, const unsigned char *salt, size_t saltlen, size_t iterations);
+pssl_symkey_t *psymkey_generate(const char *password, size_t keylen, const unsigned char *salt, size_t saltlen, size_t iterations);
 
 #endif
