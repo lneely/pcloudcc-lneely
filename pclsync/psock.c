@@ -112,11 +112,11 @@ static int wait_ssl_ready(int sock) {
   int res;
   FD_ZERO(&fds);
   FD_SET(sock, &fds);
-  if (psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ) {
+  if (psync_ssl_errno == PSSL_ERR_WANT_READ) {
     rfds = &fds;
     wfds = NULL;
     tv.tv_sec = PSYNC_SOCK_READ_TIMEOUT;
-  } else if (psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE) {
+  } else if (psync_ssl_errno == PSSL_ERR_WANT_WRITE) {
     rfds = NULL;
     wfds = &fds;
     tv.tv_sec = PSYNC_SOCK_WRITE_TIMEOUT;
@@ -387,9 +387,9 @@ int psock_try_write_buffer(psock_t *sock) {
       if (sock->ssl) {
         cw = pssl_write(sock->ssl, b->buff + b->roffset,
                              b->woffset - b->roffset);
-        if (cw == PSYNC_SSL_FAIL) {
-          if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
-                         psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE))
+        if (cw == PSSL_FAIL) {
+          if (likely_log(psync_ssl_errno == PSSL_ERR_WANT_READ ||
+                         psync_ssl_errno == PSSL_ERR_WANT_WRITE))
             break;
           else {
             if (!wrt)
@@ -468,14 +468,14 @@ psock_t *psock_connect(const char *host, int unsigned port, int ssl) {
 
   if (ssl) {
     ssl = pssl_open(sock, &sslc, host);
-    while (ssl == PSYNC_SSL_NEED_FINISH) {
+    while (ssl == PSSL_NEED_FINISH) {
       if (wait_ssl_ready(sock)) {
         pssl_free(sslc);
         break;
       }
       ssl = pssl_finish(sslc, host);
     }
-    if (unlikely_log(ssl != PSYNC_SSL_SUCCESS)) {
+    if (unlikely_log(ssl != PSSL_SUCCESS)) {
       close(sock);
       return NULL;
     }
@@ -496,7 +496,7 @@ int psock_wait_write_timeout(int sock) {
 
 void psock_close(psock_t *sock) {
   if (sock->ssl)
-    while (pssl_close(sock->ssl) == PSYNC_SSL_NEED_FINISH)
+    while (pssl_close(sock->ssl) == PSSL_NEED_FINISH)
       if (wait_ssl_ready(sock->sock)) {
         pssl_free(sock->ssl);
         break;
@@ -613,9 +613,9 @@ static int psync_socket_read_ssl(psock_t *sock, void *buff, int num) {
   while (1) {
     psock_try_write_buffer(sock);
     r = pssl_read(sock->ssl, buff, num);
-    if (r == PSYNC_SSL_FAIL) {
-      if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
-                     psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE)) {
+    if (r == PSSL_FAIL) {
+      if (likely_log(psync_ssl_errno == PSSL_ERR_WANT_READ ||
+                     psync_ssl_errno == PSSL_ERR_WANT_WRITE)) {
         if (wait_ssl_ready(sock->sock)) {
           if (sock->buffer)
             debug(D_WARNING, "timeouted on socket with pending buffers");
@@ -663,10 +663,10 @@ int psock_read(psock_t *sock, void *buff, int num) {
 static int psync_socket_read_noblock_ssl(psock_t *sock, void *buff, int num) {
   int r;
   r = pssl_read(sock->ssl, buff, num);
-  if (r == PSYNC_SSL_FAIL) {
+  if (r == PSSL_FAIL) {
     sock->pending = 0;
-    if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
-                   psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE))
+    if (likely_log(psync_ssl_errno == PSSL_ERR_WANT_READ ||
+                   psync_ssl_errno == PSSL_ERR_WANT_WRITE))
       return PSYNC_SOCKET_WOULDBLOCK;
     else {
       errno = (ECONNRESET);
@@ -711,9 +711,9 @@ static int psync_socket_read_ssl_thread(psock_t *sock, void *buff, int num) {
     psock_try_write_buffer(sock);
     r = pssl_read(sock->ssl, buff, num);
     pthread_mutex_unlock(&mutex);
-    if (r == PSYNC_SSL_FAIL) {
-      if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
-                     psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE)) {
+    if (r == PSSL_FAIL) {
+      if (likely_log(psync_ssl_errno == PSSL_ERR_WANT_READ ||
+                     psync_ssl_errno == PSSL_ERR_WANT_WRITE)) {
         if (wait_ssl_ready(sock->sock))
           return -1;
         else
@@ -802,9 +802,9 @@ int psock_write(psock_t *sock, const void *buff, int num) {
     return -1;
   if (sock->ssl) {
     r = pssl_write(sock->ssl, buff, num);
-    if (r == PSYNC_SSL_FAIL) {
-      if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
-                     psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE))
+    if (r == PSSL_FAIL) {
+      if (likely_log(psync_ssl_errno == PSSL_ERR_WANT_READ ||
+                     psync_ssl_errno == PSSL_ERR_WANT_WRITE))
         return 0;
       else
         return -1;
@@ -839,9 +839,9 @@ static int psync_socket_readall_ssl(psock_t *sock, void *buff, int num) {
 
     r = pssl_read(sock->ssl, (char *)buff + br, num - br);
 
-    if (r == PSYNC_SSL_FAIL) {
-      if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
-                     psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE)) {
+    if (r == PSSL_FAIL) {
+      if (likely_log(psync_ssl_errno == PSSL_ERR_WANT_READ ||
+                     psync_ssl_errno == PSSL_ERR_WANT_WRITE)) {
         if (wait_ssl_ready(sock->sock))
           return -1;
         else
@@ -897,9 +897,9 @@ static int psync_socket_writeall_ssl(psock_t *sock, const void *buff, int num) {
   br = 0;
   while (br < num) {
     r = pssl_write(sock->ssl, (char *)buff + br, num - br);
-    if (r == PSYNC_SSL_FAIL) {
-      if (psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
-          psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE) {
+    if (r == PSSL_FAIL) {
+      if (psync_ssl_errno == PSSL_ERR_WANT_READ ||
+          psync_ssl_errno == PSSL_ERR_WANT_WRITE) {
         if (wait_ssl_ready(sock->sock))
           return -1;
         else
@@ -959,9 +959,9 @@ static int psync_socket_readall_ssl_thread(psock_t *sock, void *buff, int num) {
     psock_try_write_buffer(sock);
     r = pssl_read(sock->ssl, (char *)buff + br, num - br);
     pthread_mutex_unlock(&mutex);
-    if (r == PSYNC_SSL_FAIL) {
-      if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
-                     psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE)) {
+    if (r == PSSL_FAIL) {
+      if (likely_log(psync_ssl_errno == PSSL_ERR_WANT_READ ||
+                     psync_ssl_errno == PSSL_ERR_WANT_WRITE)) {
         if (wait_ssl_ready(sock->sock))
           return -1;
         else
@@ -1025,9 +1025,9 @@ static int psync_socket_writeall_ssl_thread(psock_t *sock, const void *buff,
     else
       r = pssl_write(sock->ssl, (char *)buff + br, num - br);
     pthread_mutex_unlock(&mutex);
-    if (r == PSYNC_SSL_FAIL) {
-      if (psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
-          psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE) {
+    if (r == PSSL_FAIL) {
+      if (psync_ssl_errno == PSSL_ERR_WANT_READ ||
+          psync_ssl_errno == PSSL_ERR_WANT_WRITE) {
         if (wait_ssl_ready(sock->sock))
           return -1;
         else

@@ -201,11 +201,11 @@ static void save_session(ssl_connection_t *conn) {
 
 static void set_errno(ssl_connection_t *conn, int err) {
   if (err == MBEDTLS_ERR_SSL_WANT_READ)
-    psync_ssl_errno = PSYNC_SSL_ERR_WANT_READ;
+    psync_ssl_errno = PSSL_ERR_WANT_READ;
   else if (err == MBEDTLS_ERR_SSL_WANT_WRITE)
-    psync_ssl_errno = PSYNC_SSL_ERR_WANT_WRITE;
+    psync_ssl_errno = PSSL_ERR_WANT_WRITE;
   else {
-    psync_ssl_errno = PSYNC_SSL_ERR_UNKNOWN;
+    psync_ssl_errno = PSSL_ERR_UNKNOWN;
     conn->isbroken = 1;
     if (err == MBEDTLS_ERR_NET_RECV_FAILED)
       debug(D_NOTICE, "got MBEDTLS_ERR_NET_RECV_FAILED");
@@ -289,11 +289,11 @@ pssl_rsabinkey_t prsa_binary_private(pssl_rsaprivkey_t rsa) {
   mbedtls_pk_init(&ctx);
   if (mbedtls_pk_setup(&ctx, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA)) ||
       mbedtls_rsa_copy(mbedtls_pk_rsa(ctx), rsa))
-    return PSYNC_INVALID_BIN_RSA;
+    return PRSA_INVALID_BIN_KEY;
   len = mbedtls_pk_write_key_der(&ctx, buff, sizeof(buff));
   mbedtls_pk_free(&ctx);
   if (len <= 0)
-    return PSYNC_INVALID_BIN_RSA;
+    return PRSA_INVALID_BIN_KEY;
   ret =
       pmemlock_malloc(offsetof(pssl_enc_data_t, data) + len);
   ret->datalen = len;
@@ -310,12 +310,12 @@ pssl_rsabinkey_t prsa_binary_public(pssl_rsapubkey_t rsa) {
   mbedtls_pk_init(&ctx);
   if (mbedtls_pk_setup(&ctx, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA)) ||
       mbedtls_rsa_copy(mbedtls_pk_rsa(ctx), rsa))
-    return PSYNC_INVALID_BIN_RSA;
+    return PRSA_INVALID_BIN_KEY;
   p = buff + sizeof(buff);
   len = mbedtls_pk_write_pubkey(&p, buff, &ctx);
   mbedtls_pk_free(&ctx);
   if (len <= 0)
-    return PSYNC_INVALID_BIN_RSA;
+    return PRSA_INVALID_BIN_KEY;
   ret =
       pmemlock_malloc(offsetof(pssl_enc_data_t, data) + len);
   ret->datalen = len;
@@ -345,7 +345,7 @@ pssl_context_t prsa_generate(int bits) {
                           65537)) {
     mbedtls_rsa_free(ctx);
     psync_free(ctx);
-    return PSYNC_INVALID_RSA;
+    return PRSA_INVALID;
   } else
     return ctx;
 }
@@ -358,7 +358,7 @@ pssl_rsaprivkey_t prsa_get_private(pssl_context_t rsa) {
   if (unlikely(mbedtls_rsa_copy(ctx, rsa))) {
     mbedtls_rsa_free(ctx);
     psync_free(ctx);
-    return PSYNC_INVALID_RSA;
+    return PRSA_INVALID;
   } else
     return ctx;
 }
@@ -367,8 +367,8 @@ pssl_rsapubkey_t prsa_get_public(pssl_context_t rsa) {
   pssl_rsabinkey_t bin;
   pssl_rsapubkey_t ret;
   bin = prsa_binary_public(rsa);
-  if (bin == PSYNC_INVALID_BIN_RSA)
-    return PSYNC_INVALID_RSA;
+  if (bin == PRSA_INVALID_BIN_KEY)
+    return PRSA_INVALID;
   ret = prsa_load_public(bin->data, bin->datalen);  
   prsa_binary_free(bin);
   return ret;
@@ -385,7 +385,7 @@ pssl_rsaprivkey_t prsa_load_private(const unsigned char *keydata, size_t keylen)
       char ebuf[100];
       mbedtls_strerror(ret, ebuf, sizeof(ebuf));
       debug(D_WARNING, "failed to parse private key: %s (-0x%04x)", ebuf, (unsigned int) -ret);
-      return PSYNC_INVALID_RSA;
+      return PRSA_INVALID;
   }
 
   rsactx = psync_new(mbedtls_rsa_context);
@@ -397,7 +397,7 @@ pssl_rsaprivkey_t prsa_load_private(const unsigned char *keydata, size_t keylen)
     debug(D_WARNING, "rsa_copy failed with code %d", ret);
     mbedtls_rsa_free(rsactx);
     psync_free(rsactx);
-    return PSYNC_INVALID_RSA;
+    return PRSA_INVALID;
   } else {
     return rsactx;
   }
@@ -412,7 +412,7 @@ pssl_rsapubkey_t prsa_load_public(const unsigned char *keydata, size_t keylen) {
   ret = mbedtls_pk_parse_public_key(&ctx, keydata, keylen);
   if (unlikely(ret)) {
     debug(D_ERROR, "failed to parse public key with code %d", ret);
-    return PSYNC_INVALID_RSA;
+    return PRSA_INVALID;
   }
 
   rsa = psync_new(mbedtls_rsa_context);
@@ -424,7 +424,7 @@ pssl_rsapubkey_t prsa_load_public(const unsigned char *keydata, size_t keylen) {
     debug(D_WARNING, "rsa_copy failed with code %d", ret);
     mbedtls_rsa_free(rsa);
     psync_free(rsa);
-    return PSYNC_INVALID_RSA;
+    return PRSA_INVALID;
   } else {
     mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
     return rsa;
@@ -478,11 +478,11 @@ int pssl_close(ssl_connection_t *sslconn) {
   set_errno(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
                  ret == MBEDTLS_ERR_SSL_WANT_WRITE))
-    return PSYNC_SSL_NEED_FINISH;
+    return PSSL_NEED_FINISH;
 noshutdown:
   mbedtls_ssl_free(&conn->ssl);
   psync_free(conn);
-  return PSYNC_SSL_SUCCESS;
+  return PSSL_SUCCESS;
 }
 
 void pssl_debug_cb(psync_ssl_debug_callback_t cb, void *ctx) {
@@ -501,18 +501,18 @@ int pssl_finish(ssl_connection_t *sslconn, const char *hostname) {
       goto fail;
     }
     save_session(conn);
-    return PSYNC_SSL_SUCCESS;
+    return PSSL_SUCCESS;
   } else {
     debug(D_ERROR, "handshake failed, return code was %d", ret);
   }
   set_errno(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
                  ret == MBEDTLS_ERR_SSL_WANT_WRITE))
-    return PSYNC_SSL_NEED_FINISH;
+    return PSSL_NEED_FINISH;
 fail:
   mbedtls_ssl_free(&conn->ssl);
   psync_free(conn);
-  return PRINT_RETURN_CONST(PSYNC_SSL_FAIL);
+  return PRINT_RETURN_CONST(PSSL_FAIL);
 }
 
 void pssl_free(ssl_connection_t *sslconn) {
@@ -634,13 +634,13 @@ int pssl_open(int sock, ssl_connection_t **sslconn, const char *hostname) {
 
     save_session(conn);
     debug(D_NOTICE, "SSL connection established successfully");
-    return PSYNC_SSL_SUCCESS;
+    return PSSL_SUCCESS;
   }
 
   set_errno(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE)) {
     *sslconn = conn;
-    return PSYNC_SSL_NEED_FINISH;
+    return PSSL_NEED_FINISH;
   }
   debug(D_ERROR, "SSL handshake failed with error code %d", ret);
 
@@ -648,7 +648,7 @@ err1:
   mbedtls_ssl_free(&conn->ssl);
 err0:
   psync_free(conn);
-  return PRINT_RETURN_CONST(PSYNC_SSL_FAIL);
+  return PRINT_RETURN_CONST(PSSL_FAIL);
 }
 
 void pssl_random(unsigned char *buf, int num) {
@@ -666,7 +666,7 @@ int pssl_read(ssl_connection_t *sslconn, void *buf, int num) {
   if (res >= 0)
     return res;
   set_errno(conn, res);
-  return PSYNC_SSL_FAIL;
+  return PSSL_FAIL;
 }
 
 int pssl_write(ssl_connection_t *sslconn, const void *buf, int num) {
@@ -677,7 +677,7 @@ int pssl_write(ssl_connection_t *sslconn, const void *buf, int num) {
   if (res >= 0)
     return res;
   set_errno(conn, res);
-  return PSYNC_SSL_FAIL;
+  return PSSL_FAIL;
 }
 
 pssl_enc_symkey_t psymkey_alloc(size_t len) {
@@ -703,7 +703,7 @@ pssl_symkey_t *psymkey_decrypt(pssl_rsaprivkey_t rsa, const unsigned char *data,
   if (mbedtls_rsa_rsaes_oaep_decrypt(rsa, drbg_random_safe,
                                      &psync_mbed_rng, NULL,
                                      0, &len, data, buff, sizeof(buff)))
-    return PSYNC_INVALID_SYM_KEY;
+    return PSYMKEY_INVALID;
   ret = (pssl_symkey_t *)pmemlock_malloc(
       offsetof(pssl_symkey_t, key) + len);
   ret->keylen = len;
@@ -768,7 +768,7 @@ pssl_enc_symkey_t psymkey_encrypt(pssl_rsapubkey_t rsa, const unsigned char *dat
         D_WARNING,
         "rsa_rsaes_oaep_encrypt failed with error=%d, datalen=%lu, rsasize=%d",
         code, (unsigned long)datalen, (int)rsalen);
-    return PSYNC_INVALID_ENC_SYM_KEY;
+    return PSYMKEY_INVALID_ENC;
   }
   ret->datalen = rsalen;
   debug(D_NOTICE, "datalen=%lu", (unsigned long)ret->datalen);
