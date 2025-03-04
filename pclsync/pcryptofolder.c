@@ -548,7 +548,6 @@ int pcryptofolder_unlock(const char *password) {
    * to have some thread to hold sql_lock and wait for read lock. This will
    * normally deadlock with us holding writelock and waiting for sql_lock.
    * Therefore we use sql_trylock here.
-   *
    */
 retry:
   pthread_rwlock_wrlock(&crypto_lock);
@@ -604,6 +603,8 @@ retry:
     debug(D_NOTICE, "got keys from the database");
     assert(rowcnt == 4);
   }
+
+  debug(D_NOTICE, "trying to load public key");
   crypto_pubkey = psync_ssl_rsa_load_public(rsapub, rsapublen);
   if (crypto_pubkey == PSYNC_INVALID_RSA) {
     pthread_rwlock_unlock(&crypto_lock);
@@ -613,6 +614,10 @@ retry:
     psync_free(salt);
     return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_UNKNOWN_KEY_FORMAT);
   }
+  debug(D_NOTICE, "successfully loaded public key");
+
+
+  debug(D_NOTICE, "generating symmetric key");
   aeskey = psync_ssl_gen_symmetric_key_from_pass(
       password, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE, salt, saltlen,
       iterations);
@@ -622,19 +627,26 @@ retry:
   memcpy(rsaprivdec, rsapriv, rsaprivlen);
   pcrypto_ctr_encdec_decode(enc, rsaprivdec, rsaprivlen, 0);
   pcrypto_ctr_encdec_free(enc);
+  debug(D_NOTICE, "successfully generated symmetric key");
+
+
+  debug(D_NOTICE, "trying to load private key");
   crypto_privkey = psync_ssl_rsa_load_private(rsaprivdec, rsaprivlen);
   psync_ssl_memclean(rsaprivdec, rsaprivlen);
   pmemlock_free(rsaprivdec);
   if (crypto_privkey == PSYNC_INVALID_RSA) {
+    debug(D_NOTICE, "failed to load private key");
     psync_ssl_rsa_free_public(crypto_pubkey);
     crypto_pubkey = PSYNC_INVALID_RSA;
     pthread_rwlock_unlock(&crypto_lock);
-    debug(D_NOTICE, "bad password");
     psync_free(rsapriv);
     psync_free(rsapub);
     psync_free(salt);
     return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_BAD_PASSWORD);
   }
+  debug(D_NOTICE, "successfully loaded private key");
+
+  debug(D_NOTICE, "verify matching public and private key");
   if (!crypto_keys_match()) {
     psync_ssl_rsa_free_public(crypto_pubkey);
     crypto_pubkey = PSYNC_INVALID_RSA;
@@ -647,13 +659,17 @@ retry:
     psync_free(salt);
     return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_KEYS_DONT_MATCH);
   }
+  debug(D_NOTICE, "public and private keys match, setting crypto started");
+
   crypto_started_l = 1;
   crypto_started_un = 1;
   pthread_rwlock_unlock(&crypto_lock);
-  if (rowcnt < 4)
+  if (rowcnt < 4) {
+    debug(D_NOTICE, "saving crypto setup to database");
     psync_cloud_crypto_setup_save_to_db(rsapriv, rsaprivlen, rsapub, rsapublen,
                                         salt, saltlen, iterations, 0,
                                         publicsha1, privatesha1, flags);
+  }
   psync_free(rsapriv);
   psync_free(rsapub);
   psync_free(salt);

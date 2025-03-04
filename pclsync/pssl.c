@@ -44,8 +44,8 @@
 #include <pthread.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <unistd.h>
 
-#include "pfile.h"
 #include "pcompiler.h"
 
 #include "pcache.h"
@@ -63,11 +63,46 @@
 #include <stddef.h>
 #include <string.h>
 
+typedef struct {
+  mbedtls_ctr_drbg_context rnd;
+  pthread_mutex_t mutex;
+} ctr_drbg_context_locked;
+
+typedef struct {
+  mbedtls_net_context srv;
+  mbedtls_ssl_context ssl;
+  mbedtls_ssl_config cfg;
+  int sock;
+  int isbroken;
+  char cachekey[];
+} ssl_connection_t;
+
+static pthread_mutex_t rsa_decr_mutex = PTHREAD_MUTEX_INITIALIZER;
+static ctr_drbg_context_locked psync_mbed_rng;
+static mbedtls_entropy_context psync_mbed_entropy;
+static mbedtls_x509_crt psync_mbed_trusted_certs_x509;
+PSYNC_THREAD int psync_ssl_errno;
+static psync_ssl_debug_callback_t debug_cb = NULL;
+static void *debug_ctx = NULL;
+static const int psync_mbed_ciphersuite[] = {
+    MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+    MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+    MBEDTLS_TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,
+    MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384,
+    MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,
+    MBEDTLS_TLS_DHE_RSA_WITH_AES_256_CBC_SHA256,
+    MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+    MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+    MBEDTLS_TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,
+    MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+    MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
+    MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CBC_SHA256,
+    0};
+
 // HACK: This function is duplicated from mbedtls/library/pkparse.c, because
 // it is needed to properly parse the RSA keys returned by the pcloud server
 // for some reason... see the fallback code in psync_ssl_rsa_load_public.
-static int pk_get_rsapubkey(unsigned char **p, const unsigned char *end,
-                            mbedtls_rsa_context *rsa) {
+static int pk_get_rsapubkey(unsigned char **p, const unsigned char *end, mbedtls_rsa_context *rsa) {
   int ret;
   size_t len;
   mbedtls_mpi N, E;
@@ -134,192 +169,44 @@ cleanup:
   return ret;
 }
 
-
-static pthread_mutex_t rsa_decr_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 static void psync_ssl_free_psync_encrypted_data_t(psync_encrypted_data_t e) {
   psync_ssl_memclean(e->data, e->datalen);
   pmemlock_free(e);
 }
 
-void psync_ssl_rsa_free_binary(psync_binary_rsa_key_t bin) {
-  psync_ssl_free_psync_encrypted_data_t(bin);
+static inline void psync_aes256_encode_block(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst) {
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
 }
 
-void psync_ssl_free_symmetric_key(psync_symmetric_key_t key) {
-  psync_ssl_memclean(key->key, key->keylen);
-  pmemlock_free(key);
+static inline void psync_aes256_decode_block(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
 }
 
-psync_encrypted_symmetric_key_t
-psync_ssl_alloc_encrypted_symmetric_key(size_t len) {
-  psync_encrypted_symmetric_key_t ret;
-  ret = psync_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
-  ret->datalen = len;
-  return ret;
+static inline void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                        dst + PSYNC_AES256_BLOCK_SIZE);
 }
 
-psync_encrypted_symmetric_key_t
-psync_ssl_copy_encrypted_symmetric_key(psync_encrypted_symmetric_key_t src) {
-  psync_encrypted_symmetric_key_t ret;
-  ret = psync_malloc(offsetof(psync_encrypted_data_struct_t, data) +
-                     src->datalen);
-  ret->datalen = src->datalen;
-  memcpy(ret->data, src->data, src->datalen);
-  return ret;
+static inline void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                        dst + PSYNC_AES256_BLOCK_SIZE);
 }
 
-psync_symmetric_key_t psync_ssl_rsa_decrypt_symm_key_lock(
-    psync_rsa_privatekey_t *rsa,
-    const psync_encrypted_symmetric_key_t *enckey) {
-  psync_symmetric_key_t sym_key;
-
-  debug(D_NOTICE, "Get RSA decrypt key lock.");
-  pthread_mutex_lock(&rsa_decr_mutex);
-
-  sym_key = psync_ssl_rsa_decrypt_symmetric_key(*rsa, *enckey);
-
-  pthread_mutex_unlock(&rsa_decr_mutex);
-  debug(D_NOTICE, "RSA decrypt key Lock released.");
-
-  return sym_key;
-}
-
-#if defined(PSYNC_AES_HW_MSC)
-#include <intrin.h>
-#include <wmmintrin.h>
-#endif
-
-static const int psync_mbed_ciphersuite[] = {
-    MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-    MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,
-    MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384,
-    MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_256_CBC_SHA256,
-    MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-    MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,
-    MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
-    MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CBC_SHA256,
-    0};
-
-typedef struct {
-  mbedtls_ctr_drbg_context rnd;
-  pthread_mutex_t mutex;
-} ctr_drbg_context_locked;
-
-typedef struct {
-  mbedtls_net_context srv;
-  mbedtls_ssl_context ssl;
-  mbedtls_ssl_config cfg;
-  int sock;
-  int isbroken;
-  char cachekey[];
-} ssl_connection_t;
-
-static ctr_drbg_context_locked psync_mbed_rng;
-static mbedtls_entropy_context psync_mbed_entropy;
-static mbedtls_x509_crt psync_mbed_trusted_certs_x509;
-
-PSYNC_THREAD int psync_ssl_errno;
-
-#if defined(PSYNC_AES_HW)
-int psync_ssl_hw_aes;
-#endif
-
-static psync_ssl_debug_callback_t debug_cb = NULL;
-static void *debug_ctx = NULL;
-
-void psync_ssl_set_log_threshold(int threshold) {
-  mbedtls_debug_set_threshold(threshold);
-}
-
-void psync_ssl_set_debug_callback(psync_ssl_debug_callback_t cb, void *ctx) {
-  debug_cb = cb;
-  debug_ctx = ctx;
-}
-
-int ctr_drbg_random_locked(void *p_rng, unsigned char *output,
-                           size_t output_len) {
-  ctr_drbg_context_locked *rng;
-  int ret;
-  rng = (ctr_drbg_context_locked *)p_rng;
-  pthread_mutex_lock(&rng->mutex);
-  ret = mbedtls_ctr_drbg_random(&rng->rnd, output, output_len);
-  pthread_mutex_unlock(&rng->mutex);
-  return ret;
-}
-
-#if defined(PSYNC_AES_HW_GCC)
-static int psync_ssl_detect_aes_hw() {
-  uint32_t eax, ecx;
-  eax = 1;
-  __asm__("cpuid" : "=c"(ecx) : "a"(eax) : "%ebx", "%edx");
-  ecx = (ecx >> 25) & 1;
-  if (ecx)
-    debug(D_NOTICE, "hardware AES support detected");
-  else
-    debug(D_NOTICE, "hardware AES support not detected");
-  return ecx;
-}
-#elif defined(PSYNC_AES_HW_MSC)
-static int psync_ssl_detect_aes_hw() {
-  int info[4];
-  int ret;
-  __cpuid(info, 1);
-  ret = (info[2] >> 25) & 1;
-  if (ret)
-    debug(D_NOTICE, "hardware AES support detected");
-  else
-    debug(D_NOTICE, "hardware AES support not detected");
-  return ret;
-}
-#endif
-
-int psync_ssl_init() {
-  unsigned char seed[PSYNC_LHASH_DIGEST_LEN];
+static inline void psync_aes256_decode_4blocks_consec_xor(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor) {
   unsigned long i;
-  int result;
-
-#if defined(PSYNC_AES_HW)
-  psync_ssl_hw_aes = psync_ssl_detect_aes_hw();
-#else
-  debug(D_NOTICE, "hardware AES is not supported for this compiler");
-#endif
-  if (pthread_mutex_init(&psync_mbed_rng.mutex, NULL))
-    return PRINT_RETURN(-1);
-
-  mbedtls_entropy_init(&psync_mbed_entropy);
-  prand_seed(seed, seed, sizeof(seed), 0);
-  mbedtls_entropy_update_manual(&psync_mbed_entropy, seed, sizeof(seed));
-
-  mbedtls_ctr_drbg_init(&psync_mbed_rng.rnd);
-  if ((result = mbedtls_ctr_drbg_seed(&psync_mbed_rng.rnd, mbedtls_entropy_func,
-                                      &psync_mbed_entropy, NULL, 0))) {
-    debug(D_ERROR, "mbedtls_ctr_drbg_seed failed with return code %d", result);
-    return PRINT_RETURN(-1);
-  }
-
-  mbedtls_x509_crt_init(&psync_mbed_trusted_certs_x509);
-  for (i = 0; i < ARRAY_SIZE(psync_ssl_trusted_certs); i++) {
-    result = mbedtls_x509_crt_parse(&psync_mbed_trusted_certs_x509,
-                                    (unsigned char *)psync_ssl_trusted_certs[i],
-                                    1 + strlen(psync_ssl_trusted_certs[i]));
-    if (result) {
-      debug(D_ERROR, "failed to load certificate %lu, got result %d",
-            (unsigned long)i, result);
-    }
-  }
-
-  return 0;
-}
-
-void psync_ssl_memclean(void *ptr, size_t len) {
-  volatile unsigned char *p = ptr;
-  while (len--)
-    *p++ = 0;
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                        dst + PSYNC_AES256_BLOCK_SIZE);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT,
+                        src + PSYNC_AES256_BLOCK_SIZE * 2,
+                        dst + PSYNC_AES256_BLOCK_SIZE * 2);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT,
+                        src + PSYNC_AES256_BLOCK_SIZE * 3,
+                        dst + PSYNC_AES256_BLOCK_SIZE * 3);
+  for (i = 0; i < PSYNC_AES256_BLOCK_SIZE * 4 / sizeof(unsigned long); i++)
+    ((unsigned long *)dst)[i] ^= ((unsigned long *)bxor)[i];
 }
 
 static ssl_connection_t *psync_ssl_alloc_conn(const char *hostname) {
@@ -407,7 +294,6 @@ static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
   char sighex[66];
   int i;
 
-  // TODO: returning null, why?
   cert = mbedtls_ssl_get_peer_cert(&conn->ssl);
   if (!cert) {
     debug(D_WARNING, "ssl_get_peer_cert returned NULL");
@@ -434,6 +320,104 @@ static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
         "fingerprint",
         sighex);
   return -1;
+}
+
+void psync_ssl_set_log_threshold(int threshold) {
+  mbedtls_debug_set_threshold(threshold);
+}
+
+void psync_ssl_set_debug_callback(psync_ssl_debug_callback_t cb, void *ctx) {
+  debug_cb = cb;
+  debug_ctx = ctx;
+}
+
+int ctr_drbg_random_locked(void *p_rng, unsigned char *output,
+                           size_t output_len) {
+  ctr_drbg_context_locked *rng;
+  int ret;
+  rng = (ctr_drbg_context_locked *)p_rng;
+  pthread_mutex_lock(&rng->mutex);
+  ret = mbedtls_ctr_drbg_random(&rng->rnd, output, output_len);
+  pthread_mutex_unlock(&rng->mutex);
+  return ret;
+}
+
+void psync_ssl_rsa_free_binary(psync_binary_rsa_key_t bin) {
+  psync_ssl_free_psync_encrypted_data_t(bin);
+}
+
+void psync_ssl_free_symmetric_key(psync_symmetric_key_t key) {
+  psync_ssl_memclean(key->key, key->keylen);
+  pmemlock_free(key);
+}
+
+psync_encrypted_symmetric_key_t psync_ssl_alloc_encrypted_symmetric_key(size_t len) {
+  psync_encrypted_symmetric_key_t ret;
+  ret = psync_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
+  ret->datalen = len;
+  return ret;
+}
+
+psync_encrypted_symmetric_key_t psync_ssl_copy_encrypted_symmetric_key(psync_encrypted_symmetric_key_t src) {
+  psync_encrypted_symmetric_key_t ret;
+  ret = psync_malloc(offsetof(psync_encrypted_data_struct_t, data) +
+                     src->datalen);
+  ret->datalen = src->datalen;
+  memcpy(ret->data, src->data, src->datalen);
+  return ret;
+}
+
+psync_symmetric_key_t psync_ssl_rsa_decrypt_symm_key_lock(psync_rsa_privatekey_t *rsa, const psync_encrypted_symmetric_key_t *enckey) {
+  psync_symmetric_key_t sym_key;
+
+  debug(D_NOTICE, "Get RSA decrypt key lock.");
+  pthread_mutex_lock(&rsa_decr_mutex);
+
+  sym_key = psync_ssl_rsa_decrypt_symmetric_key(*rsa, *enckey);
+
+  pthread_mutex_unlock(&rsa_decr_mutex);
+  debug(D_NOTICE, "RSA decrypt key Lock released.");
+
+  return sym_key;
+}
+
+int psync_ssl_init() {
+  unsigned char seed[PSYNC_LHASH_DIGEST_LEN];
+  unsigned long i;
+  int result;
+
+  if (pthread_mutex_init(&psync_mbed_rng.mutex, NULL))
+    return PRINT_RETURN(-1);
+
+  mbedtls_entropy_init(&psync_mbed_entropy);
+  prand_seed(seed, seed, sizeof(seed), 0);
+  mbedtls_entropy_update_manual(&psync_mbed_entropy, seed, sizeof(seed));
+
+  mbedtls_ctr_drbg_init(&psync_mbed_rng.rnd);
+  if ((result = mbedtls_ctr_drbg_seed(&psync_mbed_rng.rnd, mbedtls_entropy_func,
+                                      &psync_mbed_entropy, NULL, 0))) {
+    debug(D_ERROR, "mbedtls_ctr_drbg_seed failed with return code %d", result);
+    return PRINT_RETURN(-1);
+  }
+
+  mbedtls_x509_crt_init(&psync_mbed_trusted_certs_x509);
+  for (i = 0; i < ARRAY_SIZE(psync_ssl_trusted_certs); i++) {
+    result = mbedtls_x509_crt_parse(&psync_mbed_trusted_certs_x509,
+                                    (unsigned char *)psync_ssl_trusted_certs[i],
+                                    1 + strlen(psync_ssl_trusted_certs[i]));
+    if (result) {
+      debug(D_ERROR, "failed to load certificate %lu, got result %d",
+            (unsigned long)i, result);
+    }
+  }
+
+  return 0;
+}
+
+void psync_ssl_memclean(void *ptr, size_t len) {
+  volatile unsigned char *p = ptr;
+  while (len--)
+    *p++ = 0;
 }
 
 int psync_ssl_connect(int sock, void **sslconn, const char *hostname) {
@@ -553,7 +537,6 @@ fail:
   return PRINT_RETURN_CONST(PSYNC_SSL_FAIL);
 }
 
-
 int psync_ssl_shutdown(void *sslconn) {
   ssl_connection_t *conn;
   int ret;
@@ -669,8 +652,7 @@ void psync_ssl_rsa_free_private(psync_rsa_privatekey_t key) {
   psync_ssl_free_rsa(key);
 }
 
-psync_binary_rsa_key_t
-psync_ssl_rsa_public_to_binary(psync_rsa_publickey_t rsa) {
+psync_binary_rsa_key_t psync_ssl_rsa_public_to_binary(psync_rsa_publickey_t rsa) {
   unsigned char buff[4096], *p;
   mbedtls_pk_context ctx;
   psync_binary_rsa_key_t ret;
@@ -691,8 +673,7 @@ psync_ssl_rsa_public_to_binary(psync_rsa_publickey_t rsa) {
   return ret;
 }
 
-psync_binary_rsa_key_t
-psync_ssl_rsa_private_to_binary(psync_rsa_privatekey_t rsa) {
+psync_binary_rsa_key_t psync_ssl_rsa_private_to_binary(psync_rsa_privatekey_t rsa) {
   unsigned char buff[4096];
   mbedtls_pk_context ctx;
   psync_binary_rsa_key_t ret;
@@ -713,8 +694,7 @@ psync_ssl_rsa_private_to_binary(psync_rsa_privatekey_t rsa) {
   return ret;
 }
 
-psync_rsa_publickey_t psync_ssl_rsa_load_public(const unsigned char *keydata,
-                                                size_t keylen) {
+psync_rsa_publickey_t psync_ssl_rsa_load_public(const unsigned char *keydata, size_t keylen) {
   mbedtls_pk_context ctx;
   mbedtls_rsa_context *rsa;
   int ret;
@@ -768,14 +748,13 @@ psync_rsa_publickey_t psync_ssl_rsa_load_public(const unsigned char *keydata,
   }
 }
 
-psync_rsa_privatekey_t psync_ssl_rsa_load_private(const unsigned char *keydata,
-                                                  size_t keylen) {
+psync_rsa_privatekey_t psync_ssl_rsa_load_private(const unsigned char *keydata, size_t keylen) {
   mbedtls_pk_context ctx;
   mbedtls_rsa_context *rsa;
   int ret;
   mbedtls_pk_init(&ctx);
   if (unlikely(ret = mbedtls_pk_parse_key(&ctx, keydata, keylen, NULL, 0, mbedtls_ctr_drbg_random, &psync_mbed_rng.rnd))) {
-      debug(D_WARNING, "pk_parse_key failed with code %d", ret);
+      debug(D_WARNING, "mbedtls_pk_parse_key failed with code %d", ret);
       return PSYNC_INVALID_RSA;
   }
   rsa = psync_new(mbedtls_rsa_context);
@@ -794,20 +773,15 @@ psync_rsa_privatekey_t psync_ssl_rsa_load_private(const unsigned char *keydata,
   }
 }
 
-psync_rsa_publickey_t
-psync_ssl_rsa_binary_to_public(psync_binary_rsa_key_t bin) {
+psync_rsa_publickey_t psync_ssl_rsa_binary_to_public(psync_binary_rsa_key_t bin) {
   return psync_ssl_rsa_load_public(bin->data, bin->datalen);
 }
 
-psync_rsa_privatekey_t
-psync_ssl_rsa_binary_to_private(psync_binary_rsa_key_t bin) {
+psync_rsa_privatekey_t psync_ssl_rsa_binary_to_private(psync_binary_rsa_key_t bin) {
   return psync_ssl_rsa_load_private(bin->data, bin->datalen);
 }
 
-psync_symmetric_key_t
-psync_ssl_gen_symmetric_key_from_pass(const char *password, size_t keylen,
-                                      const unsigned char *salt, size_t saltlen,
-                                      size_t iterations) {
+psync_symmetric_key_t psync_ssl_gen_symmetric_key_from_pass(const char *password, size_t keylen, const unsigned char *salt, size_t saltlen, size_t iterations) {
   psync_symmetric_key_t key = (psync_symmetric_key_t)pmemlock_malloc(
       keylen + offsetof(psync_symmetric_key_struct_t, key));
   mbedtls_md_context_t ctx;
@@ -823,8 +797,7 @@ psync_ssl_gen_symmetric_key_from_pass(const char *password, size_t keylen,
   return key;
 }
 
-char *psync_ssl_derive_password_from_passphrase(const char *username,
-                                                const char *passphrase) {
+char *psync_ssl_derive_password_from_passphrase(const char *username, const char *passphrase) {
   unsigned char *usercopy;
   unsigned char usersha512[PSYNC_SHA512_DIGEST_LEN], passwordbin[32];
   mbedtls_md_context_t ctx;
@@ -850,9 +823,7 @@ char *psync_ssl_derive_password_from_passphrase(const char *username,
   return (char *)usercopy;
 }
 
-psync_encrypted_symmetric_key_t
-psync_ssl_rsa_encrypt_data(psync_rsa_publickey_t rsa, const unsigned char *data,
-                           size_t datalen) {
+psync_encrypted_symmetric_key_t psync_ssl_rsa_encrypt_data(psync_rsa_publickey_t rsa, const unsigned char *data, size_t datalen) {
   psync_encrypted_symmetric_key_t ret;
   int code;
   size_t rsalen;
@@ -875,9 +846,7 @@ psync_ssl_rsa_encrypt_data(psync_rsa_publickey_t rsa, const unsigned char *data,
   return ret;
 }
 
-psync_symmetric_key_t psync_ssl_rsa_decrypt_data(psync_rsa_privatekey_t rsa,
-                                                 const unsigned char *data,
-                                                 size_t datalen) {
+psync_symmetric_key_t psync_ssl_rsa_decrypt_data(psync_rsa_privatekey_t rsa, const unsigned char *data, size_t datalen) {
   unsigned char buff[2048];
   psync_symmetric_key_t ret;
   size_t len;
@@ -893,19 +862,15 @@ psync_symmetric_key_t psync_ssl_rsa_decrypt_data(psync_rsa_privatekey_t rsa,
   return ret;
 }
 
-psync_encrypted_symmetric_key_t
-psync_ssl_rsa_encrypt_symmetric_key(psync_rsa_publickey_t rsa,
-                                    const psync_symmetric_key_t key) {
+psync_encrypted_symmetric_key_t psync_ssl_rsa_encrypt_symmetric_key(psync_rsa_publickey_t rsa, const psync_symmetric_key_t key) {
   return psync_ssl_rsa_encrypt_data(rsa, key->key, key->keylen);
 }
 
-psync_symmetric_key_t psync_ssl_rsa_decrypt_symmetric_key(
-    psync_rsa_privatekey_t rsa, const psync_encrypted_symmetric_key_t enckey) {
+psync_symmetric_key_t psync_ssl_rsa_decrypt_symmetric_key(psync_rsa_privatekey_t rsa, const psync_encrypted_symmetric_key_t enckey) {
   return psync_ssl_rsa_decrypt_data(rsa, enckey->data, enckey->datalen);
 }
 
-psync_aes256_encoder
-psync_ssl_aes256_create_encoder(psync_symmetric_key_t key) {
+psync_aes256_encoder psync_ssl_aes256_create_encoder(psync_symmetric_key_t key) {
   mbedtls_aes_context *aes;
   assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
   aes = psync_new(mbedtls_aes_context);
@@ -918,8 +883,7 @@ void psync_ssl_aes256_free_encoder(psync_aes256_encoder aes) {
   psync_free(aes);
 }
 
-psync_aes256_encoder
-psync_ssl_aes256_create_decoder(psync_symmetric_key_t key) {
+psync_aes256_encoder psync_ssl_aes256_create_decoder(psync_symmetric_key_t key) {
   mbedtls_aes_context *aes;
   assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
   aes = psync_new(mbedtls_aes_context);
@@ -932,9 +896,7 @@ void psync_ssl_aes256_free_decoder(psync_aes256_encoder aes) {
   psync_free(aes);
 }
 
-psync_rsa_signature_t
-psync_ssl_rsa_sign_sha256_hash(psync_rsa_privatekey_t rsa,
-                               const unsigned char *data) {
+psync_rsa_signature_t psync_ssl_rsa_sign_sha256_hash(psync_rsa_privatekey_t rsa, const unsigned char *data) {
   psync_rsa_signature_t ret;
   int padding, hash_id;
   size_t rsalen;
@@ -959,218 +921,7 @@ psync_ssl_rsa_sign_sha256_hash(psync_rsa_privatekey_t rsa,
   return ret;
 }
 
-#if defined(PSYNC_AES_HW_GCC)
-
-#define SSE2FUNC __attribute__((__target__("sse2")))
-
-#define AESDEC ".byte 0x66,0x0F,0x38,0xDE,"
-#define AESDECLAST ".byte 0x66,0x0F,0x38,0xDF,"
-#define AESENC ".byte 0x66,0x0F,0x38,0xDC,"
-#define AESENCLAST ".byte 0x66,0x0F,0x38,0xDD,"
-
-#define xmm0_xmm1 "0xC8"
-#define xmm0_xmm2 "0xD0"
-#define xmm0_xmm3 "0xD8"
-#define xmm0_xmm4 "0xE0"
-#define xmm0_xmm5 "0xE8"
-// #define xmm1_xmm0   "0xC1" // unused, may be important later
-#define xmm1_xmm2 "0xD1"
-#define xmm1_xmm3 "0xD9"
-#define xmm1_xmm4 "0xE1"
-#define xmm1_xmm5 "0xE9"
-
-SSE2FUNC void psync_aes256_encode_block_hw(psync_aes256_encoder enc,
-                                           const unsigned char *src,
-                                           unsigned char *dst) {
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
-}
-
-SSE2FUNC void psync_aes256_decode_block_hw(psync_aes256_decoder enc,
-                                           const unsigned char *src,
-                                           unsigned char *dst) {
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
-}
-
-SSE2FUNC void psync_aes256_encode_2blocks_consec_hw(psync_aes256_encoder enc,
-                                                    const unsigned char *src,
-                                                    unsigned char *dst) {
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src + 16, dst + 16);
-}
-
-SSE2FUNC void psync_aes256_decode_2blocks_consec_hw(psync_aes256_decoder enc,
-                                                    const unsigned char *src,
-                                                    unsigned char *dst) {
-    mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
-    mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + 16, dst + 16);
-}
-
-SSE2FUNC void psync_aes256_decode_4blocks_consec_xor_hw(
-    psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst,
-    unsigned char *bxor) {
-  unsigned char temp[16];
-  for (int i = 0; i < 4; i++) {
-    mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + i * 16, temp);
-    for (int j = 0; j < 16; j++) {
-      dst[i * 16 + j] = temp[j] ^ bxor[i * 16 + j];
-    }
-  }
-}
-
-#elif defined(PSYNC_AES_HW_MSC)
-
-void psync_aes256_encode_block_hw(psync_aes256_encoder enc,
-                                  const unsigned char *src,
-                                  unsigned char *dst) {
-  __m128i r0, r1;
-  unsigned char *key;
-  unsigned cnt;
-  key = (unsigned char *)enc->rk;
-  r0 = _mm_loadu_si128((__m128i *)key);
-  r1 = _mm_load_si128((__m128i *)src);
-  cnt = enc->nr - 1;
-  key += 16;
-  r1 = _mm_xor_si128(r0, r1);
-  r0 = _mm_loadu_si128((__m128i *)key);
-  do {
-    key += 16;
-    r1 = _mm_aesenc_si128(r1, r0);
-    r0 = _mm_loadu_si128((__m128i *)key);
-  } while (--cnt);
-  r1 = _mm_aesenclast_si128(r1, r0);
-  _mm_store_si128((__m128i *)dst, r1);
-}
-
-void psync_aes256_decode_block_hw(psync_aes256_encoder enc,
-                                  const unsigned char *src,
-                                  unsigned char *dst) {
-  __m128i r0, r1;
-  unsigned char *key;
-  unsigned cnt;
-  key = (unsigned char *)enc->rk;
-  r0 = _mm_loadu_si128((__m128i *)key);
-  r1 = _mm_load_si128((__m128i *)src);
-  cnt = enc->nr - 1;
-  key += 16;
-  r1 = _mm_xor_si128(r0, r1);
-  r0 = _mm_loadu_si128((__m128i *)key);
-  do {
-    key += 16;
-    r1 = _mm_aesdec_si128(r1, r0);
-    r0 = _mm_loadu_si128((__m128i *)key);
-  } while (--cnt);
-  r1 = _mm_aesdeclast_si128(r1, r0);
-  _mm_store_si128((__m128i *)dst, r1);
-}
-
-void psync_aes256_encode_2blocks_consec_hw(psync_aes256_encoder enc,
-                                           const unsigned char *src,
-                                           unsigned char *dst) {
-  __m128i r0, r1, r2;
-  unsigned char *key;
-  unsigned cnt;
-  key = (unsigned char *)enc->rk;
-  r0 = _mm_loadu_si128((__m128i *)key);
-  r1 = _mm_load_si128((__m128i *)src);
-  r2 = _mm_load_si128((__m128i *)(src + 16));
-  cnt = enc->nr - 1;
-  key += 16;
-  r1 = _mm_xor_si128(r0, r1);
-  r2 = _mm_xor_si128(r0, r2);
-  r0 = _mm_loadu_si128((__m128i *)key);
-  do {
-    key += 16;
-    r1 = _mm_aesenc_si128(r1, r0);
-    r2 = _mm_aesenc_si128(r2, r0);
-    r0 = _mm_loadu_si128((__m128i *)key);
-  } while (--cnt);
-  r1 = _mm_aesenclast_si128(r1, r0);
-  r2 = _mm_aesenclast_si128(r2, r0);
-  _mm_store_si128((__m128i *)dst, r1);
-  _mm_store_si128((__m128i *)(dst + 16), r2);
-}
-
-void psync_aes256_decode_2blocks_consec_hw(psync_aes256_decoder enc,
-                                           const unsigned char *src,
-                                           unsigned char *dst) {
-  __m128i r0, r1, r2;
-  unsigned char *key;
-  unsigned cnt;
-  key = (unsigned char *)enc->rk;
-  r0 = _mm_loadu_si128((__m128i *)key);
-  r1 = _mm_load_si128((__m128i *)src);
-  r2 = _mm_load_si128((__m128i *)(src + 16));
-  cnt = enc->nr - 1;
-  key += 16;
-  r1 = _mm_xor_si128(r0, r1);
-  r2 = _mm_xor_si128(r0, r2);
-  r0 = _mm_loadu_si128((__m128i *)key);
-  do {
-    key += 16;
-    r1 = _mm_aesdec_si128(r1, r0);
-    r2 = _mm_aesdec_si128(r2, r0);
-    r0 = _mm_loadu_si128((__m128i *)key);
-  } while (--cnt);
-  r1 = _mm_aesdeclast_si128(r1, r0);
-  r2 = _mm_aesdeclast_si128(r2, r0);
-  _mm_store_si128((__m128i *)dst, r1);
-  _mm_store_si128((__m128i *)(dst + 16), r2);
-}
-
-void psync_aes256_decode_4blocks_consec_xor_hw(psync_aes256_decoder enc,
-                                               const unsigned char *src,
-                                               unsigned char *dst,
-                                               unsigned char *bxor) {
-  __m128i r0, r1, r2, r3, r4;
-  unsigned char *key;
-  unsigned cnt;
-  key = (unsigned char *)enc->rk;
-  r0 = _mm_loadu_si128((__m128i *)key);
-  r1 = _mm_load_si128((__m128i *)src);
-  r2 = _mm_load_si128((__m128i *)(src + 16));
-  r3 = _mm_load_si128((__m128i *)(src + 32));
-  r4 = _mm_load_si128((__m128i *)(src + 48));
-  cnt = enc->nr - 1;
-  key += 16;
-  r1 = _mm_xor_si128(r0, r1);
-  r2 = _mm_xor_si128(r0, r2);
-  r3 = _mm_xor_si128(r0, r3);
-  r4 = _mm_xor_si128(r0, r4);
-  r0 = _mm_loadu_si128((__m128i *)key);
-  do {
-    key += 16;
-    r1 = _mm_aesdec_si128(r1, r0);
-    r2 = _mm_aesdec_si128(r2, r0);
-    r3 = _mm_aesdec_si128(r3, r0);
-    r4 = _mm_aesdec_si128(r4, r0);
-    r0 = _mm_loadu_si128((__m128i *)key);
-  } while (--cnt);
-  r1 = _mm_aesdeclast_si128(r1, r0);
-  r2 = _mm_aesdeclast_si128(r2, r0);
-  r3 = _mm_aesdeclast_si128(r3, r0);
-  r4 = _mm_aesdeclast_si128(r4, r0);
-  r0 = _mm_load_si128((__m128i *)bxor);
-  r1 = _mm_xor_si128(r0, r1);
-  r0 = _mm_load_si128((__m128i *)(bxor + 16));
-  _mm_store_si128((__m128i *)dst, r1);
-  r2 = _mm_xor_si128(r0, r2);
-  r0 = _mm_load_si128((__m128i *)(bxor + 32));
-  _mm_store_si128((__m128i *)(dst + 16), r2);
-  r3 = _mm_xor_si128(r0, r3);
-  r0 = _mm_load_si128((__m128i *)(bxor + 48));
-  _mm_store_si128((__m128i *)(dst + 32), r3);
-  r4 = _mm_xor_si128(r0, r4);
-  _mm_store_si128((__m128i *)(dst + 48), r4);
-}
-
-#endif
-
-#if defined(PSYNC_AES_HW)
-
-void psync_aes256_decode_4blocks_consec_xor_sw(psync_aes256_decoder enc,
-                                               const unsigned char *src,
-                                               unsigned char *dst,
-                                               unsigned char *bxor) {
+void psync_aes256_decode_4blocks_consec_xor_sw(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor) {
   unsigned long i;
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
@@ -1184,5 +935,3 @@ void psync_aes256_decode_4blocks_consec_xor_sw(psync_aes256_decoder enc,
   for (i = 0; i < PSYNC_AES256_BLOCK_SIZE * 4 / sizeof(unsigned long); i++)
     ((unsigned long *)dst)[i] ^= ((unsigned long *)bxor)[i];
 }
-
-#endif

@@ -31,6 +31,10 @@
 #ifndef _PSYNC_STATUS_H
 #define _PSYNC_STATUS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 #include "plist.h"
@@ -154,5 +158,9 @@ void pstatus_send_update();
 void pstatus_get_cb(pstatus_t *status);
 void pstatus_set_cb(pstatus_change_callback_t callback);
 void pstatus_send_status_update();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
