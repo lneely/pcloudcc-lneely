@@ -174,41 +174,6 @@ static void psync_ssl_free_psync_encrypted_data_t(psync_encrypted_data_t e) {
   pmemlock_free(e);
 }
 
-static inline void psync_aes256_encode_block(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst) {
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
-}
-
-static inline void psync_aes256_decode_block(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
-}
-
-static inline void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src + PSYNC_AES256_BLOCK_SIZE,
-                        dst + PSYNC_AES256_BLOCK_SIZE);
-}
-
-static inline void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
-                        dst + PSYNC_AES256_BLOCK_SIZE);
-}
-
-static inline void psync_aes256_decode_4blocks_consec_xor(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor) {
-  unsigned long i;
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
-                        dst + PSYNC_AES256_BLOCK_SIZE);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT,
-                        src + PSYNC_AES256_BLOCK_SIZE * 2,
-                        dst + PSYNC_AES256_BLOCK_SIZE * 2);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT,
-                        src + PSYNC_AES256_BLOCK_SIZE * 3,
-                        dst + PSYNC_AES256_BLOCK_SIZE * 3);
-  for (i = 0; i < PSYNC_AES256_BLOCK_SIZE * 4 / sizeof(unsigned long); i++)
-    ((unsigned long *)dst)[i] ^= ((unsigned long *)bxor)[i];
-}
-
 static ssl_connection_t *psync_ssl_alloc_conn(const char *hostname) {
   ssl_connection_t *conn;
   size_t len;
@@ -749,27 +714,28 @@ psync_rsa_publickey_t psync_ssl_rsa_load_public(const unsigned char *keydata, si
 }
 
 psync_rsa_privatekey_t psync_ssl_rsa_load_private(const unsigned char *keydata, size_t keylen) {
-  mbedtls_pk_context ctx;
-  mbedtls_rsa_context *rsa;
+  mbedtls_pk_context pkctx;
+  mbedtls_rsa_context *rsactx;
   int ret;
-  mbedtls_pk_init(&ctx);
-  if (unlikely(ret = mbedtls_pk_parse_key(&ctx, keydata, keylen, NULL, 0, mbedtls_ctr_drbg_random, &psync_mbed_rng.rnd))) {
+  mbedtls_pk_init(&pkctx);
+  ret = mbedtls_pk_parse_key(&pkctx, keydata, keylen, NULL, 0, mbedtls_ctr_drbg_random, &psync_mbed_rng.rnd);
+  if (unlikely(ret)) {
       debug(D_WARNING, "mbedtls_pk_parse_key failed with code %d", ret);
       return PSYNC_INVALID_RSA;
   }
-  rsa = psync_new(mbedtls_rsa_context);
-  mbedtls_rsa_init(rsa);
-  mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
-  ret = mbedtls_rsa_copy(rsa, mbedtls_pk_rsa(ctx));
-  mbedtls_pk_free(&ctx);
+  rsactx = psync_new(mbedtls_rsa_context);
+  mbedtls_rsa_init(rsactx);
+  mbedtls_rsa_set_padding(rsactx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+  ret = mbedtls_rsa_copy(rsactx, mbedtls_pk_rsa(pkctx));
+  mbedtls_pk_free(&pkctx);
   if (unlikely(ret)) {
     debug(D_WARNING, "rsa_copy failed with code %d", ret);
-    mbedtls_rsa_free(rsa);
-    psync_free(rsa);
+    mbedtls_rsa_free(rsactx);
+    psync_free(rsactx);
     return PSYNC_INVALID_RSA;
   } else {
-    mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
-    return rsa;
+    mbedtls_rsa_set_padding(rsactx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+    return rsactx;
   }
 }
 
@@ -922,6 +888,41 @@ psync_rsa_signature_t psync_ssl_rsa_sign_sha256_hash(psync_rsa_privatekey_t rsa,
 }
 
 void psync_aes256_decode_4blocks_consec_xor_sw(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor) {
+  unsigned long i;
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                        dst + PSYNC_AES256_BLOCK_SIZE);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT,
+                        src + PSYNC_AES256_BLOCK_SIZE * 2,
+                        dst + PSYNC_AES256_BLOCK_SIZE * 2);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT,
+                        src + PSYNC_AES256_BLOCK_SIZE * 3,
+                        dst + PSYNC_AES256_BLOCK_SIZE * 3);
+  for (i = 0; i < PSYNC_AES256_BLOCK_SIZE * 4 / sizeof(unsigned long); i++)
+    ((unsigned long *)dst)[i] ^= ((unsigned long *)bxor)[i];
+}
+
+void psync_aes256_encode_block(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst) {
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
+}
+
+void psync_aes256_decode_block(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
+}
+
+void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                        dst + PSYNC_AES256_BLOCK_SIZE);
+}
+
+void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
+  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
+                        dst + PSYNC_AES256_BLOCK_SIZE);
+}
+
+void psync_aes256_decode_4blocks_consec_xor(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor) {
   unsigned long i;
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
