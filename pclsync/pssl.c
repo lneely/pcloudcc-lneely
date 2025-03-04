@@ -64,10 +64,10 @@
 typedef struct {
   mbedtls_ctr_drbg_context rnd;
   pthread_mutex_t mutex;
-} ctr_drbg_context_locked;
+} pssl_drbg_context_t;
 
 static pthread_mutex_t rsa_decr_mutex = PTHREAD_MUTEX_INITIALIZER;
-static ctr_drbg_context_locked psync_mbed_rng;
+static pssl_drbg_context_t psync_mbed_rng;
 static mbedtls_entropy_context psync_mbed_entropy;
 static mbedtls_x509_crt psync_mbed_trusted_certs_x509;
 PSYNC_THREAD int psync_ssl_errno;
@@ -134,10 +134,10 @@ static ssl_connection_t *conn_alloc(const char *hostname) {
   return conn;
 }
 
-static int ctr_drbg_random_locked(void *p_rng, unsigned char *output, size_t output_len) {
-  ctr_drbg_context_locked *rng;
+static int drbg_random_safe(void *p_rng, unsigned char *output, size_t output_len) {
+  pssl_drbg_context_t *rng;
   int ret;
-  rng = (ctr_drbg_context_locked *)p_rng;
+  rng = (pssl_drbg_context_t *)p_rng;
   pthread_mutex_lock(&rng->mutex);
   ret = mbedtls_ctr_drbg_random(&rng->rnd, output, output_len);
   pthread_mutex_unlock(&rng->mutex);
@@ -341,7 +341,7 @@ psync_rsa_t prsa_generate(int bits) {
   ctx = psync_new(mbedtls_rsa_context);
   mbedtls_rsa_init(ctx);
   mbedtls_rsa_set_padding(ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
-  if (mbedtls_rsa_gen_key(ctx, ctr_drbg_random_locked, &psync_mbed_rng, bits,
+  if (mbedtls_rsa_gen_key(ctx, drbg_random_safe, &psync_mbed_rng, bits,
                           65537)) {
     mbedtls_rsa_free(ctx);
     psync_free(ctx);
@@ -445,7 +445,7 @@ psync_rsa_signature_t prsa_signature(psync_rsa_privatekey_t rsa, const unsigned 
   padding = mbedtls_rsa_get_padding_mode(rsa);
   hash_id = mbedtls_rsa_get_md_alg(rsa);
   mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-  if (mbedtls_rsa_rsassa_pss_sign(rsa, ctr_drbg_random_locked, &psync_mbed_rng,
+  if (mbedtls_rsa_rsassa_pss_sign(rsa, drbg_random_safe, &psync_mbed_rng,
                                   MBEDTLS_MD_SHA256,
                                   PSYNC_SHA256_DIGEST_LEN, data, ret->data)) {
     free(ret);
@@ -595,7 +595,7 @@ int pssl_open(int sock, ssl_connection_t **sslconn, const char *hostname) {
   mbedtls_ssl_conf_authmode(&conn->cfg, MBEDTLS_SSL_VERIFY_REQUIRED);
   mbedtls_ssl_conf_ca_chain(&conn->cfg, &psync_mbed_trusted_certs_x509, NULL);
   mbedtls_ssl_conf_ciphersuites(&conn->cfg, psync_mbed_ciphersuite);
-  mbedtls_ssl_conf_rng(&conn->cfg, ctr_drbg_random_locked, &psync_mbed_rng);
+  mbedtls_ssl_conf_rng(&conn->cfg, drbg_random_safe, &psync_mbed_rng);
 
   debug(D_NOTICE, "Configured SSL parameters");
 
@@ -652,7 +652,7 @@ err0:
 }
 
 void pssl_random(unsigned char *buf, int num) {
-  if (unlikely(ctr_drbg_random_locked(&psync_mbed_rng, buf, num))) {
+  if (unlikely(drbg_random_safe(&psync_mbed_rng, buf, num))) {
     debug(D_CRITICAL, "could not generate %d random bytes, exiting", num);
     abort();
   }
@@ -700,7 +700,7 @@ psync_symmetric_key_t psymkey_decrypt(psync_rsa_privatekey_t rsa, const unsigned
   unsigned char buff[2048];
   psync_symmetric_key_t ret;
   size_t len;
-  if (mbedtls_rsa_rsaes_oaep_decrypt(rsa, ctr_drbg_random_locked,
+  if (mbedtls_rsa_rsaes_oaep_decrypt(rsa, drbg_random_safe,
                                      &psync_mbed_rng, NULL,
                                      0, &len, data, buff, sizeof(buff)))
     return PSYNC_INVALID_SYM_KEY;
@@ -761,7 +761,7 @@ psync_encrypted_symmetric_key_t psymkey_encrypt(psync_rsa_publickey_t rsa, const
   ret = (psync_encrypted_symmetric_key_t)psync_malloc(
       offsetof(psync_encrypted_data_struct_t, data) + rsalen);
   if ((code = mbedtls_rsa_rsaes_oaep_encrypt(
-           rsa, ctr_drbg_random_locked, &psync_mbed_rng,
+           rsa, drbg_random_safe, &psync_mbed_rng,
            NULL, 0, datalen, data, ret->data))) {
     psync_free(ret);
     debug(
