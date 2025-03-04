@@ -160,22 +160,22 @@ static void copy_iv_and_xor_with_counter(unsigned char *dest,
   }
 }
 
-psync_symmetric_key_t pcrypto_key_len(size_t len) {
-  psync_symmetric_key_t key;
-  key = (psync_symmetric_key_t)pmemlock_malloc(
-      offsetof(psync_symmetric_key_struct_t, key) + len);
+pssl_symkey_t *pcrypto_key_len(size_t len) {
+  pssl_symkey_t *key;
+  key = (pssl_symkey_t *)pmemlock_malloc(
+      offsetof(pssl_symkey_t, key) + len);
   key->keylen = len;
   pssl_random(key->key, len);
   return key;
 }
 
-psync_symmetric_key_t pcrypto_key() {
+pssl_symkey_t *pcrypto_key() {
   return pcrypto_key_len(PSYNC_AES256_KEY_SIZE +
                                          PSYNC_AES256_BLOCK_SIZE);
 }
 
 pcrypto_ctr_encdec_t
-pcrypto_ctr_encdec_create(psync_symmetric_key_t key) {
+pcrypto_ctr_encdec_create(pssl_symkey_t *key) {
   psync_aes256_encoder enc;
   pcrypto_ctr_encdec_t ret;
   if (unlikely_log(key->keylen <
@@ -398,7 +398,7 @@ pcrypto_decode_text(pcrypto_textdec_t enc,
 }
 
 pcrypto_textenc_t
-pcrypto_textenc_create(psync_symmetric_key_t key) {
+pcrypto_textenc_create(pssl_symkey_t *key) {
   psync_aes256_encoder enc;
   pcrypto_textenc_t ret;
   if (unlikely_log(key->keylen <
@@ -424,7 +424,7 @@ void pcrypto_textenc_free(
 }
 
 pcrypto_textdec_t
-pcrypto_textdec_create(psync_symmetric_key_t key) {
+pcrypto_textdec_create(pssl_symkey_t *key) {
   psync_aes256_encoder enc;
   pcrypto_textenc_t ret;
   if (unlikely_log(key->keylen <
@@ -450,7 +450,7 @@ void pcrypto_textdec_free(
 }
 
 pcrypto_sector_encdec_t
-pcrypto_sec_encdec_create(psync_symmetric_key_t key) {
+pcrypto_sec_encdec_create(pssl_symkey_t *key) {
   psync_aes256_encoder enc;
   psync_aes256_decoder dec;
   pcrypto_sector_encdec_t ret;

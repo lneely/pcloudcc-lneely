@@ -321,7 +321,7 @@ static void psync_p2p_tcphandler(void *ptr) {
   psync_fileid_t localfileid;
   psync_binary_rsa_key_t binpubrsa;
   psync_rsa_publickey_t pubrsa;
-  psync_symmetric_key_t aeskey;
+  pssl_symkey_t *aeskey;
   psync_encrypted_symmetric_key_t encaeskey;
   pcrypto_ctr_encdec_t encoder;
   char *token, *localpath;
@@ -346,7 +346,7 @@ static void psync_p2p_tcphandler(void *ptr) {
     debug(D_WARNING, "got request for file that we do not have");
     goto err0;
   }
-  binpubrsa = psync_ssl_alloc_binary_rsa(packet.keylen);
+  binpubrsa = psymkey_alloc(packet.keylen);
   if (unlikely_log(
           socket_read_all(sock, binpubrsa->data, binpubrsa->datalen))) {
     psync_free(binpubrsa);
@@ -651,7 +651,7 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
                               const unsigned char *filehashhex, uint64_t fsize,
                               const char *filename) {
   uint32_t keylen = 0, enctype = 0;
-  psync_symmetric_key_t key;
+  pssl_symkey_t *key;
   psync_encrypted_symmetric_key_t ekey;
   pcrypto_ctr_encdec_t decoder;
   psync_hash_ctx hashctx;

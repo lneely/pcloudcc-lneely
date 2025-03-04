@@ -1460,7 +1460,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
           goto ex0;
         }
       } else {
-        psync_symmetric_key_t symkey;
+        pssl_symkey_t *symkey;
         encsymkey = pcryptofolder_filencoder_key_newplain(
             0, &encsymkeylen, &symkey);
         if (unlikely_log(psync_crypto_is_error(encsymkey))) {
@@ -1582,7 +1582,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
   psync_fspath_t *fpath;
   psync_fstask_folder_t *folder;
   psync_fstask_creat_t *cr;
-  psync_symmetric_key_t symkey;
+  pssl_symkey_t *symkey;
   pcrypto_sector_encdec_t encoder;
   char *encsymkey;
   size_t encsymkeylen;

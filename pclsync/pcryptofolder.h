@@ -62,7 +62,7 @@ pcrypto_sector_encdec_t pcryptofolder_filencoder_from_binresult(psync_fileid_t f
 pcrypto_sector_encdec_t pcryptofolder_filencoder_get(psync_fsfileid_t fileid, uint64_t hash, int nonetwork);
 char *pcryptofolder_filencoder_key_get(psync_fsfileid_t fileid, uint64_t hash, size_t *keylen);
 char *pcryptofolder_filencoder_key_new(uint32_t flags, size_t *keylen);
-char * pcryptofolder_filencoder_key_newplain(uint32_t flags, size_t *keylen, psync_symmetric_key_t *deckey);
+char * pcryptofolder_filencoder_key_newplain(uint32_t flags, size_t *keylen, pssl_symkey_t **deckey);
 void pcryptofolder_filencoder_release(psync_fsfileid_t fileid, uint64_t hash, pcrypto_sector_encdec_t encoder);
 char * pcryptofolder_flddecode_filename(pcrypto_textdec_t decoder, const char *name);
 pcrypto_textdec_t pcryptofolder_flddecoder_get(psync_fsfolderid_t folderid);
