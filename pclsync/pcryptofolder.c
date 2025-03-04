@@ -1852,8 +1852,9 @@ int psync_pcloud_crypto_reencode_key(const unsigned char *rsapub, size_t rsapubl
     goto err_bk_1;
   }
 
-  if (!crypto_keys_match(pub, priv))
+  if (!crypto_keys_match()) {
     goto err_ph_2;
+  }
   psync_sha256(newpriv, newprivlen, newprivsha);
   rsasign = prsa_signature(priv, newprivsha);
   if (psync_crypto_is_error(rsasign)) {
