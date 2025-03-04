@@ -197,7 +197,7 @@ void pcrypto_ctr_encdec_free(
   psync_free(enc);
 }
 
-void pcrypto_ctr_encdec_decode(
+void pcrypto_ctr_encdec_encode(
     pcrypto_ctr_encdec_t enc, void *data, size_t datalen,
     uint64_t dataoffset) {
   unsigned char buff[PSYNC_AES256_BLOCK_SIZE * 3], *aessrc, *aesdst;

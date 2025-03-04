@@ -84,7 +84,7 @@ typedef pcrypto_encdec_iv_t *pcrypto_sector_encdec_t;
 #define PSYNC_CRYPTO_INVALID_REVISIONID ((uint32_t)-1)
 
 pcrypto_ctr_encdec_t pcrypto_ctr_encdec_create(psync_symmetric_key_t key);
-void pcrypto_ctr_encdec_decode(pcrypto_ctr_encdec_t enc, void *data, size_t datalen, uint64_t dataoffset);
+void pcrypto_ctr_encdec_encode(pcrypto_ctr_encdec_t enc, void *data, size_t datalen, uint64_t dataoffset);
 void pcrypto_ctr_encdec_free(pcrypto_ctr_encdec_t enc);
 int pcrypto_decode_sec(pcrypto_sector_encdec_t enc, const unsigned char *data, size_t datalen, unsigned char *out, const pcrypto_sector_auth_t auth, uint64_t sectorid);
 unsigned char * pcrypto_decode_text(pcrypto_textdec_t enc, const unsigned char *data, size_t datalen);

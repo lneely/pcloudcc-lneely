@@ -117,13 +117,13 @@ static int write_request(int fd, int msgtype, const char *value, char **out,
 
   *ret = 0; // Initialize ret to 0
 
-  len = strlen(value);
-  size = sizeof(rpc_message_t) + len + 1;
+  len = strlen(value) + 1;
+  size = sizeof(rpc_message_t) + len;
   buf = (char *)malloc(size);
   request = (rpc_message_t *)buf;
   memset(request, 0, size);
   request->type = msgtype;
-  strncpy(request->value, value, len + 1);
+  strncpy(request->value, value, len);
   request->length = size;
   bytes_written = 0;
   curbuf = (char *)request;

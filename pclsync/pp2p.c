@@ -404,7 +404,7 @@ static void psync_p2p_tcphandler(void *ptr) {
       rd = sizeof(buff);
     if (unlikely_log(pfile_read(fd, buff, rd) != rd))
       break;
-    pcrypto_ctr_encdec_decode(encoder, buff, rd, off);
+    pcrypto_ctr_encdec_encode(encoder, buff, rd, off);
     if (unlikely_log(socket_write_all(sock, buff, rd)))
       break;
     off += rd;
@@ -701,7 +701,7 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
       rd = fsize - off;
     if (unlikely_log(socket_read_all(sock, buff, rd)))
       goto err0;
-    pcrypto_ctr_encdec_decode(decoder, buff, rd, off);
+    pcrypto_ctr_encdec_encode(decoder, buff, rd, off);
     if (unlikely_log(pfile_write(fd, buff, rd) != rd))
       goto err0;
     psync_hash_update(&hashctx, buff, rd);

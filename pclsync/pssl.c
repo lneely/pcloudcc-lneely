@@ -736,7 +736,6 @@ psync_rsa_privatekey_t psync_ssl_rsa_load_private(const unsigned char *keydata, 
     psync_free(rsactx);
     return PSYNC_INVALID_RSA;
   } else {
-    mbedtls_rsa_set_padding(rsactx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
     return rsactx;
   }
 }
