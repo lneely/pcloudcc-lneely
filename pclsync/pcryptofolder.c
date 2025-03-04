@@ -1281,19 +1281,21 @@ int pcryptofolder_unlock(const char *password) {
    * normally deadlock with us holding writelock and waiting for sql_lock.
    * Therefore we use sql_trylock here.
    */
-retry:
-  pthread_rwlock_wrlock(&rwlock);
-  if (crypto_started_l) {
-    pthread_rwlock_unlock(&rwlock);
-    return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_ALREADY_STARTED);
-  }
-  rowcnt = 0;
-  rsapriv = rsapub = salt = NULL;
-  iterations = 0;
-  if (psync_sql_trylock()) {
-    pthread_rwlock_unlock(&rwlock);
-    psys_sleep_milliseconds(1);
-    goto retry;
+  while (1) {
+    pthread_rwlock_wrlock(&rwlock);
+    if (crypto_started_l) {
+      pthread_rwlock_unlock(&rwlock);
+      return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_ALREADY_STARTED);
+    }
+    rowcnt = 0;
+    rsapriv = rsapub = salt = NULL;
+    iterations = 0;
+    if (psync_sql_trylock()) {
+      pthread_rwlock_unlock(&rwlock);
+      psys_sleep_milliseconds(1);
+      continue;
+    }
+    break;
   }
   res = psync_sql_query_nolock(
       "SELECT id, value FROM setting WHERE id IN ('crypto_private_key', "
