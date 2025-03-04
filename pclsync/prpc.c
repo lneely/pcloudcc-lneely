@@ -55,7 +55,7 @@
 int overlays_running = 1;
 int callbacks_running = 1;
 
-void psync_overlay_main_loop() {
+void prpc_proc() {
   struct sockaddr_un addr;
   int fd, cl;
 
@@ -89,7 +89,7 @@ void psync_overlay_main_loop() {
 
     // handle the request in a new thread
     prun_thread1("Pipe request handle routine",
-                      psync_overlay_handle_request, // thread proc
+                      prpc_proc_handle, // thread proc
                       (LPVOID)&cl                   // thread parameter
     );
   }
@@ -97,7 +97,7 @@ void psync_overlay_main_loop() {
   return;
 }
 
-void psync_overlay_handle_request(void *lpvParam) {
+void prpc_proc_handle(void *lpvParam) {
   int *sockfd;                  // pcloud socket file descriptor
   int rc;                       // bytes read / written per iteration
   int readbytes;                // total bytes read from request
@@ -134,7 +134,7 @@ void psync_overlay_handle_request(void *lpvParam) {
   request = (rpc_message_t *)rqbuf;
   response = (rpc_message_t *)malloc(POVERLAY_BUFSIZE);
   if (request) {
-    psync_overlay_get_response(request, response);
+    prpc_get_response(request, response);
 
     ssize_t total_size = sizeof(uint32_t) + sizeof(uint64_t) + response->length;
     ssize_t bytes_written = write(*sockfd, response, total_size);
@@ -168,14 +168,14 @@ static int callbacks_size = 15;
 static const int calbacks_lower_band = 20;
 
 // registers an overlay callback for a given message type.
-int psync_overlay_register_callback(int msgtype, poverlay_callback callback) {
+int prpc_cb_register(int msgtype, poverlay_callback callback) {
   poverlay_callback *callbacks_old = callbacks;
   int callbacks_size_old = callbacks_size;
   if (msgtype < calbacks_lower_band)
     return -1;
   if (msgtype > (calbacks_lower_band + callbacks_size)) {
     callbacks_size = msgtype - calbacks_lower_band + 1;
-    psync_overlay_init_callbacks();
+    prpc_cb_init();
     memcpy(callbacks, callbacks_old,
            callbacks_size_old * sizeof(poverlay_callback));
     psync_free(callbacks_old);
@@ -184,7 +184,7 @@ int psync_overlay_register_callback(int msgtype, poverlay_callback callback) {
   return 0;
 }
 
-void psync_overlay_init_callbacks() {
+void prpc_cb_init() {
   callbacks = (poverlay_callback *)psync_malloc(sizeof(poverlay_callback) *
                                                 callbacks_size);
   memset(callbacks, 0, sizeof(poverlay_callback) * callbacks_size);
@@ -254,8 +254,7 @@ static void psync_overlay_get_overlay_response(rpc_message_t *request,
   }
 }
 
-void psync_overlay_get_response(rpc_message_t *request,
-                                rpc_message_t *response) {
+void prpc_get_response(rpc_message_t *request, rpc_message_t *response) {
 
   const char *dbgmsg; // debug messages
   size_t value_avail; // space available to store value (flexible array)
@@ -297,9 +296,9 @@ void psync_overlay_get_response(rpc_message_t *request,
   }
 }
 
-void psync_overlay_stop_overlays() { overlays_running = 0; }
-void psync_overlay_start_overlays() { overlays_running = 1; }
-void psync_overlay_stop_overlay_callbacks() { callbacks_running = 0; }
-void psync_overlay_start_overlay_callbacks() { callbacks_running = 1; }
-int psync_overlay_overlays_running() { return overlays_running; }
-int psync_overlay_callbacks_running() { return callbacks_running; }
+void prpc_stop() { overlays_running = 0; }
+void prpc_start() { overlays_running = 1; }
+void prpc_cb_stop() { callbacks_running = 0; }
+void prpc_cb_start() { callbacks_running = 1; }
+int prpc_started() { return overlays_running; }
+int prpc_cb_started() { return callbacks_running; }

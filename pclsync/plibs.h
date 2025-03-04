@@ -71,10 +71,6 @@
 #undef assert
 #endif
 
-#define PSYNC_SSL_DEBUG_LEVEL                                                  \
-  0 /* Please make sure this setting is always set to 0 for release builds !!! \
-       Possible values are in the range [0, 5] */
-
 #define debug(level, ...)                                                      \
   do {                                                                         \
     if (level <= DEBUG_LEVEL)                                                  \

@@ -228,16 +228,6 @@ static void ssl_debug_cb(void *ctx, int level, const char *msg, int TODO1,
         TODO1); // trying to figure out what these are...
 }
 
-void psync_set_ssl_debug_callback(psync_ssl_debug_callback_t cb) {
-  if (cb) {
-    pssl_log_level(PSYNC_SSL_DEBUG_LEVEL);
-    pssl_debug_cb(cb, NULL);
-  } else {
-    pssl_log_level(0);
-    pssl_debug_cb(NULL, NULL);
-  }
-}
-
 void psync_set_apiserver(const char *binapi, uint32_t locationid) {
   if (binapi) {
     psync_apipool_set_server(binapi);
@@ -299,10 +289,12 @@ int psync_init() {
     pthread_mutex_unlock(&psync_libstate_mutex);
   }
 
-  prun_thread("Overlay main thread", psync_overlay_main_loop);
-  psync_overlay_init_callbacks();
-  if (PSYNC_SSL_DEBUG_LEVEL)
-    psync_set_ssl_debug_callback(ssl_debug_cb);
+  prun_thread("rpc main thread", prpc_proc);
+  prpc_cb_init();
+  if (PSSL_DEBUG_LEVEL) {
+    pssl_log_level(PSSL_DEBUG_LEVEL);
+    pssl_debug_cb(ssl_debug_cb, NULL);
+  }
 
   return 0;
 }

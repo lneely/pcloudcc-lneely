@@ -21,6 +21,7 @@ key_t pshm_get_key() {
         return (key_t)-1;
     }
     snprintf(path, sizeof(path), "%s/.pcloud/data.db", home);
+    psync_free(home);
     return ftok(path, 'A');
 }
 

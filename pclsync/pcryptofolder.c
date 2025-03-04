@@ -1337,6 +1337,7 @@ int pcryptofolder_unlock(const char *password) {
     }
   }
 
+  // load the public key
   debug(D_NOTICE, "trying to load public key");
   pubkey = prsa_load_public(rsapub, rsapublen);
   if (pubkey == PRSA_INVALID) {
@@ -1349,8 +1350,7 @@ int pcryptofolder_unlock(const char *password) {
   }
   debug(D_NOTICE, "successfully loaded public key");
 
-  // generate the symmetric key based on the given password and the downloaded
-  // private key
+  // decode the private key
   debug(D_NOTICE, "generating symmetric key");
   aeskey = psymkey_generate(password, PAES_KEY_SIZE + PAES_BLOCK_SIZE, salt, saltlen, iterations);
   enc = pcrypto_ctr_encdec_create(aeskey);
@@ -1359,9 +1359,9 @@ int pcryptofolder_unlock(const char *password) {
   memcpy(rsaprivdec, rsapriv, rsaprivlen);
   pcrypto_ctr_encdec_encode(enc, rsaprivdec, rsaprivlen, 0);
   pcrypto_ctr_encdec_free(enc);
-  debug(D_NOTICE, "successfully generated symmetric key");
+  debug(D_NOTICE, "successfully decoded private key");
 
-
+  // load the decoded private key
   debug(D_NOTICE, "trying to load private key");
   privkey = prsa_load_private(rsaprivdec, rsaprivlen);
   pssl_cleanup(rsaprivdec, rsaprivlen);

@@ -216,6 +216,13 @@ static void set_errno(pssl_connection_t *conn, int err) {
   }
 }
 
+static void log_ssl_err(int loglevel, int errnum, const char *fmt, ...) {
+  char ebuf[100];
+  mbedtls_strerror(errnum, ebuf, sizeof(ebuf));
+  debug(D_ERROR, "%s", fmt);
+}
+
+
 void paes_2blk_encode(pssl_decoder_t enc, const unsigned char *src, unsigned char *dst) {
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src + PAES_BLOCK_SIZE,
@@ -403,6 +410,35 @@ pssl_rsaprivkey_t prsa_load_private(const unsigned char *keydata, size_t keylen)
   }
 }
 
+pssl_rsaprivkey_t prsa_load_private2(const unsigned char *keydata, size_t keylen, pssl_symkey_t *symkey) {
+  mbedtls_pk_context pkctx;
+  mbedtls_rsa_context *rsactx;
+  int ret;
+  mbedtls_pk_init(&pkctx);
+
+  ret = mbedtls_pk_parse_key(&pkctx, keydata, keylen, symkey->key, symkey->keylen, mbedtls_ctr_drbg_random, &psync_mbed_rng.rnd);
+  if (unlikely(ret)) {
+      char ebuf[100];
+      mbedtls_strerror(ret, ebuf, sizeof(ebuf));
+      debug(D_WARNING, "failed to parse private key: %s (-0x%04x)", ebuf, (unsigned int) -ret);
+      return PRSA_INVALID;
+  }
+
+  rsactx = psync_new(mbedtls_rsa_context);
+  mbedtls_rsa_init(rsactx);
+  mbedtls_rsa_set_padding(rsactx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+  ret = mbedtls_rsa_copy(rsactx, mbedtls_pk_rsa(pkctx));
+  mbedtls_pk_free(&pkctx);
+  if (unlikely(ret)) {
+    debug(D_WARNING, "rsa_copy failed with code %d", ret);
+    mbedtls_rsa_free(rsactx);
+    psync_free(rsactx);
+    return PRSA_INVALID;
+  } else {
+    return rsactx;
+  }
+}
+
 pssl_rsapubkey_t prsa_load_public(const unsigned char *keydata, size_t keylen) {
   mbedtls_pk_context ctx;
   mbedtls_rsa_context *rsa;
@@ -503,7 +539,7 @@ int pssl_finish(pssl_connection_t *sslconn, const char *hostname) {
     save_session(conn);
     return PSSL_SUCCESS;
   } else {
-    debug(D_ERROR, "handshake failed, return code was %d", ret);
+    log_ssl_err(D_WARNING, ret, "handshake failed: %s (-0x%04x)", (unsigned int) -ret);
   }
   set_errno(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
@@ -537,7 +573,7 @@ int pssl_init() {
   mbedtls_ctr_drbg_init(&psync_mbed_rng.rnd);
   if ((result = mbedtls_ctr_drbg_seed(&psync_mbed_rng.rnd, mbedtls_entropy_func,
                                       &psync_mbed_entropy, NULL, 0))) {
-    debug(D_ERROR, "mbedtls_ctr_drbg_seed failed with return code %d", result);
+    log_ssl_err(D_ERROR, result, "mbedtls_ctr_drbg_seed failed with return code %d", result);
     return PRINT_RETURN(-1);
   }
 
@@ -547,8 +583,7 @@ int pssl_init() {
                                     (unsigned char *)psync_ssl_trusted_certs[i],
                                     1 + strlen(psync_ssl_trusted_certs[i]));
     if (result) {
-      debug(D_ERROR, "failed to load certificate %lu, got result %d",
-            (unsigned long)i, result);
+      log_ssl_err(D_ERROR, result, "failed to load certificate %lu, got result %d", (unsigned long)i, result);
     }
   }
 
@@ -578,8 +613,7 @@ int pssl_open(int sock, pssl_connection_t **sslconn, const char *hostname) {
   if ((ret = mbedtls_ssl_config_defaults(&conn->cfg, MBEDTLS_SSL_IS_CLIENT,
                                          MBEDTLS_SSL_TRANSPORT_STREAM,
                                          MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
-    debug(D_ERROR,
-          "Failed to set SSL config defaults: mbedtls_ssl_config_defaults returned %d", ret);
+    log_ssl_err(D_ERROR, ret, "Failed to set SSL config defaults");
     goto err0;
   }
 

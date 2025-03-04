@@ -1618,12 +1618,6 @@ typedef int (*poverlay_callback)(const char *);
  * synchronize.
  */
 
-int psync_overlay_register_callback(int id, poverlay_callback callback);
-void psync_overlay_stop_overlays();
-void psync_overlay_start_overlays();
-void psync_overlay_stop_overlay_callbacks();
-void psync_overlay_start_overlay_callbacks();
-
 int psync_setlanguage(const char *language, char **err);
 
 // Update crypto status information from userinfo.

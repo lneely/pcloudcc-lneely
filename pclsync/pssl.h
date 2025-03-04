@@ -64,6 +64,9 @@
 #define PSYMKEY_INVALID NULL
 #define PSYMKEY_INVALID_ENC NULL
 
+// set to 0 for release; valid range [0..5]
+#define PSSL_DEBUG_LEVEL  5
+
 // FIXME: fucking macros...
 #define psync_sha1(data, datalen, checksum)                                    \
   mbedtls_sha1(data, datalen, checksum)
@@ -146,6 +149,7 @@ pssl_context_t prsa_generate(int bits);
 pssl_rsaprivkey_t prsa_get_private(pssl_context_t rsa);
 pssl_rsapubkey_t prsa_get_public(pssl_context_t rsa);
 pssl_rsaprivkey_t prsa_load_private(const unsigned char *keydata, size_t keylen);
+pssl_rsaprivkey_t prsa_load_private2(const unsigned char *keydata, size_t keylen, pssl_symkey_t *symkey);
 pssl_rsapubkey_t prsa_load_public(const unsigned char *keydata, size_t keylen);
 pssl_signature_t prsa_signature(pssl_rsaprivkey_t rsa, const unsigned char *data);
 
