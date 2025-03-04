@@ -118,7 +118,6 @@ typedef psync_encrypted_data_t psync_rsa_signature_t;
 
 typedef void (*psync_ssl_debug_callback_t)(void *ctx, int level, const char *msg, int, const char *);
 
-// Lock used to serialize access to RSA decrypt key function
 void psync_ssl_set_log_threshold(int threshold);
 void psync_ssl_set_debug_callback(psync_ssl_debug_callback_t cb, void *ctx);
 int psync_ssl_init();
@@ -142,8 +141,6 @@ psync_binary_rsa_key_t psync_ssl_rsa_public_to_binary(psync_rsa_publickey_t rsa)
 psync_binary_rsa_key_t psync_ssl_rsa_private_to_binary(psync_rsa_privatekey_t rsa);
 psync_rsa_publickey_t psync_ssl_rsa_load_public(const unsigned char *keydata, size_t keylen);
 psync_rsa_privatekey_t psync_ssl_rsa_load_private(const unsigned char *keydata, size_t keylen);
-psync_rsa_publickey_t psync_ssl_rsa_binary_to_public(psync_binary_rsa_key_t bin);
-psync_rsa_privatekey_t psync_ssl_rsa_binary_to_private(psync_binary_rsa_key_t bin);
 void psync_ssl_rsa_free_binary(psync_binary_rsa_key_t bin);
 psync_symmetric_key_t psync_ssl_gen_symmetric_key_from_pass(const char *password, size_t keylen, const unsigned char *salt, size_t saltlen, size_t iterations);
 char *psync_ssl_derive_password_from_passphrase(const char *username, const char *passphrase);

@@ -361,7 +361,7 @@ static void psync_p2p_tcphandler(void *ptr) {
     goto err0;
   }
   psync_free(token);
-  pubrsa = psync_ssl_rsa_binary_to_public(binpubrsa);
+  pubrsa = psync_ssl_rsa_load_public(binpubrsa->data, binpubrsa->datalen);
   psync_free(binpubrsa);
   if (unlikely_log(pubrsa == PSYNC_INVALID_RSA))
     goto err0;

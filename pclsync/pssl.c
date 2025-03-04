@@ -63,6 +63,7 @@
 #include <stddef.h>
 #include <string.h>
 
+// Lock used to serialize access to RSA decrypt key function
 typedef struct {
   mbedtls_ctr_drbg_context rnd;
   pthread_mutex_t mutex;
@@ -296,8 +297,7 @@ void psync_ssl_set_debug_callback(psync_ssl_debug_callback_t cb, void *ctx) {
   debug_ctx = ctx;
 }
 
-int ctr_drbg_random_locked(void *p_rng, unsigned char *output,
-                           size_t output_len) {
+int ctr_drbg_random_locked(void *p_rng, unsigned char *output, size_t output_len) {
   ctr_drbg_context_locked *rng;
   int ret;
   rng = (ctr_drbg_context_locked *)p_rng;
@@ -591,7 +591,7 @@ psync_rsa_publickey_t psync_ssl_rsa_get_public(psync_rsa_t rsa) {
   bin = psync_ssl_rsa_public_to_binary(rsa);
   if (bin == PSYNC_INVALID_BIN_RSA)
     return PSYNC_INVALID_RSA;
-  ret = psync_ssl_rsa_binary_to_public(bin);
+  ret = psync_ssl_rsa_load_public(bin->data, bin->datalen);  
   psync_ssl_rsa_free_binary(bin);
   return ret;
 }
@@ -669,7 +669,8 @@ psync_rsa_publickey_t psync_ssl_rsa_load_public(const unsigned char *keydata, si
 
   mbedtls_pk_init(&ctx);
 
-  if (unlikely(ret = mbedtls_pk_parse_public_key(&ctx, keydata, keylen))) {
+  ret = mbedtls_pk_parse_public_key(&ctx, keydata, keylen);
+  if (unlikely(ret)) {
     debug(D_WARNING,
           "pk_parse_public_key failed with code %d (-0x%04x); resorting to "
           "mbedtls 1.x RSA fallback",
@@ -723,6 +724,7 @@ psync_rsa_privatekey_t psync_ssl_rsa_load_private(const unsigned char *keydata, 
       debug(D_WARNING, "mbedtls_pk_parse_key failed with code %d", ret);
       return PSYNC_INVALID_RSA;
   }
+
   rsactx = psync_new(mbedtls_rsa_context);
   mbedtls_rsa_init(rsactx);
   mbedtls_rsa_set_padding(rsactx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
@@ -737,14 +739,6 @@ psync_rsa_privatekey_t psync_ssl_rsa_load_private(const unsigned char *keydata, 
     mbedtls_rsa_set_padding(rsactx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
     return rsactx;
   }
-}
-
-psync_rsa_publickey_t psync_ssl_rsa_binary_to_public(psync_binary_rsa_key_t bin) {
-  return psync_ssl_rsa_load_public(bin->data, bin->datalen);
-}
-
-psync_rsa_privatekey_t psync_ssl_rsa_binary_to_private(psync_binary_rsa_key_t bin) {
-  return psync_ssl_rsa_load_private(bin->data, bin->datalen);
 }
 
 psync_symmetric_key_t psync_ssl_gen_symmetric_key_from_pass(const char *password, size_t keylen, const unsigned char *salt, size_t saltlen, size_t iterations) {
