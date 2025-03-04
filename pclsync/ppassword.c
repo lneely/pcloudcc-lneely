@@ -351,8 +351,8 @@ uint64_t ppassword_score(const char *cpassword) {
       ldpwd[nlen] = lpwd[nlen];
   }
   num = score_variants(password, lpwd, ldpwd, plen);
-  pssl_memclean(lpwd, plen);
-  pssl_memclean(ldpwd, plen);
+  pssl_cleanup(lpwd, plen);
+  pssl_cleanup(ldpwd, plen);
   psync_free(lpwd);
   psync_free(ldpwd);
   mul_score(num);

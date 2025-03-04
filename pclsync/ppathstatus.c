@@ -216,7 +216,7 @@ void ppathstatus_reload_syncs() {
 void ppathstatus_clear_cache() {
   uint64_t ndrv_hash_seed, nsync_hash_seed;
   do {
-    pssl_rand_strong((unsigned char *)&ndrv_hash_seed,
+    pssl_random((unsigned char *)&ndrv_hash_seed,
                           sizeof(ndrv_hash_seed));
   } while (unlikely(!ndrv_hash_seed));
   nsync_hash_seed = 0x49916a8e891d1dafULL * ndrv_hash_seed;
@@ -229,7 +229,7 @@ void ppathstatus_clear_cache() {
 void ppathstatus_clear_sync_cache() {
   uint64_t nsync_hash_seed;
   do {
-    pssl_rand_strong((unsigned char *)&nsync_hash_seed,
+    pssl_random((unsigned char *)&nsync_hash_seed,
                           sizeof(nsync_hash_seed));
   } while (unlikely(nsync_hash_seed == drv_hash_seed));
   psync_sql_lock();

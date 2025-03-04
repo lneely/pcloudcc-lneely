@@ -230,11 +230,11 @@ static void ssl_debug_cb(void *ctx, int level, const char *msg, int TODO1,
 
 void psync_set_ssl_debug_callback(psync_ssl_debug_callback_t cb) {
   if (cb) {
-    pssl_set_log_threshold(PSYNC_SSL_DEBUG_LEVEL);
-    pssl_set_debug_cb(cb, NULL);
+    pssl_log_level(PSYNC_SSL_DEBUG_LEVEL);
+    pssl_debug_cb(cb, NULL);
   } else {
-    pssl_set_log_threshold(0);
-    pssl_set_debug_cb(NULL, NULL);
+    pssl_log_level(0);
+    pssl_debug_cb(NULL, NULL);
   }
 }
 
@@ -2182,7 +2182,7 @@ int psync_password_quality10000(const char *password) {
 
 char *psync_derive_password_from_passphrase(const char *username,
                                             const char *passphrase) {
-  return pssl_derive_pwd(username, passphrase);
+  return psymkey_derive_passphrase(username, passphrase);
 }
 
 int psync_crypto_setup(const char *password, const char *hint) {

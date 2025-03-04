@@ -221,7 +221,7 @@ static void psync_p2p_check(const packet_check *packet) {
   else
     return;
   resp.port = tcpport;
-  pssl_rand_weak(resp.rand, sizeof(resp.rand));
+  pssl_random(resp.rand, sizeof(resp.rand));
   memcpy(hashsource, hashhex, PSYNC_HASH_DIGEST_HEXLEN);
   memcpy(hashsource + PSYNC_HASH_DIGEST_HEXLEN, resp.rand, sizeof(resp.rand));
   psync_hash(hashsource, PSYNC_HASH_BLOCK_SIZE, hashbin);
@@ -361,7 +361,7 @@ static void psync_p2p_tcphandler(void *ptr) {
     goto err0;
   }
   psync_free(token);
-  pubrsa = pssl_rsa_load_pub(binpubrsa->data, binpubrsa->datalen);
+  pubrsa = prsa_load_public(binpubrsa->data, binpubrsa->datalen);
   psync_free(binpubrsa);
   if (unlikely_log(pubrsa == PSYNC_INVALID_RSA))
     goto err0;
@@ -377,9 +377,10 @@ static void psync_p2p_tcphandler(void *ptr) {
     goto err0;
   }
   aeskey = pcrypto_key();
-  encaeskey = pssl_symkey_encrypt(pubrsa, aeskey);
+  encaeskey = psymkey_encrypt(pubrsa, aeskey->key, aeskey->keylen);
+
   encoder = pcrypto_ctr_encdec_create(aeskey);
-  pssl_symkey_free(aeskey);
+  psymkey_free(aeskey);
   keylen = encaeskey->datalen;
   enctype = P2P_ENCTYPE_RSA_AES;
   if (unlikely_log(encaeskey == PSYNC_INVALID_ENC_SYM_KEY) ||
@@ -550,7 +551,7 @@ static void psync_p2p_wake() {
 
 void pp2p_init() {
   unsigned char computerbin[PSYNC_HASH_DIGEST_LEN];
-  pssl_rand_weak(computerbin, PSYNC_HASH_DIGEST_LEN);
+  pssl_random(computerbin, PSYNC_HASH_DIGEST_LEN);
   psync_binhex(computername, computerbin, PSYNC_HASH_DIGEST_LEN);
   ptimer_exception_handler(psync_p2p_wake);
   if (!psync_setting_get_bool(_PS(p2psync)))
@@ -574,17 +575,17 @@ static int psync_p2p_check_rsa() {
     psync_rsa_publickey_t rsapub;
     psync_binary_rsa_key_t rsapubbin;
     debug(D_NOTICE, "generating %ubit RSA key", PSYNC_P2P_RSA_SIZE);
-    rsa = pssl_rsa_gen(PSYNC_P2P_RSA_SIZE);
+    rsa = prsa_generate(PSYNC_P2P_RSA_SIZE);
     debug(D_NOTICE, "key generated");
     if (unlikely_log(rsa == PSYNC_INVALID_RSA))
       goto rete;
-    rsapriv = pssl_rsa_get_priv(rsa);
-    rsapub = pssl_rsa_get_pub(rsa);
+    rsapriv = prsa_get_private(rsa);
+    rsapub = prsa_get_public(rsa);
     if (likely_log(rsapub != PSYNC_INVALID_RSA))
-      rsapubbin = pssl_rsa_bin_pub(rsapub);
+      rsapubbin = prsa_binary_public(rsapub);
     else
       rsapubbin = PSYNC_INVALID_BIN_RSA;
-    pssl_rsa_free(rsa);
+    prsa_free(rsa);
     if (likely_log(rsapriv != PSYNC_INVALID_RSA &&
                    rsapub != PSYNC_INVALID_RSA &&
                    rsapubbin != PSYNC_INVALID_BIN_RSA)) {
@@ -594,11 +595,11 @@ static int psync_p2p_check_rsa() {
       goto ret0;
     } else {
       if (rsapriv != PSYNC_INVALID_RSA)
-        pssl_rsa_free_priv(rsapriv);
+        prsa_free_private(rsapriv);
       if (rsapub != PSYNC_INVALID_RSA)
-        pssl_rsa_free_pub(rsapub);
+        prsa_free_public(rsapub);
       if (rsapubbin != PSYNC_INVALID_BIN_RSA)
-        pssl_rsa_bin_free(rsapubbin);
+        prsa_binary_free(rsapubbin);
       goto rete;
     }
   }
@@ -672,18 +673,16 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
     debug(D_ERROR, "too long key - %u bytes", (unsigned)keylen);
     return PSYNC_NET_PERMFAIL;
   }
-  ekey = pssl_alloc_symkey(keylen);
+  ekey = psymkey_alloc(keylen);
   if (unlikely_log(socket_read_all(sock, ekey->data, keylen)) ||
-      unlikely_log((key = pssl_symkey_decrypt_lock(
+      unlikely_log((key = psymkey_decrypt_lock(
                         &privkey, &ekey)) == PSYNC_INVALID_SYM_KEY)) {
-    // unlikely_log((key=pssl_symkey_decrypt(&psync_rsa_private,
-    // &ekey))==PSYNC_INVALID_SYM_KEY)){
     psync_free(ekey);
     return PSYNC_NET_TEMPFAIL;
   }
   psync_free(ekey);
   decoder = pcrypto_ctr_encdec_create(key);
-  pssl_symkey_free(key);
+  psymkey_free(key);
   if (decoder == PSYNC_CRYPTO_INVALID_ENCODER)
     return PSYNC_NET_PERMFAIL;
   fd = pfile_open(filename, O_WRONLY, O_CREAT | O_TRUNC);
@@ -754,7 +753,7 @@ int pp2p_check_download(psync_fileid_t fileid,
   pct1.type = P2P_CHECK;
   memcpy(pct1.hashstart, filehashhex, PSYNC_P2P_HEXHASH_BYTES);
   pct1.filesize = fsize;
-  pssl_rand_weak(pct1.rand, sizeof(pct1.rand));
+  pssl_random(pct1.rand, sizeof(pct1.rand));
   memcpy(hashsource, filehashhex, PSYNC_HASH_DIGEST_HEXLEN);
   memcpy(hashsource + PSYNC_HASH_DIGEST_HEXLEN, pct1.rand, sizeof(pct1.rand));
   psync_hash(hashsource, PSYNC_HASH_BLOCK_SIZE, hashbin);
@@ -841,7 +840,7 @@ int pp2p_check_download(psync_fileid_t fileid,
     goto err_perm2;
   else if (bresp == P2P_RESP_WAIT) {
     uint32_t rnd;
-    pssl_rand_weak((unsigned char *)&rnd, sizeof(rnd));
+    pssl_random((unsigned char *)&rnd, sizeof(rnd));
     rnd &= 0x7ff;
     psys_sleep_milliseconds(PSYNC_P2P_SLEEP_WAIT_DOWNLOAD + rnd);
     goto err_temp2;
