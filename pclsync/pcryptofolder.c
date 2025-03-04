@@ -55,7 +55,7 @@
 
 #include <string.h>
 
-#define PSYNC_CRYPTO_API_ERR_INTERNAL -511
+#define PCRYPTOFOLDER_API_ERROR -511
 
 static PSYNC_THREAD int crypto_api_errno;
 static PSYNC_THREAD char crypto_api_err[128];
@@ -487,7 +487,7 @@ static pssl_enc_symkey_t dl_folder_enc_key(psync_folderid_t folderid) {
     psync_free(res);
     psync_process_api_error(result);
     return (pssl_enc_symkey_t)err_to_ptr(
-        PRINT_RETURN_CONST(PSYNC_CRYPTO_API_ERR_INTERNAL));
+        PRINT_RETURN_CONST(PCRYPTOFOLDER_API_ERROR));
   }
   b64key = papi_find_result2(res, "key", PARAM_STR);
   key = psync_base64_decode((const unsigned char *)b64key->str, b64key->length,
@@ -539,7 +539,7 @@ static pssl_enc_symkey_t dl_file_enc_key(psync_fileid_t fileid) {
     set_errmsg(res);
     psync_free(res);
     return (pssl_enc_symkey_t)err_to_ptr(
-        PRINT_RETURN_CONST(PSYNC_CRYPTO_API_ERR_INTERNAL));
+        PRINT_RETURN_CONST(PCRYPTOFOLDER_API_ERROR));
   }
   result = papi_find_result2(res, "hash", PARAM_NUM)->num;
   b64key = papi_find_result2(res, "key", PARAM_STR);
@@ -1001,7 +1001,7 @@ static void free_file_encoder(void *ptr) {
 }
 
 static int set_err(int ret, const char **err) {
-  if (ret == PSYNC_CRYPTO_API_ERR_INTERNAL) {
+  if (ret == PCRYPTOFOLDER_API_ERROR) {
     if (err)
       *err = crypto_api_err;
     return crypto_api_errno;
