@@ -123,7 +123,7 @@ typedef struct {
   int sock;
   int isbroken;
   char cachekey[];
-} ssl_connection_t;
+} pssl_connection_t;
 
 typedef void (*psync_ssl_debug_callback_t)(void *ctx, int level, const char *msg, int, const char *);
 
@@ -153,18 +153,18 @@ pssl_rsapubkey_t prsa_load_public(const unsigned char *keydata, size_t keylen);
 pssl_signature_t prsa_signature(pssl_rsaprivkey_t rsa, const unsigned char *data);
 
 // SSL
-int pssl_bytes_left(ssl_connection_t *sslconn);
+int pssl_bytes_left(pssl_connection_t *sslconn);
 void pssl_cleanup(void *ptr, size_t len);
-int pssl_close(ssl_connection_t *sslconn);
+int pssl_close(pssl_connection_t *sslconn);
 void pssl_debug_cb(psync_ssl_debug_callback_t cb, void *ctx);
-int pssl_finish(ssl_connection_t *sslconn, const char *hostname);
-void pssl_free(ssl_connection_t *sslconn);
+int pssl_finish(pssl_connection_t *sslconn, const char *hostname);
+void pssl_free(pssl_connection_t *sslconn);
 int pssl_init();
 void pssl_log_level(int threshold);
-int pssl_open(int sock, ssl_connection_t **sslconn, const char *hostname);
+int pssl_open(int sock, pssl_connection_t **sslconn, const char *hostname);
 void pssl_random(unsigned char *buf, int num);
-int pssl_read(ssl_connection_t *sslconn, void *buf, int num);
-int pssl_write(ssl_connection_t *sslconn, const void *buf, int num);
+int pssl_read(pssl_connection_t *sslconn, void *buf, int num);
+int pssl_write(pssl_connection_t *sslconn, const void *buf, int num);
 
 pssl_enc_symkey_t psymkey_alloc(size_t len);
 pssl_enc_symkey_t psymkey_copy(pssl_enc_symkey_t src);

@@ -88,7 +88,7 @@ static const int psync_mbed_ciphersuite[] = {
     MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CBC_SHA256,
     0};
 
-static int check_peer_pubkey(ssl_connection_t *conn) {
+static int check_peer_pubkey(pssl_connection_t *conn) {
   const mbedtls_x509_crt *cert;
   unsigned char buff[1024], sigbin[32];
   char sighex[66];
@@ -122,11 +122,11 @@ static int check_peer_pubkey(ssl_connection_t *conn) {
   return -1;
 }
 
-static ssl_connection_t *conn_alloc(const char *hostname) {
-  ssl_connection_t *conn;
+static pssl_connection_t *conn_alloc(const char *hostname) {
+  pssl_connection_t *conn;
   size_t len;
   len = strlen(hostname) + 1;
-  conn = (ssl_connection_t *)psync_malloc(offsetof(ssl_connection_t, cachekey) +
+  conn = (pssl_connection_t *)psync_malloc(offsetof(pssl_connection_t, cachekey) +
                                           len + 4);
   conn->isbroken = 0;
   memcpy(conn->cachekey, "SSLS", 4);
@@ -155,10 +155,10 @@ static void free_session(void *ptr) {
 }
 
 static int mbed_read(void *ptr, unsigned char *buf, size_t len) {
-  ssl_connection_t *conn;
+  pssl_connection_t *conn;
   ssize_t ret;
   int err;
-  conn = (ssl_connection_t *)ptr;
+  conn = (pssl_connection_t *)ptr;
   ret = read(conn->sock, buf, len);
   if (ret == -1) {
     err = errno;
@@ -171,10 +171,10 @@ static int mbed_read(void *ptr, unsigned char *buf, size_t len) {
 }
 
 static int mbed_write(void *ptr, const unsigned char *buf, size_t len) {
-  ssl_connection_t *conn;
+  pssl_connection_t *conn;
   ssize_t ret;
   int err;
-  conn = (ssl_connection_t *)ptr;
+  conn = (pssl_connection_t *)ptr;
   ret = write(conn->sock, buf, len);
   if (ret == -1) {
     err = errno;
@@ -186,7 +186,7 @@ static int mbed_write(void *ptr, const unsigned char *buf, size_t len) {
     return (int)ret;
 }
 
-static void save_session(ssl_connection_t *conn) {
+static void save_session(pssl_connection_t *conn) {
   mbedtls_ssl_session *sess;
   sess = psync_new(mbedtls_ssl_session);
   // mbedtls_ssl_get_session seems to copy all elements, instead of referencing
@@ -199,7 +199,7 @@ static void save_session(ssl_connection_t *conn) {
                     free_session, PSYNC_MAX_SSL_SESSIONS_PER_DOMAIN);
 }
 
-static void set_errno(ssl_connection_t *conn, int err) {
+static void set_errno(pssl_connection_t *conn, int err) {
   if (err == MBEDTLS_ERR_SSL_WANT_READ)
     psync_ssl_errno = PSSL_ERR_WANT_READ;
   else if (err == MBEDTLS_ERR_SSL_WANT_WRITE)
@@ -456,8 +456,8 @@ pssl_signature_t prsa_signature(pssl_rsaprivkey_t rsa, const unsigned char *data
   return ret;
 }
 
-int pssl_bytes_left(ssl_connection_t *sslconn) {
-  return mbedtls_ssl_get_bytes_avail(&((ssl_connection_t *)sslconn)->ssl);
+int pssl_bytes_left(pssl_connection_t *sslconn) {
+  return mbedtls_ssl_get_bytes_avail(&((pssl_connection_t *)sslconn)->ssl);
 }
 
 void pssl_cleanup(void *ptr, size_t len) {
@@ -466,10 +466,10 @@ void pssl_cleanup(void *ptr, size_t len) {
     *p++ = 0;
 }
 
-int pssl_close(ssl_connection_t *sslconn) {
-  ssl_connection_t *conn;
+int pssl_close(pssl_connection_t *sslconn) {
+  pssl_connection_t *conn;
   int ret;
-  conn = (ssl_connection_t *)sslconn;
+  conn = (pssl_connection_t *)sslconn;
   if (conn->isbroken)
     goto noshutdown;
   ret = mbedtls_ssl_close_notify(&conn->ssl);
@@ -490,11 +490,11 @@ void pssl_debug_cb(psync_ssl_debug_callback_t cb, void *ctx) {
   debug_ctx = ctx;
 }
 
-int pssl_finish(ssl_connection_t *sslconn, const char *hostname) {
-  ssl_connection_t *conn;
+int pssl_finish(pssl_connection_t *sslconn, const char *hostname) {
+  pssl_connection_t *conn;
   int ret;
 
-  conn = (ssl_connection_t *)sslconn;
+  conn = (pssl_connection_t *)sslconn;
   ret = mbedtls_ssl_handshake(&conn->ssl);
   if (ret == 0) {
     if ((check_peer_pubkey(conn))) {
@@ -515,9 +515,9 @@ fail:
   return PRINT_RETURN_CONST(PSSL_FAIL);
 }
 
-void pssl_free(ssl_connection_t *sslconn) {
-  ssl_connection_t *conn;
-  conn = (ssl_connection_t *)sslconn;
+void pssl_free(pssl_connection_t *sslconn) {
+  pssl_connection_t *conn;
+  conn = (pssl_connection_t *)sslconn;
   mbedtls_ssl_free(&conn->ssl);
   psync_free(conn);
 }
@@ -559,8 +559,8 @@ void pssl_log_level(int threshold) {
   mbedtls_debug_set_threshold(threshold);
 }
 
-int pssl_open(int sock, ssl_connection_t **sslconn, const char *hostname) {
-  ssl_connection_t *conn;
+int pssl_open(int sock, pssl_connection_t **sslconn, const char *hostname) {
+  pssl_connection_t *conn;
   mbedtls_ssl_session *sess;
   int ret;
 
@@ -658,10 +658,10 @@ void pssl_random(unsigned char *buf, int num) {
   }
 }
 
-int pssl_read(ssl_connection_t *sslconn, void *buf, int num) {
-  ssl_connection_t *conn;
+int pssl_read(pssl_connection_t *sslconn, void *buf, int num) {
+  pssl_connection_t *conn;
   int res;
-  conn = (ssl_connection_t *)sslconn;
+  conn = (pssl_connection_t *)sslconn;
   res = mbedtls_ssl_read(&conn->ssl, (unsigned char *)buf, num);
   if (res >= 0)
     return res;
@@ -669,10 +669,10 @@ int pssl_read(ssl_connection_t *sslconn, void *buf, int num) {
   return PSSL_FAIL;
 }
 
-int pssl_write(ssl_connection_t *sslconn, const void *buf, int num) {
-  ssl_connection_t *conn;
+int pssl_write(pssl_connection_t *sslconn, const void *buf, int num) {
+  pssl_connection_t *conn;
   int res;
-  conn = (ssl_connection_t *)sslconn;
+  conn = (pssl_connection_t *)sslconn;
   res = mbedtls_ssl_write(&conn->ssl, (const unsigned char *)buf, num);
   if (res >= 0)
     return res;

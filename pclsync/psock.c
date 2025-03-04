@@ -456,7 +456,7 @@ int psock_create(int domain, int type, int protocol) {
 
 psock_t *psock_connect(const char *host, int unsigned port, int ssl) {
   psock_t *ret;
-  ssl_connection_t *sslc;
+  pssl_connection_t *sslc;
   int sock;
   char sport[8];
   psync_slprintf(sport, sizeof(sport), "%d", port);
