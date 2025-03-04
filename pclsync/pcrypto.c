@@ -176,7 +176,7 @@ pssl_symkey_t *pcrypto_key() {
 
 pcrypto_ctr_encdec_t
 pcrypto_ctr_encdec_create(pssl_symkey_t *key) {
-  psync_aes256_encoder enc;
+  pssl_encoder_t enc;
   pcrypto_ctr_encdec_t ret;
   if (unlikely_log(key->keylen <
                    PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE))
@@ -399,7 +399,7 @@ pcrypto_decode_text(pcrypto_textdec_t enc,
 
 pcrypto_textenc_t
 pcrypto_textenc_create(pssl_symkey_t *key) {
-  psync_aes256_encoder enc;
+  pssl_encoder_t enc;
   pcrypto_textenc_t ret;
   if (unlikely_log(key->keylen <
                    PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE))
@@ -425,7 +425,7 @@ void pcrypto_textenc_free(
 
 pcrypto_textdec_t
 pcrypto_textdec_create(pssl_symkey_t *key) {
-  psync_aes256_encoder enc;
+  pssl_encoder_t enc;
   pcrypto_textenc_t ret;
   if (unlikely_log(key->keylen <
                    PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE))
@@ -451,8 +451,8 @@ void pcrypto_textdec_free(
 
 pcrypto_sector_encdec_t
 pcrypto_sec_encdec_create(pssl_symkey_t *key) {
-  psync_aes256_encoder enc;
-  psync_aes256_decoder dec;
+  pssl_encoder_t enc;
+  pssl_decoder_t dec;
   pcrypto_sector_encdec_t ret;
   if (unlikely_log(key->keylen < PSYNC_AES256_KEY_SIZE))
     return PSYNC_CRYPTO_INVALID_ENCODER;

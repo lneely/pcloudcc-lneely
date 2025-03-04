@@ -116,9 +116,9 @@ static const uint32_t requiredstatuses[] = {
 static struct sockaddr_storage paddr;
 static socklen_t paddrlen;
 
-static psync_rsa_publickey_t pubkey = PSYNC_INVALID_RSA;
-static psync_rsa_privatekey_t privkey = PSYNC_INVALID_RSA;
-static psync_binary_rsa_key_t pubkeybin = PSYNC_INVALID_BIN_RSA;
+static pssl_rsapubkey_t pubkey = PSYNC_INVALID_RSA;
+static pssl_rsaprivkey_t privkey = PSYNC_INVALID_RSA;
+static pssl_rsabinkey_t pubkeybin = PSYNC_INVALID_BIN_RSA;
 
 PSYNC_PURE static const char *get_addr(void *addr) {
   if (((struct sockaddr_in *)addr)->sin_family == AF_INET)
@@ -319,10 +319,10 @@ static int check_token(char *token, uint32_t tlen, unsigned char *key,
 static void psync_p2p_tcphandler(void *ptr) {
   packet_get packet;
   psync_fileid_t localfileid;
-  psync_binary_rsa_key_t binpubrsa;
-  psync_rsa_publickey_t pubrsa;
+  pssl_rsabinkey_t binpubrsa;
+  pssl_rsapubkey_t pubrsa;
   pssl_symkey_t *aeskey;
-  psync_encrypted_symmetric_key_t encaeskey;
+  pssl_enc_symkey_t encaeskey;
   pcrypto_ctr_encdec_t encoder;
   char *token, *localpath;
   uint64_t off;
@@ -570,10 +570,10 @@ static int psync_p2p_check_rsa() {
   static pthread_mutex_t rsa_lock = PTHREAD_MUTEX_INITIALIZER;
   pthread_mutex_lock(&rsa_lock);
   if (privkey == PSYNC_INVALID_RSA) {
-    psync_rsa_t rsa;
-    psync_rsa_privatekey_t rsapriv;
-    psync_rsa_publickey_t rsapub;
-    psync_binary_rsa_key_t rsapubbin;
+    pssl_context_t rsa;
+    pssl_rsaprivkey_t rsapriv;
+    pssl_rsapubkey_t rsapub;
+    pssl_rsabinkey_t rsapubbin;
     debug(D_NOTICE, "generating %ubit RSA key", PSYNC_P2P_RSA_SIZE);
     rsa = prsa_generate(PSYNC_P2P_RSA_SIZE);
     debug(D_NOTICE, "key generated");
@@ -652,7 +652,7 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
                               const char *filename) {
   uint32_t keylen = 0, enctype = 0;
   pssl_symkey_t *key;
-  psync_encrypted_symmetric_key_t ekey;
+  pssl_enc_symkey_t ekey;
   pcrypto_ctr_encdec_t decoder;
   psync_hash_ctx hashctx;
   uint64_t off;

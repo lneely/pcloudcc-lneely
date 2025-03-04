@@ -50,7 +50,7 @@ typedef struct {
 typedef unsigned char pcrypto_sector_auth_t[PSYNC_CRYPTO_AUTH_SIZE];
 
 typedef struct {
-  psync_aes256_encoder encoder;
+  pssl_encoder_t encoder;
   union {
     long unsigned __aligner;
     unsigned char iv[PSYNC_AES256_BLOCK_SIZE];
@@ -60,7 +60,7 @@ typedef struct {
 typedef pcrypto_key_t *pcrypto_ctr_encdec_t;
 
 typedef struct {
-  psync_aes256_encoder encoder;
+  pssl_encoder_t encoder;
   unsigned long ivlen;
   unsigned char iv[];
 } pcrypto_key_iv_t;
@@ -69,8 +69,8 @@ typedef pcrypto_key_iv_t *pcrypto_textenc_t;
 typedef pcrypto_key_iv_t *pcrypto_textdec_t;
 
 typedef struct {
-  psync_aes256_encoder encoder;
-  psync_aes256_decoder decoder;
+  pssl_encoder_t encoder;
+  pssl_decoder_t decoder;
   unsigned long ivlen;
   unsigned char iv[];
 } pcrypto_encdec_iv_t;
