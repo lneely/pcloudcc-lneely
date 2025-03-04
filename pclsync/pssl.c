@@ -29,8 +29,8 @@
    DAMAGE.
 */
 
-#include <errno.h>
 #include <ctype.h>
+#include <errno.h>
 #include <mbedtls/bignum.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
@@ -38,30 +38,27 @@
 #include <mbedtls/error.h>
 #include <mbedtls/md.h>
 #include <mbedtls/net_sockets.h>
+#include <mbedtls/pk.h>
 #include <mbedtls/pkcs5.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
-#include "pcompiler.h"
-
 #include "pcache.h"
+#include "pcompiler.h"
 #include "plibs.h"
+#include "pmemlock.h"
 #include "pmemlock.h"
 #include "prand.h"
 #include "psettings.h"
+#include "pssl.h"
 #include "psslcerts.h"
 #include "psynclib.h"
-
-#include "plibs.h"
-#include "pmemlock.h"
-#include "pssl.h"
 #include "psynclib.h"
-#include <stddef.h>
-#include <string.h>
 
 // Lock used to serialize access to RSA decrypt key function
 typedef struct {
@@ -99,76 +96,6 @@ static const int psync_mbed_ciphersuite[] = {
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
     MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CBC_SHA256,
     0};
-
-// HACK: This function is duplicated from mbedtls/library/pkparse.c, because
-// it is needed to properly parse the RSA keys returned by the pcloud server
-// for some reason... see the fallback code in psync_ssl_rsa_load_public.
-static int pk_get_rsapubkey(unsigned char **p, const unsigned char *end, mbedtls_rsa_context *rsa) {
-  int ret;
-  size_t len;
-  mbedtls_mpi N, E;
-
-  debug(D_NOTICE, "Entering pk_get_rsapubkey");
-
-  if ((ret = mbedtls_asn1_get_tag(
-           p, end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE)) !=
-      0) {
-    debug(D_WARNING, "mbedtls_asn1_get_tag failed with code %d", ret);
-    return (MBEDTLS_ERR_PK_INVALID_PUBKEY + ret);
-  }
-
-  debug(D_NOTICE, "ASN.1 tag parsed successfully, len: %zu", len);
-
-  if (*p + len != end) {
-    debug(D_WARNING, "Length mismatch in ASN.1 structure");
-    return (MBEDTLS_ERR_PK_INVALID_PUBKEY + MBEDTLS_ERR_ASN1_LENGTH_MISMATCH);
-  }
-
-  mbedtls_mpi_init(&N);
-  mbedtls_mpi_init(&E);
-  if ((ret = mbedtls_asn1_get_mpi(p, end, &N)) != 0 ||
-      (ret = mbedtls_asn1_get_mpi(p, end, &E)) != 0) {
-    debug(D_WARNING, "Failed to parse MPI N or E, ret: %d", ret);
-    mbedtls_mpi_free(&N);
-    mbedtls_mpi_free(&E);
-    ret = (MBEDTLS_ERR_PK_INVALID_PUBKEY + ret);
-    goto cleanup;
-  }
-
-  debug(D_NOTICE, "Successfully parsed MPIs N and E");
-
-  if (*p != end) {
-    debug(D_WARNING, "Extra data after parsing N and E");
-    ret = (MBEDTLS_ERR_PK_INVALID_PUBKEY + MBEDTLS_ERR_ASN1_LENGTH_MISMATCH);
-    goto cleanup;
-  }
-
-  // set N and E in the rsa context
-  ret = mbedtls_rsa_import(rsa, &N, NULL, NULL, NULL, &E);
-  if (ret != 0) {
-    debug(D_WARNING, "mbedtls_rsa_import failed with code %d", ret);
-    mbedtls_mpi_free(&N);
-    mbedtls_mpi_free(&E);
-    goto cleanup;
-  }
-
-  debug(D_NOTICE, "Successfully imported N and E into RSA context");
-
-  ret = mbedtls_rsa_check_pubkey(rsa);
-  if (ret != 0) {
-    debug(D_WARNING, "mbedtls_rsa_check_pubkey failed with code %d", ret);
-    ret = (MBEDTLS_ERR_PK_INVALID_PUBKEY);
-    goto cleanup;
-  }
-
-  debug(D_NOTICE, "Public key check passed successfully");
-
-cleanup:
-  mbedtls_mpi_free(&N);
-  mbedtls_mpi_free(&E);
-  debug(D_NOTICE, "Exiting pk_get_rsapubkey with ret: %d", ret);
-  return ret;
-}
 
 static void psync_ssl_free_psync_encrypted_data_t(psync_encrypted_data_t e) {
   psync_ssl_memclean(e->data, e->datalen);
@@ -664,37 +591,10 @@ psync_rsa_publickey_t psync_ssl_rsa_load_public(const unsigned char *keydata, si
   mbedtls_rsa_context *rsa;
   int ret;
 
-  debug(D_NOTICE, "Public key data (first 16 bytes): %02x %02x %02x %02x ...",
-        keydata[0], keydata[1], keydata[2], keydata[3]);
-
   mbedtls_pk_init(&ctx);
-
   ret = mbedtls_pk_parse_public_key(&ctx, keydata, keylen);
   if (unlikely(ret)) {
-    debug(D_WARNING,
-          "pk_parse_public_key failed with code %d (-0x%04x); resorting to "
-          "mbedtls 1.x RSA fallback",
-          ret, -ret);
-
-    if (ret != 0) {
-      mbedtls_pk_setup(&ctx, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
-      unsigned char *p = (unsigned char *)keydata;
-      ret = pk_get_rsapubkey(&p, p + keylen, mbedtls_pk_rsa(ctx));
-      if (ret != 0)
-        mbedtls_pk_free(&ctx);
-    }
-
-    if (ret != 0) {
-      char error_buf[100];
-      mbedtls_strerror(ret, error_buf, sizeof(error_buf));
-      debug(D_WARNING, "Error details: %s", error_buf);
-      return PSYNC_INVALID_RSA;
-    }
-  }
-
-  if (mbedtls_pk_get_type(&ctx) != MBEDTLS_PK_RSA) {
-    debug(D_WARNING, "Parsed key is not RSA");
-    mbedtls_pk_free(&ctx);
+    debug(D_ERROR, "failed to parse public key with code %d", ret);
     return PSYNC_INVALID_RSA;
   }
 
@@ -719,9 +619,10 @@ psync_rsa_privatekey_t psync_ssl_rsa_load_private(const unsigned char *keydata, 
   mbedtls_rsa_context *rsactx;
   int ret;
   mbedtls_pk_init(&pkctx);
+  
   ret = mbedtls_pk_parse_key(&pkctx, keydata, keylen, NULL, 0, mbedtls_ctr_drbg_random, &psync_mbed_rng.rnd);
   if (unlikely(ret)) {
-      debug(D_WARNING, "mbedtls_pk_parse_key failed with code %d", ret);
+      debug(D_WARNING, "failed to parse private key with code %d", ret);
       return PSYNC_INVALID_RSA;
   }
 
