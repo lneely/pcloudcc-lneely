@@ -98,7 +98,7 @@ static const int psync_mbed_ciphersuite[] = {
     0};
 
 static void psync_ssl_free_psync_encrypted_data_t(psync_encrypted_data_t e) {
-  psync_ssl_memclean(e->data, e->datalen);
+  pssl_memclean(e->data, e->datalen);
   pmemlock_free(e);
 }
 
@@ -215,11 +215,11 @@ static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
   return -1;
 }
 
-void psync_ssl_set_log_threshold(int threshold) {
+void pssl_set_log_threshold(int threshold) {
   mbedtls_debug_set_threshold(threshold);
 }
 
-void psync_ssl_set_debug_callback(psync_ssl_debug_callback_t cb, void *ctx) {
+void pssl_set_debug_cb(psync_ssl_debug_callback_t cb, void *ctx) {
   debug_cb = cb;
   debug_ctx = ctx;
 }
@@ -234,23 +234,23 @@ int ctr_drbg_random_locked(void *p_rng, unsigned char *output, size_t output_len
   return ret;
 }
 
-void psync_ssl_rsa_free_binary(psync_binary_rsa_key_t bin) {
+void pssl_rsa_bin_free(psync_binary_rsa_key_t bin) {
   psync_ssl_free_psync_encrypted_data_t(bin);
 }
 
-void psync_ssl_free_symmetric_key(psync_symmetric_key_t key) {
-  psync_ssl_memclean(key->key, key->keylen);
+void pssl_symkey_free(psync_symmetric_key_t key) {
+  pssl_memclean(key->key, key->keylen);
   pmemlock_free(key);
 }
 
-psync_encrypted_symmetric_key_t psync_ssl_alloc_encrypted_symmetric_key(size_t len) {
+psync_encrypted_symmetric_key_t pssl_alloc_symkey(size_t len) {
   psync_encrypted_symmetric_key_t ret;
   ret = psync_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   return ret;
 }
 
-psync_encrypted_symmetric_key_t psync_ssl_copy_encrypted_symmetric_key(psync_encrypted_symmetric_key_t src) {
+psync_encrypted_symmetric_key_t pssl_symkey_copy(psync_encrypted_symmetric_key_t src) {
   psync_encrypted_symmetric_key_t ret;
   ret = psync_malloc(offsetof(psync_encrypted_data_struct_t, data) +
                      src->datalen);
@@ -259,13 +259,13 @@ psync_encrypted_symmetric_key_t psync_ssl_copy_encrypted_symmetric_key(psync_enc
   return ret;
 }
 
-psync_symmetric_key_t psync_ssl_rsa_decrypt_symm_key_lock(psync_rsa_privatekey_t *rsa, const psync_encrypted_symmetric_key_t *enckey) {
+psync_symmetric_key_t pssl_symkey_decrypt_lock(psync_rsa_privatekey_t *rsa, const psync_encrypted_symmetric_key_t *enckey) {
   psync_symmetric_key_t sym_key;
 
   debug(D_NOTICE, "Get RSA decrypt key lock.");
   pthread_mutex_lock(&rsa_decr_mutex);
 
-  sym_key = psync_ssl_rsa_decrypt_symmetric_key(*rsa, *enckey);
+  sym_key = pssl_symkey_decrypt(*rsa, *enckey);
 
   pthread_mutex_unlock(&rsa_decr_mutex);
   debug(D_NOTICE, "RSA decrypt key Lock released.");
@@ -273,7 +273,7 @@ psync_symmetric_key_t psync_ssl_rsa_decrypt_symm_key_lock(psync_rsa_privatekey_t
   return sym_key;
 }
 
-int psync_ssl_init() {
+int pssl_init() {
   unsigned char seed[PSYNC_LHASH_DIGEST_LEN];
   unsigned long i;
   int result;
@@ -306,13 +306,13 @@ int psync_ssl_init() {
   return 0;
 }
 
-void psync_ssl_memclean(void *ptr, size_t len) {
+void pssl_memclean(void *ptr, size_t len) {
   volatile unsigned char *p = ptr;
   while (len--)
     *p++ = 0;
 }
 
-int psync_ssl_connect(int sock, void **sslconn, const char *hostname) {
+int pssl_connect(int sock, void **sslconn, const char *hostname) {
   ssl_connection_t *conn;
   mbedtls_ssl_session *sess;
   int ret;
@@ -404,7 +404,7 @@ err0:
   return PRINT_RETURN_CONST(PSYNC_SSL_FAIL);
 }
 
-int psync_ssl_connect_finish(void *sslconn, const char *hostname) {
+int pssl_connect_finish(void *sslconn, const char *hostname) {
   ssl_connection_t *conn;
   int ret;
 
@@ -429,7 +429,7 @@ fail:
   return PRINT_RETURN_CONST(PSYNC_SSL_FAIL);
 }
 
-int psync_ssl_shutdown(void *sslconn) {
+int pssl_shutdown(void *sslconn) {
   ssl_connection_t *conn;
   int ret;
   conn = (ssl_connection_t *)sslconn;
@@ -448,18 +448,18 @@ noshutdown:
   return PSYNC_SSL_SUCCESS;
 }
 
-void psync_ssl_free(void *sslconn) {
+void pssl_free(void *sslconn) {
   ssl_connection_t *conn;
   conn = (ssl_connection_t *)sslconn;
   mbedtls_ssl_free(&conn->ssl);
   psync_free(conn);
 }
 
-int psync_ssl_pendingdata(void *sslconn) {
+int pssl_pending(void *sslconn) {
   return mbedtls_ssl_get_bytes_avail(&((ssl_connection_t *)sslconn)->ssl);
 }
 
-int psync_ssl_read(void *sslconn, void *buf, int num) {
+int pssl_read(void *sslconn, void *buf, int num) {
   ssl_connection_t *conn;
   int res;
   conn = (ssl_connection_t *)sslconn;
@@ -470,7 +470,7 @@ int psync_ssl_read(void *sslconn, void *buf, int num) {
   return PSYNC_SSL_FAIL;
 }
 
-int psync_ssl_write(void *sslconn, const void *buf, int num) {
+int pssl_write(void *sslconn, const void *buf, int num) {
   ssl_connection_t *conn;
   int res;
   conn = (ssl_connection_t *)sslconn;
@@ -481,7 +481,7 @@ int psync_ssl_write(void *sslconn, const void *buf, int num) {
   return PSYNC_SSL_FAIL;
 }
 
-void psync_ssl_rand_strong(unsigned char *buf, int num) {
+void pssl_rand_strong(unsigned char *buf, int num) {
   // FIXME: causing segfault
   if (unlikely(ctr_drbg_random_locked(&psync_mbed_rng, buf, num))) {
     debug(D_CRITICAL, "could not generate %d random bytes, exiting", num);
@@ -489,11 +489,11 @@ void psync_ssl_rand_strong(unsigned char *buf, int num) {
   }
 }
 
-void psync_ssl_rand_weak(unsigned char *buf, int num) {
-  psync_ssl_rand_strong(buf, num);
+void pssl_rand_weak(unsigned char *buf, int num) {
+  pssl_rand_strong(buf, num);
 }
 
-psync_rsa_t psync_ssl_gen_rsa(int bits) {
+psync_rsa_t pssl_rsa_gen(int bits) {
   mbedtls_rsa_context *ctx;
   ctx = psync_new(mbedtls_rsa_context);
   mbedtls_rsa_init(ctx);
@@ -507,27 +507,27 @@ psync_rsa_t psync_ssl_gen_rsa(int bits) {
     return ctx;
 }
 
-void psync_ssl_free_rsa(psync_rsa_t rsa) {
+void pssl_rsa_free(psync_rsa_t rsa) {
   mbedtls_rsa_free(rsa);
   psync_free(rsa);
 }
 
-psync_rsa_publickey_t psync_ssl_rsa_get_public(psync_rsa_t rsa) {
+psync_rsa_publickey_t pssl_rsa_get_pub(psync_rsa_t rsa) {
   psync_binary_rsa_key_t bin;
   psync_rsa_publickey_t ret;
-  bin = psync_ssl_rsa_public_to_binary(rsa);
+  bin = pssl_rsa_bin_pub(rsa);
   if (bin == PSYNC_INVALID_BIN_RSA)
     return PSYNC_INVALID_RSA;
-  ret = psync_ssl_rsa_load_public(bin->data, bin->datalen);  
-  psync_ssl_rsa_free_binary(bin);
+  ret = pssl_rsa_load_pub(bin->data, bin->datalen);  
+  pssl_rsa_bin_free(bin);
   return ret;
 }
 
-void psync_ssl_rsa_free_public(psync_rsa_publickey_t key) {
-  psync_ssl_free_rsa(key);
+void pssl_rsa_free_pub(psync_rsa_publickey_t key) {
+  pssl_rsa_free(key);
 }
 
-psync_rsa_privatekey_t psync_ssl_rsa_get_private(psync_rsa_t rsa) {
+psync_rsa_privatekey_t pssl_rsa_get_priv(psync_rsa_t rsa) {
   mbedtls_rsa_context *ctx;
   ctx = psync_new(mbedtls_rsa_context);
   mbedtls_rsa_init(ctx);
@@ -540,11 +540,11 @@ psync_rsa_privatekey_t psync_ssl_rsa_get_private(psync_rsa_t rsa) {
     return ctx;
 }
 
-void psync_ssl_rsa_free_private(psync_rsa_privatekey_t key) {
-  psync_ssl_free_rsa(key);
+void pssl_rsa_free_priv(psync_rsa_privatekey_t key) {
+  pssl_rsa_free(key);
 }
 
-psync_binary_rsa_key_t psync_ssl_rsa_public_to_binary(psync_rsa_publickey_t rsa) {
+psync_binary_rsa_key_t pssl_rsa_bin_pub(psync_rsa_publickey_t rsa) {
   unsigned char buff[4096], *p;
   mbedtls_pk_context ctx;
   psync_binary_rsa_key_t ret;
@@ -565,7 +565,7 @@ psync_binary_rsa_key_t psync_ssl_rsa_public_to_binary(psync_rsa_publickey_t rsa)
   return ret;
 }
 
-psync_binary_rsa_key_t psync_ssl_rsa_private_to_binary(psync_rsa_privatekey_t rsa) {
+psync_binary_rsa_key_t pssl_rsa_priv_bin(psync_rsa_privatekey_t rsa) {
   unsigned char buff[4096];
   mbedtls_pk_context ctx;
   psync_binary_rsa_key_t ret;
@@ -582,11 +582,11 @@ psync_binary_rsa_key_t psync_ssl_rsa_private_to_binary(psync_rsa_privatekey_t rs
       pmemlock_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   memcpy(ret->data, buff + sizeof(buff) - len, len);
-  psync_ssl_memclean(buff + sizeof(buff) - len, len);
+  pssl_memclean(buff + sizeof(buff) - len, len);
   return ret;
 }
 
-psync_rsa_publickey_t psync_ssl_rsa_load_public(const unsigned char *keydata, size_t keylen) {
+psync_rsa_publickey_t pssl_rsa_load_pub(const unsigned char *keydata, size_t keylen) {
   mbedtls_pk_context ctx;
   mbedtls_rsa_context *rsa;
   int ret;
@@ -614,15 +614,17 @@ psync_rsa_publickey_t psync_ssl_rsa_load_public(const unsigned char *keydata, si
   }
 }
 
-psync_rsa_privatekey_t psync_ssl_rsa_load_private(const unsigned char *keydata, size_t keylen) {
+psync_rsa_privatekey_t pssl_rsa_load_priv(const unsigned char *keydata, size_t keylen) {
   mbedtls_pk_context pkctx;
   mbedtls_rsa_context *rsactx;
   int ret;
   mbedtls_pk_init(&pkctx);
-  
+
   ret = mbedtls_pk_parse_key(&pkctx, keydata, keylen, NULL, 0, mbedtls_ctr_drbg_random, &psync_mbed_rng.rnd);
   if (unlikely(ret)) {
-      debug(D_WARNING, "failed to parse private key with code %d", ret);
+      char ebuf[100];
+      mbedtls_strerror(ret, ebuf, sizeof(ebuf));
+      debug(D_WARNING, "failed to parse private key: %s (-0x%04x)", ebuf, (unsigned int) -ret);
       return PSYNC_INVALID_RSA;
   }
 
@@ -641,7 +643,7 @@ psync_rsa_privatekey_t psync_ssl_rsa_load_private(const unsigned char *keydata, 
   }
 }
 
-psync_symmetric_key_t psync_ssl_gen_symmetric_key_from_pass(const char *password, size_t keylen, const unsigned char *salt, size_t saltlen, size_t iterations) {
+psync_symmetric_key_t pssl_gen_symkey_pass(const char *password, size_t keylen, const unsigned char *salt, size_t saltlen, size_t iterations) {
   psync_symmetric_key_t key = (psync_symmetric_key_t)pmemlock_malloc(
       keylen + offsetof(psync_symmetric_key_struct_t, key));
   mbedtls_md_context_t ctx;
@@ -657,7 +659,7 @@ psync_symmetric_key_t psync_ssl_gen_symmetric_key_from_pass(const char *password
   return key;
 }
 
-char *psync_ssl_derive_password_from_passphrase(const char *username, const char *passphrase) {
+char *pssl_derive_pwd(const char *username, const char *passphrase) {
   unsigned char *usercopy;
   unsigned char usersha512[PSYNC_SHA512_DIGEST_LEN], passwordbin[32];
   mbedtls_md_context_t ctx;
@@ -683,7 +685,7 @@ char *psync_ssl_derive_password_from_passphrase(const char *username, const char
   return (char *)usercopy;
 }
 
-psync_encrypted_symmetric_key_t psync_ssl_rsa_encrypt_data(psync_rsa_publickey_t rsa, const unsigned char *data, size_t datalen) {
+psync_encrypted_symmetric_key_t pssl_rsa_encrypt(psync_rsa_publickey_t rsa, const unsigned char *data, size_t datalen) {
   psync_encrypted_symmetric_key_t ret;
   int code;
   size_t rsalen;
@@ -706,7 +708,7 @@ psync_encrypted_symmetric_key_t psync_ssl_rsa_encrypt_data(psync_rsa_publickey_t
   return ret;
 }
 
-psync_symmetric_key_t psync_ssl_rsa_decrypt_data(psync_rsa_privatekey_t rsa, const unsigned char *data, size_t datalen) {
+psync_symmetric_key_t pssl_rsa_decrypt(psync_rsa_privatekey_t rsa, const unsigned char *data, size_t datalen) {
   unsigned char buff[2048];
   psync_symmetric_key_t ret;
   size_t len;
@@ -718,19 +720,19 @@ psync_symmetric_key_t psync_ssl_rsa_decrypt_data(psync_rsa_privatekey_t rsa, con
       offsetof(psync_symmetric_key_struct_t, key) + len);
   ret->keylen = len;
   memcpy(ret->key, buff, len);
-  psync_ssl_memclean(buff, len);
+  pssl_memclean(buff, len);
   return ret;
 }
 
-psync_encrypted_symmetric_key_t psync_ssl_rsa_encrypt_symmetric_key(psync_rsa_publickey_t rsa, const psync_symmetric_key_t key) {
-  return psync_ssl_rsa_encrypt_data(rsa, key->key, key->keylen);
+psync_encrypted_symmetric_key_t pssl_symkey_encrypt(psync_rsa_publickey_t rsa, const psync_symmetric_key_t key) {
+  return pssl_rsa_encrypt(rsa, key->key, key->keylen);
 }
 
-psync_symmetric_key_t psync_ssl_rsa_decrypt_symmetric_key(psync_rsa_privatekey_t rsa, const psync_encrypted_symmetric_key_t enckey) {
-  return psync_ssl_rsa_decrypt_data(rsa, enckey->data, enckey->datalen);
+psync_symmetric_key_t pssl_symkey_decrypt(psync_rsa_privatekey_t rsa, const psync_encrypted_symmetric_key_t enckey) {
+  return pssl_rsa_decrypt(rsa, enckey->data, enckey->datalen);
 }
 
-psync_aes256_encoder psync_ssl_aes256_create_encoder(psync_symmetric_key_t key) {
+psync_aes256_encoder pssl_enc_create(psync_symmetric_key_t key) {
   mbedtls_aes_context *aes;
   assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
   aes = psync_new(mbedtls_aes_context);
@@ -738,12 +740,12 @@ psync_aes256_encoder psync_ssl_aes256_create_encoder(psync_symmetric_key_t key) 
   return aes;
 }
 
-void psync_ssl_aes256_free_encoder(psync_aes256_encoder aes) {
-  psync_ssl_memclean(aes, sizeof(mbedtls_aes_context));
+void pssl_enc_free(psync_aes256_encoder aes) {
+  pssl_memclean(aes, sizeof(mbedtls_aes_context));
   psync_free(aes);
 }
 
-psync_aes256_encoder psync_ssl_aes256_create_decoder(psync_symmetric_key_t key) {
+psync_aes256_encoder pssl_dec_create(psync_symmetric_key_t key) {
   mbedtls_aes_context *aes;
   assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
   aes = psync_new(mbedtls_aes_context);
@@ -751,12 +753,12 @@ psync_aes256_encoder psync_ssl_aes256_create_decoder(psync_symmetric_key_t key) 
   return aes;
 }
 
-void psync_ssl_aes256_free_decoder(psync_aes256_encoder aes) {
-  psync_ssl_memclean(aes, sizeof(mbedtls_aes_context));
+void pssl_dec_free(psync_aes256_encoder aes) {
+  pssl_memclean(aes, sizeof(mbedtls_aes_context));
   psync_free(aes);
 }
 
-psync_rsa_signature_t psync_ssl_rsa_sign_sha256_hash(psync_rsa_privatekey_t rsa, const unsigned char *data) {
+psync_rsa_signature_t pssl_sha256_sign(psync_rsa_privatekey_t rsa, const unsigned char *data) {
   psync_rsa_signature_t ret;
   int padding, hash_id;
   size_t rsalen;
@@ -796,27 +798,27 @@ void psync_aes256_decode_4blocks_consec_xor_sw(psync_aes256_decoder enc, const u
     ((unsigned long *)dst)[i] ^= ((unsigned long *)bxor)[i];
 }
 
-void psync_aes256_encode_block(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst) {
+void pssl_enc_blk(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst) {
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
 }
 
-void psync_aes256_decode_block(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
+void pssl_dec_blk(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
 }
 
-void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
+void pssl_enc_2blk(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src + PSYNC_AES256_BLOCK_SIZE,
                         dst + PSYNC_AES256_BLOCK_SIZE);
 }
 
-void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
+void pssl_dec_2blk(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
                         dst + PSYNC_AES256_BLOCK_SIZE);
 }
 
-void psync_aes256_decode_4blocks_consec_xor(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor) {
+void pssl_dec_4blk_xor(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor) {
   unsigned long i;
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
   mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE,
