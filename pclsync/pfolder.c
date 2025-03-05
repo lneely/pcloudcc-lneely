@@ -42,6 +42,7 @@
 #include "pnetlibs.h"
 #include "psys.h"
 #include "ppath.h"
+#include "pfile.h"
 
 #include <stddef.h>
 #include <string.h>

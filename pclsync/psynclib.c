@@ -228,16 +228,6 @@ static void ssl_debug_cb(void *ctx, int level, const char *msg, int TODO1,
         TODO1); // trying to figure out what these are...
 }
 
-void psync_set_ssl_debug_callback(psync_ssl_debug_callback_t cb) {
-  if (cb) {
-    psync_ssl_set_log_threshold(PSYNC_SSL_DEBUG_LEVEL);
-    psync_ssl_set_debug_callback(cb, NULL);
-  } else {
-    psync_ssl_set_log_threshold(0);
-    psync_ssl_set_debug_callback(NULL, NULL);
-  }
-}
-
 void psync_set_apiserver(const char *binapi, uint32_t locationid) {
   if (binapi) {
     psync_apipool_set_server(binapi);
@@ -283,7 +273,7 @@ int psync_init() {
   }
   psync_sql_statement("UPDATE task SET inprogress=0 WHERE inprogress=1");
   ptimer_init();
-  if (unlikely_log(psync_ssl_init())) {
+  if (unlikely_log(pssl_init())) {
     if (IS_DEBUG)
       pthread_mutex_unlock(&psync_libstate_mutex);
     return_error(PERROR_SSL_INIT_FAILED);
@@ -299,10 +289,12 @@ int psync_init() {
     pthread_mutex_unlock(&psync_libstate_mutex);
   }
 
-  prun_thread("Overlay main thread", psync_overlay_main_loop);
-  psync_overlay_init_callbacks();
-  if (PSYNC_SSL_DEBUG_LEVEL)
-    psync_set_ssl_debug_callback(ssl_debug_cb);
+  prun_thread("rpc main thread", prpc_proc);
+  prpc_cb_init();
+  if (PSSL_DEBUG_LEVEL) {
+    pssl_log_level(PSSL_DEBUG_LEVEL);
+    pssl_debug_cb(ssl_debug_cb, NULL);
+  }
 
   return 0;
 }
@@ -2182,7 +2174,7 @@ int psync_password_quality10000(const char *password) {
 
 char *psync_derive_password_from_passphrase(const char *username,
                                             const char *passphrase) {
-  return psync_ssl_derive_password_from_passphrase(username, passphrase);
+  return psymkey_derive_passphrase(username, passphrase);
 }
 
 int psync_crypto_setup(const char *password, const char *hint) {

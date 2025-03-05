@@ -33,9 +33,8 @@
 #define _PSYNC_NETLIBS_H
 
 #include "papi.h"
-#include "pfile.h"
 #include "plist.h"
-#include "psynclib.h"
+#include "pfoldersync.h"
 
 #define senddebug(str, ...)                                                    \
   do {                                                                         \

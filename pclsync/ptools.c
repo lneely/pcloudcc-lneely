@@ -47,6 +47,7 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 char *ptools_get_mac_addr() {
   char buffer[128];

@@ -42,6 +42,7 @@
 
 #include "pcache.h"
 #include "pdiff.h"
+#include "pfile.h"
 #include "pfileops.h"
 #include "pfscrypto.h"
 #include "pfstasks.h"

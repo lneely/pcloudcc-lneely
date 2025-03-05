@@ -1,0 +1,8 @@
+enum command_ids_ {
+  STARTCRYPTO = 20,
+  STOPCRYPTO,
+  FINALIZE,
+  LISTSYNC,
+  ADDSYNC,
+  STOPSYNC
+};

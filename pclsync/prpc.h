@@ -33,6 +33,10 @@
 #ifndef POVERLAY_H
 #define POVERLAY_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef VOID
 #define VOID void
 #endif
@@ -56,17 +60,21 @@ typedef struct _rpc_message_t {
   char value[];
 } rpc_message_t;
 
-void psync_overlay_main_loop(VOID);
-void psync_overlay_handle_request(LPVOID);
-void psync_overlay_get_response(rpc_message_t*, rpc_message_t*);
-void psync_overlay_stop_overlays();
-void psync_overlay_start_overlays();
-void psync_overlay_stop_overlay_callbacks();
-void psync_overlay_start_overlay_callbacks();
-int psync_overlay_overlays_running();
-int psync_overlay_callbacks_running();
+void prpc_proc(VOID);
+void prpc_proc_handle(LPVOID);
+void prpc_get_response(rpc_message_t*, rpc_message_t*);
+void prpc_stop();
+void prpc_start();
+void prpc_cb_stop();
+void prpc_cb_start();
+int prpc_started();
+int prpc_cb_started();
 
-void psync_overlay_init_callbacks();
-int psync_overlay_register_callback(int, poverlay_callback);
+void prpc_cb_init();
+int prpc_cb_register(int, poverlay_callback);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // POVERLAY_H

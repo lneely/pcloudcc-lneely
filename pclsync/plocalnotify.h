@@ -32,7 +32,7 @@
 #ifndef _PSYNC_LOCALNOTIFY_H
 #define _PSYNC_LOCALNOTIFY_H
 
-#include "psynclib.h"
+#include "pfoldersync.h"
 
 int psync_localnotify_init();
 void psync_localnotify_add_sync(psync_syncid_t syncid);

@@ -42,6 +42,8 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include "pfile.h"
 
 // required by psync_debug
 extern PSYNC_THREAD const char *psync_thread_name; 

@@ -34,7 +34,7 @@
 
 #include "pssl.h"
 
-#define PSYNC_CRYPTO_AUTH_SIZE (PSYNC_AES256_BLOCK_SIZE * 2)
+#define PSYNC_CRYPTO_AUTH_SIZE (PAES_BLOCK_SIZE * 2)
 
 #define PSYNC_CRYPTO_MAX_HASH_TREE_LEVEL 6
 
@@ -50,17 +50,17 @@ typedef struct {
 typedef unsigned char pcrypto_sector_auth_t[PSYNC_CRYPTO_AUTH_SIZE];
 
 typedef struct {
-  psync_aes256_encoder encoder;
+  pssl_encoder_t encoder;
   union {
     long unsigned __aligner;
-    unsigned char iv[PSYNC_AES256_BLOCK_SIZE];
+    unsigned char iv[PAES_BLOCK_SIZE];
   };
 } pcrypto_key_t;
 
 typedef pcrypto_key_t *pcrypto_ctr_encdec_t;
 
 typedef struct {
-  psync_aes256_encoder encoder;
+  pssl_encoder_t encoder;
   unsigned long ivlen;
   unsigned char iv[];
 } pcrypto_key_iv_t;
@@ -69,8 +69,8 @@ typedef pcrypto_key_iv_t *pcrypto_textenc_t;
 typedef pcrypto_key_iv_t *pcrypto_textdec_t;
 
 typedef struct {
-  psync_aes256_encoder encoder;
-  psync_aes256_decoder decoder;
+  pssl_encoder_t encoder;
+  pssl_decoder_t decoder;
   unsigned long ivlen;
   unsigned char iv[];
 } pcrypto_encdec_iv_t;
@@ -83,21 +83,21 @@ typedef pcrypto_encdec_iv_t *pcrypto_sector_encdec_t;
 #define PSYNC_CRYPTO_INVALID_ENCODER NULL
 #define PSYNC_CRYPTO_INVALID_REVISIONID ((uint32_t)-1)
 
-pcrypto_ctr_encdec_t pcrypto_ctr_encdec_create(psync_symmetric_key_t key);
-void pcrypto_ctr_encdec_decode(pcrypto_ctr_encdec_t enc, void *data, size_t datalen, uint64_t dataoffset);
+pcrypto_ctr_encdec_t pcrypto_ctr_encdec_create(pssl_symkey_t *key);
+void pcrypto_ctr_encdec_encode(pcrypto_ctr_encdec_t enc, void *data, size_t datalen, uint64_t dataoffset);
 void pcrypto_ctr_encdec_free(pcrypto_ctr_encdec_t enc);
 int pcrypto_decode_sec(pcrypto_sector_encdec_t enc, const unsigned char *data, size_t datalen, unsigned char *out, const pcrypto_sector_auth_t auth, uint64_t sectorid);
 unsigned char * pcrypto_decode_text(pcrypto_textdec_t enc, const unsigned char *data, size_t datalen);
 void pcrypto_encode_sec(pcrypto_sector_encdec_t enc, const unsigned char *data, size_t datalen, unsigned char *out, pcrypto_sector_auth_t authout, uint64_t sectorid);
 void pcrypto_encode_text(pcrypto_textenc_t enc, const unsigned char *txt, size_t txtlen, unsigned char **out, size_t *outlen);
-psync_symmetric_key_t pcrypto_key();
-psync_symmetric_key_t pcrypto_key_len(size_t len);
-pcrypto_sector_encdec_t pcrypto_sec_encdec_create(psync_symmetric_key_t key);
+pssl_symkey_t *pcrypto_key();
+pssl_symkey_t *pcrypto_key_len(size_t len);
+pcrypto_sector_encdec_t pcrypto_sec_encdec_create(pssl_symkey_t *key);
 void pcrypto_sec_encdec_free(pcrypto_sector_encdec_t enc);
 void pcrypto_sign_sec(pcrypto_sector_encdec_t enc, const unsigned char *data, size_t datalen, pcrypto_sector_auth_t authout);
-pcrypto_textdec_t pcrypto_textdec_create(psync_symmetric_key_t key);
+pcrypto_textdec_t pcrypto_textdec_create(pssl_symkey_t *key);
 void pcrypto_textdec_free(pcrypto_textdec_t enc);
-pcrypto_textenc_t pcrypto_textenc_create(psync_symmetric_key_t key);
+pcrypto_textenc_t pcrypto_textenc_create(pssl_symkey_t *key);
 void pcrypto_textenc_free(pcrypto_textenc_t enc);
 
 #endif

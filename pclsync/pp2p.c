@@ -116,9 +116,9 @@ static const uint32_t requiredstatuses[] = {
 static struct sockaddr_storage paddr;
 static socklen_t paddrlen;
 
-static psync_rsa_publickey_t pubkey = PSYNC_INVALID_RSA;
-static psync_rsa_privatekey_t privkey = PSYNC_INVALID_RSA;
-static psync_binary_rsa_key_t pubkeybin = PSYNC_INVALID_BIN_RSA;
+static pssl_rsapubkey_t pubkey = PRSA_INVALID;
+static pssl_rsaprivkey_t privkey = PRSA_INVALID;
+static pssl_rsabinkey_t pubkeybin = PRSA_INVALID_BIN_KEY;
 
 PSYNC_PURE static const char *get_addr(void *addr) {
   if (((struct sockaddr_in *)addr)->sin_family == AF_INET)
@@ -221,7 +221,7 @@ static void psync_p2p_check(const packet_check *packet) {
   else
     return;
   resp.port = tcpport;
-  psync_ssl_rand_weak(resp.rand, sizeof(resp.rand));
+  pssl_random(resp.rand, sizeof(resp.rand));
   memcpy(hashsource, hashhex, PSYNC_HASH_DIGEST_HEXLEN);
   memcpy(hashsource + PSYNC_HASH_DIGEST_HEXLEN, resp.rand, sizeof(resp.rand));
   psync_hash(hashsource, PSYNC_HASH_BLOCK_SIZE, hashbin);
@@ -319,10 +319,10 @@ static int check_token(char *token, uint32_t tlen, unsigned char *key,
 static void psync_p2p_tcphandler(void *ptr) {
   packet_get packet;
   psync_fileid_t localfileid;
-  psync_binary_rsa_key_t binpubrsa;
-  psync_rsa_publickey_t pubrsa;
-  psync_symmetric_key_t aeskey;
-  psync_encrypted_symmetric_key_t encaeskey;
+  pssl_rsabinkey_t binpubrsa;
+  pssl_rsapubkey_t pubrsa;
+  pssl_symkey_t *aeskey;
+  pssl_enc_symkey_t encaeskey;
   pcrypto_ctr_encdec_t encoder;
   char *token, *localpath;
   uint64_t off;
@@ -346,7 +346,7 @@ static void psync_p2p_tcphandler(void *ptr) {
     debug(D_WARNING, "got request for file that we do not have");
     goto err0;
   }
-  binpubrsa = psync_ssl_alloc_binary_rsa(packet.keylen);
+  binpubrsa = psymkey_alloc(packet.keylen);
   if (unlikely_log(
           socket_read_all(sock, binpubrsa->data, binpubrsa->datalen))) {
     psync_free(binpubrsa);
@@ -361,9 +361,9 @@ static void psync_p2p_tcphandler(void *ptr) {
     goto err0;
   }
   psync_free(token);
-  pubrsa = psync_ssl_rsa_binary_to_public(binpubrsa);
+  pubrsa = prsa_load_public(binpubrsa->data, binpubrsa->datalen);
   psync_free(binpubrsa);
-  if (unlikely_log(pubrsa == PSYNC_INVALID_RSA))
+  if (unlikely_log(pubrsa == PRSA_INVALID))
     goto err0;
   localpath = pfolder_lpath_lfile(localfileid, NULL);
   if (unlikely_log(!localpath))
@@ -377,18 +377,19 @@ static void psync_p2p_tcphandler(void *ptr) {
     goto err0;
   }
   aeskey = pcrypto_key();
-  encaeskey = psync_ssl_rsa_encrypt_symmetric_key(pubrsa, aeskey);
+  encaeskey = psymkey_encrypt(pubrsa, aeskey->key, aeskey->keylen);
+
   encoder = pcrypto_ctr_encdec_create(aeskey);
-  psync_ssl_free_symmetric_key(aeskey);
+  psymkey_free(aeskey);
   keylen = encaeskey->datalen;
   enctype = P2P_ENCTYPE_RSA_AES;
-  if (unlikely_log(encaeskey == PSYNC_INVALID_ENC_SYM_KEY) ||
+  if (unlikely_log(encaeskey == PSYMKEY_INVALID_ENC) ||
       unlikely_log(encoder == PSYNC_CRYPTO_INVALID_ENCODER) ||
       unlikely_log(
           socket_write_all(sock, &keylen, sizeof(keylen)) ||
           socket_write_all(sock, &enctype, sizeof(enctype)) ||
           socket_write_all(sock, encaeskey->data, encaeskey->datalen))) {
-    if (encaeskey != PSYNC_INVALID_ENC_SYM_KEY)
+    if (encaeskey != PSYMKEY_INVALID_ENC)
       psync_free(encaeskey);
     if (encoder != PSYNC_CRYPTO_INVALID_ENCODER)
       pcrypto_ctr_encdec_free(encoder);
@@ -404,7 +405,7 @@ static void psync_p2p_tcphandler(void *ptr) {
       rd = sizeof(buff);
     if (unlikely_log(pfile_read(fd, buff, rd) != rd))
       break;
-    pcrypto_ctr_encdec_decode(encoder, buff, rd, off);
+    pcrypto_ctr_encdec_encode(encoder, buff, rd, off);
     if (unlikely_log(socket_write_all(sock, buff, rd)))
       break;
     off += rd;
@@ -550,7 +551,7 @@ static void psync_p2p_wake() {
 
 void pp2p_init() {
   unsigned char computerbin[PSYNC_HASH_DIGEST_LEN];
-  psync_ssl_rand_weak(computerbin, PSYNC_HASH_DIGEST_LEN);
+  pssl_random(computerbin, PSYNC_HASH_DIGEST_LEN);
   psync_binhex(computername, computerbin, PSYNC_HASH_DIGEST_LEN);
   ptimer_exception_handler(psync_p2p_wake);
   if (!psync_setting_get_bool(_PS(p2psync)))
@@ -568,37 +569,37 @@ void pp2p_change() {
 static int psync_p2p_check_rsa() {
   static pthread_mutex_t rsa_lock = PTHREAD_MUTEX_INITIALIZER;
   pthread_mutex_lock(&rsa_lock);
-  if (privkey == PSYNC_INVALID_RSA) {
-    psync_rsa_t rsa;
-    psync_rsa_privatekey_t rsapriv;
-    psync_rsa_publickey_t rsapub;
-    psync_binary_rsa_key_t rsapubbin;
+  if (privkey == PRSA_INVALID) {
+    pssl_context_t rsa;
+    pssl_rsaprivkey_t rsapriv;
+    pssl_rsapubkey_t rsapub;
+    pssl_rsabinkey_t rsapubbin;
     debug(D_NOTICE, "generating %ubit RSA key", PSYNC_P2P_RSA_SIZE);
-    rsa = psync_ssl_gen_rsa(PSYNC_P2P_RSA_SIZE);
+    rsa = prsa_generate(PSYNC_P2P_RSA_SIZE);
     debug(D_NOTICE, "key generated");
-    if (unlikely_log(rsa == PSYNC_INVALID_RSA))
+    if (unlikely_log(rsa == PRSA_INVALID))
       goto rete;
-    rsapriv = psync_ssl_rsa_get_private(rsa);
-    rsapub = psync_ssl_rsa_get_public(rsa);
-    if (likely_log(rsapub != PSYNC_INVALID_RSA))
-      rsapubbin = psync_ssl_rsa_public_to_binary(rsapub);
+    rsapriv = prsa_get_private(rsa);
+    rsapub = prsa_get_public(rsa);
+    if (likely_log(rsapub != PRSA_INVALID))
+      rsapubbin = prsa_binary_public(rsapub);
     else
-      rsapubbin = PSYNC_INVALID_BIN_RSA;
-    psync_ssl_free_rsa(rsa);
-    if (likely_log(rsapriv != PSYNC_INVALID_RSA &&
-                   rsapub != PSYNC_INVALID_RSA &&
-                   rsapubbin != PSYNC_INVALID_BIN_RSA)) {
+      rsapubbin = PRSA_INVALID_BIN_KEY;
+    prsa_free(rsa);
+    if (likely_log(rsapriv != PRSA_INVALID &&
+                   rsapub != PRSA_INVALID &&
+                   rsapubbin != PRSA_INVALID_BIN_KEY)) {
       pubkey = rsapriv;
       privkey = rsapub;
       pubkeybin = rsapubbin;
       goto ret0;
     } else {
-      if (rsapriv != PSYNC_INVALID_RSA)
-        psync_ssl_rsa_free_private(rsapriv);
-      if (rsapub != PSYNC_INVALID_RSA)
-        psync_ssl_rsa_free_public(rsapub);
-      if (rsapubbin != PSYNC_INVALID_BIN_RSA)
-        psync_ssl_rsa_free_binary(rsapubbin);
+      if (rsapriv != PRSA_INVALID)
+        prsa_free_private(rsapriv);
+      if (rsapub != PRSA_INVALID)
+        prsa_free_public(rsapub);
+      if (rsapubbin != PRSA_INVALID_BIN_KEY)
+        prsa_binary_free(rsapubbin);
       goto rete;
     }
   }
@@ -650,8 +651,8 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
                               const unsigned char *filehashhex, uint64_t fsize,
                               const char *filename) {
   uint32_t keylen = 0, enctype = 0;
-  psync_symmetric_key_t key;
-  psync_encrypted_symmetric_key_t ekey;
+  pssl_symkey_t *key;
+  pssl_enc_symkey_t ekey;
   pcrypto_ctr_encdec_t decoder;
   psync_hash_ctx hashctx;
   uint64_t off;
@@ -672,18 +673,16 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
     debug(D_ERROR, "too long key - %u bytes", (unsigned)keylen);
     return PSYNC_NET_PERMFAIL;
   }
-  ekey = psync_ssl_alloc_encrypted_symmetric_key(keylen);
+  ekey = psymkey_alloc(keylen);
   if (unlikely_log(socket_read_all(sock, ekey->data, keylen)) ||
-      unlikely_log((key = psync_ssl_rsa_decrypt_symm_key_lock(
-                        &privkey, &ekey)) == PSYNC_INVALID_SYM_KEY)) {
-    // unlikely_log((key=psync_ssl_rsa_decrypt_symmetric_key(&psync_rsa_private,
-    // &ekey))==PSYNC_INVALID_SYM_KEY)){
+      unlikely_log((key = psymkey_decrypt_lock(
+                        &privkey, &ekey)) == PSYMKEY_INVALID)) {
     psync_free(ekey);
     return PSYNC_NET_TEMPFAIL;
   }
   psync_free(ekey);
   decoder = pcrypto_ctr_encdec_create(key);
-  psync_ssl_free_symmetric_key(key);
+  psymkey_free(key);
   if (decoder == PSYNC_CRYPTO_INVALID_ENCODER)
     return PSYNC_NET_PERMFAIL;
   fd = pfile_open(filename, O_WRONLY, O_CREAT | O_TRUNC);
@@ -701,7 +700,7 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
       rd = fsize - off;
     if (unlikely_log(socket_read_all(sock, buff, rd)))
       goto err0;
-    pcrypto_ctr_encdec_decode(decoder, buff, rd, off);
+    pcrypto_ctr_encdec_encode(decoder, buff, rd, off);
     if (unlikely_log(pfile_write(fd, buff, rd) != rd))
       goto err0;
     psync_hash_update(&hashctx, buff, rd);
@@ -754,7 +753,7 @@ int pp2p_check_download(psync_fileid_t fileid,
   pct1.type = P2P_CHECK;
   memcpy(pct1.hashstart, filehashhex, PSYNC_P2P_HEXHASH_BYTES);
   pct1.filesize = fsize;
-  psync_ssl_rand_weak(pct1.rand, sizeof(pct1.rand));
+  pssl_random(pct1.rand, sizeof(pct1.rand));
   memcpy(hashsource, filehashhex, PSYNC_HASH_DIGEST_HEXLEN);
   memcpy(hashsource + PSYNC_HASH_DIGEST_HEXLEN, pct1.rand, sizeof(pct1.rand));
   psync_hash(hashsource, PSYNC_HASH_BLOCK_SIZE, hashbin);
@@ -841,7 +840,7 @@ int pp2p_check_download(psync_fileid_t fileid,
     goto err_perm2;
   else if (bresp == P2P_RESP_WAIT) {
     uint32_t rnd;
-    psync_ssl_rand_weak((unsigned char *)&rnd, sizeof(rnd));
+    pssl_random((unsigned char *)&rnd, sizeof(rnd));
     rnd &= 0x7ff;
     psys_sleep_milliseconds(PSYNC_P2P_SLEEP_WAIT_DOWNLOAD + rnd);
     goto err_temp2;

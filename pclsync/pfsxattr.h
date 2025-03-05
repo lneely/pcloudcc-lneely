@@ -32,8 +32,9 @@
 #ifndef _PSYNC_FSXATTR_H
 #define _PSYNC_FSXATTR_H
 
-#include "pfile.h"
-#include "psynclib.h"
+#include <stddef.h>
+
+#include "pfoldersync.h"
 
 #define PFS_XATTR_IGN
 

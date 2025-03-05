@@ -32,7 +32,7 @@
 #ifndef _PSYNC_LOCALSCAN_H
 #define _PSYNC_LOCALSCAN_H
 
-#include "psynclib.h"
+#include "pfoldersync.h"
 
 void psync_localscan_init();
 void psync_wake_localscan();

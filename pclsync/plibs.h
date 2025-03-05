@@ -35,10 +35,12 @@
 #include <pthread.h>
 
 #include "pcompiler.h"
+#include "pstatus.h"
 #include "putil.h"
-#include "psynclib.h"
+#include "psynclib.h" // need for macros...
 
 #include <sqlite3.h>
+#include <stdint.h>
 #include <string.h>
 
 #define D_NONE 0
@@ -70,10 +72,6 @@
 #if defined(assert)
 #undef assert
 #endif
-
-#define PSYNC_SSL_DEBUG_LEVEL                                                  \
-  0 /* Please make sure this setting is always set to 0 for release builds !!! \
-       Possible values are in the range [0, 5] */
 
 #define debug(level, ...)                                                      \
   do {                                                                         \

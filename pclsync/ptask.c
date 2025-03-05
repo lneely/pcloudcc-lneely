@@ -97,7 +97,7 @@ typedef struct {
   psync_fileid_t fileid;
   const char *localpath;
   uint64_t size;
-  char sha1hex[PSYNC_SHA1_DIGEST_HEXLEN];
+  char sha1hex[PSSL_SHA1_DIGEST_HEXLEN];
   psync_async_callback_t cb;
   void *cbext;
 } download_needed_req_t;
@@ -115,7 +115,7 @@ typedef struct {
   uint64_t mtime;
   uint64_t oldhash;
   uint64_t oldmtime;
-  unsigned char sha1hex[PSYNC_SHA1_DIGEST_HEXLEN];
+  unsigned char sha1hex[PSSL_SHA1_DIGEST_HEXLEN];
 } download_rsp_t;
 
 typedef struct _async_params_t {
@@ -152,9 +152,9 @@ typedef struct {
   uint64_t size;
   uint64_t hash;
   unsigned char osize;
-  unsigned char sha1hex[PSYNC_SHA1_DIGEST_HEXLEN];
-  unsigned char osha1hex[PSYNC_SHA1_DIGEST_HEXLEN];
-  psync_sha1_ctx sha1ctx;
+  unsigned char sha1hex[PSSL_SHA1_DIGEST_HEXLEN];
+  unsigned char osha1hex[PSSL_SHA1_DIGEST_HEXLEN];
+  pssl_sha1_ctx sha1ctx;
   uint64_t remsize;
   int fd;
 } download_context_t;
@@ -247,7 +247,7 @@ static int download_send_error(stream_t *s, async_params_t *prms,
   r.errorflags = errorflags;
   r.file.size = fda->size;
   r.file.hash = fda->hash;
-  memcpy(r.file.sha1hex, fda->sha1hex, PSYNC_SHA1_DIGEST_HEXLEN);
+  memcpy(r.file.sha1hex, fda->sha1hex, PSSL_SHA1_DIGEST_HEXLEN);
   s->cb(s->cbext, &r);
 
   debug(D_NOTICE, "closing stream %u", (unsigned)s->streamid);
@@ -259,10 +259,10 @@ static int download_send_error(stream_t *s, async_params_t *prms,
 }
 
 static int download_checksum(download_context_t *fda) {
-  unsigned char sha1b[PSYNC_SHA1_DIGEST_LEN], sha1h[PSYNC_SHA1_DIGEST_HEXLEN];
+  unsigned char sha1b[PSSL_SHA1_DIGEST_LEN], sha1h[PSSL_SHA1_DIGEST_HEXLEN];
   psync_sha1_final(sha1b, &fda->sha1ctx);
-  psync_binhex(sha1h, sha1b, PSYNC_SHA1_DIGEST_LEN);
-  if (memcmp(sha1h, fda->sha1hex, PSYNC_SHA1_DIGEST_HEXLEN)) {
+  psync_binhex(sha1h, sha1b, PSSL_SHA1_DIGEST_LEN);
+  if (memcmp(sha1h, fda->sha1hex, PSSL_SHA1_DIGEST_HEXLEN)) {
     debug(D_WARNING,
           "checksum verification for file %s failed, expected %40s got %40s",
           fda->localpath, (char *)fda->sha1hex, (char *)sha1h);
@@ -330,7 +330,7 @@ static int download_process_headers(stream_t *s,
   fda = (download_context_t *)(s + 1);
   fda->size = r.size;
   fda->hash = r.hash;
-  memcpy(fda->sha1hex, r.sha1hex, PSYNC_SHA1_DIGEST_HEXLEN);
+  memcpy(fda->sha1hex, r.sha1hex, PSSL_SHA1_DIGEST_HEXLEN);
   if (r.error)
     return download_send_error(s, prms, fda, r.error + 100, r.errorflags);
   debug(D_NOTICE,
@@ -343,13 +343,13 @@ static int download_process_headers(stream_t *s,
   psync_sql_bind_uint(res, 1, r.hash);
   psync_sql_bind_uint(res, 2, r.size);
   psync_sql_bind_lstring(res, 3, (const char *)r.sha1hex,
-                         PSYNC_SHA1_DIGEST_HEXLEN);
+                         PSSL_SHA1_DIGEST_HEXLEN);
   if (r.oldmtime) {
     psync_sql_run(res);
     psync_sql_bind_uint(res, 1, r.oldhash);
     psync_sql_bind_uint(res, 2, fda->osize);
     psync_sql_bind_lstring(res, 3, (const char *)fda->osha1hex,
-                           PSYNC_SHA1_DIGEST_HEXLEN);
+                           PSSL_SHA1_DIGEST_HEXLEN);
     psync_sql_run_free(res);
   } else
     psync_sql_run_free(res);
@@ -466,7 +466,7 @@ static int handle_download_nm(async_params_t *prms,
   s->cbext = dwl->cbext;
   s->process_data = download_process_headers;
   fda->osize = dwl->size;
-  memcpy(fda->osha1hex, dwl->sha1hex, PSYNC_SHA1_DIGEST_HEXLEN);
+  memcpy(fda->osha1hex, dwl->sha1hex, PSSL_SHA1_DIGEST_HEXLEN);
   fda->localpath = dwl->localpath;
   fda->fd = INVALID_HANDLE_VALUE;
   len = psync_slprintf(
@@ -1050,7 +1050,7 @@ int ptask_download_needed_async(psync_fileid_t fileid,
   task.request.fileid = fileid;
   task.request.localpath = localpath;
   task.request.size = size;
-  memcpy(task.request.sha1hex, sha1hex, PSYNC_SHA1_DIGEST_HEXLEN);
+  memcpy(task.request.sha1hex, sha1hex, PSSL_SHA1_DIGEST_HEXLEN);
   task.request.cb = cb;
   task.request.cbext = cbext;
   return task_send_async(&task, sizeof(task));

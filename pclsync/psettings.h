@@ -187,19 +187,19 @@
 
 #define PSYNC_CHECKSUM "sha1"
 
-#define PSYNC_HASH_BLOCK_SIZE PSYNC_SHA1_BLOCK_LEN
-#define PSYNC_HASH_DIGEST_LEN PSYNC_SHA1_DIGEST_LEN
-#define PSYNC_HASH_DIGEST_HEXLEN PSYNC_SHA1_DIGEST_HEXLEN
-#define psync_hash_ctx psync_sha1_ctx
+#define PSYNC_HASH_BLOCK_SIZE PSSL_SHA1_BLOCK_LEN
+#define PSYNC_HASH_DIGEST_LEN PSSL_SHA1_DIGEST_LEN
+#define PSYNC_HASH_DIGEST_HEXLEN PSSL_SHA1_DIGEST_HEXLEN
+#define psync_hash_ctx pssl_sha1_ctx
 #define psync_hash psync_sha1
 #define psync_hash_init psync_sha1_init
 #define psync_hash_update psync_sha1_update
 #define psync_hash_final psync_sha1_final
 
-#define PSYNC_LHASH_BLOCK_SIZE PSYNC_SHA512_BLOCK_LEN
-#define PSYNC_LHASH_DIGEST_LEN PSYNC_SHA512_DIGEST_LEN
-#define PSYNC_LHASH_DIGEST_HEXLEN PSYNC_SHA512_DIGEST_HEXLEN
-#define psync_lhash_ctx psync_sha512_ctx
+#define PSYNC_LHASH_BLOCK_SIZE PSSL_SHA512_BLOCK_LEN
+#define PSYNC_LHASH_DIGEST_LEN PSSL_SHA512_DIGEST_LEN
+#define PSYNC_LHASH_DIGEST_HEXLEN PSSL_SHA512_DIGEST_HEXLEN
+#define psync_lhash_ctx pssl_sha512_ctx
 #define psync_lhash psync_sha512
 #define psync_lhash_init psync_sha512_init
 #define psync_lhash_update psync_sha512_update

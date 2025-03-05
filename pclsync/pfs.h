@@ -41,7 +41,7 @@
 #include "pintervaltree.h"
 #include "plibs.h"
 #include "psettings.h"
-#include "psynclib.h"
+#include "pfoldersync.h"
 #include "ptimer.h"
 #include "ptree.h"
 
