@@ -1191,7 +1191,7 @@ int pcryptofolder_setup(const char *password, const char *hint) {
     return PSYNC_CRYPTO_SETUP_KEYGEN_FAILED;
   }
   debug(D_NOTICE, "encoding private key");
-  pcrypto_ctr_encdec_encode(enc, rsaprivatebin->data,
+  pcrypto_ctr_encdec_decode(enc, rsaprivatebin->data,
                                                 rsaprivatebin->datalen, 0);
   pcrypto_ctr_encdec_free(enc);
   debug(D_NOTICE, "encoded private key, uploading keys");
@@ -1357,7 +1357,7 @@ int pcryptofolder_unlock(const char *password) {
   psymkey_free(aeskey);
   rsaprivdec = (unsigned char *)pmemlock_malloc(rsaprivlen);
   memcpy(rsaprivdec, rsapriv, rsaprivlen);
-  pcrypto_ctr_encdec_encode(enc, rsaprivdec, rsaprivlen, 0);
+  pcrypto_ctr_encdec_decode(enc, rsaprivdec, rsaprivlen, 0);
   pcrypto_ctr_encdec_free(enc);
   debug(D_NOTICE, "successfully decoded private key");
 
@@ -1819,7 +1819,7 @@ int psync_pcloud_crypto_reencode_key(const unsigned char *rsapub, size_t rsapubl
       goto err_nm_1;
     }
     memcpy(rsaprivdec, rsapriv_struct->key, rsaprivlen);
-    pcrypto_ctr_encdec_encode(enc, rsaprivdec, rsaprivlen,
+    pcrypto_ctr_encdec_decode(enc, rsaprivdec, rsaprivlen,
                                                   0);
     pcrypto_ctr_encdec_free(enc);
     newpriv = (unsigned char *)psync_malloc(offsetof(priv_key_ver1, key) +
@@ -1841,7 +1841,7 @@ int psync_pcloud_crypto_reencode_key(const unsigned char *rsapub, size_t rsapubl
     if (unlikely(enc == PSYNC_CRYPTO_INVALID_ENCODER))
       goto err_nm_1;
     memcpy(rsapriv_struct->key, rsaprivdec, rsaprivlen);
-    pcrypto_ctr_encdec_encode(enc, rsapriv_struct->key,
+    pcrypto_ctr_encdec_decode(enc, rsapriv_struct->key,
                                                   rsaprivlen, 0);
     pcrypto_ctr_encdec_free(enc);
     newprivlen = offsetof(priv_key_ver1, key) + rsaprivlen;
@@ -1928,7 +1928,7 @@ int psync_pcloud_crypto_encode_key(const char *newpassphrase, uint32_t flags, ch
   if (unlikely(enc == PSYNC_CRYPTO_INVALID_ENCODER))
     goto err_nm_1;
   memcpy(rsapriv_struct->key, rsapriv->data, rsaprivlen);
-  pcrypto_ctr_encdec_encode(enc, rsapriv_struct->key,
+  pcrypto_ctr_encdec_decode(enc, rsapriv_struct->key,
                                                 rsaprivlen, 0);
   pcrypto_ctr_encdec_free(enc);
   rsaprivlen += offsetof(priv_key_ver1, key);
