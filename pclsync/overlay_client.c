@@ -58,9 +58,9 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include "debug.h"
 #include "overlay_client.h"
 #include "poverlay_protocol.h"
+#include "plibs.h"
 
 #define POVERLAY_BUFSIZE 512
 
