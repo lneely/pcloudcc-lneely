@@ -549,19 +549,21 @@ int pcryptofolder_unlock(const char *password) {
    * normally deadlock with us holding writelock and waiting for sql_lock.
    * Therefore we use sql_trylock here.
    */
-retry:
-  pthread_rwlock_wrlock(&crypto_lock);
-  if (crypto_started_l) {
-    pthread_rwlock_unlock(&crypto_lock);
-    return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_ALREADY_STARTED);
-  }
-  rowcnt = 0;
-  rsapriv = rsapub = salt = NULL;
-  iterations = 0;
-  if (psync_sql_trylock()) {
-    pthread_rwlock_unlock(&crypto_lock);
-    psys_sleep_milliseconds(1);
-    goto retry;
+  while (1) {
+    pthread_rwlock_wrlock(&crypto_lock);
+    if (crypto_started_l) {
+      pthread_rwlock_unlock(&crypto_lock);
+      return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_ALREADY_STARTED);
+    }
+    rowcnt = 0;
+    rsapriv = rsapub = salt = NULL;
+    iterations = 0;
+    if (psync_sql_trylock()) {
+      pthread_rwlock_unlock(&crypto_lock);
+      psys_sleep_milliseconds(1);
+      continue;
+    }
+    break;
   }
   res = psync_sql_query_nolock(
       "SELECT id, value FROM setting WHERE id IN ('crypto_private_key', "
@@ -2047,10 +2049,8 @@ int pcryptofolder_change_pass(const char *oldpassphrase,
 
   if (!newpassphrase || !newpassphrase[0])
     return PSYNC_CRYPTO_BAD_PASSPHRASE;
-retry:
-  if (psync_sql_trylock()) {
+  while (psync_sql_trylock()) {
     psys_sleep_milliseconds(1);
-    goto retry;
   }
   rowcnt = 0;
   res = psync_sql_query_nolock(
