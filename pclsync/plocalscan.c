@@ -37,33 +37,27 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 
-#include "pdevice.h"
-#include "pfile.h"
-#include "pfoldersync.h"
+#include "pcallbacks.h"
+#include "pfolder.h"
 #include "plibs.h"
-#include "prun.h"
 #include "plist.h"
 #include "plocalnotify.h"
 #include "plocalscan.h"
 #include "ppathstatus.h"
-#include "prunthrottled.h"
+#include "prunratelimit.h"
 #include "psettings.h"
 #include "pssl.h"
 #include "pstatus.h"
-#include "psys.h"
-#include "ptask.h"
+#include "ptasks.h"
 #include "ptimer.h"
 #include "pupload.h"
-#include "ppath.h"
-#include "putil.h"
-
 #include <ctype.h>
 #include <string.h>
 
 typedef struct {
   psync_list list;
   psync_folderid_t folderid;
-  uint64_t deviceid;
+  psync_deviceid_t deviceid;
   psync_syncid_t syncid;
   psync_synctype_t synctype;
   char localpath[];
@@ -75,8 +69,8 @@ typedef struct {
   psync_fileorfolderid_t remoteid;
   psync_folderid_t localparentfolderid;
   psync_folderid_t parentfolderid;
-  uint64_t inode;
-  uint64_t deviceid;
+  psync_inode_t inode;
+  psync_deviceid_t deviceid;
   uint64_t mtimenat;
   uint64_t size;
   psync_syncid_t syncid;
@@ -87,15 +81,15 @@ typedef struct {
 
 typedef struct {
   psync_list list;
-  uint64_t deviceid;
+  psync_deviceid_t deviceid;
   psync_syncid_t syncid;
-  uint64_t inode;
+  psync_inode_t inode;
   char localpath[];
 } sync_restat_list;
 
 typedef struct {
-  uint64_t deviceid;
-  uint64_t inode;
+  psync_deviceid_t deviceid;
+  psync_inode_t inode;
 } device_inode_t;
 
 static device_inode_t *ignored_paths = NULL;
@@ -130,7 +124,7 @@ static const uint32_t requiredstatuses[] = {
 static psync_list scan_lists[SCAN_LIST_CNT];
 static uint64_t localsleepperfolder;
 static time_t starttime;
-static unsigned long changes;
+static psync_uint_t changes;
 static int localnotify;
 psync_list scan_folders_list;
 
@@ -142,9 +136,9 @@ static void scanner_set_syncs_to_list(psync_list *lst,
   sync_list *l, *l_full_deviceid;
   char *syncmp;
   size_t lplen;
-  struct stat st;
-  uint64_t deviceid;
-  uint64_t inodeid;
+  psync_stat_t st;
+  psync_deviceid_t deviceid;
+  psync_inode_t inodeid;
 
   psync_list_init(lst);
   psync_list_init(lst_deviceid_full);
@@ -155,11 +149,11 @@ static void scanner_set_syncs_to_list(psync_list *lst,
           PSYNC_UPLOAD_ONLY));
   while ((row = psync_sql_fetch_row(res))) {
     lp = psync_get_lstring(row[2], &lplen);
-    if (unlikely(stat(lp, &st))) {
+    if (unlikely(psync_stat(lp, &st))) {
       debug(D_WARNING, "could not stat local folder %s, ignoring sync", lp);
       continue;
     }
-    if (unlikely(syncmp && !memcmp(syncmp, lp, strlen(syncmp)))) {
+    if (unlikely(syncmp && !psync_filename_cmpn(syncmp, lp, strlen(syncmp)))) {
       debug(D_WARNING,
             "folder %s is on pCloudDrive mounted as %s, ignoring sync", lp,
             syncmp);
@@ -167,8 +161,8 @@ static void scanner_set_syncs_to_list(psync_list *lst,
     }
     deviceid = psync_get_number(row[4]);
     inodeid = psync_get_number(row[5]);
-    if (unlikely(deviceid != pfile_stat_device(&st) &&
-                 inodeid != pfile_stat_inode(&st))) {
+    if (unlikely(deviceid != psync_stat_device(&st) &&
+                 inodeid != psync_stat_inode(&st))) {
       debug(D_WARNING, "folder %s deviceid is different, ignoring", lp);
       continue;
     }
@@ -182,7 +176,7 @@ static void scanner_set_syncs_to_list(psync_list *lst,
     l_full_deviceid =
         (sync_list *)psync_malloc(offsetof(sync_list, localpath) + lplen + 1);
     l_full_deviceid->folderid = psync_get_number(row[1]);
-    l_full_deviceid->deviceid = pfile_stat_device_full(&st);
+    l_full_deviceid->deviceid = psync_stat_device_full(&st);
     l_full_deviceid->syncid = psync_get_number(row[0]);
     l_full_deviceid->synctype = psync_get_number(row[3]);
     memcpy(l_full_deviceid->localpath, lp, lplen + 1);
@@ -193,9 +187,9 @@ static void scanner_set_syncs_to_list(psync_list *lst,
 }
 
 static void add_ignored_dir(const char *path) {
-  struct stat st;
+  psync_stat_t st;
 
-  if (stat(path, &st))
+  if (psync_stat(path, &st))
     return;
   if (ign_paths_cnt >= ign_paths_alloc) {
     if (!ign_paths_alloc)
@@ -205,8 +199,8 @@ static void add_ignored_dir(const char *path) {
     ignored_paths = (device_inode_t *)psync_realloc(
         ignored_paths, sizeof(device_inode_t) * ign_paths_alloc);
   }
-  ignored_paths[ign_paths_cnt].deviceid = pfile_stat_device_full(&st);
-  ignored_paths[ign_paths_cnt].inode = pfile_stat_inode(&st);
+  ignored_paths[ign_paths_cnt].deviceid = psync_stat_device_full(&st);
+  ignored_paths[ign_paths_cnt].inode = psync_stat_inode(&st);
   ign_paths_cnt++;
 }
 
@@ -222,11 +216,11 @@ static void reload_ignored_folders() {
   psync_sha256((const unsigned char *)ign, ignlen, checkcurr);
 
   if (!memcmp(ign_checksum, checkcurr, PSYNC_SHA256_DIGEST_LEN) &&
-      ign_last_check + 3600 < ptimer_time())
+      ign_last_check + 3600 < psync_timer_time())
     return;
 
   memcpy(ign_checksum, checkcurr, PSYNC_SHA256_DIGEST_LEN);
-  ign_last_check = ptimer_time();
+  ign_last_check = psync_timer_time();
   ign_paths_cnt = 0;
   next = ign;
   home = NULL;
@@ -249,7 +243,7 @@ static void reload_ignored_folders() {
     dirlen = end - start;
     if (dirlen >= 5 && !memcmp(start, "$HOME", 5)) {
       if (!home) {
-        home = ppath_home();
+        home = psync_get_home_dir();
         if (home)
           homelen = strlen(home);
       }
@@ -273,7 +267,7 @@ static void reload_ignored_folders() {
   psync_free(home);
 }
 
-static int is_path_to_ignore(uint64_t deviceid, uint64_t inode) {
+static int is_path_to_ignore(psync_deviceid_t deviceid, psync_inode_t inode) {
   uint32_t i;
   for (i = 0; i < ign_paths_cnt; i++) {
     if (ignored_paths[i].deviceid == deviceid &&
@@ -285,13 +279,13 @@ static int is_path_to_ignore(uint64_t deviceid, uint64_t inode) {
   return 0;
 }
 
-static void scanner_local_entry_to_list(void *ptr, ppath_stat *st) {
+static void scanner_local_entry_to_list(void *ptr, psync_pstat *st) {
   psync_list *lst;
   sync_folderlist *e;
   size_t l;
 
-  if (is_path_to_ignore(pfile_stat_device_full(&st->stat),
-                        pfile_stat_inode(&st->stat))) {
+  if (is_path_to_ignore(psync_stat_device_full(&st->stat),
+                        psync_stat_inode(&st->stat))) {
     return;
   }
 
@@ -300,11 +294,11 @@ static void scanner_local_entry_to_list(void *ptr, ppath_stat *st) {
   e = (sync_folderlist *)psync_malloc(offsetof(sync_folderlist, name) + l);
   e->localid = 0;
   e->remoteid = 0;
-  e->inode = pfile_stat_inode(&st->stat);
-  e->deviceid = pfile_stat_device_full(&st->stat);
-  e->mtimenat = pfile_stat_mtime_native(&st->stat);
-  e->size = pfile_stat_size(&st->stat);
-  e->isfolder = pfile_stat_isfolder(&st->stat);
+  e->inode = psync_stat_inode(&st->stat);
+  e->deviceid = psync_stat_device_full(&st->stat);
+  e->mtimenat = psync_stat_mtime_native(&st->stat);
+  e->size = psync_stat_size(&st->stat);
+  e->isfolder = psync_stat_isfolder(&st->stat);
   memcpy(e->name, st->name, l);
   psync_list_add_tail(lst, &e->list);
 }
@@ -313,7 +307,7 @@ static int scanner_local_folder_to_list(const char *localpath,
                                         psync_list *lst) {
   psync_list_init(lst);
 
-  return ppath_ls(localpath, scanner_local_entry_to_list, lst);
+  return psync_list_dir(localpath, scanner_local_entry_to_list, lst);
 }
 
 static void delete_local_folder_rec(psync_folderid_t localfolderid);
@@ -406,7 +400,7 @@ static void scanner_db_folder_to_list(psync_syncid_t syncid,
 }
 
 static int folderlist_cmp(const psync_list *l1, const psync_list *l2) {
-  return strcmp(
+  return psync_filename_cmp(
       psync_list_element(l1, sync_folderlist, list)->name,
       psync_list_element(l2, sync_folderlist, list)->name);
 }
@@ -428,7 +422,7 @@ static sync_folderlist *copy_folderlist_element(const sync_folderlist *e,
   return ret;
 }
 
-static void add_element_to_scan_list(unsigned long id, sync_folderlist *e) {
+static void add_element_to_scan_list(psync_uint_t id, sync_folderlist *e) {
   psync_list_add_tail(&scan_lists[id], &e->list);
   localsleepperfolder = 0;
   changes++;
@@ -437,7 +431,7 @@ static void add_element_to_scan_list(unsigned long id, sync_folderlist *e) {
 static void add_new_element(const sync_folderlist *e, psync_folderid_t folderid,
                             psync_folderid_t localfolderid,
                             psync_syncid_t syncid, psync_synctype_t synctype,
-                            uint64_t deviceid) {
+                            psync_deviceid_t deviceid) {
   sync_folderlist *c;
   if (e->isfolder && e->deviceid != deviceid)
     return;
@@ -496,7 +490,7 @@ add_modified_file(const sync_folderlist *e, const sync_folderlist *dbe,
 static void
 scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
                     psync_folderid_t localfolderid, psync_syncid_t syncid,
-                    psync_synctype_t synctype, uint64_t deviceid) {
+                    psync_synctype_t synctype, psync_deviceid_t deviceid) {
   psync_list disklist, dblist, *ldisk, *ldb;
   sync_folderlist *l, *fdisk, *fdb;
   char *subpath;
@@ -517,7 +511,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
   while (ldisk != &disklist && ldb != &dblist) {
     fdisk = psync_list_element(ldisk, sync_folderlist, list);
     fdb = psync_list_element(ldb, sync_folderlist, list);
-    cmp = strcmp(fdisk->name, fdb->name);
+    cmp = psync_filename_cmp(fdisk->name, fdb->name);
     if (cmp == 0) {
       if (fdisk->isfolder == fdb->isfolder) {
         fdisk->localid = fdb->localid;
@@ -528,7 +522,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
           add_modified_file(fdisk, fdb, folderid, localfolderid, syncid,
                             synctype);
         if (fdisk->isfolder &&
-            pdevice_id_short(fdisk->deviceid) != fdb->deviceid &&
+            psync_deviceid_short(fdisk->deviceid) != fdb->deviceid &&
             fdisk->inode != fdb->inode) {
           if (fdisk->deviceid == deviceid) {
             debug(D_NOTICE,
@@ -566,7 +560,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
   }
   psync_list_for_each_element_call(&dblist, sync_folderlist, list, psync_free);
   if (localsleepperfolder) {
-    psys_sleep_milliseconds(localsleepperfolder);
+    psync_milisleep(localsleepperfolder);
     if (psync_current_time - starttime >=
         PSYNC_LOCALSCAN_SLEEPSEC_PER_SCAN * 3 / 2)
       localsleepperfolder = 0;
@@ -574,7 +568,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
   psync_list_for_each_element(l, &disklist, sync_folderlist,
                               list) if (l->isfolder && l->localid &&
                                         l->deviceid == deviceid) {
-    subpath = psync_strcat(localpath, "/", l->name, NULL);
+    subpath = psync_strcat(localpath, PSYNC_DIRECTORY_SEPARATOR, l->name, NULL);
     scanner_scan_folder(subpath, l->remoteid, l->localid, syncid, synctype,
                         deviceid);
     psync_free(subpath);
@@ -657,12 +651,12 @@ static void scan_rename_file(sync_folderlist *rnfr, sync_folderlist *rnto) {
   psync_sql_bind_string(res, 3, rnto->name);
   psync_sql_bind_uint(res, 4, rnfr->localid);
   psync_sql_run_free(res);
-  ptask_rfile_rename(rnfr->syncid, rnto->syncid, rnfr->localid,
+  psync_task_rename_remote_file(rnfr->syncid, rnto->syncid, rnfr->localid,
                                 rnto->localparentfolderid, rnto->name);
   if (filetoupload) {
-    ppath_syncfldr_task_added_locked(rnto->syncid,
+    psync_path_status_sync_folder_task_added_locked(rnto->syncid,
                                                     rnto->localparentfolderid);
-    ppathstatus_syncfldr_task_completed(old_syncid,
+    psync_path_status_sync_folder_task_completed(old_syncid,
                                                  old_parentfolderid);
   }
 }
@@ -673,7 +667,7 @@ static void scan_upload_file(sync_folderlist *fl) {
   debug(D_NOTICE, "file created %s", fl->name);
   /* it is possible that files that are reported as new are already uploading
    * -- is it? when? how? and with what localid?
-  pupload_del_tasks(fl->localid);
+  psync_delete_upload_tasks_for_file(fl->localid);
   */
   res = psync_sql_prep_statement(
       "INSERT OR IGNORE INTO localfile (localparentfolderid, syncid, size, "
@@ -683,32 +677,32 @@ static void scan_upload_file(sync_folderlist *fl) {
   psync_sql_bind_uint(res, 2, fl->syncid);
   psync_sql_bind_uint(res, 3, fl->size);
   psync_sql_bind_uint(res, 4, fl->inode);
-  psync_sql_bind_uint(res, 5, psys_native_to_mtime(fl->mtimenat));
+  psync_sql_bind_uint(res, 5, psync_mtime_native_to_mtime(fl->mtimenat));
   psync_sql_bind_uint(res, 6, fl->mtimenat);
   psync_sql_bind_string(res, 7, fl->name);
   psync_sql_run_free(res);
   if (unlikely_log(!psync_sql_affected_rows()))
     return;
   localfileid = psync_sql_insertid();
-  ptask_upload_q(fl->syncid, localfileid, fl->name);
-  ppath_syncfldr_task_added(fl->syncid, fl->localparentfolderid);
+  psync_task_upload_file_silent(fl->syncid, localfileid, fl->name);
+  psync_path_status_sync_folder_task_added(fl->syncid, fl->localparentfolderid);
 }
 
 static void scan_upload_modified_file(sync_folderlist *fl) {
   psync_sql_res *res;
   debug(D_NOTICE, "file modified %s (%lu)", fl->name,
         (unsigned long)fl->localid);
-  pupload_del_tasks(fl->localid);
+  psync_delete_upload_tasks_for_file(fl->localid);
   res = psync_sql_prep_statement("UPDATE localfile SET size=?, inode=?, "
                                  "mtime=?, mtimenative=? WHERE id=?");
   psync_sql_bind_uint(res, 1, fl->size);
   psync_sql_bind_uint(res, 2, fl->inode);
-  psync_sql_bind_uint(res, 3, psys_native_to_mtime(fl->mtimenat));
+  psync_sql_bind_uint(res, 3, psync_mtime_native_to_mtime(fl->mtimenat));
   psync_sql_bind_uint(res, 4, fl->mtimenat);
   psync_sql_bind_uint(res, 5, fl->localid);
   psync_sql_run_free(res);
-  ptask_upload_q(fl->syncid, fl->localid, fl->name);
-  ppath_syncfldr_task_added(fl->syncid, fl->localparentfolderid);
+  psync_task_upload_file_silent(fl->syncid, fl->localid, fl->name);
+  psync_path_status_sync_folder_task_added(fl->syncid, fl->localparentfolderid);
 }
 
 static void scan_delete_file(sync_folderlist *fl) {
@@ -732,13 +726,13 @@ static void scan_delete_file(sync_folderlist *fl) {
     return;
   }
   psync_sql_free_result(res);
-  pupload_del_tasks(fl->localid);
+  psync_delete_upload_tasks_for_file(fl->localid);
   res = psync_sql_prep_statement("DELETE FROM localfile WHERE id=?");
   psync_sql_bind_uint(res, 1, fl->localid);
   psync_sql_run_free(res);
   if (fileid)
-    ptask_rfile_rm(fl->syncid, fileid);
-  ppathstatus_syncfldr_task_completed(syncid, localparentfolderid);
+    psync_task_delete_remote_file(fl->syncid, fileid);
+  psync_path_status_sync_folder_task_completed(syncid, localparentfolderid);
 }
 
 static void scan_create_folder(sync_folderlist *fl) {
@@ -752,8 +746,8 @@ static void scan_create_folder(sync_folderlist *fl) {
   psync_sql_bind_uint(res, 1, fl->localparentfolderid);
   psync_sql_bind_uint(res, 2, fl->syncid);
   psync_sql_bind_uint(res, 3, fl->inode);
-  psync_sql_bind_uint(res, 4, pdevice_id_short(fl->deviceid));
-  psync_sql_bind_uint(res, 5, psys_native_to_mtime(fl->mtimenat));
+  psync_sql_bind_uint(res, 4, psync_deviceid_short(fl->deviceid));
+  psync_sql_bind_uint(res, 5, psync_mtime_native_to_mtime(fl->mtimenat));
   psync_sql_bind_uint(res, 6, fl->mtimenat);
   psync_sql_bind_string(res, 7, fl->name);
   psync_sql_run_free(res);
@@ -775,8 +769,8 @@ static void scan_create_folder(sync_folderlist *fl) {
         "UPDATE localfolder SET inode=?, deviceid=?, mtime=?, mtimenative=?, "
         "flags=0 WHERE syncid=? AND localparentfolderid=? AND name=?");
     psync_sql_bind_uint(res, 1, fl->inode);
-    psync_sql_bind_uint(res, 2, pdevice_id_short(fl->deviceid));
-    psync_sql_bind_uint(res, 3, psys_native_to_mtime(fl->mtimenat));
+    psync_sql_bind_uint(res, 2, psync_deviceid_short(fl->deviceid));
+    psync_sql_bind_uint(res, 3, psync_mtime_native_to_mtime(fl->mtimenat));
     psync_sql_bind_uint(res, 4, fl->mtimenat);
     psync_sql_bind_uint(res, 5, fl->syncid);
     psync_sql_bind_uint(res, 6, fl->localparentfolderid);
@@ -796,7 +790,7 @@ static void scan_create_folder(sync_folderlist *fl) {
   psync_sql_run_free(res);
   if (unlikely_log(!psync_sql_affected_rows()))
     return;
-  ptask_rdir_mk(fl->syncid, localfolderid, fl->name);
+  psync_task_create_remote_folder(fl->syncid, localfolderid, fl->name);
   return;
 hasfolder:
   return;
@@ -808,7 +802,7 @@ static void scan_created_folder(sync_folderlist *fl) {
     debug(D_WARNING, "local folder %s does not have localid", fl->name);
     return;
   }
-  localpath = pfolder_lpath_lfldr(fl->localid, fl->syncid, NULL);
+  localpath = psync_local_path_for_local_folder(fl->localid, fl->syncid, NULL);
   if (likely_log(localpath)) {
     debug(D_NOTICE, "scanning just created folder %s localid %lu name %s",
           localpath, (unsigned long)fl->localid, fl->name);
@@ -848,7 +842,7 @@ static void scan_rename_folder(sync_folderlist *rnfr, sync_folderlist *rnto) {
       "SELECT syncid, localparentfolderid FROM localfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, rnfr->localid);
   if ((row = psync_sql_fetch_rowint(res))) {
-    ppathstatus_syncfldr_moved(
+    psync_path_status_sync_folder_moved(
         rnfr->localid, row[0], row[1], rnto->syncid, rnto->localparentfolderid);
     psync_sql_free_result(res);
   } else {
@@ -879,7 +873,7 @@ static void scan_rename_folder(sync_folderlist *rnfr, sync_folderlist *rnto) {
           (unsigned)rnfr->syncid, (unsigned)rnto->syncid);
     update_syncid_rec(rnfr->localid, rnto->syncid);
   }
-  ptask_rdir_rename(rnfr->syncid, rnto->syncid, rnfr->localid,
+  psync_task_rename_remote_folder(rnfr->syncid, rnto->syncid, rnfr->localid,
                                   rnto->localparentfolderid, rnto->name);
 }
 
@@ -895,7 +889,7 @@ static void delete_local_folder_rec(psync_folderid_t localfolderid) {
   res = psync_sql_query("SELECT id FROM localfile WHERE localparentfolderid=?");
   psync_sql_bind_uint(res, 1, localfolderid);
   while ((row = psync_sql_fetch_rowint(res)))
-    pupload_del_tasks(row[0]);
+    psync_delete_upload_tasks_for_file(row[0]);
   psync_sql_free_result(res);
   res = psync_sql_prep_statement(
       "DELETE FROM localfile WHERE localparentfolderid=?");
@@ -904,7 +898,7 @@ static void delete_local_folder_rec(psync_folderid_t localfolderid) {
   res = psync_sql_query("SELECT syncid FROM localfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, localfolderid);
   if (row)
-    ppathstatus_syncfldr_deleted(row[0], localfolderid);
+    psync_path_status_sync_folder_deleted(row[0], localfolderid);
   psync_sql_free_result(res);
   res = psync_sql_prep_statement("DELETE FROM localfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, localfolderid);
@@ -943,16 +937,16 @@ retry:
     } else {
       psync_sql_commit_transaction();
       if (tries == 10)
-        ptimer_notify_exception();
+        psync_timer_notify_exception();
       tries++;
-      psys_sleep_milliseconds(20 + tries * 20);
+      psync_milisleep(20 + tries * 20);
       psync_sql_start_transaction();
       goto retry;
     }
   }
   delete_local_folder_rec(fl->localid);
   if (folderid)
-    ptask_rdir_rm(fl->syncid, folderid);
+    psync_task_delete_remote_folder(fl->syncid, folderid);
 }
 
 #define check_for_query_cnt()                                                  \
@@ -960,7 +954,7 @@ retry:
     if (unlikely(++trn > 1000)) {                                              \
       trn = 0;                                                                 \
       psync_sql_commit_transaction();                                          \
-      psys_sleep_milliseconds(20);                                                     \
+      psync_milisleep(20);                                                     \
       psync_sql_start_transaction();                                           \
     }                                                                          \
   } while (0)
@@ -969,7 +963,7 @@ static void scanner_scan(int first) {
   psync_list slist, slist_full_deviceid, newtmp, *l1, *l2;
   sync_folderlist *fl;
   sync_list *l;
-  unsigned long i, w, trn, restartsleep;
+  psync_uint_t i, w, trn, restartsleep;
   int movedfolders;
   if (first)
     localsleepperfolder = 0;
@@ -992,7 +986,7 @@ restart:
     pthread_cond_wait(&scan_cond, &scan_mutex);
   restart_scan = 0;
   pthread_mutex_unlock(&scan_mutex);
-  if (!pstatus_ok_status_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses)))
+  if (!psync_statuses_ok_array(requiredstatuses, ARRAY_SIZE(requiredstatuses)))
     return;
   reload_ignored_folders();
   for (i = 0; i < SCAN_LIST_CNT; i++)
@@ -1002,28 +996,28 @@ restart:
   movedfolders = 0;
 
   psync_list_for_each_element(l, &slist, sync_list, list) {
-    struct stat st;
-    if (unlikely(stat(l->localpath, &st))) {
+    psync_stat_t st;
+    if (unlikely(psync_stat(l->localpath, &st))) {
       debug(D_WARNING,
             "could not stat local sync folder %s and will not scan it "
             "(recursively)",
             l->localpath);
       continue;
     }
-    if (is_path_to_ignore(pfile_stat_device_full(&st), pfile_stat_inode(&st))) {
+    if (is_path_to_ignore(psync_stat_device_full(&st), psync_stat_inode(&st))) {
       debug(D_NOTICE, "not syncing folder %s as it is in ignore list",
             l->localpath);
       continue;
     }
     scanner_scan_folder(l->localpath, l->folderid, 0, l->syncid, l->synctype,
-                        pfile_stat_device_full(&st));
+                        psync_stat_device_full(&st));
   }
 
   psync_list_for_each_element(l, &slist_full_deviceid, sync_list, list) {
-    struct stat st;
-    uint64_t deviceid;
+    psync_stat_t st;
+    psync_deviceid_t deviceid;
 
-    if (unlikely(stat(l->localpath, &st))) {
+    if (unlikely(psync_stat(l->localpath, &st))) {
       debug(D_NOTICE,
             "Can't stat sync folder %s. Was it deleted/unmounted while "
             "scanning? Will restart the local scan.",
@@ -1031,7 +1025,7 @@ restart:
       psync_restart_localscan();
       break;
     } else {
-      deviceid = pfile_stat_device_full(&st);
+      deviceid = psync_stat_device_full(&st);
     }
     if (l->deviceid != deviceid) {
       debug(D_NOTICE,
@@ -1055,7 +1049,7 @@ restart:
       for (i = 0; i < SCAN_LIST_CNT; i++)
         psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list,
                                          psync_free);
-      psys_sleep_milliseconds(restartsleep);
+      psync_milisleep(restartsleep);
       if (restartsleep < 16000)
         restartsleep *= 2;
       goto restart;
@@ -1117,7 +1111,7 @@ restart:
     for (i = 0; i < SCAN_LIST_CNT; i++)
       psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list,
                                        psync_free);
-    psys_sleep_milliseconds(restartsleep);
+    psync_milisleep(restartsleep);
     if (restartsleep < 16000)
       restartsleep *= 2;
 
@@ -1163,13 +1157,13 @@ restart:
     w++;
     check_for_query_cnt();
   }
-  ppathstatus_clear_sync_cache();
+  psync_path_status_clear_sync_path_cache();
 
   psync_sql_commit_transaction();
 
   if (w) {
-    pupload_wake();
-    pstatus_upload_recalc_async();
+    psync_wake_upload();
+    psync_status_recalc_to_upload_async();
   }
   for (i = 0; i < SCAN_LIST_CNT; i++)
     psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list,
@@ -1202,18 +1196,18 @@ static int scanner_wait() {
 static void scanner_thread() {
   time_t lastscan;
   int w;
-  psys_sleep_milliseconds(1500);
-  pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
-  pstatus_wait(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
+  psync_milisleep(1500);
+  psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+  psync_wait_status(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
   scanner_scan(1);
-  pstatus_set(PSTATUS_TYPE_LOCALSCAN, PSTATUS_LOCALSCAN_READY);
+  psync_set_status(PSTATUS_TYPE_LOCALSCAN, PSTATUS_LOCALSCAN_READY);
   scanner_wait();
   w = 0;
   lastscan = 0;
   while (psync_do_run) {
-    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
     if (lastscan + 5 >= psync_current_time) {
-      psys_sleep_milliseconds(2000);
+      psync_milisleep(2000);
       pthread_mutex_lock(&scan_mutex);
       scan_wakes = 0;
       pthread_mutex_unlock(&scan_mutex);
@@ -1234,7 +1228,7 @@ static void psync_do_wake_localscan() {
 }
 
 void psync_wake_localscan() {
-  prun_throttled("wake localscan", psync_do_wake_localscan,
+  psync_run_ratelimited("wake localscan", psync_do_wake_localscan,
                         PSYNC_LOCALSCAN_MIN_INTERVAL, 0);
 }
 
@@ -1268,21 +1262,21 @@ static void psync_wake_localscan_noscan() {
 void psync_restat_sync_folders_add(psync_syncid_t syncid,
                                    const char *localpath) {
   sync_restat_list *l;
-  struct stat st;
+  psync_stat_t st;
   size_t lplen = strlen(localpath);
   l = (sync_restat_list *)psync_malloc(offsetof(sync_restat_list, localpath) +
                                        lplen + 1);
   l->syncid = syncid;
   memcpy(l->localpath, localpath, lplen + 1);
-  if (stat(l->localpath, &st)) {
+  if (psync_stat(l->localpath, &st)) {
     debug(D_NOTICE,
           "Can't stat sync folder '%s'. Putting zeros for inode and deviceid",
           l->localpath);
     l->inode = 0;
     l->deviceid = 0;
   } else {
-    l->inode = pfile_stat_inode(&st);
-    l->deviceid = pfile_stat_device_full(&st);
+    l->inode = psync_stat_inode(&st);
+    l->deviceid = psync_stat_device_full(&st);
   }
   pthread_mutex_lock(&restat_mutex);
   psync_list_add_tail(&scan_folders_list, &l->list);
@@ -1308,20 +1302,20 @@ void psync_restat_sync_folders_del(psync_syncid_t syncid) {
 void psync_restat_sync_folders() {
   sync_restat_list *l;
   int has_changes = 0;
-  struct stat st;
-  uint64_t deviceid;
-  uint64_t inode;
+  psync_stat_t st;
+  psync_deviceid_t deviceid;
+  psync_inode_t inode;
   pthread_mutex_lock(&restat_mutex);
   psync_list_for_each_element(l, &scan_folders_list, sync_restat_list, list) {
-    if (stat(l->localpath, &st)) {
+    if (psync_stat(l->localpath, &st)) {
       debug(D_NOTICE,
             "Can't stat sync folder '%s'. Setting deviceid and inode to zero.",
             l->localpath);
       deviceid = 0;
       inode = 0;
     } else {
-      deviceid = pfile_stat_device_full(&st);
-      inode = pfile_stat_inode(&st);
+      deviceid = psync_stat_device_full(&st);
+      inode = psync_stat_inode(&st);
     }
     if (l->deviceid != deviceid || l->inode != inode) {
       l->deviceid = deviceid;
@@ -1343,8 +1337,8 @@ void psync_localscan_init() {
   const char *localpath;
   psync_syncid_t syncid;
   psync_list_init(&scan_folders_list);
-  ptimer_exception_handler(psync_wake_localscan_noscan);
-  prun_thread("localscan", scanner_thread);
+  psync_timer_exception_handler(psync_wake_localscan_noscan);
+  psync_run_thread("localscan", scanner_thread);
   localnotify = psync_localnotify_init();
   res = psync_sql_query_rdlock(
       "SELECT id, localpath FROM syncfolder WHERE synctype&" NTO_STR(

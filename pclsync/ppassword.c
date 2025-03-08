@@ -269,7 +269,7 @@ static uint64_t uint_sqrt(uint64_t n) {
   return m;
 }
 
-uint64_t ppassword_score(const char *cpassword) {
+uint64_t psync_password_score(const char *cpassword) {
   uint64_t score, oscore, num;
   char unsigned *lpwd, *ldpwd, *password;
   size_t plen, nlen;

@@ -38,7 +38,7 @@ static psync_interval_tree_t *psync_interval_tree_new(uint64_t from,
   tree->from = from;
   tree->to = to;
   return psync_interval_tree_element(
-      ptree_get_add_after(PSYNC_TREE_EMPTY, NULL, &tree->tree));
+      psync_tree_get_add_after(PSYNC_TREE_EMPTY, NULL, &tree->tree));
 }
 
 static psync_interval_tree_t *psync_interval_new(uint64_t from, uint64_t to) {
@@ -93,7 +93,7 @@ psync_interval_tree_get_add(psync_interval_tree_t *tree, uint64_t from,
           e2 = psync_interval_new(from, to);
           return psync_interval_tree_consume_intervals(
               psync_interval_tree_element(
-                  ptree_get_add_before(&tree->tree, &e->tree, &e2->tree)),
+                  psync_tree_get_add_before(&tree->tree, &e->tree, &e2->tree)),
               e2);
         }
       } else {
@@ -104,7 +104,7 @@ psync_interval_tree_get_add(psync_interval_tree_t *tree, uint64_t from,
           e2 = psync_interval_new(from, to);
           return psync_interval_tree_consume_intervals(
               psync_interval_tree_element(
-                  ptree_get_add_after(&tree->tree, &e->tree, &e2->tree)),
+                  psync_tree_get_add_after(&tree->tree, &e->tree, &e2->tree)),
               e2);
         }
       }
@@ -124,7 +124,7 @@ void psync_interval_tree_remove(psync_interval_tree_t **tree, uint64_t from,
   while (tr) {
     if (tr->from < from && tr->to > to) {
       // the only case we have to split interval
-      ptree_add_after((psync_tree **)tree, &tr->tree,
+      psync_tree_add_after((psync_tree **)tree, &tr->tree,
                            &psync_interval_new(to, tr->to)->tree);
       tr->to = from;
       break;
@@ -144,7 +144,7 @@ void psync_interval_tree_remove(psync_interval_tree_t **tree, uint64_t from,
 
 void psync_interval_tree_free(psync_interval_tree_t *tree) {
   if (tree)
-    ptree_for_each_element_call_safe(&tree->tree, psync_interval_tree_t,
+    psync_tree_for_each_element_call_safe(&tree->tree, psync_interval_tree_t,
                                           tree, psync_free);
 }
 
@@ -159,7 +159,7 @@ psync_interval_tree_get_cut_end(psync_interval_tree_t *tree, uint64_t end) {
     }
     prev = psync_interval_tree_get_prev(last);
     tree = psync_interval_tree_element(
-        ptree_get_del(&tree->tree, &last->tree));
+        psync_tree_get_del(&tree->tree, &last->tree));
     psync_free(last);
     last = prev;
   }

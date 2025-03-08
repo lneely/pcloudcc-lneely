@@ -28,28 +28,33 @@
   DAMAGE.
 */
 
-#include <errno.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/debug.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/pkcs5.h>
+#include <mbedtls/sha1.h>
+#include <mbedtls/ssl.h>
 #include <pthread.h>
 #include <stddef.h>
 
-#include "pqevent.h"
+#include "papi.h"
+#include "pasyncnet.h"
+#include "pcallbacks.h"
 #include "pdownload.h"
-#include "pfoldersync.h"
+#include "pfolder.h"
 #include "plibs.h"
+#include "plist.h"
 #include "plocalscan.h"
 #include "pnetlibs.h"
 #include "pp2p.h"
 #include "ppathstatus.h"
-#include "prun.h"
-#include "psys.h"
+#include "psettings.h"
+#include "pssl.h"
 #include "pstatus.h"
-#include "pfoldersync.h"
-#include "ptask.h"
+#include "psyncer.h"
+#include "ptasks.h"
 #include "ptimer.h"
 #include "pupload.h"
-#include "ppath.h"
-
-extern const unsigned char pfile_invalid_chars[];
 
 typedef struct {
   psync_list list;
@@ -83,14 +88,14 @@ typedef struct {
 
 static pthread_mutex_t download_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t download_cond = PTHREAD_COND_INITIALIZER;
-static unsigned long download_wakes = 0;
+static psync_uint_t download_wakes = 0;
 static const uint32_t requiredstatuses[] = {
     PSTATUS_COMBINE(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED),
     PSTATUS_COMBINE(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN),
     PSTATUS_COMBINE(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE)};
 
-static unsigned long started_downloads = 0;
-static unsigned long current_downloads_waiters = 0;
+static psync_uint_t started_downloads = 0;
+static psync_uint_t current_downloads_waiters = 0;
 static pthread_mutex_t current_downloads_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t current_downloads_cond = PTHREAD_COND_INITIALIZER;
 
@@ -109,35 +114,35 @@ static void task_wait_no_downloads() {
 static int task_mkdir(const char *path) {
   int err;
   while (1) {
-    if (likely(!mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE))) { // don't change to likely_log, as it may
+    if (likely(!psync_mkdir(path))) { // don't change to likely_log, as it may
                                       // overwrite psync_fs_err;
       psync_set_local_full(0);
       return 0;
     }
-    err = errno;
+    err = psync_fs_err();
     debug(D_WARNING, "mkdir of %s failed, errno=%d", path, (int)err);
-    if (err == ENOSPC || err == EDQUOT) {
+    if (err == P_NOSPC || err == P_DQUOT) {
       psync_set_local_full(1);
-      psys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
+      psync_milisleep(PSYNC_SLEEP_ON_DISK_FULL);
     } else {
       psync_set_local_full(0);
-      if (err == ENOENT)
+      if (err == P_NOENT)
         return 0; // do we have a choice? the user deleted the directory
-      else if (err == EEXIST) {
-        struct stat st;
-        if (stat(path, &st)) {
+      else if (err == P_EXIST) {
+        psync_stat_t st;
+        if (psync_stat(path, &st)) {
           debug(D_BUG,
                 "mkdir failed with EEXIST, but stat returned error. race?");
           return -1;
         }
-        if (pfile_stat_isfolder(&st))
+        if (psync_stat_isfolder(&st))
           return 0;
         if (psync_rename_conflicted_file(path))
           return -1;
       } else
         return -1;
     }
-    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
   }
 }
 
@@ -145,19 +150,22 @@ static int task_rmdir(const char *path) {
   task_wait_no_downloads();
   if (likely_log(!psync_rmdir_with_trashes(path)))
     return 0;
-  if (errno == EBUSY || errno == EROFS)
+  if (psync_fs_err() == P_BUSY || psync_fs_err() == P_ROFS)
     return -1;
   psync_wake_localscan();
   return 0;
 }
 
-static void do_move(void *ptr, ppath_stat *st) {
+static void do_move(void *ptr, psync_pstat *st) {
   const char **arr;
   char *oldpath, *newpath;
   arr = (const char **)ptr;
   oldpath = psync_strcat(arr[0], st->name, NULL);
   newpath = psync_strcat(arr[1], st->name, NULL);
-  pfile_rename(oldpath, newpath);
+  if (psync_stat_isfolder(&st->stat))
+    psync_rendir(oldpath, newpath);
+  else
+    psync_file_rename(oldpath, newpath);
   psync_free(newpath);
   psync_free(oldpath);
 }
@@ -166,58 +174,58 @@ static int move_folder_contents(const char *oldpath, const char *newpath) {
   const char *arr[2];
   arr[0] = oldpath;
   arr[1] = newpath;
-  ppath_ls(oldpath, do_move, (void *)arr);
+  psync_list_dir(oldpath, do_move, (void *)arr);
   return psync_rmdir_with_trashes(oldpath);
 }
 
 static int task_renamedir(const char *oldpath, const char *newpath) {
   while (1) {
-    if (likely_log(!pfile_rename(oldpath, newpath))) {
+    if (likely_log(!psync_rendir(oldpath, newpath))) {
       psync_set_local_full(0);
       return 0;
     }
-    if (errno == ENOSPC || errno == EDQUOT) {
+    if (psync_fs_err() == P_NOSPC || psync_fs_err() == P_DQUOT) {
       psync_set_local_full(1);
-      psys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
+      psync_milisleep(PSYNC_SLEEP_ON_DISK_FULL);
     } else {
       psync_set_local_full(0);
-      if (errno == EBUSY || errno == EROFS)
+      if (psync_fs_err() == P_BUSY || psync_fs_err() == P_ROFS)
         return -1;
-      if (errno == ENOENT)
+      if (psync_fs_err() == P_NOENT)
         return 0;
-      else if (errno == EEXIST || errno == ENOTEMPTY ||
-               errno == ENOTDIR) {
-        struct stat st;
-        if (stat(newpath, &st)) {
+      else if (psync_fs_err() == P_EXIST || psync_fs_err() == P_NOTEMPTY ||
+               psync_fs_err() == P_NOTDIR) {
+        psync_stat_t st;
+        if (psync_stat(newpath, &st)) {
           debug(D_BUG,
                 "rename failed with EEXIST, but stat returned error. race?");
           return -1;
         }
-        if (pfile_stat_isfolder(&st))
+        if (psync_stat_isfolder(&st))
           return move_folder_contents(oldpath, newpath);
         if (psync_rename_conflicted_file(newpath))
           return -1;
       } else
         return -1;
     }
-    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
   }
 }
 
 static void update_local_folder_mtime(const char *localpath,
                                       psync_folderid_t localfolderid) {
-  struct stat st;
+  psync_stat_t st;
   psync_sql_res *res;
-  if (stat(localpath, &st)) {
+  if (psync_stat(localpath, &st)) {
     debug(D_ERROR, "stat failed for %s", localpath);
     return;
   }
   res = psync_sql_prep_statement("UPDATE localfolder SET inode=?, deviceid=?, "
                                  "mtime=?, mtimenative=? WHERE id=?");
-  psync_sql_bind_uint(res, 1, pfile_stat_inode(&st));
-  psync_sql_bind_uint(res, 2, pfile_stat_device(&st));
-  psync_sql_bind_uint(res, 3, pfile_stat_mtime(&st));
-  psync_sql_bind_uint(res, 4, pfile_stat_mtime_native(&st));
+  psync_sql_bind_uint(res, 1, psync_stat_inode(&st));
+  psync_sql_bind_uint(res, 2, psync_stat_device(&st));
+  psync_sql_bind_uint(res, 3, psync_stat_mtime(&st));
+  psync_sql_bind_uint(res, 4, psync_stat_mtime_native(&st));
   psync_sql_bind_uint(res, 5, localfolderid);
   psync_sql_run_free(res);
 }
@@ -229,14 +237,14 @@ static int call_func_for_folder(psync_folderid_t localfolderid,
                                 const char *debug) {
   char *localpath;
   int res;
-  localpath = pfolder_lpath_lfldr(localfolderid, syncid, NULL);
+  localpath = psync_local_path_for_local_folder(localfolderid, syncid, NULL);
   if (likely(localpath)) {
     res = func(localpath);
     if (!res) {
-      pqevent_queue_sync_event_id(event, syncid, localpath, folderid);
+      psync_send_event_by_id(event, syncid, localpath, folderid);
       if (updatemtime)
         update_local_folder_mtime(localpath, localfolderid);
-      psyncer_folder_dec_tasks(localfolderid);
+      psync_decrease_local_folder_taskcnt(localfolderid);
       debug(D_NOTICE, "%s %s", debug, localpath);
     }
     psync_free(localpath);
@@ -256,14 +264,14 @@ static int call_func_for_folder_name(psync_folderid_t localfolderid,
                                      const char *debug) {
   char *localpath;
   int res;
-  localpath = pfolder_lpath_lfldr(localfolderid, syncid, NULL);
+  localpath = psync_local_path_for_local_folder(localfolderid, syncid, NULL);
   if (likely(localpath)) {
     res = func(localpath);
     if (!res) {
-      pqevent_queue_sync_event_path(event, syncid, localpath, folderid, name);
+      psync_send_event_by_path(event, syncid, localpath, folderid, name);
       if (updatemtime)
         update_local_folder_mtime(localpath, localfolderid);
-      psyncer_folder_dec_tasks(localfolderid);
+      psync_decrease_local_folder_taskcnt(localfolderid);
       debug(D_NOTICE, "%s %s", debug, localpath);
     }
     psync_free(localpath);
@@ -290,7 +298,7 @@ static void delete_local_folder_from_db(psync_folderid_t localfolderid,
         psync_sql_query("SELECT id FROM localfile WHERE localparentfolderid=?");
     psync_sql_bind_uint(res, 1, localfolderid);
     while ((row = psync_sql_fetch_rowint(res)))
-      pupload_del_tasks(row[0]);
+      psync_delete_upload_tasks_for_file(row[0]);
     psync_sql_free_result(res);
     res = psync_sql_prep_statement(
         "DELETE FROM localfile WHERE localparentfolderid=?");
@@ -304,7 +312,7 @@ static void delete_local_folder_from_db(psync_folderid_t localfolderid,
     psync_sql_bind_uint(res, 1, localfolderid);
     psync_sql_run_free(res);
   }
-  ppathstatus_syncfldr_deleted(syncid, localfolderid);
+  psync_path_status_sync_folder_deleted(syncid, localfolderid);
 }
 
 static int task_renamefolder(psync_syncid_t newsyncid,
@@ -333,7 +341,7 @@ static int task_renamefolder(psync_syncid_t newsyncid,
   oldsyncid = psync_get_number(row[0]);
   if (oldsyncid == newsyncid &&
       psync_get_number(row[1]) == newlocalparentfolderid &&
-      !strcmp(psync_get_string(row[2]), newname)) {
+      !psync_filename_cmp(psync_get_string(row[2]), newname)) {
     psync_sql_free_result(res);
     debug(D_NOTICE,
           "folder %s already renamed locally, probably update initiated from "
@@ -342,7 +350,7 @@ static int task_renamefolder(psync_syncid_t newsyncid,
     return 0;
   }
   psync_sql_free_result(res);
-  oldpath = pfolder_lpath_lfldr(localfolderid, oldsyncid, NULL);
+  oldpath = psync_local_path_for_local_folder(localfolderid, oldsyncid, NULL);
   if (unlikely(!oldpath)) {
     debug(D_ERROR, "could not get local path for folder id %lu",
           (unsigned long)localfolderid);
@@ -354,7 +362,7 @@ static int task_renamefolder(psync_syncid_t newsyncid,
       "SELECT syncid, localparentfolderid FROM localfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, localfolderid);
   if ((urow = psync_sql_fetch_rowint(res))) {
-    ppathstatus_syncfldr_moved(localfolderid, urow[0], urow[1],
+    psync_path_status_sync_folder_moved(localfolderid, urow[0], urow[1],
                                         newsyncid, newlocalparentfolderid);
     psync_sql_free_result(res);
   } else {
@@ -369,7 +377,7 @@ static int task_renamefolder(psync_syncid_t newsyncid,
   psync_sql_bind_string(res, 3, newname);
   psync_sql_bind_uint(res, 4, localfolderid);
   psync_sql_run_free(res);
-  newpath = pfolder_lpath_lfldr(localfolderid, newsyncid, NULL);
+  newpath = psync_local_path_for_local_folder(localfolderid, newsyncid, NULL);
   if (unlikely(!newpath)) {
     psync_sql_rollback_transaction();
     psync_free(oldpath);
@@ -381,9 +389,9 @@ static int task_renamefolder(psync_syncid_t newsyncid,
   if (ret)
     psync_sql_rollback_transaction();
   else {
-    psyncer_folder_dec_tasks(localfolderid);
+    psync_decrease_local_folder_taskcnt(localfolderid);
     psync_sql_commit_transaction();
-    pqevent_queue_sync_event_id(PEVENT_LOCAL_FOLDER_RENAMED, newsyncid, newpath,
+    psync_send_event_by_id(PEVENT_LOCAL_FOLDER_RENAMED, newsyncid, newpath,
                            folderid);
     debug(D_NOTICE, "local folder renamed from %s to %s", oldpath, newpath);
   }
@@ -437,7 +445,7 @@ static int rename_if_notex(const char *oldname, const char *newname,
             "file %s is found to be old revision of fileid %lu, overwriting",
             newname, (unsigned long)fileid);
   }
-  return pfile_rename_overwrite(oldname, newname);
+  return psync_file_rename_overwrite(oldname, newname);
 }
 
 static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
@@ -446,11 +454,11 @@ static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
                                  unsigned char *checksum, uint64_t serversize,
                                  uint64_t hash) {
   psync_sql_res *sql;
-  struct stat st;
+  psync_stat_t st;
   psync_uint_row row;
   psync_fileid_t localfileid;
-  if (unlikely_log(stat(name, &st)) ||
-      unlikely_log(pfile_stat_size(&st) != serversize))
+  if (unlikely_log(psync_stat(name, &st)) ||
+      unlikely_log(psync_stat_size(&st) != serversize))
     return -1;
   localfileid = 0;
   psync_sql_start_transaction();
@@ -466,7 +474,7 @@ static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
   sql = psync_sql_query_nolock("SELECT parentfolderid FROM file WHERE id=?");
   psync_sql_bind_uint(sql, 1, fileid);
   row = psync_sql_fetch_rowint(sql);
-  if (!row || !psyncer_dl_has_folder(row[0])) {
+  if (!row || !psync_is_folder_in_downloadlist(row[0])) {
     psync_sql_free_result(sql);
     if (localfileid) {
       sql = psync_sql_prep_statement("DELETE FROM localfile WHERE id=?");
@@ -474,7 +482,7 @@ static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
       psync_sql_run_free(sql);
     }
     psync_sql_commit_transaction(sql);
-    pfile_delete(name);
+    psync_file_delete(name);
     if (row)
       debug(D_NOTICE,
             "fileid %lu (%s) got moved out of download folder while finishing "
@@ -497,10 +505,10 @@ static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
     psync_sql_bind_uint(sql, 2, fileid);
     psync_sql_bind_uint(sql, 3, hash);
     psync_sql_bind_uint(sql, 4, syncid);
-    psync_sql_bind_uint(sql, 5, pfile_stat_size(&st));
-    psync_sql_bind_uint(sql, 6, pfile_stat_inode(&st));
-    psync_sql_bind_uint(sql, 7, pfile_stat_mtime(&st));
-    psync_sql_bind_uint(sql, 8, pfile_stat_mtime_native(&st));
+    psync_sql_bind_uint(sql, 5, psync_stat_size(&st));
+    psync_sql_bind_uint(sql, 6, psync_stat_inode(&st));
+    psync_sql_bind_uint(sql, 7, psync_stat_mtime(&st));
+    psync_sql_bind_uint(sql, 8, psync_stat_mtime_native(&st));
     psync_sql_bind_string(sql, 9, filename);
     psync_sql_bind_lstring(sql, 10, (char *)checksum, PSYNC_HASH_DIGEST_HEXLEN);
     psync_sql_bind_uint(sql, 11, localfileid);
@@ -514,10 +522,10 @@ static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
     psync_sql_bind_uint(sql, 2, fileid);
     psync_sql_bind_uint(sql, 3, hash);
     psync_sql_bind_uint(sql, 4, syncid);
-    psync_sql_bind_uint(sql, 5, pfile_stat_size(&st));
-    psync_sql_bind_uint(sql, 6, pfile_stat_inode(&st));
-    psync_sql_bind_uint(sql, 7, pfile_stat_mtime(&st));
-    psync_sql_bind_uint(sql, 8, pfile_stat_mtime_native(&st));
+    psync_sql_bind_uint(sql, 5, psync_stat_size(&st));
+    psync_sql_bind_uint(sql, 6, psync_stat_inode(&st));
+    psync_sql_bind_uint(sql, 7, psync_stat_mtime(&st));
+    psync_sql_bind_uint(sql, 8, psync_stat_mtime_native(&st));
     psync_sql_bind_string(sql, 9, filename);
     psync_sql_bind_lstring(sql, 10, (char *)checksum, PSYNC_HASH_DIGEST_HEXLEN);
     psync_sql_run_free(sql);
@@ -537,12 +545,12 @@ static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
 static int rename_and_create_local(download_task_t *dt, unsigned char *checksum,
                                    uint64_t serversize, uint64_t hash) {
   psync_stop_localscan();
-  pfile_set_crtime_mtime(dt->tmpname, dt->crtime, dt->mtime);
+  psync_set_crtime_mtime(dt->tmpname, dt->crtime, dt->mtime);
   if (rename_if_notex(dt->tmpname, dt->localname, dt->dwllist.fileid,
                       dt->localfolderid, dt->dwllist.syncid, dt->filename)) {
     psync_resume_localscan();
     debug(D_WARNING, "failed to rename %s to %s", dt->tmpname, dt->localname);
-    psys_sleep_milliseconds(1000);
+    psync_milisleep(1000);
     return -1;
   }
   if (stat_and_create_local(dt->dwllist.syncid, dt->dwllist.fileid,
@@ -557,9 +565,9 @@ static int rename_and_create_local(download_task_t *dt, unsigned char *checksum,
 }
 
 static int task_download_file(download_task_t *dt) {
-  binparam params[] = {PAPI_STR("auth", psync_my_auth),
-                       PAPI_NUM("fileid", dt->dwllist.fileid)};
-  struct stat st;
+  binparam params[] = {P_STR("auth", psync_my_auth),
+                       P_NUM("fileid", dt->dwllist.fileid)};
+  psync_stat_t st;
   psync_list ranges;
   psync_range_list_t *range;
   binresult *res;
@@ -579,7 +587,7 @@ static int task_download_file(download_task_t *dt) {
       localhashbin[PSYNC_HASH_DIGEST_LEN];
   char cookie[128];
   uint32_t i;
-  int fd, ifd;
+  psync_file_t fd, ifd;
   int rd, rt;
 
   psync_list_init(&ranges);
@@ -601,7 +609,7 @@ static int task_download_file(download_task_t *dt) {
     psync_status.bytestodownloadcurrent += serversize;
     pthread_mutex_unlock(&current_downloads_mutex);
     dt->size = serversize;
-    pstatus_send_update();
+    psync_status_send_update();
   }
 
   sql = psync_sql_query_rdlock(
@@ -650,7 +658,7 @@ static int task_download_file(download_task_t *dt) {
   psync_sql_bind_lstring(sql, 2, (char *)serverhashhex,
                          PSYNC_HASH_DIGEST_HEXLEN);
   while ((row = psync_sql_fetch_rowint(sql))) {
-    tmpold = pfolder_lpath_lfile(row[0], NULL);
+    tmpold = psync_local_path_for_local_file(row[0], NULL);
     if (unlikely_log(!tmpold))
       continue;
     psync_sql_free_result(sql);
@@ -677,10 +685,10 @@ static int task_download_file(download_task_t *dt) {
   if (dt->dwllist.stop)
     return 0;
 
-  //  pqevent_queue_sync_event_id(PEVENT_FILE_DOWNLOAD_STARTED, syncid, name,
+  //  psync_send_event_by_id(PEVENT_FILE_DOWNLOAD_STARTED, syncid, name,
   //  fileid);
   if (serversize >= PSYNC_MIN_SIZE_FOR_P2P) {
-    rt = pp2p_check_download(dt->dwllist.fileid, serverhashhex, serversize,
+    rt = psync_p2p_check_download(dt->dwllist.fileid, serverhashhex, serversize,
                                   dt->tmpname);
     if (rt == PSYNC_NET_OK) {
       if (rename_and_create_local(dt, serverhashhex, serversize, hash))
@@ -693,7 +701,7 @@ static int task_download_file(download_task_t *dt) {
   res = psync_api_run_command("getfilelink", params);
   if (unlikely_log(!res))
     return -1;
-  result = papi_find_result2(res, "result", PARAM_NUM)->num;
+  result = psync_find_result(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
     debug(D_WARNING, "got error %lu from getfilelink", (long unsigned)result);
     psync_process_api_error(result);
@@ -710,12 +718,12 @@ static int task_download_file(download_task_t *dt) {
 
   oldcnt = 0;
   if (serversize >= PSYNC_MIN_SIZE_FOR_CHECKSUMS) {
-    if (!stat(dt->tmpname, &st) &&
-        pfile_stat_size(&st) >= PSYNC_MIN_SIZE_FOR_CHECKSUMS) {
+    if (!psync_stat(dt->tmpname, &st) &&
+        psync_stat_size(&st) >= PSYNC_MIN_SIZE_FOR_CHECKSUMS) {
       tmpold =
-          psync_strcat(dt->localpath, "/", dt->filename,
+          psync_strcat(dt->localpath, PSYNC_DIRECTORY_SEPARATOR, dt->filename,
                        "-old", PSYNC_APPEND_PARTIAL_FILES, NULL);
-      if (pfile_rename_overwrite(dt->tmpname, tmpold)) {
+      if (psync_file_rename_overwrite(dt->tmpname, tmpold)) {
         psync_free(tmpold);
         tmpold = NULL;
       } else
@@ -725,7 +733,7 @@ static int task_download_file(download_task_t *dt) {
       oldfiles[oldcnt++] = dt->localname;
   }
 
-  fd = pfile_open(dt->tmpname, O_WRONLY, O_CREAT | O_TRUNC);
+  fd = psync_file_open(dt->tmpname, P_O_WRONLY, P_O_CREAT | P_O_TRUNC);
   if (unlikely_log(fd == INVALID_HANDLE_VALUE))
     goto err0;
 
@@ -734,10 +742,10 @@ static int task_download_file(download_task_t *dt) {
   if (rt == PSYNC_NET_TEMPFAIL)
     goto err1;
 
-  hosts = papi_find_result2(res, "hosts", PARAM_ARRAY);
-  requestpath = papi_find_result2(res, "path", PARAM_STR)->str;
+  hosts = psync_find_result(res, "hosts", PARAM_ARRAY);
+  requestpath = psync_find_result(res, "path", PARAM_STR)->str;
   psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
-                 papi_find_result2(res, "dwltag", PARAM_STR)->str);
+                 psync_find_result(res, "dwltag", PARAM_STR)->str);
   buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
   http = NULL;
   psync_hash_init(&hashctx);
@@ -774,9 +782,9 @@ static int task_download_file(download_task_t *dt) {
                                              PSYNC_START_NEW_DOWNLOADS_TRESHOLD)
           pthread_cond_signal(&current_downloads_cond);
         pthread_mutex_unlock(&current_downloads_mutex);
-        pstatus_send_status_update();
+        psync_send_status_update();
         dt->downloadedsize += rd;
-        if (unlikely(!pstatus_ok_status_arr(requiredstatuses,
+        if (unlikely(!psync_statuses_ok_array(requiredstatuses,
                                               ARRAY_SIZE(requiredstatuses))))
           goto err2;
       }
@@ -786,11 +794,11 @@ static int task_download_file(download_task_t *dt) {
       debug(D_NOTICE, "copying %lu bytes from %s offset %lu",
             (unsigned long)range->len, range->filename,
             (unsigned long)range->off);
-      ifd = pfile_open(range->filename, O_RDONLY, 0);
+      ifd = psync_file_open(range->filename, P_O_RDONLY, 0);
       if (unlikely_log(ifd == INVALID_HANDLE_VALUE))
         goto err2;
-      if (unlikely_log(pfile_seek(ifd, range->off, SEEK_SET) == -1)) {
-        pfile_close(ifd);
+      if (unlikely_log(psync_file_seek(ifd, range->off, P_SEEK_SET) == -1)) {
+        psync_file_close(ifd);
         goto err2;
       }
       result = range->len;
@@ -799,12 +807,12 @@ static int task_download_file(download_task_t *dt) {
           rd = PSYNC_COPY_BUFFER_SIZE;
         else
           rd = result;
-        rd = pfile_read(ifd, buff, rd);
+        rd = psync_file_read(ifd, buff, rd);
         if (unlikely_log(rd <= 0) ||
             unlikely_log(psync_file_writeall_checkoverquota(fd, buff, rd)) ||
-            unlikely(!pstatus_ok_status_arr(requiredstatuses,
+            unlikely(!psync_statuses_ok_array(requiredstatuses,
                                               ARRAY_SIZE(requiredstatuses)))) {
-          pfile_close(ifd);
+          psync_file_close(ifd);
           goto err2;
         }
         result -= rd;
@@ -816,10 +824,10 @@ static int task_download_file(download_task_t *dt) {
                                              PSYNC_START_NEW_DOWNLOADS_TRESHOLD)
           pthread_cond_signal(&current_downloads_cond);
         pthread_mutex_unlock(&current_downloads_mutex);
-        pstatus_send_status_update();
+        psync_send_status_update();
         dt->downloadedsize += rd;
       }
-      pfile_close(ifd);
+      psync_file_close(ifd);
     }
     if (dt->dwllist.stop)
       break;
@@ -827,15 +835,15 @@ static int task_download_file(download_task_t *dt) {
   if (unlikely(dt->dwllist.stop)) {
     if (dt->dwllist.stop == 2) {
       debug(D_NOTICE, "deleting file %s as stop is detected", dt->tmpname);
-      pfile_delete(dt->tmpname);
+      psync_file_delete(dt->tmpname);
     }
     goto err2;
   }
-  if (unlikely_log(pfile_sync(fd)))
+  if (unlikely_log(psync_file_sync(fd)))
     goto err2;
   psync_free(buff);
   psync_hash_final(localhashbin, &hashctx);
-  if (unlikely_log(pfile_close(fd)))
+  if (unlikely_log(psync_file_close(fd)))
     goto err0;
   psync_binhex(localhashhex, localhashbin, PSYNC_HASH_DIGEST_LEN);
   if (unlikely_log(
@@ -843,24 +851,24 @@ static int task_download_file(download_task_t *dt) {
     debug(D_WARNING, "got wrong file checksum for file %s", dt->filename);
     if (dt->dwllist.stop == 2) {
       debug(D_NOTICE, "deleting file %s as stop is detected", dt->tmpname);
-      pfile_delete(dt->tmpname);
+      psync_file_delete(dt->tmpname);
     }
     goto err0;
   }
   if (dt->dwllist.stop == 2) {
     debug(D_NOTICE, "deleting file %s as stop is detected", dt->tmpname);
-    pfile_delete(dt->tmpname);
+    psync_file_delete(dt->tmpname);
     goto err0;
   }
   if (rename_and_create_local(dt, serverhashhex, serversize, hash))
     goto err0;
-  //  pqevent_queue_sync_event_id(PEVENT_FILE_DOWNLOAD_FINISHED, syncid, name,
+  //  psync_send_event_by_id(PEVENT_FILE_DOWNLOAD_FINISHED, syncid, name,
   //  fileid);
   debug(D_NOTICE, "file downloaded %s", dt->localname);
   psync_list_for_each_element_call(&ranges, psync_range_list_t, list,
                                    psync_free);
   if (tmpold) {
-    pfile_delete(tmpold);
+    psync_file_delete(tmpold);
     psync_free(tmpold);
   }
   psync_free(res);
@@ -871,12 +879,12 @@ err2:
   if (http)
     psync_http_close(http);
 err1:
-  pfile_close(fd);
+  psync_file_close(fd);
 err0:
   psync_list_for_each_element_call(&ranges, psync_range_list_t, list,
                                    psync_free);
   if (tmpold) {
-    pfile_delete(tmpold);
+    psync_file_delete(tmpold);
     psync_free(tmpold);
   }
   psync_free(res);
@@ -900,12 +908,12 @@ static int task_delete_file(psync_syncid_t syncid, psync_fileid_t fileid,
   psync_sql_bind_uint(res, 1, fileid);
   psync_restart_localscan();
   while ((row = psync_sql_fetch_rowint(res))) {
-    name = pfolder_lpath_lfile(row[0], NULL);
+    name = psync_local_path_for_local_file(row[0], NULL);
     if (likely_log(name)) {
-      if (unlikely(pfile_delete(name))) {
+      if (unlikely(psync_file_delete(name))) {
         debug(D_WARNING, "error deleting local file %s error %d", name,
-              (int)errno);
-        if (errno == EBUSY || errno == EROFS) {
+              (int)psync_fs_err());
+        if (psync_fs_err() == P_BUSY || psync_fs_err() == P_ROFS) {
           ret = -1;
           psync_free(name);
           continue;
@@ -914,7 +922,7 @@ static int task_delete_file(psync_syncid_t syncid, psync_fileid_t fileid,
         debug(D_NOTICE, "local file %s deleted", name);
       //      threre are some reports about crashes here, comment out for now as
       //      events are not fully implemented anyway
-      //      pqevent_queue_sync_event_path(PEVENT_LOCAL_FILE_DELETED, row[1], name,
+      //      psync_send_event_by_path(PEVENT_LOCAL_FILE_DELETED, row[1], name,
       //      fileid, remotepath);
       psync_free(name);
     }
@@ -935,7 +943,7 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
   psync_sql_res *res;
   psync_variant_row row;
   psync_fileid_t lfileid;
-  struct stat st;
+  psync_stat_t st;
   psync_syncid_t syncid;
   int ret;
   task_wait_no_downloads();
@@ -946,7 +954,7 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
   while ((row = psync_sql_fetch_row(res))) {
     syncid = psync_get_number(row[2]);
     if (psync_get_number(row[1]) == newlocalfolderid && syncid == newsyncid &&
-        !strcmp(psync_get_string(row[3]), newname)) {
+        !psync_filename_cmp(psync_get_string(row[3]), newname)) {
       debug(D_NOTICE,
             "file %s already renamed locally, probably update initiated from "
             "this client",
@@ -960,40 +968,40 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
   }
   psync_sql_free_result(res);
   if (unlikely_log(!lfileid)) {
-    ptask_download(newsyncid, fileid, newlocalfolderid, newname);
+    psync_task_download_file(newsyncid, fileid, newlocalfolderid, newname);
     return 0;
   }
   newfolder =
-      pfolder_lpath_lfldr(newlocalfolderid, newsyncid, NULL);
+      psync_local_path_for_local_folder(newlocalfolderid, newsyncid, NULL);
   if (unlikely_log(!newfolder))
     return 0;
-  oldpath = pfolder_lpath_lfile(lfileid, NULL);
+  oldpath = psync_local_path_for_local_file(lfileid, NULL);
   if (unlikely_log(!oldpath)) {
     psync_free(newfolder);
     return 0;
   }
-  newpath = psync_strcat(newfolder, "/", newname, NULL);
+  newpath = psync_strcat(newfolder, PSYNC_DIRECTORY_SEPARATOR, newname, NULL);
   ret = 0;
   psync_stop_localscan();
-  if (pfile_rename_overwrite(oldpath, newpath)) {
+  if (psync_file_rename_overwrite(oldpath, newpath)) {
     psync_resume_localscan();
-    if (errno == ENOENT) {
+    if (psync_fs_err() == P_NOENT) {
       debug(D_WARNING, "renamed from %s to %s failed, downloading", oldpath,
             newpath);
-      ptask_download(newsyncid, fileid, newlocalfolderid, newname);
+      psync_task_download_file(newsyncid, fileid, newlocalfolderid, newname);
     } else
       ret = -1;
   } else {
-    if (likely_log(!stat(newpath, &st))) {
+    if (likely_log(!psync_stat(newpath, &st))) {
       res = psync_sql_prep_statement(
           "UPDATE OR REPLACE localfile SET localparentfolderid=?, syncid=?, "
           "name=?, inode=?, mtime=?, mtimenative=? WHERE id=?");
       psync_sql_bind_uint(res, 1, newlocalfolderid);
       psync_sql_bind_uint(res, 2, newsyncid);
       psync_sql_bind_string(res, 3, newname);
-      psync_sql_bind_uint(res, 4, pfile_stat_inode(&st));
-      psync_sql_bind_uint(res, 5, pfile_stat_mtime(&st));
-      psync_sql_bind_uint(res, 6, pfile_stat_mtime_native(&st));
+      psync_sql_bind_uint(res, 4, psync_stat_inode(&st));
+      psync_sql_bind_uint(res, 5, psync_stat_mtime(&st));
+      psync_sql_bind_uint(res, 6, psync_stat_mtime_native(&st));
       psync_sql_bind_uint(res, 7, lfileid);
       psync_sql_run_free(res);
       debug(D_NOTICE, "renamed %s to %s", oldpath, newpath);
@@ -1045,13 +1053,13 @@ static void free_task_timer_thread(void *ptr) {
   download_task_t *dt = (download_task_t *)ptr;
   set_task_inprogress(dt->taskid, 0);
   free_download_task(dt);
-  pstatus_send_status_update();
-  pdownload_wake();
+  psync_send_status_update();
+  psync_wake_download();
 }
 
 static void free_task_timer(psync_timer_t timer, void *ptr) {
-  ptimer_stop(timer);
-  prun_thread1("free task", free_task_timer_thread, ptr);
+  psync_timer_stop(timer);
+  psync_run_thread1("free task", free_task_timer_thread, ptr);
 }
 
 static void handle_async_error(download_task_t *dt, psync_async_result_t *res) {
@@ -1066,15 +1074,15 @@ static void handle_async_error(download_task_t *dt, psync_async_result_t *res) {
     psync_sql_run_free(sres);
     set_task_inprogress(dt->taskid, 0);
     free_download_task(dt);
-    pstatus_send_status_update();
-    pdownload_wake();
+    psync_send_status_update();
+    psync_wake_download();
   } else if ((res->errorflags & PSYNC_ASYNC_ERR_FLAG_PERM) ||
              !(res->errorflags & PSYNC_ASYNC_ERR_FLAG_RETRY_AS_IS)) {
     delete_task(dt->taskid);
     free_download_task(dt);
-    pstatus_download_recalc_async();
+    psync_status_recalc_to_download_async();
   } else
-    ptimer_register(free_task_timer, 1, dt);
+    psync_timer_register(free_task_timer, 1, dt);
 }
 
 static void finish_async_download(void *ptr, psync_async_result_t *res) {
@@ -1084,18 +1092,18 @@ static void finish_async_download(void *ptr, psync_async_result_t *res) {
   else {
     if (dt->dwllist.stop == 2) {
       debug(D_NOTICE, "deleting file %s as stop is detected", dt->tmpname);
-      pfile_delete(dt->tmpname);
+      psync_file_delete(dt->tmpname);
       return;
     }
     if (rename_and_create_local(dt, res->file.sha1hex, res->file.size,
                                 res->file.hash))
-      ptimer_register(free_task_timer, 1, dt);
+      psync_timer_register(free_task_timer, 1, dt);
     else {
       delete_task(dt->taskid);
-      ppathstatus_syncfldr_task_completed(dt->dwllist.syncid,
+      psync_path_status_sync_folder_task_completed(dt->dwllist.syncid,
                                                    dt->localfolderid);
       free_download_task(dt);
-      pstatus_download_recalc_async();
+      psync_status_recalc_to_download_async();
     }
   }
 }
@@ -1108,13 +1116,13 @@ static void finish_async_download_existing_not_mod(download_task_t *dt,
                             res->file.sha1hex, res->file.size,
                             res->file.hash)) {
     debug(D_WARNING, "stat_and_create_local failed for %s", dt->localname);
-    ptimer_register(free_task_timer, 1, dt);
+    psync_timer_register(free_task_timer, 1, dt);
   } else {
     delete_task(dt->taskid);
-    ppathstatus_syncfldr_task_completed(dt->dwllist.syncid,
+    psync_path_status_sync_folder_task_completed(dt->dwllist.syncid,
                                                  dt->localfolderid);
     free_download_task(dt);
-    pstatus_download_recalc_async();
+    psync_status_recalc_to_download_async();
   }
 }
 
@@ -1130,16 +1138,16 @@ static void task_run_download_file_thread(void *ptr) {
   download_task_t *dt;
   dt = (download_task_t *)ptr;
   if (task_download_file(dt)) {
-    psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
+    psync_milisleep(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
     set_task_inprogress(dt->taskid, 0);
-    pdownload_wake();
+    psync_wake_download();
   } else {
     delete_task(dt->taskid);
-    ppathstatus_syncfldr_task_completed(dt->dwllist.syncid,
+    psync_path_status_sync_folder_task_completed(dt->dwllist.syncid,
                                                  dt->localfolderid);
   }
   free_download_task(dt);
-  pstatus_download_recalc_async();
+  psync_status_recalc_to_download_async();
 }
 
 static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
@@ -1191,12 +1199,12 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
   } else
     hastargetchecksum = 0;
   psync_sql_free_result(res);
-  localpath = pfolder_lpath_lfldr(localfolderid, syncid, NULL);
+  localpath = psync_local_path_for_local_folder(localfolderid, syncid, NULL);
   if (unlikely_log(!localpath))
     return 0;
   localname =
-      psync_strcat(localpath, "/", filename, NULL);
-  tmpname = psync_strcat(localpath, "/", filename,
+      psync_strcat(localpath, PSYNC_DIRECTORY_SEPARATOR, filename, NULL);
+  tmpname = psync_strcat(localpath, PSYNC_DIRECTORY_SEPARATOR, filename,
                          PSYNC_APPEND_PARTIAL_FILES, NULL);
   len = strlen(filename);
   dt = (download_task_t *)psync_malloc(offsetof(download_task_t, filename) +
@@ -1238,7 +1246,7 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
     free_download_task(dt);
     return -1;
   }
-  pstatus_send_status_update();
+  psync_send_status_update();
   if (hastargetchecksum &&
       psync_get_local_file_checksum(tmpname, dt->checksum, &csize) ==
           PSYNC_NET_OK &&
@@ -1268,7 +1276,7 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
     return ret;
   }
   minfree = psync_setting_get_uint(_PS(minlocalfreespace));
-  freespace = ppath_free_space(localpath);
+  freespace = psync_get_free_space_by_path(localpath);
   debug(D_NOTICE, "free space is %llu, needed %llu+%llu",
         (unsigned long long)freespace, (unsigned long long)minfree,
         (unsigned long long)size);
@@ -1279,7 +1287,7 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
       free_download_task(dt);
       psync_set_local_full(1);
       debug(D_NOTICE, "disk is full, sleeping 10 seconds");
-      psys_sleep_milliseconds(PSYNC_SLEEP_ON_DISK_FULL);
+      psync_milisleep(PSYNC_SLEEP_ON_DISK_FULL);
       return -1;
     }
   } else {
@@ -1288,35 +1296,35 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
           "sleeping a bit and failing task",
           localpath);
     free_download_task(dt);
-    psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
+    psync_milisleep(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
     return -1;
   }
   lock = psync_lock_file(localname);
   if (!lock) {
     debug(D_NOTICE, "file %s is currently locked, skipping for now", localname);
     free_download_task(dt);
-    psys_sleep_milliseconds(PSYNC_SLEEP_ON_LOCKED_FILE);
+    psync_milisleep(PSYNC_SLEEP_ON_LOCKED_FILE);
     return -1;
   }
   dt->lock = lock;
   set_task_inprogress(taskid, 1);
   if (size <= PSYNC_MAX_SIZE_FOR_ASYNC_DOWNLOAD) {
     if (dt->localexists)
-      ret = ptask_download_needed_async(
+      ret = psync_async_download_file_if_changed(
           fileid, dt->tmpname, dt->localsize, dt->checksum,
           finish_async_download_existing, dt);
     else
-      ret = ptask_download_async(fileid, dt->tmpname,
+      ret = psync_async_download_file(fileid, dt->tmpname,
                                       finish_async_download, dt);
     if (ret) {
       debug(D_WARNING, "async download start failed for %s", dt->localname);
       free_download_task(dt);
       set_task_inprogress(taskid, 0);
-      psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
+      psync_milisleep(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
     }
   } else {
-    prun_thread1("download file", task_run_download_file_thread, dt);
-    psys_sleep_milliseconds(25); // do not run downloads strictly in parallel so we
+    psync_run_thread1("download file", task_run_download_file_thread, dt);
+    psync_milisleep(25); // do not run downloads strictly in parallel so we
                          // reuse some API connections
   }
   return -1;
@@ -1333,11 +1341,11 @@ static void task_del_folder_rec_do(const char *localpath,
   psync_sql_bind_uint(res, 1, localfolderid);
   psync_sql_bind_uint(res, 2, syncid);
   while ((vrow = psync_sql_fetch_row(res))) {
-    pupload_del_tasks(psync_get_number(vrow[0]));
-    nm = psync_strcat(localpath, "/",
+    psync_delete_upload_tasks_for_file(psync_get_number(vrow[0]));
+    nm = psync_strcat(localpath, PSYNC_DIRECTORY_SEPARATOR,
                       psync_get_string(vrow[1]), NULL);
     debug(D_NOTICE, "deleting %s", nm);
-    pfile_delete(nm);
+    psync_file_delete(nm);
     psync_free(nm);
   }
   psync_sql_free_result(res);
@@ -1351,7 +1359,7 @@ static void task_del_folder_rec_do(const char *localpath,
   psync_sql_bind_uint(res, 1, localfolderid);
   psync_sql_bind_uint(res, 2, syncid);
   while ((vrow = psync_sql_fetch_row(res))) {
-    nm = psync_strcat(localpath, "/",
+    nm = psync_strcat(localpath, PSYNC_DIRECTORY_SEPARATOR,
                       psync_get_string(vrow[1]), NULL);
     task_del_folder_rec_do(nm, psync_get_number(vrow[0]), syncid);
     psync_free(nm);
@@ -1368,7 +1376,7 @@ static void task_del_folder_rec_do(const char *localpath,
     psync_sql_bind_uint(res, 1, localfolderid);
     psync_sql_run_free(res);
   }
-  ppathstatus_syncfldr_deleted(syncid, localfolderid);
+  psync_path_status_sync_folder_deleted(syncid, localfolderid);
 }
 
 static int task_del_folder_rec(psync_folderid_t localfolderid,
@@ -1378,7 +1386,7 @@ static int task_del_folder_rec(psync_folderid_t localfolderid,
   psync_sql_res *res;
   task_wait_no_downloads();
   psync_stop_localscan();
-  localpath = pfolder_lpath_lfldr(localfolderid, syncid, NULL);
+  localpath = psync_local_path_for_local_folder(localfolderid, syncid, NULL);
   if (unlikely_log(!localpath)) {
     psync_resume_localscan();
     return 0;
@@ -1415,7 +1423,7 @@ static int download_task(uint64_t taskid, uint32_t type, psync_syncid_t syncid,
   if (name && type != PSYNC_DELETE_LOCAL_FILE &&
       type != PSYNC_DELETE_LOCAL_FOLDER)
     for (ptr = name; *ptr; ptr++)
-      if (pfile_invalid_chars[(unsigned char)*ptr]) {
+      if (psync_invalid_filename_chars[(unsigned char)*ptr]) {
         if (!vname)
           vname = psync_strdup(name);
         vname[ptr - name] = PSYNC_REPLACE_INV_CH_IN_FILENAMES;
@@ -1473,7 +1481,7 @@ static void download_thread() {
   uint64_t taskid;
   uint32_t type;
   while (psync_do_run) {
-    pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
+    psync_wait_statuses_array(requiredstatuses, ARRAY_SIZE(requiredstatuses));
 
     row = psync_sql_row(
         "SELECT id, type, syncid, itemid, localitemid, newitemid, name, "
@@ -1490,12 +1498,12 @@ static void download_thread() {
                          psync_get_number_or_null(row[7]))) {
         delete_task(taskid);
         if (type == PSYNC_DOWNLOAD_FILE) {
-          pstatus_download_recalc_async();
-          ppathstatus_syncfldr_task_completed(
+          psync_status_recalc_to_download_async();
+          psync_path_status_sync_folder_task_completed(
               psync_get_number(row[2]), psync_get_number(row[4]));
         }
       } else if (type != PSYNC_DOWNLOAD_FILE)
-        psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
+        psync_milisleep(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
       psync_free(row);
       continue;
     }
@@ -1508,19 +1516,19 @@ static void download_thread() {
   }
 }
 
-void pdownload_wake() {
+void psync_wake_download() {
   pthread_mutex_lock(&download_mutex);
   if (!download_wakes++)
     pthread_cond_signal(&download_cond);
   pthread_mutex_unlock(&download_mutex);
 }
 
-void pdownload_init() {
-  ptimer_exception_handler(pdownload_wake);
-  prun_thread("download main", download_thread);
+void psync_download_init() {
+  psync_timer_exception_handler(psync_wake_download);
+  psync_run_thread("download main", download_thread);
 }
 
-void pdownload_tasks_delete(psync_fileid_t fileid,
+void psync_delete_download_tasks_for_file(psync_fileid_t fileid,
                                           psync_syncid_t syncid, int deltemp) {
   psync_sql_res *res;
   download_list_t *dwl;
@@ -1539,7 +1547,7 @@ void pdownload_tasks_delete(psync_fileid_t fileid,
   aff = psync_sql_affected_rows();
   psync_sql_free_result(res);
   if (aff)
-    pstatus_download_recalc_async();
+    psync_status_recalc_to_download_async();
   if (deltemp)
     deltemp = 2;
   else
@@ -1552,7 +1560,7 @@ void pdownload_tasks_delete(psync_fileid_t fileid,
   pthread_mutex_unlock(&current_downloads_mutex);
 }
 
-void pdownload_stop_file(psync_fileid_t fileid, psync_syncid_t syncid) {
+void psync_stop_file_download(psync_fileid_t fileid, psync_syncid_t syncid) {
   download_list_t *dwl;
   pthread_mutex_lock(&current_downloads_mutex);
   psync_list_for_each_element(dwl, &downloads, download_list_t,
@@ -1561,7 +1569,7 @@ void pdownload_stop_file(psync_fileid_t fileid, psync_syncid_t syncid) {
   pthread_mutex_unlock(&current_downloads_mutex);
 }
 
-void pdownload_stop_sync(psync_syncid_t syncid) {
+void psync_stop_sync_download(psync_syncid_t syncid) {
   download_list_t *dwl;
   psync_sql_res *res;
   res = psync_sql_prep_statement(
@@ -1569,14 +1577,14 @@ void pdownload_stop_sync(psync_syncid_t syncid) {
           PSYNC_TASK_DWLUPL_MASK) "=" NTO_STR(PSYNC_TASK_DOWNLOAD));
   psync_sql_bind_uint(res, 1, syncid);
   psync_sql_run_free(res);
-  pstatus_download_recalc_async();
+  psync_status_recalc_to_download_async();
   pthread_mutex_lock(&current_downloads_mutex);
   psync_list_for_each_element(dwl, &downloads, download_list_t,
                               list) if (dwl->syncid == syncid) dwl->stop = 1;
   pthread_mutex_unlock(&current_downloads_mutex);
 }
 
-void pdownload_stop_all() {
+void psync_stop_all_download() {
   download_list_t *dwl;
   pthread_mutex_lock(&current_downloads_mutex);
   psync_list_for_each_element(dwl, &downloads, download_list_t, list)
@@ -1584,15 +1592,15 @@ void pdownload_stop_all() {
   pthread_mutex_unlock(&current_downloads_mutex);
 }
 
-download_hashes_t *pdownload_get_hashes() {
+downloading_files_hashes *psync_get_downloading_hashes() {
   download_list_t *dwl;
-  download_hashes_t *ret;
+  downloading_files_hashes *ret;
   size_t cnt;
   cnt = 0;
   pthread_mutex_lock(&current_downloads_mutex);
   psync_list_for_each_element(dwl, &downloads, download_list_t, list) cnt++;
-  ret = (download_hashes_t *)psync_malloc(
-      offsetof(download_hashes_t, hashes) +
+  ret = (downloading_files_hashes *)psync_malloc(
+      offsetof(downloading_files_hashes, hashes) +
       sizeof(psync_hex_hash) * cnt);
   cnt = 0;
   psync_list_for_each_element(dwl, &downloads, download_list_t,

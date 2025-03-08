@@ -34,15 +34,12 @@
 
 #include <stdlib.h>
 
-void pmemlock_init();
+void psync_locked_init();
 
-int pmemlock_lock(void *ptr, size_t size);
-int pmemlock_unlock(void *ptr, size_t size);
+int psync_mem_lock(void *ptr, size_t size);
+int psync_mem_unlock(void *ptr, size_t size);
 
-void *pmemlock_malloc(size_t size);
-void pmemlock_free(void *ptr);
-
-int pmemlock_get_pagesize();
-void pmemlock_set_pagesize(int sz);
+void *psync_locked_malloc(size_t size);
+void psync_locked_free(void *ptr);
 
 #endif

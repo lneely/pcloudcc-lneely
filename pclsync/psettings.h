@@ -33,7 +33,6 @@
 #define _PSYNC_SETTINGS_H
 
 #include "pcompiler.h"
-#include "pssl.h"
 #include <stdint.h>
 
 #define PSYNC_LIB_VERSION "1.5.1"
@@ -257,9 +256,12 @@ $RECYCLE.BIN;\
 *.part;\
 .pcloud;"
 
+// XXX: wtf??
+#if defined(P_OS_LINUX)
 #define PSYNC_IGNORE_PATHS_DEFAULT                                             \
   "/Applications;/Library;/private;/System;/bin;/dev;/etc;/net;/sbin;/usr;/"   \
   "Developer;"
+#endif
 
 /* Defaults for business account settings */
 #define PSYNC_BACC_COMPANYNAME "Not set"

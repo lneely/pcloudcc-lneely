@@ -36,10 +36,10 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 
-#include "pcryptofolder.h"
+#include "pcloudcrypto.h"
+#include "pcompat.h"
 #include "pintervaltree.h"
 #include "plibs.h"
-#include "pmem.h"
 #include "pmemlock.h"
 #include "ptree.h"
 #include <stdint.h>
@@ -59,15 +59,13 @@ typedef struct {
   int locked;
 } allocator_range;
 
-static int psync_page_size;
-
 static pthread_mutex_t page_mutex = PTHREAD_MUTEX_INITIALIZER;
 static psync_tree *locked_pages = PSYNC_TREE_EMPTY;
 
 static pthread_mutex_t allocator_mutex;
 static psync_tree *allocator_ranges = PSYNC_TREE_EMPTY;
 
-void pmemlock_init() {
+void psync_locked_init() {
   pthread_mutexattr_t mattr;
   pthread_mutexattr_init(&mattr);
   pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
@@ -87,7 +85,7 @@ retry:
   tr = locked_pages;
   if (tr) {
     while (1) {
-      node = ptree_element(tr, locked_page_t, tree);
+      node = psync_tree_element(tr, locked_page_t, tree);
       if (pageid < node->pageid) {
         if (tr->left)
           tr = tr->left;
@@ -118,12 +116,12 @@ retry:
     // properly, an status "in progress" should be introduced for new elements
     // in the tree that mlock is yet not returned. This will complicate things a
     // lot.
-    if (unlikely(pmem_mlock((void *)(pageid * page_size), page_size))) {
+    if (unlikely(psync_mlock((void *)(pageid * page_size), page_size))) {
       if (!tryn) {
         tryn++;
         pthread_mutex_unlock(&page_mutex);
         debug(D_NOTICE, "mlock failed, trying to clean cache");
-        pcryptofolder_cache_clean();
+        psync_cloud_crypto_clean_cache();
         goto retry;
       } else {
         debug(D_WARNING, "mlock for page %lx failed even after cache clean",
@@ -136,7 +134,7 @@ retry:
       node->pageid = pageid;
       node->refcnt = 1;
       *addto = &node->tree;
-      ptree_added_at(&locked_pages, tr, &node->tree);
+      psync_tree_added_at(&locked_pages, tr, &node->tree);
     }
   }
   pthread_mutex_unlock(&page_mutex);
@@ -150,7 +148,7 @@ static int unlock_page(pageid_t pageid, int page_size) {
   pthread_mutex_lock(&page_mutex);
   tr = locked_pages;
   while (tr) {
-    node = ptree_element(tr, locked_page_t, tree);
+    node = psync_tree_element(tr, locked_page_t, tree);
     if (pageid < node->pageid)
       tr = tr->left;
     else if (pageid > node->pageid)
@@ -164,10 +162,10 @@ static int unlock_page(pageid_t pageid, int page_size) {
             (unsigned long)pageid * page_size, (unsigned)node->refcnt);
       ret = 0;
     } else {
-      ptree_del(&locked_pages, tr);
+      psync_tree_del(&locked_pages, tr);
       psync_free(node);
       // do not move out of the mutex, will create race conditions
-      if (unlikely(pmem_munlock((void *)(pageid * page_size), page_size)))
+      if (unlikely(psync_munlock((void *)(pageid * page_size), page_size)))
         ret = PRINT_RETURN(-1);
       else {
         debug(D_NOTICE, "unlocked page %lx", (unsigned long)pageid * page_size);
@@ -183,10 +181,10 @@ static int unlock_page(pageid_t pageid, int page_size) {
   return ret;
 }
 
-int pmemlock_lock(void *ptr, size_t size) {
+int psync_mem_lock(void *ptr, size_t size) {
   pageid_t frompage, topage, i;
   int page_size;
-  page_size = pmemlock_get_pagesize();
+  page_size = psync_get_page_size();
   if (page_size == -1)
     return PRINT_RETURN(-1);
   frompage = (uintptr_t)ptr / page_size;
@@ -200,10 +198,10 @@ int pmemlock_lock(void *ptr, size_t size) {
   return 0;
 }
 
-int pmemlock_unlock(void *ptr, size_t size) {
+int psync_mem_unlock(void *ptr, size_t size) {
   pageid_t frompage, topage, i;
   int page_size, ret;
-  page_size = pmemlock_get_pagesize();
+  page_size = psync_get_page_size();
   if (page_size == -1)
     return PRINT_RETURN(-1);
   frompage = (uintptr_t)ptr / page_size;
@@ -228,7 +226,7 @@ static void mark_aligment_bytes(char *ptr, size_t from, size_t to) {
 }
 #endif
 
-void *pmemlock_malloc(size_t size) {
+void *psync_locked_malloc(size_t size) {
   return psync_malloc(size);
   allocator_range *range, *brange;
   psync_tree *tr, **addto;
@@ -248,11 +246,11 @@ void *pmemlock_malloc(size_t size) {
   bestsize = ~((size_t)0);
   brange = NULL;
   boffset = 0; // just to make compilers happy
-  // psync_mem_lock may call pcryptofolder_cache_clean(), which in turn can
-  // call pmemlock_free() on few pointers, therefore allocator_mutex is
+  // psync_mem_lock may call psync_cloud_crypto_clean_cache(), which in turn can
+  // call psync_locked_free() on few pointers, therefore allocator_mutex is
   // recursive
   pthread_mutex_lock(&allocator_mutex);
-  ptree_for_each_element(range, allocator_ranges, allocator_range, tree)
+  psync_tree_for_each_element(range, allocator_ranges, allocator_range, tree)
       psync_interval_tree_for_each(interval, range->freeintervals) {
     intsize = interval->to - interval->from;
     if (intsize >= size && intsize < bestsize) {
@@ -266,7 +264,7 @@ void *pmemlock_malloc(size_t size) {
   if (brange) {
   foundneededsize:
     if (unlikely(!brange->locked))
-      if (!pmemlock_lock(brange->mem, brange->size))
+      if (!psync_mem_lock(brange->mem, brange->size))
         brange->locked = 1;
     psync_interval_tree_remove(&brange->freeintervals, boffset, boffset + size);
     ret = brange->mem + boffset;
@@ -285,17 +283,17 @@ void *pmemlock_malloc(size_t size) {
   pthread_mutex_unlock(&allocator_mutex);
   if (ret)
     return ret;
-  page_size = pmemlock_get_pagesize();
+  page_size = psync_get_page_size();
   if (unlikely(page_size == -1))
     page_size = 4096;
   intsize = (size + LM_RANGE_OVERHEAD + page_size - 1) / page_size * page_size;
   brange = psync_new(allocator_range);
   brange->freeintervals = NULL;
-  brange->mem = pmem_mmap_safe(intsize);
+  brange->mem = psync_mmap_anon_safe(intsize);
   brange->size = intsize;
   debug(D_NOTICE, "allocating new locked block of size %lu at %p",
         (unsigned long)intsize, brange->mem);
-  if (unlikely(pmemlock_lock(brange->mem, intsize))) {
+  if (unlikely(psync_mem_lock(brange->mem, intsize))) {
     brange->locked = 0;
     debug(D_WARNING, "could not lock %lu bytes in memory",
           (unsigned long)intsize);
@@ -319,7 +317,7 @@ void *pmemlock_malloc(size_t size) {
   tr = allocator_ranges;
   if (tr) {
     while (1) {
-      range = ptree_element(tr, allocator_range, tree);
+      range = psync_tree_element(tr, allocator_range, tree);
       if (brange->mem < range->mem) {
         assert(brange->mem + brange->size <= range->mem);
         if (tr->left)
@@ -341,12 +339,12 @@ void *pmemlock_malloc(size_t size) {
   } else
     addto = &allocator_ranges;
   *addto = &brange->tree;
-  ptree_added_at(&allocator_ranges, tr, &brange->tree);
+  psync_tree_added_at(&allocator_ranges, tr, &brange->tree);
   pthread_mutex_unlock(&allocator_mutex);
   return ret;
 }
 
-void pmemlock_free(void *ptr) {
+void psync_locked_free(void *ptr) {
   psync_free(ptr);
   return;
   allocator_range *range;
@@ -370,7 +368,7 @@ void pmemlock_free(void *ptr) {
   pthread_mutex_lock(&allocator_mutex);
   tr = allocator_ranges;
   while (tr) {
-    range = ptree_element(tr, allocator_range, tree);
+    range = psync_tree_element(tr, allocator_range, tree);
     if (cptr < range->mem)
       tr = tr->left;
     else if (cptr >= range->mem + range->size)
@@ -385,7 +383,7 @@ found:
                           cptr - range->mem + size);
   if (range->freeintervals->from == LM_RANGE_OVERHEAD &&
       range->freeintervals->to == range->size)
-    ptree_del(&allocator_ranges, &range->tree);
+    psync_tree_del(&allocator_ranges, &range->tree);
   else
     range = NULL;
   pthread_mutex_unlock(&allocator_mutex);
@@ -393,16 +391,8 @@ found:
     debug(D_NOTICE, "freeing block of size %lu at %p",
           (unsigned long)range->size, range->mem);
     if (range->locked)
-      pmemlock_unlock(range->mem, range->size);
-    pmem_munmap(range->mem, range->size);
+      psync_mem_unlock(range->mem, range->size);
+    psync_munmap_anon(range->mem, range->size);
     psync_free(range);
   }
-}
-
-int pmemlock_get_pagesize() { 
-  return psync_page_size; 
-}
-
-void pmemlock_set_pagesize(int sz) {
-  psync_page_size = sz;
 }

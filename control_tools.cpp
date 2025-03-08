@@ -38,11 +38,11 @@
 #include <unistd.h>
 
 #include "control_tools.h"
+#include "pclsync/overlay_client.h"
 
 #include "pclsync_lib.h"
+#include "pclsync/psynclib.h"
 #include "pclsync/pshm.h"
-#include "pclsync/pfoldersync.h"
-#include "pclsync/rpcclient.h"
 
 #include "CLI11.hpp"
 
@@ -74,7 +74,7 @@ int list_sync_folders() {
   errmsz = 0;
   rval = 0;
 
-  result = rpc_call(LISTSYNC, "", &ret, &errm, &errmsz);
+  result = SendCall(LISTSYNC, "", &ret, &errm, &errmsz);
 
   if (result != 0) {
     std::cout << "List Sync Folders failed. return is " << ret
@@ -124,7 +124,7 @@ int start_crypto(const char *pass) {
   char *errm;
   size_t errm_size;
 
-  int result = rpc_call(STARTCRYPTO, pass, &ret, &errm, &errm_size);
+  int result = SendCall(STARTCRYPTO, pass, &ret, &errm, &errm_size);
 
   if (result != 0 || ret != 0) {
     std::cout << "Start Crypto failed. return is " << ret << " and message is "
@@ -142,7 +142,7 @@ int stop_crypto() {
   char *errm;
   size_t errm_size;
 
-  int result = rpc_call(STOPCRYPTO, "", &ret, &errm, &errm_size);
+  int result = SendCall(STOPCRYPTO, "", &ret, &errm, &errm_size);
   if (result != 0) {
     std::cout << "Stop Crypto failed. return is " << ret << " and message is "
               << (errm ? errm : "no message") << std::endl;
@@ -166,7 +166,7 @@ int remove_sync_folder(const char *folderid) {
   errmsz = 0;
   rval = 0;
 
-  result = rpc_call(STOPSYNC, folderid, &ret, &errm, &errmsz);
+  result = SendCall(STOPSYNC, folderid, &ret, &errm, &errmsz);
   if (result != 0) {
     std::cout << "Remove Sync Folder failed with unknown error. return is "
               << ret << " and message is " << (errm ? errm : "no message")
@@ -197,7 +197,7 @@ int add_sync_folder(std::string localpath, std::string remotepath) {
   rval = 0;
 
   std::string combinedPaths = localpath + '|' + remotepath;
-  result = rpc_call(ADDSYNC, combinedPaths.c_str(), &ret, &errm, &errmsz);
+  result = SendCall(ADDSYNC, combinedPaths.c_str(), &ret, &errm, &errmsz);
 
   if (result != 0) {
     if (result == -1) {
@@ -225,7 +225,7 @@ int finalize() {
   char *errm;
   size_t errm_size;
 
-  rpc_call(FINALIZE, "", &ret, &errm, &errm_size);
+  SendCall(FINALIZE, "", &ret, &errm, &errm_size);
   std::cout << "Exiting ..." << std::endl;
 
   if (errm){

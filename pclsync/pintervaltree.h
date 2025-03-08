@@ -42,35 +42,35 @@ typedef struct {
 } psync_interval_tree_t;
 
 #define psync_interval_tree_element(a)                                         \
-  ptree_element(a, psync_interval_tree_t, tree)
+  psync_tree_element(a, psync_interval_tree_t, tree)
 #define psync_interval_tree_for_each(a, l)                                     \
   for (a = psync_interval_tree_get_first(l); a != NULL;                        \
        a = psync_interval_tree_get_next(a))
 
 static inline psync_interval_tree_t *
 psync_interval_tree_get_first(psync_interval_tree_t *tree) {
-  return psync_interval_tree_element(ptree_get_first(&tree->tree));
+  return psync_interval_tree_element(psync_tree_get_first(&tree->tree));
 }
 
 static inline psync_interval_tree_t *
 psync_interval_tree_get_last(psync_interval_tree_t *tree) {
-  return psync_interval_tree_element(ptree_get_last(&tree->tree));
+  return psync_interval_tree_element(psync_tree_get_last(&tree->tree));
 }
 
 static inline psync_interval_tree_t *
 psync_interval_tree_get_next(psync_interval_tree_t *tree) {
-  return psync_interval_tree_element(ptree_get_next(&tree->tree));
+  return psync_interval_tree_element(psync_tree_get_next(&tree->tree));
 }
 
 static inline psync_interval_tree_t *
 psync_interval_tree_get_prev(psync_interval_tree_t *tree) {
-  return psync_interval_tree_element(ptree_get_prev(&tree->tree));
+  return psync_interval_tree_element(psync_tree_get_prev(&tree->tree));
 }
 
 static inline void psync_interval_tree_del(psync_interval_tree_t **tree,
                                            psync_interval_tree_t *node) {
   *tree = psync_interval_tree_element(
-      ptree_get_del(&(*tree)->tree, &node->tree));
+      psync_tree_get_del(&(*tree)->tree, &node->tree));
 }
 
 static inline psync_interval_tree_t *

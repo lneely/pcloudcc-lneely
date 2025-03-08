@@ -43,15 +43,57 @@
 
 #include "paccountevents.h"
 #include "ptools.h"
-#include "pstatus.h"
-#include "pfoldersync.h"
-#include "publiclinks.h"
 
+typedef uint64_t psync_folderid_t;
+typedef uint64_t psync_fileid_t;
+typedef uint64_t psync_fileorfolderid_t;
 typedef uint64_t psync_userid_t;
 typedef uint64_t psync_shareid_t;
 typedef uint64_t psync_sharerequestid_t;
 typedef uint64_t psync_teamid_t;
+typedef uint32_t psync_syncid_t;
 typedef uint32_t psync_eventtype_t;
+typedef uint32_t psync_synctype_t;
+typedef uint32_t psync_listtype_t;
+
+typedef struct {
+  psync_fileid_t fileid;
+  uint64_t size;
+} pfile_t;
+
+typedef struct {
+  psync_folderid_t folderid;
+  uint8_t cansyncup;
+  uint8_t cansyncdown;
+  uint8_t canshare;
+  uint8_t isencrypted;
+} pfolder_t;
+
+typedef struct {
+  const char *name;
+  union {
+    pfolder_t folder;
+    pfile_t file;
+  };
+  uint16_t namelen;
+  uint8_t isfolder;
+} pentry_t;
+
+typedef struct {
+  size_t entrycnt;
+  pentry_t entries[];
+} pfolder_list_t;
+
+typedef struct {
+  const char *localpath;
+  const char *name;
+  const char *description;
+} psuggested_folder_t;
+
+typedef struct {
+  size_t entrycnt;
+  psuggested_folder_t entries[];
+} psuggested_folders_t;
 
 typedef struct {
   const char *label;
@@ -92,6 +134,60 @@ typedef struct {
 #define BEAPI_ERR_DEST_F_EXISTS 2004 // destination folder already exists
 #define BEAPI_ERR_MV_TOO_MANY_IN_SHA                                           \
   2352 // Too many objects moved at once in shared folder
+
+#define PSTATUS_READY 0
+#define PSTATUS_DOWNLOADING 1
+#define PSTATUS_UPLOADING 2
+#define PSTATUS_DOWNLOADINGANDUPLOADING 3
+#define PSTATUS_LOGIN_REQUIRED 4
+#define PSTATUS_BAD_LOGIN_DATA 5
+#define PSTATUS_BAD_LOGIN_TOKEN 6
+#define PSTATUS_ACCOUNT_FULL 7
+#define PSTATUS_DISK_FULL 8
+#define PSTATUS_PAUSED 9
+#define PSTATUS_STOPPED 10
+#define PSTATUS_OFFLINE 11
+#define PSTATUS_CONNECTING 12
+#define PSTATUS_SCANNING 13
+#define PSTATUS_USER_MISMATCH 14
+#define PSTATUS_ACCOUNT_EXPIRED 15
+#define PSTATUS_TFA_REQUIRED 16
+#define PSTATUS_BAD_TFA_CODE 17
+#define PSTATUS_VERIFY_REQUIRED 18
+#define PSTATUS_RELOCATION 19
+#define PSTATUS_RELOCATED 20
+
+#define PSTATUS_ACCOUT_TFAERR PSTATUS_TFA_REQUIRED
+#define PSTATUS_ACCOUT_EXPIRED PSTATUS_ACCOUNT_EXPIRED
+
+typedef struct pstatus_struct_ {
+  const char *downloadstr; /* formatted string with the status of uploads */
+  const char *uploadstr;   /* formatted string with the status of downloads */
+  uint64_t bytestoupload;  /* sum of the sizes of files that need to be uploaded
+                              to sync state */
+  uint64_t
+      bytestouploadcurrent; /* sum of the sizes of files in filesuploading */
+  uint64_t
+      bytesuploaded; /* bytes uploaded in files accounted in filesuploading */
+  uint64_t bytestodownload;        /* sum of the sizes of files that need to be
+                                      downloaded to sync state */
+  uint64_t bytestodownloadcurrent; /* sum of the sizes of files in
+                                      filesdownloading */
+  uint64_t bytesdownloaded;        /* bytes downloaded in files accounted in
+                                      filesdownloading */
+  uint32_t status;          /* current status, one of PSTATUS_ constants */
+  uint32_t filestoupload;   /* number of files to upload in order to sync state,
+                               including filesuploading*/
+  uint32_t filesuploading;  /* number of files currently uploading */
+  uint32_t uploadspeed;     /* in bytes/sec */
+  uint32_t filestodownload; /* number of files to download in order to sync
+                               state, including filesdownloading*/
+  uint32_t filesdownloading; /* number of files currently downloading */
+  uint32_t downloadspeed;    /* in bytes/sec */
+  uint8_t remoteisfull; /* account is full and no files will be synced upwards*/
+  uint8_t localisfull;  /* (some) local hard drive is full and no files will be
+                           synced from the cloud */
+} pstatus_t;
 
 /* PEVENT_LOCAL_FOLDER_CREATED means that a folder was created in remotely and
  * this action was replicated locally, not the other way around. Accordingly
@@ -286,6 +382,9 @@ typedef struct {
 #define PSYNC_CRYPTO_STATUS_ACTIVE 4
 #define PSYNC_CRYPTO_STATUS_SETUP 5
 
+// limitation: path length of 255, plus null terminator.
+#define PSYNC_MAX_PATH_LENGTH 256
+
 #define PSYNC_CRYPTO_INVALID_FOLDERID ((psync_folderid_t) - 1)
 
 #define PSYNC_CRYPTO_FLAG_TEMP_PASS 1
@@ -306,6 +405,20 @@ typedef struct {
 // Backup errors end
 
 // Lib error codes end
+typedef struct {
+  char localname[PSYNC_MAX_PATH_LENGTH];
+  char localpath[PSYNC_MAX_PATH_LENGTH];
+  char remotename[PSYNC_MAX_PATH_LENGTH];
+  char remotepath[PSYNC_MAX_PATH_LENGTH];
+  psync_folderid_t folderid;
+  psync_syncid_t syncid;
+  psync_synctype_t synctype;
+} psync_folder_t;
+
+typedef struct {
+  size_t foldercnt;
+  psync_folder_t folders[];
+} psync_folder_list_t;
 
 typedef struct {
   psync_fileid_t fileid;
@@ -423,6 +536,36 @@ typedef struct {
   psync_notification_t notifications[];
 } psync_notification_list_t;
 
+typedef enum Status { INSYNC, INPROG, NOSYNC, INVSYNC } external_status;
+
+typedef struct {
+  uint64_t linkid;
+  const char *name;
+  const char *code;
+  const char *comment;
+  const char *fulllink;
+  uint64_t traffic;
+  uint64_t maxspace;
+  uint64_t downloads;
+  uint64_t created;
+  uint64_t modified;
+  uint64_t itemid;
+  uint8_t isfolder;
+  uint8_t isupload;
+  uint8_t icon;
+  uint64_t parentfolderid;
+  uint8_t haspassword;
+  uint8_t type;
+  uint64_t views;
+  uint64_t expire;
+  uint8_t enableuploadforeveryone;
+  uint8_t enableuploadforchosenusers;
+} link_info_t;
+
+typedef struct {
+  uint32_t entrycnt;
+  link_info_t entries[];
+} plink_info_list_t;
 
 typedef enum {
   Dev_Types_UsbRemovableDisk = 1,
@@ -464,6 +607,20 @@ typedef struct {
 } plogged_device_list_t;
 
 typedef struct {
+  const char *name;
+  uint64_t created;
+  uint64_t modified;
+  uint8_t isfolder;
+  uint64_t itemid;
+  uint8_t icon;
+} link_cont_t;
+
+typedef struct {
+  uint32_t entrycnt;
+  link_cont_t entries[];
+} plink_contents_t;
+
+typedef struct {
   uint64_t teamid;
   const char *mail;
   const char *name;
@@ -474,6 +631,30 @@ typedef struct {
   size_t entrycnt;
   contact_info_t entries[];
 } pcontacts_list_t;
+
+typedef struct {
+  uint64_t recieverid;
+  const char *mail;
+} reciever_info_t;
+
+typedef struct {
+  size_t entrycnt;
+  reciever_info_t entries[];
+} preciever_list_t;
+
+typedef struct {
+  const char *link;
+  const char *name;
+  const char *code;
+  const char *description;
+  uint64_t created;
+  uint8_t locationid;
+} bookmark_info_t;
+
+typedef struct {
+  size_t entrycnt;
+  bookmark_info_t entries[];
+} bookmarks_list_t;
 
 typedef struct {
   const char *email;
@@ -517,6 +698,14 @@ typedef void (*psync_generic_callback_t)();
 void *psync_malloc(size_t size);
 void *psync_realloc(void *ptr, size_t size);
 void psync_free(void *ptr);
+
+/* Status change callback is called every time value is changed. It may be
+ * called quite often when there are active uploads/downloads. Callbacks are
+ * issued from a special callback thread (e.g. the same thread all the time) and
+ * are guaranteed not to overlap.
+ */
+
+typedef void (*pstatus_change_callback_t)(pstatus_t *status);
 
 /* Event callback is called every time a download/upload is started/finished,
  * quota is changed, folder is shared or similar. Look at the PEVENT_ constants
@@ -588,6 +777,16 @@ typedef void (*pnotification_callback_t)(uint32_t notificationcnt,
  * to be used to free any memory that is said to be freed when returned by the
  * library.
  *
+ * psync_set_software_string can set the name (and version) of the software that
+ * is passed to the server during token creation. Important: library will not
+ * make its own copy, so either pass a static string or make a copy of your
+ * dynamic string. This function is to be called BEFORE psync_start_sync and it
+ * is acceptable to call it even before psync_init().
+ *
+ * psync_set_os_string() will set the name and version of the operating system
+ * that is passed to the server during token creation. If not set, it will be
+ * autodetected.
+ *
  * psync_set_database_path can set a full path to database file. If it does not
  * exists it will be created. The function should be only called before
  * psync_init. If database path is not set, appropriate location for the given
@@ -608,6 +807,9 @@ typedef void (*pnotification_callback_t)(uint32_t notificationcnt,
 void psync_set_database_path(const char *databasepath);
 void psync_set_alloc(psync_malloc_t malloc_call, psync_realloc_t realloc_call,
                      psync_free_t free_call);
+void psync_set_software_string(const char *str);
+void psync_set_os_string(const char *str);
+
 int psync_init();
 void psync_start_sync(pstatus_change_callback_t status_callback,
                       pevent_callback_t event_callback);
@@ -1186,7 +1388,7 @@ int psync_upload_file_as(const char *remote_path, const char *remote_filename,
  * full path (including mountpoint) of a given folderid on the filesystem or
  *                            NULL if it is not mounted or folder could not be
  * found. You are supposed to free the returned pointer.
- * pfolder_file_path() - returns path (without mountpoint) of a given
+ * psync_get_path_by_fileid() - returns path (without mountpoint) of a given
  * fileid on the filesystem or NULL if it is not mounted or parent folder could
  * not be found. You are supposed to free the returned pointer.
  *
@@ -1216,6 +1418,7 @@ void psync_fs_stop();
 char *psync_fs_getmountpoint();
 void psync_fs_register_start_callback(psync_generic_callback_t callback);
 char *psync_fs_get_path_by_folderid(psync_folderid_t folderid);
+char *psync_get_path_by_fileid(psync_fileid_t fileid, size_t *retlen);
 
 void psync_fs_clean_read_cache();
 int psync_fs_move_cache(const char *path);
@@ -1361,9 +1564,9 @@ uint64_t psync_crypto_priv_key_flags();
  * files and folders not in drive or sync folder INSYNC is returned.
  */
 
-external_status_t psync_filesystem_status(const char *path);
-external_status_t psync_status_file(const char *path);
-external_status_t psync_status_folder(const char *path);
+external_status psync_filesystem_status(const char *path);
+external_status psync_status_file(const char *path);
+external_status psync_status_folder(const char *path);
 
 /*
  * Publik links API functions.
@@ -1381,7 +1584,7 @@ external_status_t psync_status_folder(const char *path);
  * if any is returned.
  *
  *
- * ptree_public_link() creates public link for a tree. Tree is define by
+ * psync_tree_public_link() creates public link for a tree. Tree is define by
  * root folder and arrays of folders and file paths. Each entry in the arrays
  *  describes a path to file or folder. Number of entries in the arrays is
  * passed separately. The API constructs a virtual folder of this files and
@@ -1439,7 +1642,7 @@ int64_t psync_folder_public_link_full(const char *path, char **link /*OUT*/,
                                       const char *password);
 int64_t psync_folder_updownlink_link(int canupload, unsigned long long folderid,
                                      const char *mail, char **err /*OUT*/);
-int64_t ptree_public_link(const char *linkname, const char *root,
+int64_t psync_tree_public_link(const char *linkname, const char *root,
                                char **folders, int numfolders, char **files,
                                int numfiles, char **link /*OUT*/,
                                char **err /*OUT*/);
@@ -1685,7 +1888,7 @@ userinfo_t *psync_get_userinfo();
  * label - string representing label of the event
  * eventParams - list of binparams(optional)
  */
-int psync_ptools_create_backend_event(const char *category, const char *action,
+int psync_create_backend_event(const char *category, const char *action,
                                const char *label, eventParams params,
                                char *err);
 
@@ -1696,9 +1899,5 @@ void psync_init_data_event_handler(void *ptr);
 #ifdef __cplusplus
 }
 #endif
-
-// moved from pdiff
-void psync_delete_cached_crypto_keys();
-
 
 #endif

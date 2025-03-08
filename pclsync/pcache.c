@@ -28,7 +28,6 @@
   DAMAGE.
 */
 
-
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
@@ -37,36 +36,63 @@
 #include <pthread.h>
 
 #include "pcache.h"
+#include "pcompat.h"
 #include "plibs.h"
 #include "plist.h"
+#include "pssl.h"
 #include "psynclib.h"
-#include "psys.h"
 #include "ptimer.h"
 #include <string.h>
 
-// required by psync_cache_get
-extern PSYNC_THREAD const char *psync_thread_name; 
-
 #define CACHE_HASH_SIZE 2048
-#define CACHE_NUM_LOCKS 8
+#define CACHE_LOCKS 8
 
 #define hash_to_bucket(h) ((h) % CACHE_HASH_SIZE)
-#define hash_to_lock(h) ((((h) * CACHE_NUM_LOCKS) / CACHE_HASH_SIZE) % CACHE_NUM_LOCKS)
+#define hash_to_lock(h) ((((h) * CACHE_LOCKS) / CACHE_HASH_SIZE) % CACHE_LOCKS)
+
+// unused, may be important later
+// #define CACHE_WAIT_FOR_TIMER 1
+// #define CACHE_TIMER_CALLED   2
 
 typedef struct {
   psync_list list;
   void *value;
-  pcache_free_cb free;
+  psync_cache_free_callback free;
   psync_timer_t timer;
   uint32_t hash;
   char key[];
-} cache_entry_t;
+} hash_element;
 
 static psync_list cache_hash[CACHE_HASH_SIZE];
-static pthread_mutex_t cachelocks[CACHE_NUM_LOCKS];
+static pthread_mutex_t cache_mutexes[CACHE_LOCKS];
 static uint32_t hash_seed;
 
-static uint32_t compute_hash(const char *key, size_t *len) {
+void psync_cache_init() {
+  pthread_mutexattr_t mattr;
+  psync_uint_t i;
+  for (i = 0; i < CACHE_HASH_SIZE; i++)
+    psync_list_init(&cache_hash[i]);
+  for (i = 0; i < CACHE_LOCKS; i++) {
+    pthread_mutexattr_init(&mattr);
+    pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&cache_mutexes[i], &mattr);
+    pthread_mutexattr_destroy(&mattr);
+  }
+  // do not use psync_ssl_rand_* here as it is not yet initialized
+  hash_seed = psync_time() * 0xc2b2ae35U;
+}
+
+static uint32_t hash_func(const char *key) {
+  uint32_t c, hash;
+  hash = hash_seed;
+  while ((c = (uint32_t)*key++))
+    hash = c + (hash << 5) + hash;
+  hash += hash << 3;
+  hash ^= hash >> 11;
+  return hash;
+}
+
+static uint32_t hash_funcl(const char *key, size_t *len) {
   const char *k;
   uint32_t c, hash;
   k = key;
@@ -75,39 +101,12 @@ static uint32_t compute_hash(const char *key, size_t *len) {
     hash = c + (hash << 5) + hash;
   hash += hash << 3;
   hash ^= hash >> 11;
-  if(len) {
-    *len = k - key - 1;
-  }
+  *len = k - key - 1;
   return hash;
 }
 
-static void cache_timer(psync_timer_t timer, void *ptr) {
-  cache_entry_t *he = (cache_entry_t *)ptr;
-  pthread_mutex_lock(&cachelocks[hash_to_lock(he->hash)]);
-  psync_list_del(&he->list);
-  pthread_mutex_unlock(&cachelocks[hash_to_lock(he->hash)]);
-  he->free(he->value);
-  psync_free(he);
-  ptimer_stop(timer);
-}
-
-void pcache_init() {
-  pthread_mutexattr_t mattr;
-  unsigned long i;
-  for (i = 0; i < CACHE_HASH_SIZE; i++)
-    psync_list_init(&cache_hash[i]);
-  for (i = 0; i < CACHE_NUM_LOCKS; i++) {
-    pthread_mutexattr_init(&mattr);
-    pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
-    pthread_mutex_init(&cachelocks[i], &mattr);
-    pthread_mutexattr_destroy(&mattr);
-  }
-  // do not use psync_ssl_rand_* here as it is not yet initialized
-  hash_seed = psys_time_seconds() * 0xc2b2ae35U;
-}
-
-void *pcache_get(const char *key) {
-  cache_entry_t *he;
+void *psync_cache_get(const char *key) {
+  hash_element *he;
   void *val;
   psync_list *lst;
   uint32_t h;
@@ -120,64 +119,74 @@ void *pcache_get(const char *key) {
           "query/statement, you can use _nocache version)",
           key);
 
-  h = compute_hash(key, NULL);
+  h = hash_func(key);
   //  debug(D_NOTICE, "get %s %lu", key, h);
   lst = &cache_hash[hash_to_bucket(h)];
-  pthread_mutex_lock(&cachelocks[hash_to_lock(h)]);
+  pthread_mutex_lock(&cache_mutexes[hash_to_lock(h)]);
   psync_list_for_each_element(
-      he, lst, cache_entry_t, list) if (he->hash == h && !strcmp(key, he->key)) {
-    if (ptimer_stop(he->timer))
+      he, lst, hash_element, list) if (he->hash == h && !strcmp(key, he->key)) {
+    if (psync_timer_stop(he->timer))
       continue;
     psync_list_del(&he->list);
-    pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
+    pthread_mutex_unlock(&cache_mutexes[hash_to_lock(h)]);
     val = he->value;
     psync_free(he);
     return val;
   }
-  pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
+  pthread_mutex_unlock(&cache_mutexes[hash_to_lock(h)]);
   return NULL;
 }
 
-int pcache_has(const char *key) {
-  cache_entry_t *he;
+int psync_cache_has(const char *key) {
+  hash_element *he;
   psync_list *lst;
   uint32_t h;
   int ret;
-  h = compute_hash(key, NULL);
+  h = hash_func(key);
   ret = 0;
   lst = &cache_hash[hash_to_bucket(h)];
-  pthread_mutex_lock(&cachelocks[hash_to_lock(h)]);
+  pthread_mutex_lock(&cache_mutexes[hash_to_lock(h)]);
   psync_list_for_each_element(
-      he, lst, cache_entry_t, list) if (he->hash == h && !strcmp(key, he->key)) {
+      he, lst, hash_element, list) if (he->hash == h && !strcmp(key, he->key)) {
     ret = 1;
     break;
   }
-  pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
+  pthread_mutex_unlock(&cache_mutexes[hash_to_lock(h)]);
   return ret;
 }
 
-void pcache_add(const char *key, void *ptr, time_t freeafter,
-                     pcache_free_cb freefunc, uint32_t maxkeys) {
-  cache_entry_t *he, *he2;
+static void cache_timer(psync_timer_t timer, void *ptr) {
+  hash_element *he = (hash_element *)ptr;
+  pthread_mutex_lock(&cache_mutexes[hash_to_lock(he->hash)]);
+  psync_list_del(&he->list);
+  pthread_mutex_unlock(&cache_mutexes[hash_to_lock(he->hash)]);
+  he->free(he->value);
+  psync_free(he);
+  psync_timer_stop(timer);
+}
+
+void psync_cache_add(const char *key, void *ptr, time_t freeafter,
+                     psync_cache_free_callback freefunc, uint32_t maxkeys) {
+  hash_element *he, *he2;
   psync_list *lst;
   size_t l;
   uint32_t h;
-  h = compute_hash(key, &l);
+  h = hash_funcl(key, &l);
   l++;
-  he = (cache_entry_t *)psync_malloc(offsetof(cache_entry_t, key) + l);
+  he = (hash_element *)psync_malloc(offsetof(hash_element, key) + l);
   he->value = ptr;
   he->free = freefunc;
   he->hash = h;
   memcpy(he->key, key, l);
   lst = &cache_hash[hash_to_bucket(h)];
-  pthread_mutex_lock(&cachelocks[hash_to_lock(h)]);
+  pthread_mutex_lock(&cache_mutexes[hash_to_lock(h)]);
   if (maxkeys) {
     l = 0;
-    psync_list_for_each_element(he2, lst, cache_entry_t,
+    psync_list_for_each_element(he2, lst, hash_element,
                                 list) if (unlikely(he2->hash == h &&
                                                    !strcmp(key, he2->key) &&
                                                    ++l == maxkeys)) {
-      pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
+      pthread_mutex_unlock(&cache_mutexes[hash_to_lock(h)]);
       psync_free(he);
       freefunc(ptr);
       //        debug(D_NOTICE, "not adding key %s to cache as there already %u
@@ -190,12 +199,19 @@ void pcache_add(const char *key, void *ptr, time_t freeafter,
    * "faster" (e.g. further from idle slowstart reset)
    */
   psync_list_add_head(lst, &he->list);
-  he->timer = ptimer_register(cache_timer, freeafter, he);
-  pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
+  he->timer = psync_timer_register(cache_timer, freeafter, he);
+  pthread_mutex_unlock(&cache_mutexes[hash_to_lock(h)]);
 }
 
-void pcache_del(const char *key) {
-  cache_entry_t *he;
+void psync_cache_add_free(char *key, void *ptr, time_t freeafter,
+                          psync_cache_free_callback freefunc,
+                          uint32_t maxkeys) {
+  psync_cache_add(key, ptr, freeafter, freefunc, maxkeys);
+  psync_free(key);
+}
+
+void psync_cache_del(const char *key) {
+  hash_element *he;
   psync_list *lst;
   uint32_t h;
   if (IS_DEBUG && !strcmp(psync_thread_name, "timer"))
@@ -207,64 +223,68 @@ void pcache_del(const char *key) {
           "query/statement, you can use _nocache version)",
           key);
 
-  h = compute_hash(key, NULL);
+  h = hash_func(key);
   lst = &cache_hash[hash_to_bucket(h)];
 restart:
-  pthread_mutex_lock(&cachelocks[hash_to_lock(h)]);
+  pthread_mutex_lock(&cache_mutexes[hash_to_lock(h)]);
   psync_list_for_each_element(
-      he, lst, cache_entry_t, list) if (he->hash == h && !strcmp(key, he->key)) {
-    if (ptimer_stop(he->timer))
+      he, lst, hash_element, list) if (he->hash == h && !strcmp(key, he->key)) {
+    if (psync_timer_stop(he->timer))
       continue;
     psync_list_del(&he->list);
-    pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
+    pthread_mutex_unlock(&cache_mutexes[hash_to_lock(h)]);
     he->free(he->value);
     psync_free(he);
     goto restart;
   }
-  pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
+  pthread_mutex_unlock(&cache_mutexes[hash_to_lock(h)]);
 }
 
-void pcache_clean() {
+void psync_cache_clean_all() {
   psync_list *l1, *l2;
-  cache_entry_t *he;
-  unsigned long h;
+  hash_element *he;
+  psync_uint_t h;
   for (h = 0; h < CACHE_HASH_SIZE; h++) {
-    pthread_mutex_lock(&cachelocks[hash_to_lock(h)]);
+    pthread_mutex_lock(&cache_mutexes[hash_to_lock(h)]);
     psync_list_for_each_safe(l1, l2, &cache_hash[h]) {
-      he = psync_list_element(l1, cache_entry_t, list);
-      if (!ptimer_stop(he->timer)) {
+      he = psync_list_element(l1, hash_element, list);
+      if (!psync_timer_stop(he->timer)) {
         psync_list_del(l1);
         he->free(he->value);
         psync_free(he);
       }
     }
-    pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
+    pthread_mutex_unlock(&cache_mutexes[hash_to_lock(h)]);
   }
 }
 
-void pcache_clean_oneof(const char **prefixes, size_t cnt) {
+void psync_cache_clean_starting_with(const char *prefix) {
+  psync_cache_clean_starting_with_one_of(&prefix, 1);
+}
+
+void psync_cache_clean_starting_with_one_of(const char **prefixes, size_t cnt) {
   psync_list *l1, *l2;
-  cache_entry_t *he;
-  unsigned long h;
+  hash_element *he;
+  psync_uint_t h;
   size_t i;
-  VAR_ARRAY(lens, size_t, cnt);
+  psync_def_var_arr(lens, size_t, cnt);
   for (i = 0; i < cnt; i++)
     lens[i] = strlen(prefixes[i]);
   for (h = 0; h < CACHE_HASH_SIZE; h++) {
-    pthread_mutex_lock(&cachelocks[hash_to_lock(h)]);
+    pthread_mutex_lock(&cache_mutexes[hash_to_lock(h)]);
     psync_list_for_each_safe(l1, l2, &cache_hash[h]) {
-      he = psync_list_element(l1, cache_entry_t, list);
+      he = psync_list_element(l1, hash_element, list);
       for (i = 0; i < cnt; i++)
         if (!strncmp(he->key, prefixes[i], lens[i]))
           break;
       if (i == cnt)
         continue;
-      if (!ptimer_stop(he->timer)) {
+      if (!psync_timer_stop(he->timer)) {
         psync_list_del(l1);
         he->free(he->value);
         psync_free(he);
       }
     }
-    pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
+    pthread_mutex_unlock(&cache_mutexes[hash_to_lock(h)]);
   }
 }

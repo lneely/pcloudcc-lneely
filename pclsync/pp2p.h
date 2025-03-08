@@ -32,11 +32,11 @@
 #ifndef _PSYNC_P2P_H
 #define _PSYNC_P2P_H
 
-#include "pfoldersync.h"
+#include "psynclib.h"
 
-void pp2p_init();
-void pp2p_change();
-int pp2p_check_download(psync_fileid_t fileid,
+void psync_p2p_init();
+void psync_p2p_change();
+int psync_p2p_check_download(psync_fileid_t fileid,
                              const unsigned char *filehashhex, uint64_t fsize,
                              const char *filename);
 

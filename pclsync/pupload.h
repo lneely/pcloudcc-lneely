@@ -32,19 +32,17 @@
 #ifndef _PSYNC_UPLOAD_H
 #define _PSYNC_UPLOAD_H
 
-#include <stdint.h>
+#include "psynclib.h"
 
-#include "pfoldersync.h"
-
-void pupload_init();
-void pupload_inc();
-void pupload_dec();
-void pupload_dec_by(uint32_t cnt);
-void pupload_bytes_add(uint64_t bytes);
-void pupload_bytes_sub(uint64_t bytes);
-void pupload_wake();
-void pupload_del_tasks(psync_fileid_t localfileid);
-void pupload_stop_sync(psync_syncid_t syncid);
-void pupload_stop_all();
+void psync_upload_init();
+void psync_upload_inc_uploads();
+void psync_upload_dec_uploads();
+void psync_upload_dec_uploads_cnt(uint32_t cnt);
+void psync_upload_add_bytes_uploaded(uint64_t bytes);
+void psync_upload_sub_bytes_uploaded(uint64_t bytes);
+void psync_wake_upload();
+void psync_delete_upload_tasks_for_file(psync_fileid_t localfileid);
+void psync_stop_sync_upload(psync_syncid_t syncid);
+void psync_stop_all_upload();
 
 #endif

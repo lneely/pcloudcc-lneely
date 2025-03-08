@@ -2,12 +2,12 @@ CC			:= gcc
 CXX			:= g++
 AR			:= ar
 COMMONFLAGS	= -fsanitize=address
-CFLAGS		= -fPIC $(COMMONFLAGS) -I./pclsync -I/usr/include
+CFLAGS		= -fPIC $(COMMONFLAGS) -I./pclsync -I/usr/include -I/usr/include/mbedtls2
 ifneq (,$(filter clang%,$(CC)))
     CFLAGS += -Wthread-safety
 endif
 CXXFLAGS	= $(CFLAGS)
-LIBLDFLAGS	= $(COMMONFLAGS) -lpthread -ludev -lsqlite3 -lz -lmbedtls -lmbedx509 -lmbedcrypto
+LIBLDFLAGS	= $(COMMONFLAGS) -lpthread -ludev -lsqlite3 -lz -l:libmbedtls.so.14 -l:libmbedx509.so.1 -l:libmbedcrypto.so.7
 EXECLDFLAGS	= $(COMMONFLAGS) -lboost_program_options -lfuse
 
 SCAN		:= 0
@@ -28,11 +28,11 @@ LIBOUT		:= libpcloudcc_lib.so
 
 # Build type specific flags
 ifeq ($(BUILD), debug)
-    CFLAGS += -g -O0 -DDEBUG -Wall -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE
-    CXXFLAGS += -g -O0 -DDEBUG -Wall -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE
+    CFLAGS += -g -O0 -DDEBUG -Wall 
+    CXXFLAGS += -g -O0 -DDEBUG -Wall
 else ifeq ($(BUILD), release)
-    CFLAGS += -O2 -DNDEBUG -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE
-    CXXFLAGS += -O2 -DNDEBUG -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE
+    CFLAGS += -O2 -DNDEBUG
+    CXXFLAGS += -O2 -DNDEBUG
     COMMONFLAGS := $(filter-out -fsanitize=address,$(COMMONFLAGS))
     LIBLDFLAGS := $(filter-out -fsanitize=address,$(LIBLDFLAGS))
     EXECLDFLAGS := $(filter-out -fsanitize=address,$(EXECLDFLAGS))

@@ -436,7 +436,7 @@ static int crc_hashw = 0;
 PSYNC_NOINLINE static uint32_t psync_crc32c_sw(uint32_t crc, const void *ptr,
                                                size_t len) {
 #else
-uint32_t pcrc32c_compute(uint32_t crc, const void *ptr, size_t len) {
+uint32_t psync_crc32c(uint32_t crc, const void *ptr, size_t len) {
 #endif
   const char *data;
   data = (const char *)ptr;
@@ -779,7 +779,7 @@ PSYNC_NOINLINE static uint32_t psync_crc32c_init(uint32_t crc, const void *ptr,
     return psync_crc32c_sw(crc, ptr, len);
 }
 
-uint32_t pcrc32c_compute(uint32_t crc, const void *ptr, size_t len) {
+uint32_t psync_crc32c(uint32_t crc, const void *ptr, size_t len) {
 #if defined(CRC32_GNUC) && defined(__SSE4_2__)
   return psync_crc32c_hw(crc, ptr, len);
 #else
@@ -800,7 +800,7 @@ uint32_t pcrc32c_compute(uint32_t crc, const void *ptr, size_t len) {
  * https://code.google.com/p/cityhash/
  */
 
-void pcrc32c_fast_hash256_init(psync_fast_hash256_ctx *ctx) {
+void psync_fast_hash256_init(psync_fast_hash256_ctx *ctx) {
 #ifdef CRC32_HW
   if (unlikely(!crc_hashw))
     crc_hashw = psync_has_hw_crc() + 1;
@@ -810,10 +810,10 @@ void pcrc32c_fast_hash256_init(psync_fast_hash256_ctx *ctx) {
   ctx->buff[PSYNC_FAST_HASH256_BLOCK_LEN - 1] = 0;
 }
 
-void pcrc32c_fast_hash256_seed(psync_fast_hash256_ctx *ctx, const void *seed,
+void psync_fast_hash256_init_seed(psync_fast_hash256_ctx *ctx, const void *seed,
                                   size_t seedlen) {
   size_t i;
-  pcrc32c_fast_hash256_init(ctx);
+  psync_fast_hash256_init(ctx);
   if (seedlen > sizeof(ctx->state))
     seedlen = sizeof(ctx->state);
   for (i = 0; i < seedlen; i++)
@@ -950,7 +950,7 @@ static void psync_fast_hash256_update_long_sw(psync_fast_hash256_ctx *ctx,
 static void psync_fast_hash256_update_short_sw(psync_fast_hash256_ctx *ctx,
                                                const char *cdata, size_t len);
 
-void pcrc32c_fast_hash256_update(psync_fast_hash256_ctx *ctx, const void *data,
+void psync_fast_hash256_update(psync_fast_hash256_ctx *ctx, const void *data,
                                size_t len) {
   ctx->length += len;
   if (len + ctx->buff[PSYNC_FAST_HASH256_BLOCK_LEN - 1] <
@@ -1023,7 +1023,7 @@ psync_fast_hash256_update_long_sw(psync_fast_hash256_ctx *ctx,
   ctx->buff[PSYNC_FAST_HASH256_BLOCK_LEN - 1] = len;
 }
 
-void pcrc32c_fast_hash256_final(void *hash, psync_fast_hash256_ctx *ctx) {
+void psync_fast_hash256_final(void *hash, psync_fast_hash256_ctx *ctx) {
   uint64_t a, b, c, d, x, y, len;
   len = ctx->buff[PSYNC_FAST_HASH256_BLOCK_LEN - 1];
   memcpy(ctx->buff + len, &crc32c_table[1][2],

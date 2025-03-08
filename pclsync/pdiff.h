@@ -34,14 +34,15 @@
 
 #include "papi.h"
 
-void pdiff_init();
-void pdiff_lock();
-void pdiff_unlock();
-void pdiff_wake();
-void pdiff_file_create(const binresult *meta);
-void pdiff_file_update(const binresult *meta);
-void pdiff_file_delete(const binresult *meta);
-void pdiff_fldr_update(const binresult *meta);
-void pdiff_fldr_delete(const binresult *meta);
+void psync_diff_init();
+void psync_diff_lock();
+void psync_diff_unlock();
+void psync_diff_wake();
+void psync_diff_create_file(const binresult *meta);
+void psync_diff_update_file(const binresult *meta);
+void psync_diff_delete_file(const binresult *meta);
+void psync_diff_update_folder(const binresult *meta);
+void psync_diff_delete_folder(const binresult *meta);
+void psync_delete_cached_crypto_keys();
 
 #endif

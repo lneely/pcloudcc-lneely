@@ -34,6 +34,6 @@
 
 #include <stdint.h>
 
-uint64_t ppassword_score(const char *password);
+uint64_t psync_password_score(const char *password);
 
 #endif

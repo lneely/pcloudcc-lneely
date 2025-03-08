@@ -32,7 +32,7 @@
 #ifndef _PSYNC_FSXATTR_H
 #define _PSYNC_FSXATTR_H
 
-#include "pfile.h"
+#include "pcompat.h"
 #include "psynclib.h"
 
 #define PFS_XATTR_IGN

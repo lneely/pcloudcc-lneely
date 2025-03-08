@@ -7,20 +7,21 @@
 #include <stdbool.h>
 #include <errno.h>
 
-#include "ppath.h"
-#include "plibs.h"
+#include "debug.h"
+
 #include "pshm.h"
 
 key_t pshm_get_key() {
     char path[PATH_MAX];
     char *home;
     
-    home = ppath_home();
-    if(!home) {
+    home = getenv("HOME");
+    if (home == NULL) {
         debug(D_ERROR, "HOME environment variable is not set");
         return (key_t)-1;
     }
     snprintf(path, sizeof(path), "%s/.pcloud/data.db", home);
+
     return ftok(path, 'A');
 }
 

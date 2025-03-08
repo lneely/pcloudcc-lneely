@@ -29,22 +29,12 @@
    DAMAGE.
 */
 
-#include <dirent.h>
-#include <errno.h>
-#include <stddef.h>
-#include <string.h>
-#include <sys/epoll.h>
-#include <sys/inotify.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-
 #include "plocalnotify.h"
-#include "pfoldersync.h"
+#include "pcompat.h"
 #include "plibs.h"
-#include "prun.h"
 #include "plist.h"
 #include "plocalscan.h"
+#include "psettings.h"
 
 #define NOTIFY_MSG_ADD 0
 #define NOTIFY_MSG_DEL 1
@@ -53,6 +43,14 @@ typedef struct {
   uint32_t type;
   psync_syncid_t syncid;
 } localnotify_msg;
+
+#include <dirent.h>
+#include <stddef.h>
+#include <string.h>
+#include <sys/epoll.h>
+#include <sys/inotify.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 static int pipe_read, pipe_write, epoll_fd;
 static psync_list dirs = PSYNC_LIST_STATIC_INIT(dirs);
@@ -110,8 +108,8 @@ static void add_dir_scan(localnotify_dir *dir, const char *path) {
     cpath = (char *)psync_malloc(pl + namelen + 2);
     entry = (struct dirent *)psync_malloc(entrylen);
     memcpy(cpath, path, pl);
-    if (!pl || cpath[pl - 1] != '/')
-      cpath[pl++] = '/';
+    if (!pl || cpath[pl - 1] != PSYNC_DIRECTORY_SEPARATORC)
+      cpath[pl++] = PSYNC_DIRECTORY_SEPARATORC;
     // while (!readdir_r(dh, entry, &de) && de) { // DELETEME: deprecated
     while ((de = readdir(dh))) {
       if (de->d_name[0] != '.' ||
@@ -171,7 +169,7 @@ err:
 static void del_syncid(psync_syncid_t syncid) {
   localnotify_dir *dir;
   localnotify_watch *wch, *next;
-  unsigned long i;
+  psync_uint_t i;
   psync_list_for_each_element(dir, &dirs, localnotify_dir,
                               list) if (dir->syncid == syncid) {
     psync_list_del(&dir->list);
@@ -290,7 +288,7 @@ int psync_localnotify_init() {
   e.data.ptr = NULL;
   if (unlikely_log(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pipe_read, &e)))
     goto err2;
-  prun_thread("localnotify", psync_localnotify_thread);
+  psync_run_thread("localnotify", psync_localnotify_thread);
   return 0;
 err2:
   close(epoll_fd);

@@ -42,7 +42,6 @@
 #include "pp2p.h"
 #include "ppagecache.h"
 #include "psettings.h"
-#include "ppath.h"
 #include "ptimer.h"
 #include <ctype.h>
 #include <string.h>
@@ -60,7 +59,7 @@ typedef struct {
     char *str;
     int boolean;
   };
-  unsigned long type;
+  psync_uint_t type;
 } psync_setting_t;
 
 static void lower_patterns(void *ptr);
@@ -74,7 +73,7 @@ static void fsroot_change() { psync_fs_remount(); }
 
 static psync_setting_t settings[] = {
     {"usessl",
-     ptimer_do_notify_exception,
+     psync_timer_do_notify_exception,
      NULL,
      {PSYNC_USE_SSL_DEFAULT},
      PSYNC_TBOOL},
@@ -87,11 +86,11 @@ static psync_setting_t settings[] = {
      NULL,
      {PSYNC_MIN_LOCAL_FREE_SPACE},
      PSYNC_TNUMBER},
-    {"p2psync", pp2p_change, NULL, {PSYNC_P2P_SYNC_DEFAULT}, PSYNC_TBOOL},
+    {"p2psync", psync_p2p_change, NULL, {PSYNC_P2P_SYNC_DEFAULT}, PSYNC_TBOOL},
     {"fsroot", fsroot_change, NULL, {0}, PSYNC_TSTRING},
     {"autostartfs", NULL, NULL, {PSYNC_AUTOSTARTFS_DEFAULT}, PSYNC_TBOOL},
     {"fscachesize",
-     ppagecache_resize,
+     psync_pagecache_resize_cache,
      NULL,
      {PSYNC_FS_DEFAULT_CACHE_SIZE},
      PSYNC_TNUMBER},
@@ -120,12 +119,12 @@ static psync_setting_t settings[] = {
 void psync_settings_reset() {
   char *home, *defaultfs, *defaultcache;
   psync_settingid_t i;
-  home = ppath_home();
-  defaultfs = psync_strcat(home, "/",
+  home = psync_get_home_dir();
+  defaultfs = psync_strcat(home, PSYNC_DIRECTORY_SEPARATOR,
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
   psync_free(home);
-  home = ppath_pcloud();
-  defaultcache = psync_strcat(home, "/",
+  home = psync_get_pcloud_path();
+  defaultcache = psync_strcat(home, PSYNC_DIRECTORY_SEPARATOR,
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
   psync_free(home);
   for (i = 0; i < ARRAY_SIZE(settings); i++)
@@ -175,12 +174,12 @@ void psync_settings_init() {
   const char *name;
   char *home, *defaultfs, *defaultcache;
   psync_settingid_t i;
-  home = ppath_home();
-  defaultfs = psync_strcat(home, "/",
+  home = psync_get_home_dir();
+  defaultfs = psync_strcat(home, PSYNC_DIRECTORY_SEPARATOR,
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
   psync_free(home);
-  home = ppath_pcloud();
-  defaultcache = psync_strcat(home, "/",
+  home = psync_get_pcloud_path();
+  defaultcache = psync_strcat(home, PSYNC_DIRECTORY_SEPARATOR,
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
   psync_free(home);
   settings[_PS(ignorepatterns)].str = PSYNC_IGNORE_PATTERNS_DEFAULT;
@@ -231,7 +230,7 @@ void psync_settings_init() {
             settings[i].fix_callback(&settings[i].boolean);
         } else
           debug(D_BUG,
-                "bad setting type for settingid %d (%s) expected %lu", i,
+                "bad setting type for settingid %d (%s) expected %" P_PRI_U, i,
                 name, settings[i].type);
       }
   }

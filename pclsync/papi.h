@@ -30,8 +30,8 @@
 #ifndef _PSYNC_API_H
 #define _PSYNC_API_H
 
+#include "pcompat.h"
 #include "pcompiler.h"
-#include "psock.h"
 #include <stdint.h>
 
 #define PARAM_STR 0
@@ -87,66 +87,83 @@ typedef struct {
   unsigned char *data;
 } async_result_reader;
 
-#define PAPI_STR(name, val)                                                       \
+#define P_STR(name, val)                                                       \
   {                                                                            \
     PARAM_STR, strlen(name), strlen(val), (name), {                            \
       (uint64_t)((uintptr_t)(val))                                             \
     }                                                                          \
   }
-#define PAPI_LSTR(name, val, len)                                                 \
+#define P_LSTR(name, val, len)                                                 \
   {                                                                            \
     PARAM_STR, strlen(name), (len), (name), { (uint64_t)((uintptr_t)(val)) }   \
   }
-#define PAPI_NUM(name, val)                                                       \
+#define P_NUM(name, val)                                                       \
   {                                                                            \
     PARAM_NUM, strlen(name), 0, (name), { (val) }                              \
   }
-#define PAPI_BOOL(name, val)                                                      \
+#define P_BOOL(name, val)                                                      \
   {                                                                            \
     PARAM_BOOL, strlen(name), 0, (name), { (val) ? 1 : 0 }                     \
   }
 
-#define papi_send2(sock, cmd, params)                                        \
-  papi_send(sock, cmd, strlen(cmd), params,                              \
+#define send_command(sock, cmd, params)                                        \
+  do_send_command(sock, cmd, strlen(cmd), params,                              \
                   sizeof(params) / sizeof(binparam), -1, 1)
-#define papi_send_no_res(sock, cmd, params)                                 \
-  papi_send(sock, cmd, strlen(cmd), params,                              \
+#define send_command_no_res(sock, cmd, params)                                 \
+  do_send_command(sock, cmd, strlen(cmd), params,                              \
                   sizeof(params) / sizeof(binparam), -1, 0)
 
-#define papi_send_thread(sock, cmd, params)                                 \
-  papi_send(sock, cmd, strlen(cmd), params,                              \
+#define send_command_thread(sock, cmd, params)                                 \
+  do_send_command(sock, cmd, strlen(cmd), params,                              \
                   sizeof(params) / sizeof(binparam), -1, 1 | 2)
-#define papi_send_no_res_thread(sock, cmd, params)                          \
-  papi_send(sock, cmd, strlen(cmd), params,                              \
+#define send_command_no_res_thread(sock, cmd, params)                          \
+  do_send_command(sock, cmd, strlen(cmd), params,                              \
                   sizeof(params) / sizeof(binparam), -1, 2)
 
-#define papi_prepare_alloc(cmd, params, datalen, alloclen, retlen)     \
-  papi_prepare(cmd, strlen(cmd), params,                                 \
+#define prepare_command_data_alloc(cmd, params, datalen, alloclen, retlen)     \
+  do_prepare_command(cmd, strlen(cmd), params,                                 \
                      sizeof(params) / sizeof(binparam), datalen, alloclen,     \
                      retlen)
 
-#define papi_find_result2(res, name, type)                                     \
-  papi_find_result(res, name, type, __FILE__, __FUNCTION__, __LINE__)
-#define papi_check_result2(res, name, type)                                    \
-  papi_check_result(res, name, type, __FILE__, __FUNCTION__, __LINE__)
-#define papi_get_result2(res, name)                                            \
-  papi_get_result(res, name, __FILE__, __FUNCTION__, __LINE__)
-#define papi_dump2(res)                                                 \
-  papi_dump(res, __FILE__, __FUNCTION__, __LINE__)
+#define psync_find_result(res, name, type)                                     \
+  psync_do_find_result(res, name, type, __FILE__, __FUNCTION__, __LINE__)
+#define psync_check_result(res, name, type)                                    \
+  psync_do_check_result(res, name, type, __FILE__, __FUNCTION__, __LINE__)
+#define psync_get_result(res, name)                                            \
+  psync_do_get_result(res, name, __FILE__, __FUNCTION__, __LINE__)
+#define psync_dump_result(res)                                                 \
+  psync_do_dump_binresult(res, __FILE__, __FUNCTION__, __LINE__)
 
-psock_t *papi_connect(const char *hostname, int usessl);
-void papi_conn_fail_inc();
-void papi_conn_fail_reset();
-binresult *papi_result(psock_t *sock) PSYNC_NONNULL(1);
-binresult *papi_result_thread(psock_t *sock) PSYNC_NONNULL(1);
-void papi_rdr_alloc(async_result_reader *reader) PSYNC_NONNULL(1);
-void papi_rdr_free(async_result_reader *reader) PSYNC_NONNULL(1);
-int papi_result_async(psock_t *sock, async_result_reader *reader) PSYNC_NONNULL(1, 2);
-unsigned char *papi_prepare(const char *command, size_t cmdlen, const binparam *params, size_t paramcnt, int64_t datalen, size_t additionalalloc, size_t *retlen);
-binresult *papi_send(psock_t *sock, const char *command, size_t cmdlen, const binparam *params, size_t paramcnt, int64_t datalen, int readres) PSYNC_NONNULL(1, 2);
-const binresult *papi_find_result(const binresult *res, const char *name, uint32_t type, const char *file, const char *function, int unsigned line) PSYNC_NONNULL(2) PSYNC_PURE;
-const binresult *papi_check_result(const binresult *res, const char *name, uint32_t type, const char *file, const char *function, int unsigned line) PSYNC_NONNULL(2) PSYNC_PURE;
-const binresult *papi_get_result(const binresult *res, const char *name, const char *file, const char *function, int unsigned line) PSYNC_NONNULL(2) PSYNC_PURE;
-void papi_dump(const binresult *res, const char *file, const char *function, int unsigned line);
+psync_socket *psync_api_connect(const char *hostname, int usessl);
+void psync_api_conn_fail_inc();
+void psync_api_conn_fail_reset();
 
+binresult *get_result(psync_socket *sock) PSYNC_NONNULL(1);
+binresult *get_result_thread(psync_socket *sock) PSYNC_NONNULL(1);
+void async_result_reader_init(async_result_reader *reader) PSYNC_NONNULL(1);
+void async_result_reader_destroy(async_result_reader *reader) PSYNC_NONNULL(1);
+int get_result_async(psync_socket *sock, async_result_reader *reader)
+    PSYNC_NONNULL(1, 2);
+unsigned char *do_prepare_command(const char *command, size_t cmdlen,
+                                  const binparam *params, size_t paramcnt,
+                                  int64_t datalen, size_t additionalalloc,
+                                  size_t *retlen);
+binresult *do_send_command(psync_socket *sock, const char *command,
+                           size_t cmdlen, const binparam *params,
+                           size_t paramcnt, int64_t datalen, int readres)
+    PSYNC_NONNULL(1, 2);
+const binresult *psync_do_find_result(const binresult *res, const char *name,
+                                      uint32_t type, const char *file,
+                                      const char *function, int unsigned line)
+    PSYNC_NONNULL(2) PSYNC_PURE;
+const binresult *psync_do_check_result(const binresult *res, const char *name,
+                                       uint32_t type, const char *file,
+                                       const char *function, int unsigned line)
+    PSYNC_NONNULL(2) PSYNC_PURE;
+const binresult *psync_do_get_result(const binresult *res, const char *name,
+                                     const char *file, const char *function,
+                                     int unsigned line)
+    PSYNC_NONNULL(2) PSYNC_PURE;
+void psync_do_dump_binresult(const binresult *res, const char *file,
+                             const char *function, int unsigned line);
 #endif

@@ -29,14 +29,13 @@
    DAMAGE.
 */
 
-#include "pfile.h"
 #include "pstatus.h"
+#include "pcallbacks.h"
 #include "pfstasks.h"
 #include "plibs.h"
-#include "prunthrottled.h"
+#include "prunratelimit.h"
 #include "psettings.h"
-#include "ptask.h"
-#include "putil.h"
+#include "ptasks.h"
 #include <stdarg.h>
 #include <string.h>
 
@@ -45,11 +44,11 @@ static uint32_t statuses[PSTATUS_NUM_STATUSES] = {
     PSTATUS_INVALID,     PSTATUS_ACCFULL_QUOTAOK,
     PSTATUS_DISKFULL_OK, PSTATUS_LOCALSCAN_SCANNING};
 
-static pthread_mutex_t status_internal_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t statusmutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t statuscond = PTHREAD_COND_INITIALIZER;
-static unsigned long status_waiters = 0;
+static psync_uint_t status_waiters = 0;
 
-static uint32_t calc_status() {
+static uint32_t psync_calc_status() {
   if (statuses[PSTATUS_TYPE_AUTH] != PSTATUS_AUTH_PROVIDED &&
       statuses[PSTATUS_TYPE_AUTH] != PSTATUS_INVALID) {
     if (statuses[PSTATUS_TYPE_AUTH] == PSTATUS_AUTH_REQUIRED)
@@ -139,17 +138,7 @@ static uint32_t calc_status() {
     return PSTATUS_READY;
 }
 
-static void proc_recalc_download() {
-  pstatus_download_recalc();
-  pstatus_send_status_update();
-}
-
-static void proc_recalc_upload() {
-  pstatus_upload_recalc();
-  pstatus_send_status_update();
-}
-
-void pstatus_init() {
+void psync_status_init() {
   memset(&psync_status, 0, sizeof(psync_status));
   statuses[PSTATUS_TYPE_RUN] =
       psync_sql_cellint("SELECT value FROM setting WHERE id='runstatus'", 0);
@@ -160,12 +149,12 @@ void pstatus_init() {
         "REPLACE INTO setting (id, value) VALUES ('runstatus', " NTO_STR(
             PSTATUS_RUN_RUN) ")");
   }
-  pstatus_download_recalc();
-  pstatus_upload_recalc();
-  psync_status.status = calc_status();
+  psync_status_recalc_to_download();
+  psync_status_recalc_to_upload();
+  psync_status.status = psync_calc_status();
 }
 
-void pstatus_download_recalc() {
+void psync_status_recalc_to_download() {
   psync_sql_res *res;
   psync_uint_row row;
   res = psync_sql_query_rdlock("SELECT COUNT(*), SUM(f.size) FROM task t, file "
@@ -182,16 +171,16 @@ void pstatus_download_recalc() {
   if (!psync_status.filestodownload) {
     psync_status.downloadspeed = 0;
   }
-  psync_status.status = calc_status();
+  psync_status.status = psync_calc_status();
 }
 
-void pstatus_upload_recalc() {
+void psync_status_recalc_to_upload() {
   char fileidhex[sizeof(psync_fsfileid_t) * 2 + 2];
   char *filename;
   const char *fscpath;
   psync_sql_res *res;
   psync_uint_row row;
-  struct stat st;
+  psync_stat_t st;
   uint64_t bytestou;
   uint32_t filestou;
   res = psync_sql_query_rdlock(
@@ -216,10 +205,10 @@ void pstatus_upload_recalc() {
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     filename =
-        psync_strcat(fscpath, "/", fileidhex, NULL);
-    if (!stat(filename, &st)) {
+        psync_strcat(fscpath, PSYNC_DIRECTORY_SEPARATOR, fileidhex, NULL);
+    if (!psync_stat(filename, &st)) {
       filestou++;
-      bytestou += pfile_stat_size(&st);
+      bytestou += psync_stat_size(&st);
     }
     psync_free(filename);
   }
@@ -228,26 +217,40 @@ void pstatus_upload_recalc() {
   psync_status.bytestoupload = bytestou;
   if (!filestou)
     psync_status.uploadspeed = 0;
-  psync_status.status = calc_status();
+  psync_status.status = psync_calc_status();
 }
 
-void pstatus_download_recalc_async() {
-  prun_throttled("recalc download", proc_recalc_download, PSYNC_MIN_INTERVAL_RECALC_DOWNLOAD, 1);
+static void psync_status_recalc_to_download_async_thread() {
+  psync_status_recalc_to_download();
+  psync_send_status_update();
 }
 
-void pstatus_upload_recalc_async() {
-  prun_throttled("recalc upload", proc_recalc_upload, PSYNC_MIN_INTERVAL_RECALC_UPLOAD, 1);
+void psync_status_recalc_to_download_async() {
+  psync_run_ratelimited("recalc download",
+                        psync_status_recalc_to_download_async_thread,
+                        PSYNC_MIN_INTERVAL_RECALC_DOWNLOAD, 1);
 }
 
-uint32_t pstatus_get(uint32_t statusid) {
-  pthread_mutex_lock(&status_internal_mutex);
+static void psync_status_recalc_to_upload_async_thread() {
+  psync_status_recalc_to_upload();
+  psync_send_status_update();
+}
+
+void psync_status_recalc_to_upload_async() {
+  psync_run_ratelimited("recalc upload",
+                        psync_status_recalc_to_upload_async_thread,
+                        PSYNC_MIN_INTERVAL_RECALC_UPLOAD, 1);
+}
+
+uint32_t psync_status_get(uint32_t statusid) {
+  pthread_mutex_lock(&statusmutex);
   statusid = statuses[statusid];
-  pthread_mutex_unlock(&status_internal_mutex);
+  pthread_mutex_unlock(&statusmutex);
   return statusid;
 }
 
-void pstatus_set(uint32_t statusid, uint32_t status) {
-  pthread_mutex_lock(&status_internal_mutex);
+void psync_set_status(uint32_t statusid, uint32_t status) {
+  pthread_mutex_lock(&statusmutex);
   statuses[statusid] = status;
   if (status_waiters)
     pthread_cond_broadcast(&statuscond);
@@ -255,38 +258,38 @@ void pstatus_set(uint32_t statusid, uint32_t status) {
       (statuses[PSTATUS_TYPE_ACCFULL] == PSTATUS_ACCFULL_OVERQUOTA);
   psync_status.localisfull =
       (statuses[PSTATUS_TYPE_DISKFULL] == PSTATUS_DISKFULL_FULL);
-  pthread_mutex_unlock(&status_internal_mutex);
-  status = calc_status();
+  pthread_mutex_unlock(&statusmutex);
+  status = psync_calc_status();
   if (psync_status.status != status) {
     psync_status.status = status;
-    pstatus_send_status_update();
+    psync_send_status_update();
   }
 }
 
-void pstatus_wait(uint32_t statusid, uint32_t status) {
-  pthread_mutex_lock(&status_internal_mutex);
+void psync_wait_status(uint32_t statusid, uint32_t status) {
+  pthread_mutex_lock(&statusmutex);
   while ((statuses[statusid] & status) == 0 && psync_do_run) {
     status_waiters++;
-    pthread_cond_wait(&statuscond, &status_internal_mutex);
+    pthread_cond_wait(&statuscond, &statusmutex);
     status_waiters--;
   }
-  pthread_mutex_unlock(&status_internal_mutex);
+  pthread_mutex_unlock(&statusmutex);
   if (unlikely(!psync_do_run)) {
     debug(D_NOTICE, "exiting");
     pthread_exit(NULL);
   }
 }
 
-void pstatus_wait_term() {
-  pthread_mutex_lock(&status_internal_mutex);
+void psync_terminate_status_waiters() {
+  pthread_mutex_lock(&statusmutex);
   if (status_waiters)
     pthread_cond_broadcast(&statuscond);
-  pthread_mutex_unlock(&status_internal_mutex);
+  pthread_mutex_unlock(&statusmutex);
 }
 
-void pstatus_wait_statuses_arr(const uint32_t *combinedstatuses, uint32_t cnt) {
+void psync_wait_statuses_array(const uint32_t *combinedstatuses, uint32_t cnt) {
   uint32_t waited, i, statusid, status;
-  pthread_mutex_lock(&status_internal_mutex);
+  pthread_mutex_lock(&statusmutex);
   do {
     waited = 0;
     for (i = 0; i < cnt; i++) {
@@ -295,15 +298,15 @@ void pstatus_wait_statuses_arr(const uint32_t *combinedstatuses, uint32_t cnt) {
       while ((statuses[statusid] & status) == 0) {
         waited = 1;
         status_waiters++;
-        pthread_cond_wait(&statuscond, &status_internal_mutex);
+        pthread_cond_wait(&statuscond, &statusmutex);
         status_waiters--;
       }
     }
   } while (waited);
-  pthread_mutex_unlock(&status_internal_mutex);
+  pthread_mutex_unlock(&statusmutex);
 }
 
-void pstatus_wait_status(uint32_t first, ...) {
+void psync_wait_statuses(uint32_t first, ...) {
   uint32_t arr[PSTATUS_NUM_STATUSES];
   uint32_t cnt;
   va_list ap;
@@ -313,45 +316,45 @@ void pstatus_wait_status(uint32_t first, ...) {
     arr[cnt++] = first;
   } while ((first = va_arg(ap, uint32_t)));
   va_end(ap);
-  pstatus_wait_statuses_arr(arr, cnt);
+  psync_wait_statuses_array(arr, cnt);
 }
 
-int pstatus_ok_status_arr(const uint32_t *combinedstatuses, uint32_t cnt) {
+int psync_statuses_ok_array(const uint32_t *combinedstatuses, uint32_t cnt) {
   uint32_t i, statusid, status;
-  pthread_mutex_lock(&status_internal_mutex);
+  pthread_mutex_lock(&statusmutex);
   for (i = 0; i < cnt; i++) {
     statusid = combinedstatuses[i] >> 24;
     status = combinedstatuses[i] & 0x00ffffff;
     if ((statuses[statusid] & status) == 0) {
-      pthread_mutex_unlock(&status_internal_mutex);
+      pthread_mutex_unlock(&statusmutex);
       return 0;
     }
   }
-  pthread_mutex_unlock(&status_internal_mutex);
+  pthread_mutex_unlock(&statusmutex);
   return 1;
 }
 
-void pstatus_download_set_speed(uint32_t speed) {
+void psync_status_set_download_speed(uint32_t speed) {
   if (psync_status.downloadspeed != speed) {
     if (psync_status.filesdownloading)
       psync_status.downloadspeed = speed;
     else
       psync_status.downloadspeed = 0;
-    pstatus_send_status_update();
+    psync_send_status_update();
   }
 }
 
-void pstatus_upload_set_speed(uint32_t speed) {
+void psync_status_set_upload_speed(uint32_t speed) {
   if (psync_status.uploadspeed != speed) {
     if (psync_status.filesuploading)
       psync_status.uploadspeed = speed;
     else
       psync_status.uploadspeed = 0;
-    pstatus_send_status_update();
+    psync_send_status_update();
   }
 }
 
-void pstatus_send_update() {
-  psync_status.status = calc_status();
-  pstatus_send_status_update();
+void psync_status_send_update() {
+  psync_status.status = psync_calc_status();
+  psync_send_status_update();
 }

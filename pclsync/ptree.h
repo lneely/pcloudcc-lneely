@@ -44,42 +44,42 @@ typedef struct _psync_tree {
 
 #define PSYNC_TREE_EMPTY NULL
 
-#define ptree_isempty(l) ((l) == NULL)
-#define ptree_element(a, t, n) ((t *)((char *)(a)-offsetof(t, n)))
-#define ptree_for_each(a, l)                                              \
-  for (a = ptree_get_first(l); a != NULL; a = ptree_get_next(a))
-#define ptree_for_each_element(a, l, t, n)                                \
-  for (a = ptree_element(ptree_get_first(l), t, n); &a->n != NULL;   \
-       a = ptree_element(ptree_get_next(&a->n), t, n))
+#define psync_tree_isempty(l) ((l) == NULL)
+#define psync_tree_element(a, t, n) ((t *)((char *)(a)-offsetof(t, n)))
+#define psync_tree_for_each(a, l)                                              \
+  for (a = psync_tree_get_first(l); a != NULL; a = psync_tree_get_next(a))
+#define psync_tree_for_each_element(a, l, t, n)                                \
+  for (a = psync_tree_element(psync_tree_get_first(l), t, n); &a->n != NULL;   \
+       a = psync_tree_element(psync_tree_get_next(&a->n), t, n))
 
-#define ptree_for_each_element_call(l, t, n, c)                           \
+#define psync_tree_for_each_element_call(l, t, n, c)                           \
   do {                                                                         \
     psync_tree *___tmpa;                                                       \
-    ___tmpa = ptree_get_first(l);                                         \
+    ___tmpa = psync_tree_get_first(l);                                         \
     while (___tmpa) {                                                          \
-      c(ptree_element(___tmpa, t, n));                                    \
-      ___tmpa = ptree_get_next(___tmpa);                                  \
+      c(psync_tree_element(___tmpa, t, n));                                    \
+      ___tmpa = psync_tree_get_next(___tmpa);                                  \
     }                                                                          \
   } while (0)
 
-#define ptree_for_each_element_call_safe(l, t, n, c)                      \
+#define psync_tree_for_each_element_call_safe(l, t, n, c)                      \
   do {                                                                         \
     psync_tree *___tmpa, *___tmpb;                                             \
-    ___tmpa = ptree_get_first_safe(l);                                    \
+    ___tmpa = psync_tree_get_first_safe(l);                                    \
     while (___tmpa) {                                                          \
-      ___tmpb = ptree_get_next_safe(___tmpa);                             \
-      c(ptree_element(___tmpa, t, n));                                    \
+      ___tmpb = psync_tree_get_next_safe(___tmpa);                             \
+      c(psync_tree_element(___tmpa, t, n));                                    \
       ___tmpa = ___tmpb;                                                       \
     }                                                                          \
   } while (0)
 
-typedef int (*ptree_compare)(const psync_tree *, const psync_tree *);
+typedef int (*psync_tree_compare)(const psync_tree *, const psync_tree *);
 
-static inline long int ptree_height(psync_tree *tree) {
+static inline long int psync_tree_height(psync_tree *tree) {
   return tree ? tree->height : 0;
 }
 
-static inline psync_tree *ptree_get_first(psync_tree *tree) {
+static inline psync_tree *psync_tree_get_first(psync_tree *tree) {
   if (!tree)
     return tree;
   while (tree->left)
@@ -87,7 +87,7 @@ static inline psync_tree *ptree_get_first(psync_tree *tree) {
   return tree;
 }
 
-static inline psync_tree *ptree_get_last(psync_tree *tree) {
+static inline psync_tree *psync_tree_get_last(psync_tree *tree) {
   if (!tree)
     return tree;
   while (tree->right)
@@ -95,7 +95,7 @@ static inline psync_tree *ptree_get_last(psync_tree *tree) {
   return tree;
 }
 
-static inline psync_tree *ptree_get_next(psync_tree *tree) {
+static inline psync_tree *psync_tree_get_next(psync_tree *tree) {
   if (tree->right) {
     tree = tree->right;
     while (tree->left)
@@ -108,7 +108,7 @@ static inline psync_tree *ptree_get_next(psync_tree *tree) {
   }
 }
 
-static inline psync_tree *ptree_get_prev(psync_tree *tree) {
+static inline psync_tree *psync_tree_get_prev(psync_tree *tree) {
   if (tree->left) {
     tree = tree->left;
     while (tree->right)
@@ -121,7 +121,7 @@ static inline psync_tree *ptree_get_prev(psync_tree *tree) {
   }
 }
 
-static inline psync_tree *ptree_get_first_safe(psync_tree *tree) {
+static inline psync_tree *psync_tree_get_first_safe(psync_tree *tree) {
   if (!tree)
     return tree;
   while (1) {
@@ -135,7 +135,7 @@ static inline psync_tree *ptree_get_first_safe(psync_tree *tree) {
   return tree;
 }
 
-static inline psync_tree *ptree_get_next_safe(psync_tree *tree) {
+static inline psync_tree *psync_tree_get_next_safe(psync_tree *tree) {
   if (!tree->parent)
     return NULL;
   if (tree->parent->right == tree || tree->parent->right == NULL)
@@ -152,59 +152,59 @@ static inline psync_tree *ptree_get_next_safe(psync_tree *tree) {
   return tree;
 }
 
-psync_tree *ptree_get_add_after(psync_tree *tree, psync_tree *node,
+psync_tree *psync_tree_get_add_after(psync_tree *tree, psync_tree *node,
                                      psync_tree *newnode);
-psync_tree *ptree_get_add_before(psync_tree *tree, psync_tree *node,
+psync_tree *psync_tree_get_add_before(psync_tree *tree, psync_tree *node,
                                       psync_tree *newnode);
-psync_tree *ptree_get_added_at(psync_tree *tree, psync_tree *parent,
+psync_tree *psync_tree_get_added_at(psync_tree *tree, psync_tree *parent,
                                     psync_tree *newnode);
 
-psync_tree *ptree_get_del(psync_tree *tree, psync_tree *node);
+psync_tree *psync_tree_get_del(psync_tree *tree, psync_tree *node);
 
-static inline psync_tree *ptree_get_add(psync_tree *tree,
+static inline psync_tree *psync_tree_get_add(psync_tree *tree,
                                              psync_tree *newnode,
-                                             ptree_compare comp) {
+                                             psync_tree_compare comp) {
   psync_tree *el;
   if (!tree)
-    return ptree_get_add_after(tree, NULL, newnode);
+    return psync_tree_get_add_after(tree, NULL, newnode);
   el = tree;
   while (1) {
     if (comp(newnode, el) < 0) {
       if (el->left)
         el = el->left;
       else
-        return ptree_get_add_before(tree, el, newnode);
+        return psync_tree_get_add_before(tree, el, newnode);
     } else {
       if (el->right)
         el = el->right;
       else
-        return ptree_get_add_after(tree, el, newnode);
+        return psync_tree_get_add_after(tree, el, newnode);
     }
   }
 }
 
-static inline void ptree_add_after(psync_tree **tree, psync_tree *node,
+static inline void psync_tree_add_after(psync_tree **tree, psync_tree *node,
                                         psync_tree *newnode) {
-  *tree = ptree_get_add_after(*tree, node, newnode);
+  *tree = psync_tree_get_add_after(*tree, node, newnode);
 }
 
-static inline void ptree_add_before(psync_tree **tree, psync_tree *node,
+static inline void psync_tree_add_before(psync_tree **tree, psync_tree *node,
                                          psync_tree *newnode) {
-  *tree = ptree_get_add_before(*tree, node, newnode);
+  *tree = psync_tree_get_add_before(*tree, node, newnode);
 }
 
-static inline void ptree_added_at(psync_tree **tree, psync_tree *parent,
+static inline void psync_tree_added_at(psync_tree **tree, psync_tree *parent,
                                        psync_tree *newnode) {
-  *tree = ptree_get_added_at(*tree, parent, newnode);
+  *tree = psync_tree_get_added_at(*tree, parent, newnode);
 }
 
-static inline void ptree_del(psync_tree **tree, psync_tree *node) {
-  *tree = ptree_get_del(*tree, node);
+static inline void psync_tree_del(psync_tree **tree, psync_tree *node) {
+  *tree = psync_tree_get_del(*tree, node);
 }
 
-static inline void ptree_add(psync_tree **tree, psync_tree *newnode,
-                                  ptree_compare comp) {
-  *tree = ptree_get_add(*tree, newnode, comp);
+static inline void psync_tree_add(psync_tree **tree, psync_tree *newnode,
+                                  psync_tree_compare comp) {
+  *tree = psync_tree_get_add(*tree, newnode, comp);
 }
 
 #endif

@@ -30,7 +30,7 @@
 */
 
 #include "plist.h"
-#include "pfile.h"
+#include "pcompat.h"
 
 /* Fairly simple in-place merge sort with constant storage requirements.
  *
@@ -42,7 +42,7 @@
 
 void psync_list_sort(psync_list *l, psync_list_compare cmp) {
   psync_list *ls, *l1, *l2, **tail;
-  unsigned long depth, cnt, i, l1len, l2len;
+  psync_uint_t depth, cnt, i, l1len, l2len;
   if (psync_list_isempty(l))
     return;
   ls = l->next;

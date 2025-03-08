@@ -43,16 +43,19 @@
 #include "stdlib.h"
 #include "string.h"
 
+#if defined(P_OS_LINUX)
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#endif
 
-char *ptools_get_mac_addr() {
+char *getMACaddr() {
   char buffer[128];
 
   memset(buffer, 0, sizeof(buffer));
 
+#if defined(P_OS_LINUX)
   int fd;
   struct ifreq ifr;
   char *iface = "eth0";
@@ -72,6 +75,7 @@ char *ptools_get_mac_addr() {
   sprintf(buffer, "%.2x%.2x%.2x%.2x%.2x%.2x", mac[0], mac[1], mac[2], mac[3],
           mac[4], mac[5]);
   buffer[12] = 0;
+#endif
 
   if (buffer[0] == 0) {
     return psync_strdup("GENERIC_MAC");
@@ -81,12 +85,12 @@ char *ptools_get_mac_addr() {
   }
 }
 
-int ptools_create_backend_event(const char *binapi, const char *category,
+int create_backend_event(const char *binapi, const char *category,
                          const char *action, const char *label,
                          const char *auth, int os, time_t etime,
                          eventParams *params, char **err) {
   binresult *res;
-  psock_t *sock;
+  psync_socket *sock;
   uint64_t result;
   binparam *paramsLocal;
   int i;
@@ -96,7 +100,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
   char *keyParams;
   char charBuff[30][258];
 
-  sock = papi_connect(binapi, psync_setting_get_bool(0));
+  sock = psync_api_connect(binapi, psync_setting_get_bool(0));
 
   if (unlikely_log(!sock)) {
     if (err) {
@@ -116,12 +120,12 @@ int ptools_create_backend_event(const char *binapi, const char *category,
       (tpCnt) * sizeof(binparam)); // Allocate size for all parameters.
 
   // Set the mandatory pramaters.
-  paramsLocal[0] = (binparam)PAPI_STR(EPARAM_CATEG, category);
-  paramsLocal[1] = (binparam)PAPI_STR(EPARAM_ACTION, action);
-  paramsLocal[2] = (binparam)PAPI_STR(EPARAM_LABEL, label);
-  paramsLocal[3] = (binparam)PAPI_STR(EPARAM_AUTH, auth);
-  paramsLocal[4] = (binparam)PAPI_NUM(EPARAM_OS, os);
-  paramsLocal[5] = (binparam)PAPI_NUM(EPARAM_TIME, etime);
+  paramsLocal[0] = (binparam)P_STR(EPARAM_CATEG, category);
+  paramsLocal[1] = (binparam)P_STR(EPARAM_ACTION, action);
+  paramsLocal[2] = (binparam)P_STR(EPARAM_LABEL, label);
+  paramsLocal[3] = (binparam)P_STR(EPARAM_AUTH, auth);
+  paramsLocal[4] = (binparam)P_NUM(EPARAM_OS, os);
+  paramsLocal[5] = (binparam)P_NUM(EPARAM_TIME, etime);
 
   if (pCnt > 0) {
     keyParams = (char *)malloc(258 * pCnt);
@@ -141,26 +145,26 @@ int ptools_create_backend_event(const char *binapi, const char *category,
 
       if (params->Params[i].paramtype == 0) {
         paramsLocal[mpCnt + i] =
-            (binparam)PAPI_STR(charBuff[i], params->Params[i].str);
+            (binparam)P_STR(charBuff[i], params->Params[i].str);
 
         continue;
       }
 
       if (params->Params[i].paramtype == 1) {
         paramsLocal[mpCnt + i] =
-            (binparam)PAPI_NUM(charBuff[i], params->Params[i].num);
+            (binparam)P_NUM(charBuff[i], params->Params[i].num);
 
         continue;
       }
 
       if (params->Params[i].paramtype == 2) {
         paramsLocal[mpCnt + i] =
-            (binparam)PAPI_BOOL(*charBuff, params->Params[i].num);
+            (binparam)P_BOOL(*charBuff, params->Params[i].num);
         continue;
       }
     }
 
-    paramsLocal[mpCnt + pCnt] = (binparam)PAPI_STR(EPARAM_KEY, keyParams);
+    paramsLocal[mpCnt + pCnt] = (binparam)P_STR(EPARAM_KEY, keyParams);
   }
 
   for (i = 0; i < tpCnt; i++) {
@@ -177,14 +181,14 @@ int ptools_create_backend_event(const char *binapi, const char *category,
     }
   }
 
-  res = papi_send(sock, EVENT_WS, strlen(EVENT_WS), paramsLocal, tpCnt,
+  res = do_send_command(sock, EVENT_WS, strlen(EVENT_WS), paramsLocal, tpCnt,
                         -1, 1);
 
   free(keyParams);
   free(paramsLocal);
 
   if (unlikely_log(!res)) {
-    psock_close(sock);
+    psync_socket_close(sock);
 
     if (err) {
       *err = psync_strdup("Could not connect to the server.");
@@ -193,13 +197,13 @@ int ptools_create_backend_event(const char *binapi, const char *category,
     return -1;
   }
 
-  result = papi_find_result2(res, "result", PARAM_NUM)->num;
+  result = psync_find_result(res, "result", PARAM_NUM)->num;
 
-  psock_close(sock);
+  psync_socket_close(sock);
 
   if (result) {
     if (err) {
-      *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
+      *err = psync_strdup(psync_find_result(res, "error", PARAM_STR)->str);
     }
 
     debug(D_CRITICAL, "Event command failed. Error:[%s]", *err);
@@ -208,7 +212,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
   return result;
 }
 
-int ptools_backend_call(const char *binapi, const char *wsPath,
+int backend_call(const char *binapi, const char *wsPath,
                  const char *payloadName, eventParams *requiredParams,
                  eventParams *optionalParams, binresult **resData, char **err) {
   int reqParCnt = requiredParams->paramCnt;
@@ -219,7 +223,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
   binparam *localParams;
   binresult *res;
   binresult *payload;
-  psock_t *sock;
+  psync_socket *sock;
   uint64_t result;
 
   if (totalParCnt > 0) {
@@ -233,21 +237,21 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
   // Add required parameters to the structure
   for (i = 0; i < reqParCnt; i++) {
     if (requiredParams->Params[i].paramtype == 0) {
-      localParams[i] = (binparam)PAPI_STR(requiredParams->Params[i].paramname,
+      localParams[i] = (binparam)P_STR(requiredParams->Params[i].paramname,
                                        requiredParams->Params[i].str);
 
       continue;
     }
 
     if (requiredParams->Params[i].paramtype == 1) {
-      localParams[i] = (binparam)PAPI_NUM(requiredParams->Params[i].paramname,
+      localParams[i] = (binparam)P_NUM(requiredParams->Params[i].paramname,
                                        requiredParams->Params[i].num);
 
       continue;
     }
 
     if (requiredParams->Params[i].paramtype == 2) {
-      localParams[i] = (binparam)PAPI_BOOL(requiredParams->Params[i].paramname,
+      localParams[i] = (binparam)P_BOOL(requiredParams->Params[i].paramname,
                                         requiredParams->Params[i].num);
 
       continue;
@@ -259,21 +263,21 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
     int j = 0;
 
     if (optionalParams->Params[i].paramtype == 0) {
-      localParams[i] = (binparam)PAPI_STR(optionalParams->Params[j].paramname,
+      localParams[i] = (binparam)P_STR(optionalParams->Params[j].paramname,
                                        optionalParams->Params[j].str);
 
       continue;
     }
 
     if (optionalParams->Params[i].paramtype == 1) {
-      localParams[i] = (binparam)PAPI_NUM(optionalParams->Params[j].paramname,
+      localParams[i] = (binparam)P_NUM(optionalParams->Params[j].paramname,
                                        optionalParams->Params[j].num);
 
       continue;
     }
 
     if (optionalParams->Params[i].paramtype == 2) {
-      localParams[i] = (binparam)PAPI_BOOL(optionalParams->Params[j].paramname,
+      localParams[i] = (binparam)P_BOOL(optionalParams->Params[j].paramname,
                                         optionalParams->Params[j].num);
 
       continue;
@@ -292,7 +296,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
     }
   }
 
-  sock = papi_connect(binapi, psync_setting_get_bool(0));
+  sock = psync_api_connect(binapi, psync_setting_get_bool(0));
 
   if (unlikely_log(!sock)) {
     if (err) {
@@ -302,13 +306,13 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
     return -1;
   }
 
-  res = papi_send(sock, wsPath, strlen(wsPath), localParams, totalParCnt,
+  res = do_send_command(sock, wsPath, strlen(wsPath), localParams, totalParCnt,
                         -1, 1);
 
   free(localParams);
 
   if (unlikely_log(!res)) {
-    psock_close(sock);
+    psync_socket_close(sock);
 
     if (err) {
       *err = psync_strdup("Could not connect to the server.");
@@ -317,19 +321,19 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
     return -1;
   }
 
-  result = papi_find_result2(res, "result", PARAM_NUM)->num;
+  result = psync_find_result(res, "result", PARAM_NUM)->num;
 
-  psock_close(sock);
+  psync_socket_close(sock);
 
   if (result) {
     if (err) {
-      *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
+      *err = psync_strdup(psync_find_result(res, "error", PARAM_STR)->str);
     }
 
     debug(D_CRITICAL, "Backend command failed. Error:[%s]", *err);
   } else {
     if (strlen(payloadName) > 0) {
-      payload = (binresult *)papi_find_result2(res, payloadName, PARAM_HASH);
+      payload = (binresult *)psync_find_result(res, payloadName, PARAM_HASH);
 
       *resData = (binresult *)malloc(payload->length * sizeof(binresult));
       memcpy(*resData, payload, (payload->length * sizeof(binresult)));
@@ -339,22 +343,27 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
   return result;
 }
 
-char *ptools_get_machine_name() {
+char *get_machine_name() {
   int nameSize = 1024;
   char pcName[1024];
 
   pcName[0] = 0;
 
+#if defined(P_OS_LINUX)
   gethostname(pcName, nameSize);
+#endif
 
   if (pcName[0] == 0) {
+
+#if defined(P_OS_LINUX)
     strcpy(pcName, "LinuxMachine");
+#endif
   }
 
   return psync_strdup(pcName);
 }
 
-void ptools_parse_os_path(char *path, folderPath *folders, char *delim, int mode) {
+void parse_os_path(char *path, folderPath *folders, char *delim, int mode) {
   char fName[255];
   char *buff;
   int i = 0, j = 0, k = 0;
@@ -401,7 +410,7 @@ void ptools_parse_os_path(char *path, folderPath *folders, char *delim, int mode
   folders->cnt = j;
 }
 
-void ptools_send_psyncs_event(const char *binapi, const char *auth) {
+void send_psyncs_event(const char *binapi, const char *auth) {
   psync_folderid_t syncEventFlag = 0;
   time_t rawtime;
   char *errMsg;
@@ -429,9 +438,9 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
     }
 
     eventParams params = {1, // Number of parameters passed below
-                          {PAPI_NUM(PSYNC_SYNCS_COUNT, syncCnt)}};
+                          {P_NUM(PSYNC_SYNCS_COUNT, syncCnt)}};
 
-    intRes = ptools_create_backend_event(binapi,
+    intRes = create_backend_event(binapi,
                                   PSYNC_EVENT_CATEG,  // "SYNCS_EVENTS"
                                   PSYNC_EVENT_ACTION, // "SYNCS_LOG_COUNT"
                                   PSYNC_EVENT_LABEL,  // "SYNCS_COUNT"
@@ -449,7 +458,7 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
   psync_free(errMsg);
 }
 
-int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
+int set_be_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
   int callRes;
   char msgErr[1024];
   binresult *retData;
@@ -462,25 +471,25 @@ int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
   eventParams optionalParams = {0};
 
   eventParams requiredParams1 = {5,
-                                 {PAPI_STR("auth", psync_my_auth),
-                                  PAPI_NUM("fileid", fileid),
-                                  PAPI_STR("timeformat", "timestamp"),
-                                  PAPI_NUM("newtm", ctime), PAPI_BOOL("isctime", 1)}};
+                                 {P_STR("auth", psync_my_auth),
+                                  P_NUM("fileid", fileid),
+                                  P_STR("timeformat", "timestamp"),
+                                  P_NUM("newtm", ctime), P_BOOL("isctime", 1)}};
 
   callRes =
-      ptools_backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams1,
+      backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams1,
                    &optionalParams, &retData, (char **)msgErr);
 
   debug(D_NOTICE, "cTime res: [%d]", callRes);
 
   eventParams requiredParams = {5,
-                                {PAPI_STR("auth", psync_my_auth),
-                                 PAPI_NUM("fileid", fileid),
-                                 PAPI_STR("timeformat", "timestamp"),
-                                 PAPI_NUM("newtm", mtime), PAPI_BOOL("isctime", 0)}};
+                                {P_STR("auth", psync_my_auth),
+                                 P_NUM("fileid", fileid),
+                                 P_STR("timeformat", "timestamp"),
+                                 P_NUM("newtm", mtime), P_BOOL("isctime", 0)}};
 
   callRes =
-      ptools_backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams,
+      backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams,
                    &optionalParams, &retData, (char **)msgErr);
 
   debug(D_NOTICE, "mTime res: [%d]", callRes);
@@ -488,7 +497,7 @@ int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
   return callRes;
 }
 
-psync_syncid_t ptools_syncid_from_fid(psync_folderid_t fid) {
+psync_syncid_t get_sync_id_from_fid(psync_folderid_t fid) {
   psync_sql_res *res;
   psync_variant_row row;
   psync_syncid_t syncId = -1;
@@ -506,7 +515,7 @@ psync_syncid_t ptools_syncid_from_fid(psync_folderid_t fid) {
   return syncId;
 }
 
-char *ptools_sfldr_by_syncid(uint64_t syncId) {
+char *get_sync_folder_by_syncid(uint64_t syncId) {
   psync_sql_res *res;
   psync_variant_row row;
   const char *syncName;
@@ -530,7 +539,7 @@ char *ptools_sfldr_by_syncid(uint64_t syncId) {
   return retName;
 }
 
-char *ptools_fldr_name_by_path(char *path) {
+char *get_folder_name_from_path(char *path) {
   char *folder;
 
   folder = "";

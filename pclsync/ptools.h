@@ -79,27 +79,27 @@ typedef struct _folderPath {
   char *folders[50];
 } folderPath;
 
-int ptools_create_backend_event(const char *binapi, const char *category,
+int create_backend_event(const char *binapi, const char *category,
                          const char *action, const char *label,
                          const char *auth, int os, time_t etime,
                          eventParams *params, char **err);
 
-int ptools_backend_call(const char *binapi, const char *wsPath,
+int backend_call(const char *binapi, const char *wsPath,
                  const char *payloadName, eventParams *requiredParams,
                  eventParams *optionalParams, binresult **resData, char **err);
 
-char *ptools_get_mac_addr();
+char *getMACaddr();
 
-char *ptools_get_machine_name();
+char *get_machine_name();
 
-void ptools_parse_os_path(char *path, folderPath *folders, char *delim, int mode);
+void parse_os_path(char *path, folderPath *folders, char *delim, int mode);
 
-void ptools_send_psyncs_event(const char *binapi, const char *auth);
+void send_psyncs_event(const char *binapi, const char *auth);
 
-int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime);
+int set_be_file_dates(uint64_t fileid, time_t ctime, time_t mtime);
 
-uint32_t ptools_syncid_from_fid(uint64_t fid);
+uint32_t get_sync_id_from_fid(uint64_t fid);
 
-char *ptools_sfldr_by_syncid(uint64_t syncId);
+char *get_sync_folder_by_syncid(uint64_t syncId);
 
-char *ptools_fldr_name_by_path(char *path);
+char *get_folder_name_from_path(char *path);

@@ -37,10 +37,11 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "prpc.h"
+#include "poverlay_protocol.h"
+
+#include "poverlay.h"
 #include "psynclib.h"
 #include "pshm.h"
-#include "pdevice.h"
 
 #include "pclsync_lib.h"
 
@@ -420,7 +421,7 @@ int clib::pclsync_lib::init() {
   std::string software_string;
   char *username_old;
 
-  pdevice_set_software(client_name.c_str());
+  psync_set_software_string(client_name.c_str());
 
   if (setup_crypto_ && crypto_pass_.empty()) {
     return 3;

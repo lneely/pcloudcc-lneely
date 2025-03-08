@@ -46,21 +46,23 @@ typedef struct {
   pthread_cond_t wcond;
 } psync_rwlock_t;
 
-void plocks_init(psync_rwlock_t *rw);
-void plocks_destroy(psync_rwlock_t *rw);
-void plocks_rdlock(psync_rwlock_t *rw);
-int plocks_tryrdlock(psync_rwlock_t *rw);
-int plocks_timedrdlock(psync_rwlock_t *rw, const struct timespec *abstime);
-void plocks_rdlock_starvewr(psync_rwlock_t *rw);
-void plocks_wrlock(psync_rwlock_t *rw);
-int plocks_trywrlock(psync_rwlock_t *rw);
-int plocks_timedwrlock(psync_rwlock_t *rw, const struct timespec *abstime);
-void plocks_rslock(psync_rwlock_t *rw);
-int plocks_towrlock(psync_rwlock_t *rw);
-void plocks_unlock(psync_rwlock_t *rw);
-unsigned plocks_num_waiters(psync_rwlock_t *rw);
-int plocks_holding_rdlock(psync_rwlock_t *rw);
-int plocks_holding_wrlock(psync_rwlock_t *rw);
-int plocks_holding_lock(psync_rwlock_t *rw);
+void psync_rwlock_init(psync_rwlock_t *rw);
+void psync_rwlock_destroy(psync_rwlock_t *rw);
+void psync_rwlock_rdlock(psync_rwlock_t *rw);
+int psync_rwlock_tryrdlock(psync_rwlock_t *rw);
+int psync_rwlock_timedrdlock(psync_rwlock_t *rw,
+                             const struct timespec *abstime);
+void psync_rwlock_rdlock_starvewr(psync_rwlock_t *rw);
+void psync_rwlock_wrlock(psync_rwlock_t *rw);
+int psync_rwlock_trywrlock(psync_rwlock_t *rw);
+int psync_rwlock_timedwrlock(psync_rwlock_t *rw,
+                             const struct timespec *abstime);
+void psync_rwlock_rslock(psync_rwlock_t *rw);
+int psync_rwlock_towrlock(psync_rwlock_t *rw);
+void psync_rwlock_unlock(psync_rwlock_t *rw);
+unsigned psync_rwlock_num_waiters(psync_rwlock_t *rw);
+int psync_rwlock_holding_rdlock(psync_rwlock_t *rw);
+int psync_rwlock_holding_wrlock(psync_rwlock_t *rw);
+int psync_rwlock_holding_lock(psync_rwlock_t *rw);
 
 #endif

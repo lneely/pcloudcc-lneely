@@ -32,10 +32,8 @@
 #ifndef _PSYNC_LIBS_H
 #define _PSYNC_LIBS_H
 
-#include <pthread.h>
-
+#include "pcompat.h"
 #include "pcompiler.h"
-#include "putil.h"
 #include "psynclib.h"
 
 #include <sqlite3.h>
@@ -47,9 +45,6 @@
 #define D_ERROR 30
 #define D_WARNING 40
 #define D_NOTICE 50
-
-// required for pcloud api; 7=>linux
-#define P_OS_ID 7 
 
 #define DEBUG_LEVELS                                                           \
   {                                                                            \
@@ -462,7 +457,7 @@ void *psync_list_builder_finalize(psync_list_builder_t *builder);
 psync_task_manager_t
 psync_task_run_tasks(psync_task_callback_t const *callbacks,
                      void *const *params, int cnt);
-void *psync_task_papi_result(psync_task_manager_t tm, int id);
+void *psync_task_get_result(psync_task_manager_t tm, int id);
 void psync_task_free(psync_task_manager_t tm);
 int psync_task_complete(void *h, void *data);
 

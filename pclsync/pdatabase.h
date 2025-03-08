@@ -34,7 +34,7 @@
 
 #include <sqlite3.h>
 
-#include "putil.h"
+#include "pcompat.h"
 
 #if defined(SQLITE_VERSION_NUMBER) && SQLITE_VERSION_NUMBER >= 3008002
 #define P_SQL_WOWROWID "WITHOUT ROWID"
@@ -42,7 +42,11 @@
 #define P_SQL_WOWROWID
 #endif
 
+#if PSYNC_FILENAMES_CASESENSITIVE
 #define PSYNC_TEXT_COL "COLLATE BINARY"
+#else
+#define PSYNC_TEXT_COL "COLLATE NOCASE"
+#endif
 
 #define PSYNC_DATABASE_VERSION 22
 
