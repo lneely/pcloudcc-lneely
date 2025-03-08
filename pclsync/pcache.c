@@ -28,6 +28,7 @@
   DAMAGE.
 */
 
+
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
@@ -36,13 +37,15 @@
 #include <pthread.h>
 
 #include "pcache.h"
-#include "pcompat.h"
 #include "plibs.h"
 #include "plist.h"
-#include "pssl.h"
 #include "psynclib.h"
+#include "psys.h"
 #include "ptimer.h"
 #include <string.h>
+
+// required by psync_cache_get
+extern PSYNC_THREAD const char *psync_thread_name; 
 
 #define CACHE_HASH_SIZE 2048
 #define CACHE_LOCKS 8
@@ -69,7 +72,7 @@ static uint32_t hash_seed;
 
 void psync_cache_init() {
   pthread_mutexattr_t mattr;
-  psync_uint_t i;
+  unsigned long i;
   for (i = 0; i < CACHE_HASH_SIZE; i++)
     psync_list_init(&cache_hash[i]);
   for (i = 0; i < CACHE_LOCKS; i++) {
@@ -79,7 +82,7 @@ void psync_cache_init() {
     pthread_mutexattr_destroy(&mattr);
   }
   // do not use psync_ssl_rand_* here as it is not yet initialized
-  hash_seed = psync_time() * 0xc2b2ae35U;
+  hash_seed = psys_time_seconds() * 0xc2b2ae35U;
 }
 
 static uint32_t hash_func(const char *key) {
@@ -243,7 +246,7 @@ restart:
 void psync_cache_clean_all() {
   psync_list *l1, *l2;
   hash_element *he;
-  psync_uint_t h;
+  unsigned long h;
   for (h = 0; h < CACHE_HASH_SIZE; h++) {
     pthread_mutex_lock(&cache_mutexes[hash_to_lock(h)]);
     psync_list_for_each_safe(l1, l2, &cache_hash[h]) {
@@ -265,9 +268,9 @@ void psync_cache_clean_starting_with(const char *prefix) {
 void psync_cache_clean_starting_with_one_of(const char **prefixes, size_t cnt) {
   psync_list *l1, *l2;
   hash_element *he;
-  psync_uint_t h;
+  unsigned long h;
   size_t i;
-  psync_def_var_arr(lens, size_t, cnt);
+  VAR_ARRAY(lens, size_t, cnt);
   for (i = 0; i < cnt; i++)
     lens[i] = strlen(prefixes[i]);
   for (h = 0; h < CACHE_HASH_SIZE; h++) {

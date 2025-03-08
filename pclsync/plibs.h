@@ -32,7 +32,7 @@
 #ifndef _PSYNC_LIBS_H
 #define _PSYNC_LIBS_H
 
-#include "pcompat.h"
+#include "putil.h"
 #include "pcompiler.h"
 #include "psynclib.h"
 
@@ -45,6 +45,9 @@
 #define D_ERROR 30
 #define D_WARNING 40
 #define D_NOTICE 50
+
+// required for pcloud api; 7=>linux
+#define P_OS_ID 7 
 
 #define DEBUG_LEVELS                                                           \
   {                                                                            \

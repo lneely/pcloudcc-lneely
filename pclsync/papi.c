@@ -100,19 +100,19 @@ static const binresult NUM_SMALL[VSMALL_NUMBER_NUM] = {
 
 static uint32_t connfailures = 0;
 
-psync_socket *psync_api_connect(const char *hostname, int usessl) {
+psock_t *psync_api_connect(const char *hostname, int usessl) {
   static time_t notuntil = 0;
-  psync_socket *ret;
+  psock_t *ret;
   const char *userapi = psync_setting_get_string(_PS(api_server));
   if (psync_timer_time() > notuntil || !userapi) {
-    ret = psync_socket_connect(
+    ret = psock_connect(
         hostname, usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT, usessl);
     if (ret) {
       return ret;
     }
     if (!userapi || !strcmp(hostname, userapi))
       return NULL;
-    ret = psync_socket_connect(
+    ret = psock_connect(
         userapi, usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT, usessl);
     if (ret) {
       debug(D_NOTICE, "failed to connect to %s, but was able to connect to %s",
@@ -121,7 +121,7 @@ psync_socket *psync_api_connect(const char *hostname, int usessl) {
     }
     return ret;
   }
-  return psync_socket_connect(
+  return psock_connect(
       userapi, usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT, usessl);
 }
 
@@ -246,7 +246,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
                                   size_t *restrict nextstrid) {
   binresult *ret;
   long cond;
-  psync_uint_t type, len;
+  unsigned long type, len;
   type = **indata;
   (*indata)++;
   if ((cond = (type >= RPARAM_SHORT_STR_BASE &&
@@ -301,7 +301,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     return (binresult *)&BOOL_FALSE;
   else if (type == RPARAM_ARRAY) {
     binresult **arr;
-    psync_uint_t cnt, alloc;
+    unsigned long cnt, alloc;
     ret = (binresult *)(*odata);
     *odata += sizeof(binresult);
     ret->type = PARAM_ARRAY;
@@ -325,7 +325,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     return ret;
   } else if (type == RPARAM_HASH) {
     struct _hashpair *arr;
-    psync_uint_t cnt, alloc;
+    unsigned long cnt, alloc;
     binresult *key;
     ret = (binresult *)(*odata);
     *odata += sizeof(binresult);
@@ -385,19 +385,19 @@ static binresult *parse_result(unsigned char *data, size_t datalen) {
   return res;
 }
 
-binresult *get_result(psync_socket *sock) {
+binresult *get_result(psock_t *sock) {
   unsigned char *data;
   binresult *res;
   uint32_t ressize;
 
-  if (unlikely_log(psync_socket_readall(sock, &ressize, sizeof(uint32_t)) !=
+  if (unlikely_log(psock_readall(sock, &ressize, sizeof(uint32_t)) !=
                    sizeof(uint32_t))) {
     return NULL;
   }
 
   data = (unsigned char *)psync_malloc(ressize);
 
-  if (unlikely_log(psync_socket_readall(sock, data, ressize) != ressize)) {
+  if (unlikely_log(psock_readall(sock, data, ressize) != ressize)) {
     psync_free(data);
     return NULL;
   }
@@ -408,15 +408,15 @@ binresult *get_result(psync_socket *sock) {
   return res;
 }
 
-binresult *get_result_thread(psync_socket *sock) {
+binresult *get_result_thread(psock_t *sock) {
   unsigned char *data;
   binresult *res;
   uint32_t ressize;
-  if (unlikely_log(psync_socket_readall_thread(
+  if (unlikely_log(psock_readall_thread(
                        sock, &ressize, sizeof(uint32_t)) != sizeof(uint32_t)))
     return NULL;
   data = (unsigned char *)psync_malloc(ressize);
-  if (unlikely_log(psync_socket_readall_thread(sock, data, ressize) !=
+  if (unlikely_log(psock_readall_thread(sock, data, ressize) !=
                    ressize)) {
     psync_free(data);
     return NULL;
@@ -438,10 +438,10 @@ void async_result_reader_destroy(async_result_reader *reader) {
     psync_free(reader->data);
 }
 
-int get_result_async(psync_socket *sock, async_result_reader *reader) {
+int get_result_async(psock_t *sock, async_result_reader *reader) {
   int rd;
 again:
-  rd = psync_socket_read_noblock(sock, reader->data + reader->bytesread,
+  rd = psock_read_noblock(sock, reader->data + reader->bytesread,
                                  reader->bytestoread - reader->bytesread);
   if (rd == PSYNC_SOCKET_WOULDBLOCK)
     return ASYNC_RES_NEEDMORE;
@@ -528,7 +528,7 @@ unsigned char *do_prepare_command(const char *command, size_t cmdlen,
   return sdata;
 }
 
-binresult *do_send_command(psync_socket *sock, const char *command,
+binresult *do_send_command(psock_t *sock, const char *command,
                            size_t cmdlen, const binparam *params,
                            size_t paramcnt, int64_t datalen, int readres) {
   unsigned char *sdata;
@@ -542,12 +542,12 @@ binresult *do_send_command(psync_socket *sock, const char *command,
   }
 
   if (readres & 2) {
-    if (unlikely_log(psync_socket_writeall_thread(sock, sdata, plen) != plen)) {
+    if (unlikely_log(psock_writeall_thread(sock, sdata, plen) != plen)) {
       psync_free(sdata);
       return NULL;
     }
   } else {
-    if (unlikely_log(psync_socket_writeall(sock, sdata, plen) != plen)) {
+    if (unlikely_log(psock_writeall(sock, sdata, plen) != plen)) {
       psync_free(sdata);
       return NULL;
     }

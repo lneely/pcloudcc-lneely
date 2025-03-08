@@ -29,16 +29,21 @@
    DAMAGE.
 */
 
+#include <errno.h>
+#include <pthread.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/pkcs5.h>
 #include <mbedtls/ssl.h>
-#include <pthread.h>
 
 #include "pcache.h"
 #include "pcloudcrypto.h"
-#include "pcompat.h"
+#include "putil.h"
 #include "pfolder.h"
 #include "pfs.h"
 #include "pfstasks.h"
@@ -47,9 +52,7 @@
 #include "ppathstatus.h"
 #include "psettings.h"
 #include "ptimer.h"
-#include <stddef.h>
-#include <stdio.h>
-#include <string.h>
+
 
 typedef struct {
   psync_folderid_t folderid;
@@ -191,7 +194,7 @@ static psync_tree *psync_fstask_search_tree(psync_tree *tree, size_t nameoff,
                                             size_t taskidoff) {
   int c;
   while (tree) {
-    c = psync_filename_cmp(name, ((char *)tree) + nameoff);
+    c = strcmp(name, ((char *)tree) + nameoff);
     if (c < 0)
       tree = tree->left;
     else if (c > 0)
@@ -205,7 +208,7 @@ static psync_tree *psync_fstask_search_tree(psync_tree *tree, size_t nameoff,
     psync_tree *tn;
     tn = psync_tree_get_prev(tree);
     while (tn) {
-      if (psync_filename_cmp(name, ((char *)tn) + nameoff))
+      if (strcmp(name, ((char *)tn) + nameoff))
         break;
       if (*((uint64_t *)(((char *)tn) + taskidoff)) == taskid)
         return tn;
@@ -213,7 +216,7 @@ static psync_tree *psync_fstask_search_tree(psync_tree *tree, size_t nameoff,
     }
     tn = psync_tree_get_next(tree);
     while (tn) {
-      if (psync_filename_cmp(name, ((char *)tn) + nameoff))
+      if (strcmp(name, ((char *)tn) + nameoff))
         break;
       if (*((uint64_t *)(((char *)tn) + taskidoff)) == taskid)
         return tn;
@@ -249,7 +252,7 @@ static void psync_fstask_insert_into_tree(psync_tree **tree, size_t nameoff,
   node = *tree;
 
   while (1) {
-    c = psync_filename_cmp(name, ((char *)node) + nameoff);
+    c = strcmp(name, ((char *)node) + nameoff);
 
     if (c < 0) {
       if (node->left)
@@ -2137,7 +2140,7 @@ void psync_fstask_add_banned_folders() {
 }
 
 void psync_fstask_init() {
-  psync_uint_t tp;
+  unsigned long tp;
   psync_sql_res *res;
   psync_variant_row row;
   res = psync_sql_prep_statement(

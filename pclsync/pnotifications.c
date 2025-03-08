@@ -35,6 +35,9 @@
 #include "psettings.h"
 #include "ptimer.h"
 #include "ptree.h"
+#include "ppath.h"
+#include "prun.h"
+
 
 typedef struct {
   psync_tree tree;
@@ -69,23 +72,23 @@ static void psync_notifications_download_thumb(const binresult *thumb,
   char *filepath, *tmpfilepath, *buff;
   char cookie[128];
   psync_http_socket *sock;
-  psync_stat_t st;
-  psync_file_t fd;
+  struct stat st;
+  int fd;
   int rd;
   rd = -1;
   path = psync_find_result(thumb, "path", PARAM_STR)->str;
   filename = strrchr(path, '/');
   if (unlikely_log(!filename++))
     return;
-  filepath = psync_strcat(thumbpath, PSYNC_DIRECTORY_SEPARATOR, filename, NULL);
-  if (!psync_stat(filepath, &st)) {
+  filepath = psync_strcat(thumbpath, "/", filename, NULL);
+  if (!stat(filepath, &st)) {
     debug(D_NOTICE, "skipping download of %s as it already exists", filename);
     goto err0;
   }
   tmpfilepath = psync_strcat(filepath, ".part", NULL);
   debug(D_NOTICE, "downloading thumbnail %s", filename);
-  if (unlikely_log((fd = psync_file_open(tmpfilepath, P_O_WRONLY,
-                                         P_O_CREAT | P_O_TRUNC)) ==
+  if (unlikely_log((fd = pfile_open(tmpfilepath, O_WRONLY,
+                                         O_CREAT | O_TRUNC)) ==
                    INVALID_HANDLE_VALUE))
     goto err1;
   sock = psync_http_connect_multihost(
@@ -103,16 +106,16 @@ static void psync_notifications_download_thumb(const binresult *thumb,
     rd = psync_http_request_readall(sock, buff, PSYNC_COPY_BUFFER_SIZE);
     if (rd <= 0)
       break;
-    if (psync_file_write(fd, buff, rd) != rd)
+    if (pfile_write(fd, buff, rd) != rd)
       break;
   }
   psync_free(buff);
 err3:
   psync_http_close(sock);
 err2:
-  psync_file_close(fd);
+  pfile_close(fd);
 err1:
-  if (rd == 0 && !psync_file_rename_overwrite(tmpfilepath, filepath))
+  if (rd == 0 && !pfile_rename_overwrite(tmpfilepath, filepath))
     debug(D_NOTICE, "downloaded thumbnail %s", filename);
   else
     debug(D_WARNING, "downloading of thumbnail %s failed", filename);
@@ -159,7 +162,7 @@ static void psync_notifications_set_current_list(binresult *res,
 static void psync_notifications_thread() {
   char *thumbpath;
   binresult *res;
-  thumbpath = psync_get_private_dir(PSYNC_DEFAULT_NTF_THUMB_DIR);
+  thumbpath = ppath_private(PSYNC_DEFAULT_NTF_THUMB_DIR);
   while (psync_do_run) {
     pthread_mutex_lock(&ntf_mutex);
     if (unlikely(!ntf_callback)) {
@@ -192,7 +195,7 @@ void psync_notifications_set_callback(
   ntf_callback = notification_callback;
   if (!ntf_thread_running && notification_callback) {
     ntf_thread_running = 1;
-    psync_run_thread("notifications", psync_notifications_thread);
+    prun_thread("notifications", psync_notifications_thread);
   }
   pthread_mutex_unlock(&ntf_mutex);
 }
@@ -219,18 +222,18 @@ static void fill_actionid(const binresult *ntf, psync_notification_t *pntf,
 }
 
 static void psync_notifications_thumb_dir_list(void *ptr,
-                                               psync_pstat_fast *st) {
+                                               ppath_fast_stat *st) {
   psync_tree **tree, **addto, *tr;
   psync_thumb_list_t *tl;
   size_t len;
   int cmp;
-  if (psync_stat_fast_isfolder(st))
+  if (pfile_stat_fast_isfolder(st))
     return;
   tree = (psync_tree **)ptr;
   tr = *tree;
   if (tr) {
     while (1) {
-      cmp = psync_filename_cmp(
+      cmp = strcmp(
           st->name, psync_tree_element(tr, psync_thumb_list_t, tree)->name);
       if (cmp < 0) {
         if (tr->left)
@@ -268,7 +271,7 @@ static void psync_notification_remove_from_list(psync_tree **tree,
   int cmp;
   tr = *tree;
   while (tr) {
-    cmp = psync_filename_cmp(
+    cmp = strcmp(
         name, psync_tree_element(tr, psync_thumb_list_t, tree)->name);
     if (cmp < 0)
       tr = tr->left;
@@ -289,13 +292,13 @@ psync_notification_list_t *psync_notifications_get() {
   char *thumbpath, *filepath;
   psync_notification_t *pntf;
   psync_tree *thumbs, *nx;
-  psync_stat_t st;
+  struct stat st;
   uint32_t cntnew, cnttotal, i;
   cntnew = 0;
-  thumbpath = psync_get_private_dir(PSYNC_DEFAULT_NTF_THUMB_DIR);
+  thumbpath = ppath_private(PSYNC_DEFAULT_NTF_THUMB_DIR);
   thumbs = PSYNC_TREE_EMPTY;
   if (likely(thumbpath))
-    psync_list_dir_fast(thumbpath, psync_notifications_thumb_dir_list, &thumbs);
+    ppath_ls_fast(thumbpath, psync_notifications_thumb_dir_list, &thumbs);
   builder = psync_list_builder_create(
       sizeof(psync_notification_t),
       offsetof(psync_notification_list_t, notifications));
@@ -323,9 +326,9 @@ psync_notification_list_t *psync_notifications_get() {
         filename = strrchr(psync_find_result(br, "path", PARAM_STR)->str, '/');
         if (filename++) {
           psync_notification_remove_from_list(&thumbs, filename);
-          filepath = psync_strcat(thumbpath, PSYNC_DIRECTORY_SEPARATOR,
+          filepath = psync_strcat(thumbpath, "/",
                                   filename, NULL);
-          if (!psync_stat(filepath, &st)) {
+          if (!stat(filepath, &st)) {
             pntf->thumb = filepath;
             psync_list_add_string_offset(builder,
                                          offsetof(psync_notification_t, thumb));
@@ -353,9 +356,9 @@ psync_notification_list_t *psync_notifications_get() {
     debug(D_NOTICE, "deleting unused thumb %s",
           psync_tree_element(thumbs, psync_thumb_list_t, tree)->name);
     filepath = psync_strcat(
-        thumbpath, PSYNC_DIRECTORY_SEPARATOR,
+        thumbpath, "/",
         psync_tree_element(thumbs, psync_thumb_list_t, tree)->name, NULL);
-    psync_file_delete(filepath);
+    pfile_delete(filepath);
     psync_free(filepath);
     psync_free(psync_tree_element(thumbs, psync_thumb_list_t, tree));
     thumbs = nx;
@@ -366,19 +369,19 @@ psync_notification_list_t *psync_notifications_get() {
   return res;
 }
 
-static void psync_notifications_del_thumb(void *ptr, psync_pstat *st) {
-  if (psync_stat_isfolder(&st->stat))
+static void psync_notifications_del_thumb(void *ptr, ppath_stat *st) {
+  if (pfile_stat_isfolder(&st->stat))
     return;
   debug(D_NOTICE, "deleting thumb %s", st->path);
-  psync_file_delete(st->path);
+  pfile_delete(st->path);
 }
 
 void psync_notifications_clean() {
   char *thumbpath;
   pthread_mutex_lock(&ntf_mutex);
-  thumbpath = psync_get_private_dir(PSYNC_DEFAULT_NTF_THUMB_DIR);
+  thumbpath = ppath_private(PSYNC_DEFAULT_NTF_THUMB_DIR);
   if (thumbpath) {
-    psync_list_dir(thumbpath, psync_notifications_del_thumb, NULL);
+    ppath_ls(thumbpath, psync_notifications_del_thumb, NULL);
     psync_free(thumbpath);
   }
   if (ntf_processed_result) {

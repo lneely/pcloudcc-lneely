@@ -35,6 +35,7 @@
   act upon it.
 */
 
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,13 +43,14 @@
 #include <sys/un.h>
 #include <time.h>
 
-#include "pcompat.h"
+#include "pfile.h"
 #include "poverlay_protocol.h"
 
 #include "poverlay.h"
 #include "ppathstatus.h"
 
 #include "plibs.h"
+#include "prun.h"
 
 #define POVERLAY_BUFSIZE 512
 
@@ -88,7 +90,7 @@ void psync_overlay_main_loop() {
     }
 
     // handle the request in a new thread
-    psync_run_thread1("Pipe request handle routine",
+    prun_thread1("Pipe request handle routine",
                       psync_overlay_handle_request, // thread proc
                       (LPVOID)&cl                   // thread parameter
     );

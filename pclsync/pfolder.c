@@ -45,7 +45,9 @@
 #include "plibs.h"
 #include "plist.h"
 #include "pnetlibs.h"
-#include "psettings.h"
+#include "psys.h"
+#include "ppath.h"
+
 #include <stddef.h>
 #include <string.h>
 #define INITIAL_NAME_BUFF 2000
@@ -131,7 +133,7 @@ static psync_folderid_t wait_folder_id_in_db(psync_folderid_t folderid) {
     psync_sql_free_result(res);
     if (row)
       return folderid;
-    psync_milisleep(50);
+    psys_sleep_milliseconds(50);
   }
   return PSYNC_INVALID_FOLDERID;
 }
@@ -181,7 +183,7 @@ psync_folderid_t psync_get_folderid_by_path_or_create(const char *path) {
       binparam params[] = {P_STR("auth", psync_my_auth),
                            P_NUM("folderid", cfolderid),
                            P_LSTR("name", path, len)};
-      psync_socket *api;
+      psock_t *api;
       binresult *bres;
       uint64_t result;
       api = psync_apipool_get();
@@ -501,7 +503,7 @@ char *psync_local_path_for_local_folder(psync_folderid_t localfolderid,
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
   }
-  ret = psync_join_string_list(PSYNC_DIRECTORY_SEPARATOR, &folderlist, retlen);
+  ret = psync_join_string_list("/", &folderlist, retlen);
   psync_free_string_list(&folderlist);
   return ret;
 }
@@ -542,7 +544,7 @@ char *psync_local_path_for_local_file(psync_fileid_t localfileid,
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
   }
-  ret = psync_join_string_list(PSYNC_DIRECTORY_SEPARATOR, &folderlist, retlen);
+  ret = psync_join_string_list("/", &folderlist, retlen);
   psync_free_string_list(&folderlist);
   return ret;
 }
@@ -691,24 +693,24 @@ pfolder_list_t *psync_list_remote_folder(psync_folderid_t folderid,
   return folder_list_finalize(list);
 }
 
-static void add_to_folderlist(void *ptr, psync_pstat *stat) {
+static void add_to_folderlist(void *ptr, ppath_stat *stat) {
   flist_ltype *ft = (flist_ltype *)ptr;
   pentry_t entry;
-  int isfolder = psync_stat_isfolder(&stat->stat);
+  int isfolder = pfile_stat_isfolder(&stat->stat);
   if (((ft->listtype & PLIST_FOLDERS) && isfolder) ||
       ((ft->listtype & PLIST_FILES) && !isfolder)) {
     entry.name = stat->name;
     entry.namelen = strlen(stat->name);
     if (isfolder) {
       entry.isfolder = 1;
-      entry.folder.folderid = psync_stat_inode(&stat->stat);
-      entry.folder.cansyncup = psync_stat_mode_ok(&stat->stat, 5);
-      entry.folder.cansyncdown = psync_stat_mode_ok(&stat->stat, 7);
+      entry.folder.folderid = pfile_stat_inode(&stat->stat);
+      entry.folder.cansyncup = pfile_stat_mode_ok(&stat->stat, 5);
+      entry.folder.cansyncdown = pfile_stat_mode_ok(&stat->stat, 7);
       entry.folder.isencrypted = 0;
     } else {
       entry.isfolder = 0;
-      entry.file.fileid = psync_stat_inode(&stat->stat);
-      entry.file.size = psync_stat_size(&stat->stat);
+      entry.file.fileid = pfile_stat_inode(&stat->stat);
+      entry.file.size = pfile_stat_size(&stat->stat);
     }
     folder_list_add(ft->folderlist, &entry);
   }
@@ -719,7 +721,7 @@ pfolder_list_t *psync_list_local_folder(const char *path,
   flist_ltype ft;
   ft.folderlist = folder_list_init();
   ft.listtype = listtype;
-  if (psync_list_dir(path, add_to_folderlist, &ft)) {
+  if (ppath_ls(path, add_to_folderlist, &ft)) {
     folder_list_free(ft.folderlist);
     return NULL;
   } else
@@ -885,10 +887,10 @@ psync_folder_list_t *psync_list_get_list(char *syncTypes) {
 
     l--;
 
-    while (l && str[l] != PSYNC_DIRECTORY_SEPARATORC && str[l] != '/')
+    while (l && str[l] != '/' && str[l] != '/')
       l--;
 
-    if ((str[l] == PSYNC_DIRECTORY_SEPARATORC || str[l] == '/') && str[l + 1])
+    if ((str[l] == '/' || str[l] == '/') && str[l + 1])
       l++;
 
     strncpy(ret->folders[i].localname, str,

@@ -73,12 +73,6 @@
 #define POVERLAY_READ_INCOMPLETE -105
 #define POVERLAY_READ_INVALID_RESPONSE -106
 
-void free_response_message(message *resp) {
-  if (resp) {
-    free(resp);
-  }
-}
-
 int QueryState(pCloud_FileState *state, char *path) {
   int rep = 0;
   char *errm;
@@ -133,10 +127,6 @@ int socket_connect(const char *sockpath, char **out, size_t *out_size,
   return fd;
 }
 
-// write_request writes a request_message to given socket file
-// descriptor of a given type and value. it may write out an error
-// message and error message size to out and out_size, and a "ret"
-// value to ret (i think this is redundant, maybe...)
 int write_request(int fd, int msgtype, const char *value, char **out,
                   size_t *out_size, int *ret) {
   uint64_t bytes_written;
@@ -186,10 +176,6 @@ int write_request(int fd, int msgtype, const char *value, char **out,
   return *ret;
 }
 
-// read_response reads a response message from a given socket. it may
-// write an error message OR an API response value to out (and its
-// size to out_size), a "ret" value to ret (redundant?), and the
-// callback's return data to payload and payloadsz.
 int read_response(int fd, char **out, size_t *out_size, int *ret) {
     message *msg;
     ssize_t bytes_read;

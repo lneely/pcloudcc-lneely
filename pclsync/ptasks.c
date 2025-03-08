@@ -44,7 +44,7 @@
 #include "ptasks.h"
 #include "pupload.h"
 
-static void create_task1(psync_uint_t type, psync_syncid_t syncid,
+static void create_task1(unsigned long type, psync_syncid_t syncid,
                          uint64_t entryid, uint64_t localentryid) {
   psync_sql_res *res;
   res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
@@ -56,7 +56,7 @@ static void create_task1(psync_uint_t type, psync_syncid_t syncid,
   psync_sql_run_free(res);
 }
 
-static void create_task2(psync_uint_t type, psync_syncid_t syncid,
+static void create_task2(unsigned long type, psync_syncid_t syncid,
                          uint64_t entryid, uint64_t localentryid,
                          uint64_t newitemid, const char *name) {
   psync_sql_res *res;
@@ -72,7 +72,7 @@ static void create_task2(psync_uint_t type, psync_syncid_t syncid,
   psync_sql_run_free(res);
 }
 
-static void create_task3(psync_uint_t type, psync_syncid_t syncid,
+static void create_task3(unsigned long type, psync_syncid_t syncid,
                          uint64_t entryid, uint64_t localentryid,
                          const char *name) {
   psync_sql_res *res;
@@ -86,7 +86,7 @@ static void create_task3(psync_uint_t type, psync_syncid_t syncid,
   psync_sql_run_free(res);
 }
 
-static void create_task4(psync_uint_t type, uint64_t entryid,
+static void create_task4(unsigned long type, uint64_t entryid,
                          const char *name) {
   psync_sql_res *res;
   res = psync_sql_prep_statement(
@@ -97,7 +97,7 @@ static void create_task4(psync_uint_t type, uint64_t entryid,
   psync_sql_run_free(res);
 }
 
-static void create_task5(psync_uint_t type, psync_syncid_t syncid,
+static void create_task5(unsigned long type, psync_syncid_t syncid,
                          uint64_t entryid) {
   psync_sql_res *res;
   res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
@@ -108,7 +108,7 @@ static void create_task5(psync_uint_t type, psync_syncid_t syncid,
   psync_sql_run_free(res);
 }
 
-static void create_task6(psync_uint_t type, psync_syncid_t syncid,
+static void create_task6(unsigned long type, psync_syncid_t syncid,
                          uint64_t entryid, const char *name) {
   psync_sql_res *res;
   res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "

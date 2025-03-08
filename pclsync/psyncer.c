@@ -44,11 +44,15 @@
 #include "plocalnotify.h"
 #include "plocalscan.h"
 #include "ppathstatus.h"
+#include "prun.h"
 #include "pstatus.h"
 #include "psyncer.h"
 #include "ptasks.h"
 #include "ptree.h"
+#include "putil.h"
 #include <string.h>
+
+extern const unsigned char pfile_invalid_chars[];
 
 typedef struct {
   psync_tree tree;
@@ -190,7 +194,7 @@ psync_folderid_t psync_create_local_folder_in_db(
   vname = NULL;
   if (name)
     for (ptr = name; *ptr; ptr++)
-      if (psync_invalid_filename_chars[(unsigned char)*ptr]) {
+      if (pfile_invalid_chars[(unsigned char)*ptr]) {
         if (!vname)
           vname = psync_strdup(name);
         vname[ptr - name] = '_';
@@ -349,7 +353,7 @@ static void psync_do_sync_thread(void *ptr) {
 void psync_syncer_new(psync_syncid_t syncid) {
   psync_syncid_t *psid = psync_new(psync_syncid_t);
   *psid = syncid;
-  psync_run_thread1("syncer", psync_do_sync_thread, psid);
+  prun_thread1("syncer", psync_do_sync_thread, psid);
 }
 
 static void psync_syncer_thread() {
@@ -376,18 +380,18 @@ int psync_str_is_prefix(const char *str1, const char *str2) {
   len2 = strlen(str2);
 
   while (len1 > 1 && (str1[len1 - 1] == '/' ||
-                      str1[len1 - 1] == PSYNC_DIRECTORY_SEPARATORC))
+                      str1[len1 - 1] == '/'))
     len1--;
 
   if (len2 < len1) {
-    if (str1[len2] != '/' && str1[len2] != PSYNC_DIRECTORY_SEPARATORC)
+    if (str1[len2] != '/' && str1[len2] != '/')
       return 0;
     len1 = len2;
   } else {
-    if (str2[len1] != '/' && str2[len1] != PSYNC_DIRECTORY_SEPARATORC)
+    if (str2[len1] != '/' && str2[len1] != '/')
       return 0;
   }
-  return !psync_filename_cmpn(str1, str2, len1);
+  return !memcmp(str1, str2, len1);
 }
 
 int psync_left_str_is_prefix(const char *str1, const char *str2) {
@@ -396,22 +400,22 @@ int psync_left_str_is_prefix(const char *str1, const char *str2) {
   len2 = strlen(str2);
 
   while (len1 > 1 && (str1[len1 - 1] == '/' ||
-                      str1[len1 - 1] == PSYNC_DIRECTORY_SEPARATORC))
+                      str1[len1 - 1] == '/'))
     len1--;
 
   while (len2 > 1 && (str2[len2 - 1] == '/' ||
-                      str1[len2 - 1] == PSYNC_DIRECTORY_SEPARATORC))
+                      str1[len2 - 1] == '/'))
     len2--;
 
   if (len2 < len1) {
     return 0;
   }
 
-  return !psync_filename_cmpn(str1, str2, len1);
+  return !memcmp(str1, str2, len1);
 }
 
 void psync_syncer_check_delayed_syncs() {
-  psync_stat_t st;
+  struct stat st;
   psync_sql_res *res, *res2, *stmt;
   psync_variant_row row;
   psync_uint_row urow;
@@ -433,11 +437,11 @@ re:
       mbedtls_md = 7;
     else
       mbedtls_md = 5;
-    if (unlikely_log(psync_stat(localpath, &st)) ||
-        unlikely_log(!psync_stat_isfolder(&st)) ||
-        unlikely_log(!psync_stat_mode_ok(&st, mbedtls_md))) {
+    if (unlikely_log(stat(localpath, &st)) ||
+        unlikely_log(!pfile_stat_isfolder(&st)) ||
+        unlikely_log(!pfile_stat_mode_ok(&st, mbedtls_md))) {
       debug(D_WARNING,
-            "ignoring delayed sync id %" P_PRI_U64 " for local path %s", id,
+            "ignoring delayed sync id %" PRIu64 " for local path %s", id,
             localpath);
       delete_delayed_sync(id);
       continue;
@@ -451,7 +455,7 @@ re:
             "skipping localfolder %s, remote %s, because of same parent to %s",
             localpath, remotepath, srow[0]);
         mbedtls_md = 1;
-      } else if (!psync_filename_cmp(srow[0], localpath)) {
+      } else if (!strcmp(srow[0], localpath)) {
         debug(D_WARNING,
               "skipping localfolder %s, remote %s, because of same dir to %s",
               localpath, remotepath, srow[0]);
@@ -496,8 +500,8 @@ re:
     psync_sql_bind_uint(stmt, 1, folderid);
     psync_sql_bind_string(stmt, 2, localpath);
     psync_sql_bind_uint(stmt, 3, synctype);
-    psync_sql_bind_uint(stmt, 4, psync_stat_inode(&st));
-    psync_sql_bind_uint(stmt, 5, psync_stat_device(&st));
+    psync_sql_bind_uint(stmt, 4, pfile_stat_inode(&st));
+    psync_sql_bind_uint(stmt, 5, pfile_stat_device(&st));
     psync_sql_run(stmt);
     if (likely_log(psync_sql_affected_rows()))
       syncid = psync_sql_insertid();
@@ -527,5 +531,5 @@ void psync_syncer_init() {
     psync_add_folder_to_downloadlist_locked(row[0]);
   pthread_mutex_unlock(&sync_down_mutex);
   psync_sql_free_result(res);
-  psync_run_thread("syncer", psync_syncer_thread);
+  prun_thread("syncer", psync_syncer_thread);
 }

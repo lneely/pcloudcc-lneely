@@ -30,8 +30,9 @@
 #ifndef _PSYNC_API_H
 #define _PSYNC_API_H
 
-#include "pcompat.h"
+#include "pfile.h"
 #include "pcompiler.h"
+#include "psock.h"
 #include <stdint.h>
 
 #define PARAM_STR 0
@@ -134,21 +135,21 @@ typedef struct {
 #define psync_dump_result(res)                                                 \
   psync_do_dump_binresult(res, __FILE__, __FUNCTION__, __LINE__)
 
-psync_socket *psync_api_connect(const char *hostname, int usessl);
+psock_t *psync_api_connect(const char *hostname, int usessl);
 void psync_api_conn_fail_inc();
 void psync_api_conn_fail_reset();
 
-binresult *get_result(psync_socket *sock) PSYNC_NONNULL(1);
-binresult *get_result_thread(psync_socket *sock) PSYNC_NONNULL(1);
+binresult *get_result(psock_t *sock) PSYNC_NONNULL(1);
+binresult *get_result_thread(psock_t *sock) PSYNC_NONNULL(1);
 void async_result_reader_init(async_result_reader *reader) PSYNC_NONNULL(1);
 void async_result_reader_destroy(async_result_reader *reader) PSYNC_NONNULL(1);
-int get_result_async(psync_socket *sock, async_result_reader *reader)
+int get_result_async(psock_t *sock, async_result_reader *reader)
     PSYNC_NONNULL(1, 2);
 unsigned char *do_prepare_command(const char *command, size_t cmdlen,
                                   const binparam *params, size_t paramcnt,
                                   int64_t datalen, size_t additionalalloc,
                                   size_t *retlen);
-binresult *do_send_command(psync_socket *sock, const char *command,
+binresult *do_send_command(psock_t *sock, const char *command,
                            size_t cmdlen, const binparam *params,
                            size_t paramcnt, int64_t datalen, int readres)
     PSYNC_NONNULL(1, 2);

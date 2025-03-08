@@ -36,6 +36,7 @@
 #include "prunratelimit.h"
 #include "psettings.h"
 #include "ptasks.h"
+#include "putil.h"
 #include <stdarg.h>
 #include <string.h>
 
@@ -46,7 +47,7 @@ static uint32_t statuses[PSTATUS_NUM_STATUSES] = {
 
 static pthread_mutex_t statusmutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t statuscond = PTHREAD_COND_INITIALIZER;
-static psync_uint_t status_waiters = 0;
+static unsigned long status_waiters = 0;
 
 static uint32_t psync_calc_status() {
   if (statuses[PSTATUS_TYPE_AUTH] != PSTATUS_AUTH_PROVIDED &&
@@ -180,7 +181,7 @@ void psync_status_recalc_to_upload() {
   const char *fscpath;
   psync_sql_res *res;
   psync_uint_row row;
-  psync_stat_t st;
+  struct stat st;
   uint64_t bytestou;
   uint32_t filestou;
   res = psync_sql_query_rdlock(
@@ -205,10 +206,10 @@ void psync_status_recalc_to_upload() {
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     filename =
-        psync_strcat(fscpath, PSYNC_DIRECTORY_SEPARATOR, fileidhex, NULL);
-    if (!psync_stat(filename, &st)) {
+        psync_strcat(fscpath, "/", fileidhex, NULL);
+    if (!stat(filename, &st)) {
       filestou++;
-      bytestou += psync_stat_size(&st);
+      bytestou += pfile_stat_size(&st);
     }
     psync_free(filename);
   }
