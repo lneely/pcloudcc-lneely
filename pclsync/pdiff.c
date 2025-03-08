@@ -38,6 +38,7 @@
 #include <mbedtls/ssl.h>
 #include <pthread.h>
 #include <stddef.h>
+#include <unistd.h>
 
 #include "paccountevents.h"
 #include "papi.h"

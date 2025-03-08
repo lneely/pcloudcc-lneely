@@ -36,13 +36,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/sha1.h>
-#include <mbedtls/ssl.h>
-
 #include "papi.h"
 #include "pcache.h"
 #include "pdevice.h"
@@ -56,6 +49,7 @@
 #include "ppath.h"
 #include "psys.h"
 #include "ptree.h"
+#include "pfile.h"
 
 // required by psync_send_debug
 extern PSYNC_THREAD const char *psync_thread_name; 

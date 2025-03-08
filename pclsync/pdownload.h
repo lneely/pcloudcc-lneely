@@ -33,7 +33,7 @@
 #define _PSYNC_DOWNLOAD_H
 
 #include "psettings.h"
-#include "psynclib.h"
+#include "pfoldersync.h"
 
 typedef unsigned char psync_hex_hash[PSYNC_HASH_DIGEST_HEXLEN];
 
