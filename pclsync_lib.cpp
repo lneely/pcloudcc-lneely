@@ -334,7 +334,6 @@ static void status_change(pstatus_t *status) {
 }
 
 int clib::pclsync_lib::start_crypto(const char *pass) {
-  std::cout << "calling startcrypto pass: " << pass << std::endl;
   get_lib().crypto_pass_ = pass;
   return lib_setup_cripto();
 }
