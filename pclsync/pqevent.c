@@ -27,12 +27,10 @@
    IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "pcallbacks.h"
-#include "pfile.h"
-#include "pfolder.h"
+#include "pqevent.h"
+#include "pfoldersync.h"
 #include "plibs.h"
 #include "plist.h"
-#include "prunratelimit.h"
 #include "prun.h"
 #include "psys.h"
 #include <string.h>
@@ -40,6 +38,8 @@
 #define MAX_STATUS_STR_LEN 64
 #define DONT_SHOW_TIME_IF_SEC_OVER (2 * 86400)
 #define DONT_SHOW_TIME_IF_SPEED_BELOW (4 * 1024)
+
+#define cat_const(src, app) cat_lstr(src, app, sizeof(app) - 1)
 
 static pthread_mutex_t statusmutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t statuscond = PTHREAD_COND_INITIALIZER;
@@ -99,8 +99,6 @@ format10:
   *src++ = '0' + num;
   return src;
 }
-
-#define cat_const(src, app) cat_lstr(src, app, sizeof(app) - 1)
 
 static char *fill_formatted_bytes(char *str, uint64_t bytes) {
   const static char *sizes[] = {"Bytes", "KB", "MB", "GB", "TB"};
@@ -254,12 +252,6 @@ static void status_fill_formatted_str(pstatus_t *status, char *downloadstr,
   status->uploadstr = uploadstr;
 }
 
-void psync_callbacks_get_status(pstatus_t *status) {
-  static char downloadstr[MAX_STATUS_STR_LEN], uploadstr[MAX_STATUS_STR_LEN];
-  memcpy(status, &psync_status, sizeof(pstatus_t));
-  status_fill_formatted_str(status, downloadstr, uploadstr);
-}
-
 static void status_change_thread(void *ptr) {
   char downloadstr[MAX_STATUS_STR_LEN], uploadstr[MAX_STATUS_STR_LEN];
   pstatus_change_callback_t callback = (pstatus_change_callback_t)ptr;
@@ -298,25 +290,7 @@ static void status_change_thread(void *ptr) {
   }
 }
 
-void psync_set_status_callback(pstatus_change_callback_t callback) {
-  pthread_mutex_lock(&statusmutex);
-  statusthreadrunning = 1;
-  pthread_mutex_unlock(&statusmutex);
-  prun_thread1("status change", status_change_thread, callback);
-}
-
-void psync_send_status_update() {
-  if (statusthreadrunning) {
-    pthread_mutex_lock(&statusmutex);
-    if (++statuschanges == 0) {
-      statuschanges++;
-      pthread_cond_signal(&statuscond);
-    }
-    pthread_mutex_unlock(&statusmutex);
-  }
-}
-
-static void event_thread(void *ptr) {
+static void proc_send_event(void *ptr) {
   pevent_callback_t callback = (pevent_callback_t)ptr;
   event_list_t *event;
 
@@ -342,31 +316,55 @@ static void event_thread(void *ptr) {
   }
 }
 
-void psync_set_event_callback(pevent_callback_t callback) {
+void pstatus_get_cb(pstatus_t *status) {
+  static char downloadstr[MAX_STATUS_STR_LEN], uploadstr[MAX_STATUS_STR_LEN];
+  memcpy(status, &psync_status, sizeof(pstatus_t));
+  status_fill_formatted_str(status, downloadstr, uploadstr);
+}
+
+void pstatus_set_cb(pstatus_change_callback_t callback) {
+  pthread_mutex_lock(&statusmutex);
+  statusthreadrunning = 1;
+  pthread_mutex_unlock(&statusmutex);
+  prun_thread1("status change", status_change_thread, callback);
+}
+
+void pstatus_send_status_update() {
+  if (statusthreadrunning) {
+    pthread_mutex_lock(&statusmutex);
+    if (++statuschanges == 0) {
+      statuschanges++;
+      pthread_cond_signal(&statuscond);
+    }
+    pthread_mutex_unlock(&statusmutex);
+  }
+}
+
+void pqevent_process(pevent_callback_t callback) {
   pthread_mutex_lock(&statusmutex);
   eventthreadrunning = 1;
   pthread_mutex_unlock(&statusmutex);
   psync_list_init(&eventlist);
-  prun_thread1("event", event_thread, callback);
+  prun_thread1("event", proc_send_event, callback);
 }
 
-void psync_send_event_by_id(psync_eventtype_t eventid, psync_syncid_t syncid,
+void pqevent_queue_sync_event_id(psync_eventtype_t eventid, psync_syncid_t syncid,
                             const char *localpath,
                             psync_fileorfolderid_t remoteid) {
   if (eventthreadrunning) {
     char *remotepath;
     if (eventid & PEVENT_TYPE_FOLDER)
-      remotepath = psync_get_path_by_folderid(remoteid, NULL);
+      remotepath = pfolder_path(remoteid, NULL);
     else
-      remotepath = psync_get_path_by_fileid(remoteid, NULL);
+      remotepath = pfolder_file_path(remoteid, NULL);
     if (unlikely_log(!remotepath))
       return;
-    psync_send_event_by_path(eventid, syncid, localpath, remoteid, remotepath);
+    pqevent_queue_sync_event_path(eventid, syncid, localpath, remoteid, remotepath);
     psync_free(remotepath);
   }
 }
 
-void psync_send_event_by_path(psync_eventtype_t eventid, psync_syncid_t syncid,
+void pqevent_queue_sync_event_path(psync_eventtype_t eventid, psync_syncid_t syncid,
                               const char *localpath,
                               psync_fileorfolderid_t remoteid,
                               const char *remotepath) {
@@ -414,7 +412,7 @@ void psync_send_event_by_path(psync_eventtype_t eventid, psync_syncid_t syncid,
   }
 }
 
-void psync_send_eventid(psync_eventtype_t eventid) {
+void pqevent_queue_eventid(psync_eventtype_t eventid) {
   if (eventthreadrunning) {
     event_list_t *event;
 
@@ -430,7 +428,7 @@ void psync_send_eventid(psync_eventtype_t eventid) {
   }
 }
 
-void psync_send_eventdata(psync_eventtype_t eventid, void *eventdata) {
+void pqevent_queue_event(psync_eventtype_t eventid, void *eventdata) {
   if (eventthreadrunning) {
     event_list_t *event;
 
@@ -445,50 +443,4 @@ void psync_send_eventdata(psync_eventtype_t eventid, void *eventdata) {
     pthread_mutex_unlock(&eventmutex);
   } else
     psync_free(eventdata);
-}
-
-data_event_callback data_event_fptr = NULL;
-
-void psync_init_data_event(void *ptr) {
-  data_event_fptr = (data_event_callback)ptr;
-  debug(D_NOTICE, "Data event handler set.");
-}
-
-void data_event_thread(void *ptr) {
-  event_data_struct *data = (event_data_struct *)ptr;
-
-  debug(D_NOTICE,
-        "Sending data event Event id: [%d] Str1: [%s], Str1: [%s], Uint1:[%lu] "
-        "Uint2:[%lu]",
-        data->eventid, data->str1, data->str2, data->uint1, data->uint2);
-
-  data_event_fptr(data->eventid, (char *)data->str1, (char *)data->str2,
-                  data->uint1, data->uint2);
-
-  psync_free(ptr);
-}
-
-void psync_send_data_event(event_data_struct *data) {
-  event_data_struct *event_data;
-
-  if (data_event_fptr) {
-    event_data = psync_new(event_data_struct);
-    event_data->eventid = data->eventid;
-    event_data->uint1 = data->uint1;
-    event_data->uint2 = data->uint2;
-    event_data->str1 = strdup(data->str1);
-    event_data->str2 = strdup(data->str2);
-
-    prun_thread1("Data Event", data_event_thread, event_data);
-  } else {
-    debug(D_ERROR, "Data event callback function not set.");
-  }
-}
-
-void psync_data_event_test(int eventid, char *str1, char *str2, uint64_t uint1,
-                           uint64_t uint2) {
-  debug(D_NOTICE,
-        "Test Data event callback. eventid [%d]. String1: [%s], String2: [%s], "
-        "uInt1: [%lu] uInt2: [%lu]",
-        eventid, str1, str2, uint1, uint2);
 }

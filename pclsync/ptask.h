@@ -32,18 +32,29 @@
 #ifndef _PSYNC_TASKS_H
 #define _PSYNC_TASKS_H
 
-#include "pcompiler.h"
 #include "psynclib.h"
 
+#define PSYNC_ASYNC_ERR_FLAG_PERM                                              \
+  0x01 // the error is permanent(ish) and there is no reason to retry
+#define PSYNC_ASYNC_ERR_FLAG_RETRY_AS_IS                                       \
+  0x02 // same request may succeed in the future if retried as is
+#define PSYNC_ASYNC_ERR_FLAG_SUCCESS                                           \
+  0x04 // like no action performed because of no need - file already exists and
+       // so on
+
+#define PSYNC_ASYNC_ERROR_NET 1
+#define PSYNC_ASYNC_ERROR_FILE 2
+#define PSYNC_ASYNC_ERROR_DISK_FULL 3
+#define PSYNC_ASYNC_ERROR_IO 4
+#define PSYNC_ASYNC_ERROR_CHECKSUM 5
+#define PSYNC_SERVER_ERROR_TOO_BIG 102
+#define PSYNC_SERVER_ERROR_NOT_MOD 104
 #define PSYNC_TASK_DOWNLOAD 0
 #define PSYNC_TASK_UPLOAD 1
 #define PSYNC_TASK_DWLUPL_MASK 1
-
 #define PSYNC_TASK_FOLDER 0
 #define PSYNC_TASK_FILE 2
-
 #define PSYNC_TASK_TYPE_OFF 2
-
 #define PSYNC_TASK_TYPE_CREATE 0
 #define PSYNC_TASK_TYPE_DELETE 1
 #define PSYNC_TASK_TYPE_DELREC 2
@@ -94,65 +105,53 @@
   ((PSYNC_TASK_TYPE_DELREC << PSYNC_TASK_TYPE_OFF) + PSYNC_TASK_FOLDER +       \
    PSYNC_TASK_UPLOAD)
 
-void psync_task_create_local_folder(psync_syncid_t syncid,
-                                    psync_folderid_t folderid,
-                                    psync_folderid_t localfolderid);
-void psync_task_delete_local_folder(psync_syncid_t syncid,
-                                    psync_folderid_t folderid,
-                                    psync_folderid_t localfolderid,
-                                    const char *remotepath);
-void psync_task_delete_local_folder_recursive(psync_syncid_t syncid,
-                                              psync_folderid_t folderid,
-                                              psync_folderid_t localfolderid);
-void psync_task_rename_local_folder(psync_syncid_t syncid,
-                                    psync_folderid_t folderid,
-                                    psync_folderid_t localfolderid,
-                                    psync_folderid_t newlocalparentfolderid,
-                                    const char *newname);
-void psync_task_download_file(psync_syncid_t syncid, psync_fileid_t fileid,
-                              psync_folderid_t localfolderid, const char *name);
-void psync_task_download_file_silent(psync_syncid_t syncid,
-                                     psync_fileid_t fileid,
-                                     psync_folderid_t localfolderid,
-                                     const char *name);
-void psync_task_rename_local_file(psync_syncid_t oldsyncid,
-                                  psync_syncid_t newsyncid,
-                                  psync_fileid_t fileid,
-                                  psync_folderid_t oldlocalfolderid,
-                                  psync_folderid_t newlocalfolderid,
-                                  const char *newname);
-void psync_task_delete_local_file(psync_fileid_t fileid,
-                                  const char *remotepath);
-void psync_task_delete_local_file_syncid(psync_syncid_t syncid,
-                                         psync_fileid_t fileid,
-                                         const char *remotepath);
+typedef struct {
+  uint64_t size;
+  uint64_t hash;
+  unsigned char sha1hex[40];
+} psync_async_file_result_t;
 
-void psync_task_create_remote_folder(psync_syncid_t syncid,
-                                     psync_folderid_t localfolderid,
-                                     const char *name);
-void psync_task_upload_file(psync_syncid_t syncid, psync_fileid_t localfileid,
-                            const char *name);
-void psync_task_upload_file_silent(psync_syncid_t syncid,
-                                   psync_fileid_t localfileid,
-                                   const char *name);
+typedef struct {
+  uint32_t error;
+  uint32_t errorflags;
+  union {
+    psync_async_file_result_t file;
+  };
+} psync_async_result_t;
 
-/* newname should be passed here instead of reading it from localfile in time of
- * renaming as there might be many pending renames and filename conflict is
- * possible
+typedef void (*psync_async_callback_t)(void *, psync_async_result_t *);
+
+
+/* Important! The interface typically expect all passed pointers to be alive
+ * until the completion callback is called.
  */
-void psync_task_rename_remote_file(psync_syncid_t oldsyncid,
-                                   psync_syncid_t newsyncid,
-                                   psync_fileid_t localfileid,
-                                   psync_folderid_t newlocalparentfolderid,
-                                   const char *newname);
-void psync_task_rename_remote_folder(psync_syncid_t oldsyncid,
-                                     psync_syncid_t newsyncid,
-                                     psync_fileid_t localfileid,
-                                     psync_folderid_t newlocalparentfolderid,
-                                     const char *newname);
-void psync_task_delete_remote_file(psync_syncid_t syncid,
-                                   psync_fileid_t fileid);
-void psync_task_delete_remote_folder(psync_syncid_t syncid,
-                                     psync_folderid_t folderid);
+void ptask_stop_async();
+int ptask_download_async(psync_fileid_t fileid, const char *localpath, psync_async_callback_t cb, void *cbext);
+int ptask_download_needed_async(psync_fileid_t fileid, const char *localpath, uint64_t size, const void *sha1hex, psync_async_callback_t cb, void *cbext);
+
+// local ops
+void ptask_ldir_mk(psync_syncid_t syncid, psync_folderid_t folderid, psync_folderid_t localfolderid);
+void ptask_ldir_rename(psync_syncid_t syncid, psync_folderid_t folderid, psync_folderid_t localfolderid, psync_folderid_t newlocalparentfolderid, const char *newname);
+void ptask_ldir_rm(psync_syncid_t syncid, psync_folderid_t folderid, psync_folderid_t localfolderid, const char *remotepath);
+void ptask_ldir_rm_r(psync_syncid_t syncid, psync_folderid_t folderid, psync_folderid_t localfolderid);
+void ptask_lfile_rename(psync_syncid_t oldsyncid, psync_syncid_t newsyncid, psync_fileid_t fileid, psync_folderid_t oldlocalfolderid, psync_folderid_t newlocalfolderid, const char *newname);
+void ptask_lfile_rm(psync_fileid_t fileid, const char *remotepath);
+void ptask_lfile_rm_id(psync_syncid_t syncid, psync_fileid_t fileid, const char *remotepath);
+
+// remote ops
+// 
+// for rename operations, "newname" should be passed here instead of reading
+// it from localfile, to avoid conflict due to many pending renames
+void ptask_rdir_mk(psync_syncid_t syncid, psync_folderid_t localfolderid, const char *name);
+void ptask_rdir_rename(psync_syncid_t oldsyncid, psync_syncid_t newsyncid, psync_fileid_t localfileid, psync_folderid_t newlocalparentfolderid, const char *newname);
+void ptask_rdir_rm(psync_syncid_t syncid, psync_folderid_t folderid);
+void ptask_rfile_rename(psync_syncid_t oldsyncid, psync_syncid_t newsyncid, psync_fileid_t localfileid, psync_folderid_t newlocalparentfolderid, const char *newname);
+void ptask_rfile_rm(psync_syncid_t syncid, psync_fileid_t fileid);
+
+// file transfer
+void ptask_download(psync_syncid_t syncid, psync_fileid_t fileid, psync_folderid_t localfolderid, const char *name);
+void ptask_download_q(psync_syncid_t syncid, psync_fileid_t fileid, psync_folderid_t localfolderid, const char *name);
+void ptask_upload(psync_syncid_t syncid, psync_fileid_t localfileid, const char *name);
+void ptask_upload_q(psync_syncid_t syncid, psync_fileid_t localfileid, const char *name);
 
 #endif

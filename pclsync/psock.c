@@ -1,8 +1,39 @@
+/*
+   Copyright (c) 2013 Anton Titov.
+
+   Copyright (c) 2013 pCloud Ltd.  All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions
+   are met: Redistributions of source code must retain the above
+   copyright notice, this list of conditions and the following
+   disclaimer.  Redistributions in binary form must reproduce the
+   above copyright notice, this list of conditions and the following
+   disclaimer in the documentation and/or materials provided with the
+   distribution.  Neither the name of pCloud Ltd nor the names of its
+   contributors may be used to endorse or promote products derived
+   from this software without specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+   FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL pCloud
+   Ltd BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+   EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+   PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+   PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+   OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+   USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+   DAMAGE.
+*/
 
 #include <errno.h>
 #include <ifaddrs.h>
+#include <netdb.h>
 #include <netinet/tcp.h>
-#include <sys/socket.h>
+#include <pthread.h>
+#include <unistd.h>
 
 #include "plibs.h"
 #include "psettings.h"
@@ -191,7 +222,7 @@ static void addr_save(const char *host, const char *port,
       "protocol, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
   psync_sql_bind_string(res, 1, host);
   psync_sql_bind_string(res, 2, port);
-  psync_sql_bind_uint(res, 4, psync_timer_time());
+  psync_sql_bind_uint(res, 4, ptimer_time());
   id = 0;
   do {
     psync_sql_bind_uint(res, 3, id++);
@@ -284,7 +315,7 @@ static int connect_socket(const char *host, const char *port) {
     callbacks[0] = cb_connect_res;
     callbacks[1] = cb_resolve;
     tasks = psync_task_run_tasks(callbacks, params, 2);
-    res = (struct addrinfo *)psync_task_get_result(tasks, 1);
+    res = (struct addrinfo *)psync_task_papi_result(tasks, 1);
     if (unlikely(!res)) {
       psync_task_free(tasks);
       debug(D_WARNING, "failed to resolve %s", host);
@@ -293,7 +324,7 @@ static int connect_socket(const char *host, const char *port) {
     addr_save(host, port, res);
     if (addr_valid(dbres, res)) {
       debug(D_NOTICE, "successfully reused cached IP for %s:%s", host, port);
-      sock = (int)(uintptr_t)psync_task_get_result(tasks, 0);
+      sock = (int)(uintptr_t)psync_task_papi_result(tasks, 0);
     } else {
       debug(D_NOTICE, "cached IP not valid for %s:%s", host, port);
       sock = connect_res(res);

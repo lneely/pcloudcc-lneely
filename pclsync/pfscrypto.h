@@ -32,7 +32,7 @@
 #ifndef _PSYNC_FSCRYPTO_H
 #define _PSYNC_FSCRYPTO_H
 
-#include "pcloudcrypto.h"
+#include "pcryptofolder.h"
 #include "pfs.h"
 
 #define PSYNC_CRYPTO_MAX_SECTORID (UINT32_MAX - 1)
@@ -48,36 +48,23 @@ typedef struct {
   psync_tree tree;
   psync_crypto_sectorid_t sectorid;
   uint32_t logoffset;
-  psync_crypto_sector_auth_t auth;
+  pcrypto_sector_auth_t auth;
 } psync_sector_inlog_t;
 
-typedef psync_crypto_sector_auth_t
-    psync_crypto_auth_sector_t[PSYNC_CRYPTO_HASH_TREE_SECTORS];
+typedef pcrypto_sector_auth_t psync_crypto_auth_sector_t[PSYNC_CRYPTO_HASH_TREE_SECTORS];
 
-int psync_fs_crypto_init_log(psync_openfile_t *of);
-int psync_fs_crypto_read_newfile_locked(psync_openfile_t *of, char *buf,
-                                        uint64_t size, uint64_t offset);
-int psync_fs_crypto_write_newfile_locked(psync_openfile_t *of, const char *buf,
-                                         uint64_t size, uint64_t offset);
-int psync_fs_crypto_read_modified_locked(psync_openfile_t *of, char *buf,
-                                         uint64_t size, uint64_t offset);
-int psync_fs_crypto_write_modified_locked(psync_openfile_t *of, const char *buf,
-                                          uint64_t size, uint64_t offset);
-int psync_fs_crypto_ftruncate(psync_openfile_t *of, uint64_t size);
-int psync_fs_crypto_flush_file(psync_openfile_t *of);
-
-psync_crypto_sectorid_t
-psync_fs_crypto_data_sectorid_by_sectorid(psync_crypto_sectorid_t sectorid);
-void psync_fs_crypto_offsets_by_plainsize(uint64_t size,
-                                          psync_crypto_offsets_t *offsets);
-uint64_t psync_fs_crypto_plain_size(uint64_t cryptosize);
-uint64_t psync_fs_crypto_crypto_size(uint64_t plainsize);
-void psync_fs_crypto_get_auth_sector_off(psync_crypto_sectorid_t sectorid,
-                                         uint32_t level,
-                                         psync_crypto_offsets_t *offsets,
-                                         uint64_t *offset, uint32_t *size,
-                                         uint32_t *authid);
-
-void psync_fs_crypto_check_logs();
+int pfscrypto_init_log(psync_openfile_t *of);
+int pfscrypto_read_new(psync_openfile_t *of, char *buf, uint64_t size, uint64_t offset);
+int pfscrypto_write_new(psync_openfile_t *of, const char *buf, uint64_t size, uint64_t offset);
+int pfscrypto_read_mod(psync_openfile_t *of, char *buf, uint64_t size, uint64_t offset);
+int pfscrypto_write_mod(psync_openfile_t *of, const char *buf, uint64_t size, uint64_t offset);
+int pfscrypto_truncate(psync_openfile_t *of, uint64_t size);
+int pfscrypto_flush(psync_openfile_t *of);
+psync_crypto_sectorid_t pfscrypto_sector_id(psync_crypto_sectorid_t sectorid);
+void pfscrypto_offset_by_size(uint64_t size, psync_crypto_offsets_t *offsets);
+uint64_t pfscrypto_plain_size(uint64_t cryptosize);
+uint64_t pfscrypto_crypto_size(uint64_t plainsize);
+void pfscrypto_get_auth_off(psync_crypto_sectorid_t sectorid, uint32_t level, psync_crypto_offsets_t *offsets, uint64_t *offset, uint32_t *size, uint32_t *authid);
+void pfscrypto_check_logs();
 
 #endif

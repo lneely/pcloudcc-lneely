@@ -35,16 +35,16 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/inotify.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include "plocalnotify.h"
-#include "pfile.h"
+#include "pfoldersync.h"
 #include "plibs.h"
 #include "prun.h"
 #include "plist.h"
 #include "plocalscan.h"
-#include "psettings.h"
 
 #define NOTIFY_MSG_ADD 0
 #define NOTIFY_MSG_DEL 1

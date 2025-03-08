@@ -74,7 +74,7 @@ static void fsroot_change() { psync_fs_remount(); }
 
 static psync_setting_t settings[] = {
     {"usessl",
-     psync_timer_do_notify_exception,
+     ptimer_do_notify_exception,
      NULL,
      {PSYNC_USE_SSL_DEFAULT},
      PSYNC_TBOOL},
@@ -87,11 +87,11 @@ static psync_setting_t settings[] = {
      NULL,
      {PSYNC_MIN_LOCAL_FREE_SPACE},
      PSYNC_TNUMBER},
-    {"p2psync", psync_p2p_change, NULL, {PSYNC_P2P_SYNC_DEFAULT}, PSYNC_TBOOL},
+    {"p2psync", pp2p_change, NULL, {PSYNC_P2P_SYNC_DEFAULT}, PSYNC_TBOOL},
     {"fsroot", fsroot_change, NULL, {0}, PSYNC_TSTRING},
     {"autostartfs", NULL, NULL, {PSYNC_AUTOSTARTFS_DEFAULT}, PSYNC_TBOOL},
     {"fscachesize",
-     psync_pagecache_resize_cache,
+     ppagecache_resize,
      NULL,
      {PSYNC_FS_DEFAULT_CACHE_SIZE},
      PSYNC_TNUMBER},

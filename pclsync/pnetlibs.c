@@ -134,7 +134,7 @@ static psock_t *psync_get_api() {
   psock_t *sock;
   sem_wait(&api_pool_sem);
   debug(D_NOTICE, "connecting to %s", apiserver);
-  sock = psync_api_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
+  sock = papi_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
   if (sock)
     sock->misc = hash_func(apiserver);
   return sock;
@@ -193,7 +193,7 @@ void psync_apipool_set_server(const char *binapi) {
 psock_t *psync_apipool_get() {
   psock_t *ret;
   while (1) {
-    ret = (psock_t *)psync_cache_get(apikey);
+    ret = (psock_t *)pcache_get(apikey);
     if (!ret)
       break;
     if (!api_sock_is_broken(ret))
@@ -201,14 +201,14 @@ psock_t *psync_apipool_get() {
   }
   ret = psync_get_api();
   if (unlikely_log(!ret))
-    psync_timer_notify_exception();
+    ptimer_notify_exception();
   return ret;
 }
 
 psock_t *psync_apipool_get_from_cache() {
   psock_t *ret;
   while (1) {
-    ret = (psock_t *)psync_cache_get(apikey);
+    ret = (psock_t *)pcache_get(apikey);
     if (!ret)
       break;
     if (!api_sock_is_broken(ret))
@@ -218,13 +218,13 @@ psock_t *psync_apipool_get_from_cache() {
 }
 
 void psync_apipool_prepare() {
-  if (psync_cache_has(apikey))
+  if (pcache_has(apikey))
     return;
   else {
     psock_t *ret;
     ret = psync_get_api();
     if (unlikely_log(!ret))
-      psync_timer_notify_exception();
+      ptimer_notify_exception();
     else {
       debug(D_NOTICE, "prepared api connection");
       psync_apipool_release(ret);
@@ -244,9 +244,9 @@ binresult *psync_do_api_run_command(const char *command, size_t cmdlen,
     if (unlikely(!api))
       break;
     if (likely(
-            do_send_command(api, command, cmdlen, params, paramcnt, -1, 0))) {
+            papi_send(api, command, cmdlen, params, paramcnt, -1, 0))) {
       // something useful can be done here as we will wait a while
-      ret = get_result(api);
+      ret = papi_result(api);
       if (likely(ret)) {
         psync_apipool_release(api);
         return ret;
@@ -255,7 +255,7 @@ binresult *psync_do_api_run_command(const char *command, size_t cmdlen,
     psync_apipool_release_bad(api);
   } while (++tries <= PSYNC_RETRY_REQUEST);
 
-  psync_timer_notify_exception();
+  ptimer_notify_exception();
 
   return NULL;
 }
@@ -314,7 +314,7 @@ static void print_tree(const binresult *tree, int ident) {
 
 PSYNC_NOINLINE static void psync_apipool_dump_socket(psock_t *api) {
   binresult *res;
-  res = get_result(api);
+  res = papi_result(api);
   psync_apipool_release_bad(api);
   if (!res) {
     debug(D_NOTICE, "could not read result from socket, it is probably broken");
@@ -337,7 +337,7 @@ void psync_apipool_release(psock_t *api) {
   }
 #endif
   if (hash_func(apiserver) == api->misc)
-    psync_cache_add(apikey, api, PSYNC_APIPOOL_MAXIDLESEC, psync_ret_api,
+    pcache_add(apikey, api, PSYNC_APIPOOL_MAXIDLESEC, psync_ret_api,
                     PSYNC_APIPOOL_MAXIDLE);
   else
     psync_ret_api(api);
@@ -393,16 +393,16 @@ void psync_set_local_full(int over) {
   if (over != isover) {
     isover = over;
     if (isover) {
-      psync_set_status(PSTATUS_TYPE_DISKFULL, PSTATUS_DISKFULL_FULL);
+      pstatus_set(PSTATUS_TYPE_DISKFULL, PSTATUS_DISKFULL_FULL);
     } else
-      psync_set_status(PSTATUS_TYPE_DISKFULL, PSTATUS_DISKFULL_OK);
+      pstatus_set(PSTATUS_TYPE_DISKFULL, PSTATUS_DISKFULL_OK);
   }
 }
 
 int psync_handle_api_result(uint64_t result) {
   if (result == 2000) {
-    psync_set_status(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADLOGIN);
-    psync_timer_notify_exception();
+    pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADLOGIN);
+    ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   } else if (result == 2003 || result == 2009 || result == 2005 ||
              result == 2029 || result == 2067 || result == 5002)
@@ -421,7 +421,7 @@ int psync_get_remote_file_checksum(psync_fileid_t fileid, unsigned char *hexsum,
   psync_sql_res *sres;
   psync_variant_row row;
   uint64_t result, h;
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("fileid", fileid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("fileid", fileid)};
   sres = psync_sql_query_rdlock(
       "SELECT h.checksum, f.size, f.hash FROM hashchecksum h, file f WHERE "
       "f.id=? AND f.hash=h.hash AND f.size=h.size");
@@ -441,16 +441,16 @@ int psync_get_remote_file_checksum(psync_fileid_t fileid, unsigned char *hexsum,
   res = psync_api_run_command("checksumfile", params);
   if (!res)
     return PSYNC_NET_TEMPFAIL;
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     debug(D_WARNING, "checksumfile returned error %lu", (unsigned long)result);
     psync_free(res);
     return psync_handle_api_result(result);
   }
-  meta = psync_find_result(res, "metadata", PARAM_HASH);
-  checksum = psync_find_result(res, PSYNC_CHECKSUM, PARAM_STR);
-  result = psync_find_result(meta, "size", PARAM_NUM)->num;
-  h = psync_find_result(meta, "hash", PARAM_NUM)->num;
+  meta = papi_find_result2(res, "metadata", PARAM_HASH);
+  checksum = papi_find_result2(res, PSYNC_CHECKSUM, PARAM_STR);
+  result = papi_find_result2(meta, "size", PARAM_NUM)->num;
+  h = papi_find_result2(meta, "hash", PARAM_NUM)->num;
   if (fsize)
     *fsize = result;
   if (hash)
@@ -696,7 +696,7 @@ psock_t *psync_socket_connect_download(const char *host, int unsigned port,
 psock_t *psync_api_connect_download() {
   psock_t *sock;
   int64_t dwlspeed;
-  sock = psync_api_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
+  sock = papi_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
   if (sock) {
     dwlspeed = psync_setting_get_int(_PS(maxdownloadspeed));
     if (dwlspeed != -1 && dwlspeed < PSYNC_MAX_SPEED_RECV_BUFFER) {
@@ -734,7 +734,7 @@ void psync_account_downloaded_bytes(int unsigned bytes) {
           psync_current_time - PSYNC_SPEED_CALC_AVERAGE_SEC)
         sum += download_bytes_sec[i].bytes;
     download_speed = sum / PSYNC_SPEED_CALC_AVERAGE_SEC;
-    psync_status_set_download_speed(download_speed);
+    pstatus_download_set_speed(download_speed);
   }
 }
 
@@ -776,7 +776,7 @@ static int psync_socket_readall_download_th(psock_t *sock, void *buff,
     readbytes = 0;
     while (num) {
       while ((thissec = get_download_bytes_this_sec()) >= dwlspeed)
-        psync_timer_wait_next_sec();
+        ptimer_wait_next_sec();
       if (num > dwlspeed - thissec)
         rrd = dwlspeed - thissec;
       else
@@ -829,7 +829,7 @@ static void account_uploaded_bytes(int unsigned bytes) {
           psync_current_time - PSYNC_SPEED_CALC_AVERAGE_SEC)
         sum += upload_bytes_sec[i].bytes;
     upload_speed = sum / PSYNC_SPEED_CALC_AVERAGE_SEC;
-    psync_status_set_upload_speed(upload_speed);
+    pstatus_upload_set_speed(upload_speed);
   }
 }
 
@@ -862,7 +862,7 @@ long psync_socket_writeall_upload(psock_t *sock, const void *buff,
         dyn_upload_speed =
             (dyn_upload_speed * PSYNC_UPL_AUTO_SHAPER_INC_PER) / 100;
         //        set_send_buf(sock);
-        psync_timer_wait_next_sec();
+        ptimer_wait_next_sec();
       }
       debug(D_NOTICE, "dyn_upload_speed=%lu", dyn_upload_speed);
       if (num > dyn_upload_speed - thissec)
@@ -890,7 +890,7 @@ long psync_socket_writeall_upload(psock_t *sock, const void *buff,
     writebytes = 0;
     while (num) {
       while ((thissec = get_upload_bytes_this_sec()) >= uplspeed)
-        psync_timer_wait_next_sec();
+        ptimer_wait_next_sec();
       if (num > uplspeed - thissec)
         wwr = uplspeed - thissec;
       else
@@ -925,7 +925,7 @@ psync_http_socket *psync_http_connect(const char *host, const char *path,
   usessl = psync_setting_get_bool(_PS(usessl));
   cl = snprintf(cachekey, sizeof(cachekey) - 1, "HTTP%d-%s", usessl, host) + 1;
   cachekey[sizeof(cachekey) - 1] = 0;
-  sock = (psock_t *)psync_cache_get(cachekey);
+  sock = (psock_t *)pcache_get(cachekey);
   if (!sock) {
     sock = psync_socket_connect_download(host, usessl ? 443 : 80, usessl);
     if (!sock)
@@ -1043,8 +1043,8 @@ void psync_http_close(psync_http_socket *http) {
     //    contentlength=%lu", http->cachekey, (unsigned)http->keepalive,
     //                    (unsigned long)http->readbytes, (unsigned
     //                    long)http->contentlength);
-    psync_cache_add(http->cachekey, http->sock, http->keepalive - 5,
-                    (psync_cache_free_callback)psync_socket_close_download,
+    pcache_add(http->cachekey, http->sock, http->keepalive - 5,
+                    (pcache_free_cb)psync_socket_close_download,
                     PSYNC_MAX_IDLE_HTTP_CONNS);
   } else {
     debug(D_NOTICE,
@@ -1116,7 +1116,7 @@ static void connect_cache_thread(void *ptr) {
   sock =
       psock_connect(node->host, node->usessl ? 443 : 80, node->usessl);
   pthread_mutex_lock(&connect_cache_mutex);
-  psync_tree_del(&connect_cache_tree, &node->tree);
+  ptree_del(&connect_cache_tree, &node->tree);
   if (node->haswaiter) {
     *node->res = sock;
     node->ready = 1;
@@ -1129,8 +1129,8 @@ static void connect_cache_thread(void *ptr) {
       snprintf(cachekey, sizeof(cachekey) - 1, "HTTP%d-%s", node->usessl,
                node->host);
       cachekey[sizeof(cachekey) - 1] = 0;
-      psync_cache_add(cachekey, sock, 25,
-                      (psync_cache_free_callback)psync_socket_close_download,
+      pcache_add(cachekey, sock, 25,
+                      (pcache_free_cb)psync_socket_close_download,
                       PSYNC_MAX_IDLE_HTTP_CONNS);
     }
     pthread_mutex_unlock(&connect_cache_mutex);
@@ -1157,23 +1157,23 @@ static connect_cache_tree_node_t *
 connect_cache_neighbour_is_free_duplicate(psync_tree *e, const char *host) {
   connect_cache_tree_node_t *node;
   psync_tree *n;
-  n = psync_tree_get_next(e);
+  n = ptree_get_next(e);
   while (n) {
-    node = psync_tree_element(n, connect_cache_tree_node_t, tree);
+    node = ptree_element(n, connect_cache_tree_node_t, tree);
     if (strcmp(node->host, host))
       break;
     if (!node->haswaiter)
       return node;
-    n = psync_tree_get_next(n);
+    n = ptree_get_next(n);
   }
-  n = psync_tree_get_prev(e);
+  n = ptree_get_prev(e);
   while (n) {
-    node = psync_tree_element(n, connect_cache_tree_node_t, tree);
+    node = ptree_element(n, connect_cache_tree_node_t, tree);
     if (strcmp(node->host, host))
       break;
     if (!node->haswaiter)
       return node;
-    n = psync_tree_get_prev(n);
+    n = ptree_get_prev(n);
   }
   return NULL;
 }
@@ -1186,18 +1186,18 @@ void psync_http_connect_and_cache_host(const char *host) {
   pthread_mutex_lock(&connect_cache_mutex);
   if (!connect_cache_tree) {
     node = connect_cache_create_node(host);
-    psync_tree_add_after(&connect_cache_tree, NULL, &node->tree);
+    ptree_add_after(&connect_cache_tree, NULL, &node->tree);
   } else {
     e = connect_cache_tree;
     while (1) {
-      node = psync_tree_element(e, connect_cache_tree_node_t, tree);
+      node = ptree_element(e, connect_cache_tree_node_t, tree);
       c = strcmp(host, node->host);
       if (c < 0) {
         if (e->left)
           e = e->left;
         else {
           node = connect_cache_create_node(host);
-          psync_tree_add_before(&connect_cache_tree, e, &node->tree);
+          ptree_add_before(&connect_cache_tree, e, &node->tree);
           break;
         }
       } else if (c > 0) {
@@ -1205,7 +1205,7 @@ void psync_http_connect_and_cache_host(const char *host) {
           e = e->right;
         else {
           node = connect_cache_create_node(host);
-          psync_tree_add_after(&connect_cache_tree, e, &node->tree);
+          ptree_add_after(&connect_cache_tree, e, &node->tree);
           break;
         }
       } else {
@@ -1215,7 +1215,7 @@ void psync_http_connect_and_cache_host(const char *host) {
           break;
         } else {
           node = connect_cache_create_node(host);
-          psync_tree_add_after(&connect_cache_tree, e, &node->tree);
+          ptree_add_after(&connect_cache_tree, e, &node->tree);
           break;
         }
       }
@@ -1237,7 +1237,7 @@ psock_t *connect_cache_wait_for_http_connection(const char *host,
   if (connect_cache_tree) {
     e = connect_cache_tree;
     while (1) {
-      node = psync_tree_element(e, connect_cache_tree_node_t, tree);
+      node = ptree_element(e, connect_cache_tree_node_t, tree);
       c = strcmp(host, node->host);
       if (c < 0) {
         if (e->left)
@@ -1290,7 +1290,7 @@ psync_http_socket *psync_http_connect_multihost(const binresult *hosts,
                   hosts->array[i]->str) +
          1;
     cachekey[sizeof(cachekey) - 1] = 0;
-    sock = (psock_t *)psync_cache_get(cachekey);
+    sock = (psock_t *)pcache_get(cachekey);
     if (sock) {
       if (unlikely_log(psock_is_broken(sock->sock))) {
         psock_close_bad(sock);
@@ -1327,7 +1327,7 @@ psync_http_socket *psync_http_connect_multihost(const binresult *hosts,
         }
       }
       if (!sock) {
-        psync_timer_notify_exception();
+        ptimer_notify_exception();
         return NULL;
       }
     }
@@ -1361,7 +1361,7 @@ psync_http_connect_multihost_from_cache(const binresult *hosts,
                   hosts->array[i]->str) +
          1;
     cachekey[sizeof(cachekey) - 1] = 0;
-    sock = (psock_t *)psync_cache_get(cachekey);
+    sock = (psock_t *)pcache_get(cachekey);
     if (sock) {
       if (unlikely_log(psock_is_broken(sock->sock))) {
         psock_close_bad(sock);
@@ -1592,8 +1592,8 @@ char *psync_url_decode(const char *s) {
 static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
                                    uint64_t hash,
                                    psync_file_checksums **checksums) {
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("fileid", fileid),
-                       P_NUM("hash", hash)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("fileid", fileid),
+                       PAPI_NUM("hash", hash)};
   binresult *res;
   const binresult *hosts;
   const char *requestpath;
@@ -1606,31 +1606,31 @@ static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
   *checksums = NULL; /* gcc is not smart enough to notice that initialization is
                         not needed */
   if (api)
-    res = send_command(api, "getchecksumlink", params);
+    res = papi_send2(api, "getchecksumlink", params);
   else {
     api = psync_apipool_get();
     if (unlikely(!api))
       return PSYNC_NET_TEMPFAIL;
-    res = send_command(api, "getchecksumlink", params);
+    res = papi_send2(api, "getchecksumlink", params);
     if (res)
       psync_apipool_release(api);
     else
       psync_apipool_release_bad(api);
   }
   if (unlikely_log(!res)) {
-    psync_timer_notify_exception();
+    ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     debug(D_ERROR, "getchecksumlink returned error %lu", (unsigned long)result);
     psync_free(res);
     return psync_handle_api_result(result);
   }
-  hosts = psync_find_result(res, "hosts", PARAM_ARRAY);
-  requestpath = psync_find_result(res, "path", PARAM_STR)->str;
+  hosts = papi_find_result2(res, "hosts", PARAM_ARRAY);
+  requestpath = papi_find_result2(res, "path", PARAM_STR)->str;
   psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
-                 psync_find_result(res, "dwltag", PARAM_STR)->str);
+                 papi_find_result2(res, "dwltag", PARAM_STR)->str);
   http = NULL;
   for (i = 0; i < hosts->length; i++)
     if ((http = psync_http_connect(hosts->array[i]->str, requestpath, 0, 0,
@@ -1678,20 +1678,20 @@ err0:
 static int psync_net_get_upload_checksums(psock_t *api,
                                           psync_uploadid_t uploadid,
                                           psync_file_checksums **checksums) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("uploadid", uploadid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("uploadid", uploadid)};
   binresult *res;
   psync_file_checksums *cs;
   psync_block_checksum_header hdr;
   uint64_t result;
   uint32_t i;
   *checksums = NULL;
-  res = send_command(api, "upload_blockchecksums", params);
+  res = papi_send2(api, "upload_blockchecksums", params);
   if (unlikely_log(!res)) {
-    psync_timer_notify_exception();
+    ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     debug(D_ERROR, "upload_blockchecksums returned error %lu",
           (unsigned long)result);
@@ -2430,9 +2430,9 @@ static int is_revision_local(const unsigned char *localhashhex,
 }
 
 static int download_file_revisions(psync_fileid_t fileid) {
-  binparam params[] = {P_STR("auth", psync_my_auth), P_NUM("fileid", fileid),
-                       P_BOOL("showchecksums", 1),
-                       P_STR("timeformat", "timestamp")};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("fileid", fileid),
+                       PAPI_BOOL("showchecksums", 1),
+                       PAPI_STR("timeformat", "timestamp")};
   psock_t *api;
   binresult *res;
   const binresult *revs, *meta;
@@ -2442,54 +2442,54 @@ static int download_file_revisions(psync_fileid_t fileid) {
   api = psync_apipool_get();
   if (unlikely(!api))
     return PSYNC_NET_TEMPFAIL;
-  res = send_command(api, "listrevisions", params);
+  res = papi_send2(api, "listrevisions", params);
   if (unlikely_log(!res)) {
     psync_apipool_release_bad(api);
-    psync_timer_notify_exception();
+    ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   }
   psync_apipool_release(api);
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     debug(D_ERROR, "listrevisions returned error %lu", (unsigned long)result);
     psync_free(res);
     return psync_handle_api_result(result);
   }
-  revs = psync_find_result(res, "revisions", PARAM_ARRAY);
-  meta = psync_find_result(res, "metadata", PARAM_HASH);
+  revs = papi_find_result2(res, "revisions", PARAM_ARRAY);
+  meta = papi_find_result2(res, "metadata", PARAM_HASH);
   psync_sql_start_transaction();
   fr = psync_sql_prep_statement("REPLACE INTO filerevision (fileid, hash, "
                                 "ctime, size) VALUES (?, ?, ?, ?)");
   hc = psync_sql_prep_statement(
       "REPLACE INTO hashchecksum (hash, size, checksum) VALUES (?, ?, ?)");
   for (i = 0; i < revs->length; i++) {
-    hash = psync_find_result(revs->array[i], "hash", PARAM_NUM)->num;
-    size = psync_find_result(revs->array[i], "size", PARAM_NUM)->num;
+    hash = papi_find_result2(revs->array[i], "hash", PARAM_NUM)->num;
+    size = papi_find_result2(revs->array[i], "size", PARAM_NUM)->num;
     psync_sql_bind_uint(fr, 1, fileid);
     psync_sql_bind_uint(fr, 2, hash);
     psync_sql_bind_uint(
-        fr, 3, psync_find_result(revs->array[i], "created", PARAM_NUM)->num);
+        fr, 3, papi_find_result2(revs->array[i], "created", PARAM_NUM)->num);
     psync_sql_bind_uint(fr, 4, size);
     psync_sql_run(fr);
     psync_sql_bind_uint(hc, 1, hash);
     psync_sql_bind_uint(hc, 2, size);
     psync_sql_bind_lstring(
         hc, 3,
-        psync_find_result(revs->array[i], PSYNC_CHECKSUM, PARAM_STR)->str,
+        papi_find_result2(revs->array[i], PSYNC_CHECKSUM, PARAM_STR)->str,
         PSYNC_HASH_DIGEST_HEXLEN);
     psync_sql_run(hc);
   }
-  hash = psync_find_result(meta, "hash", PARAM_NUM)->num;
+  hash = papi_find_result2(meta, "hash", PARAM_NUM)->num;
   psync_sql_bind_uint(fr, 1, fileid);
   psync_sql_bind_uint(fr, 2, hash);
   psync_sql_bind_uint(fr, 3,
-                      psync_find_result(meta, "modified", PARAM_NUM)->num);
-  psync_sql_bind_uint(fr, 4, psync_find_result(meta, "size", PARAM_NUM)->num);
+                      papi_find_result2(meta, "modified", PARAM_NUM)->num);
+  psync_sql_bind_uint(fr, 4, papi_find_result2(meta, "size", PARAM_NUM)->num);
   psync_sql_run_free(fr);
   psync_sql_bind_uint(hc, 1, hash);
-  psync_sql_bind_uint(hc, 2, psync_find_result(meta, "size", PARAM_NUM)->num);
+  psync_sql_bind_uint(hc, 2, papi_find_result2(meta, "size", PARAM_NUM)->num);
   psync_sql_bind_lstring(hc, 3,
-                         psync_find_result(res, PSYNC_CHECKSUM, PARAM_STR)->str,
+                         papi_find_result2(res, PSYNC_CHECKSUM, PARAM_STR)->str,
                          PSYNC_HASH_DIGEST_HEXLEN);
   psync_sql_run_free(hc);
   psync_sql_commit_transaction();
@@ -2528,7 +2528,7 @@ psync_file_lock_t *psync_lock_file(const char *path) {
   at = &file_lock_tree;
   while (tr) {
     cmp = strcmp(
-        path, psync_tree_element(tr, psync_file_lock_t, tree)->filename);
+        path, ptree_element(tr, psync_file_lock_t, tree)->filename);
     if (cmp < 0) {
       if (tr->left)
         tr = tr->left;
@@ -2550,40 +2550,40 @@ psync_file_lock_t *psync_lock_file(const char *path) {
     }
   }
   *at = &lock->tree;
-  psync_tree_added_at(&file_lock_tree, tr, &lock->tree);
+  ptree_added_at(&file_lock_tree, tr, &lock->tree);
   pthread_mutex_unlock(&file_lock_mutex);
   return lock;
 }
 
 void psync_unlock_file(psync_file_lock_t *lock) {
   pthread_mutex_lock(&file_lock_mutex);
-  psync_tree_del(&file_lock_tree, &lock->tree);
+  ptree_del(&file_lock_tree, &lock->tree);
   pthread_mutex_unlock(&file_lock_mutex);
   psync_free(lock);
 }
 
 int psync_get_upload_checksum(psync_uploadid_t uploadid, unsigned char *uhash,
                               uint64_t *usize) {
-  binparam params[] = {P_STR("auth", psync_my_auth),
-                       P_NUM("uploadid", uploadid)};
+  binparam params[] = {PAPI_STR("auth", psync_my_auth),
+                       PAPI_NUM("uploadid", uploadid)};
   psock_t *api;
   binresult *res;
   api = psync_apipool_get();
   if (unlikely(!api))
     return PSYNC_NET_TEMPFAIL;
-  res = send_command(api, "upload_info", params);
+  res = papi_send2(api, "upload_info", params);
   if (unlikely_log(!res)) {
     psync_apipool_release_bad(api);
-    psync_timer_notify_exception();
+    ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   }
   psync_apipool_release(api);
-  if (psync_find_result(res, "result", PARAM_NUM)->num) {
+  if (papi_find_result2(res, "result", PARAM_NUM)->num) {
     psync_free(res);
     return PSYNC_NET_PERMFAIL;
   }
-  *usize = psync_find_result(res, "size", PARAM_NUM)->num;
-  memcpy(uhash, psync_find_result(res, PSYNC_CHECKSUM, PARAM_STR)->str,
+  *usize = papi_find_result2(res, "size", PARAM_NUM)->num;
+  memcpy(uhash, papi_find_result2(res, PSYNC_CHECKSUM, PARAM_STR)->str,
          PSYNC_HASH_DIGEST_HEXLEN);
   psync_free(res);
   return PSYNC_NET_OK;
@@ -2610,8 +2610,8 @@ static void psync_send_debug_thread(void *ptr) {
   char *str = (char *)ptr;
   pthread_mutex_lock(&m);
   if (!last || strcmp(last, str)) {
-    binparam params[] = {P_STR("report", str),
-                         P_NUM("userid", psync_my_userid)};
+    binparam params[] = {PAPI_STR("report", str),
+                         PAPI_NUM("userid", psync_my_userid)};
     binresult *res;
     debug(D_NOTICE, "sending debug %s", str);
     res = psync_api_run_command("senddebug", params);
@@ -2657,7 +2657,7 @@ int psync_send_debug(int thread, const char *file, const char *function,
 }
 
 void psync_netlibs_init() {
-  psync_timer_register(psync_netlibs_timer, 1, NULL);
+  ptimer_register(psync_netlibs_timer, 1, NULL);
   sem_init(&api_pool_sem, 0, PSYNC_APIPOOL_MAXACTIVE);
 }
 
@@ -2673,7 +2673,7 @@ int psync_do_run_command_res(const char *cmd, size_t cmdlen,
     api = psync_apipool_get();
     if (unlikely(!api))
       goto neterr;
-    res = do_send_command(api, cmd, cmdlen, params, paramscnt, -1, 1);
+    res = papi_send(api, cmd, cmdlen, params, paramscnt, -1, 1);
     if (likely(res)) {
       psync_apipool_release(api);
       break;
@@ -2683,11 +2683,11 @@ int psync_do_run_command_res(const char *cmd, size_t cmdlen,
         goto neterr;
     }
   }
-  result = psync_find_result(res, "result", PARAM_NUM)->num;
+  result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     debug(D_WARNING, "command %s returned code %u", cmd, (unsigned)result);
     if (err)
-      *err = psync_strdup(psync_find_result(res, "error", PARAM_STR)->str);
+      *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     psync_process_api_error(result);
   }
   psync_free(res);

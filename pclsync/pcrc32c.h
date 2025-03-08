@@ -51,7 +51,7 @@ typedef struct {
   };
 } psync_fast_hash256_ctx;
 
-uint32_t psync_crc32c(uint32_t crc, const void *ptr, size_t len);
+uint32_t pcrc32c_compute(uint32_t crc, const void *ptr, size_t len);
 
 /* psync_fast_hash256 is supposed to be fast, non-cryptographic strength,
  * non-collision resistant hash function with large output. Think of it as CRC32
@@ -59,12 +59,9 @@ uint32_t psync_crc32c(uint32_t crc, const void *ptr, size_t len);
  * chances of CRC32 _random_ collision. It is intended for large inputs,
  * finalization is relatively expensive.
  */
-
-void psync_fast_hash256_init(psync_fast_hash256_ctx *ctx);
-void psync_fast_hash256_init_seed(psync_fast_hash256_ctx *ctx, const void *seed,
-                                  size_t seedlen);
-void psync_fast_hash256_update(psync_fast_hash256_ctx *ctx, const void *data,
-                               size_t len);
-void psync_fast_hash256_final(void *hash, psync_fast_hash256_ctx *ctx);
+void pcrc32c_fast_hash256_init(psync_fast_hash256_ctx *ctx);
+void pcrc32c_fast_hash256_seed(psync_fast_hash256_ctx *ctx, const void *seed, size_t seedlen);
+void pcrc32c_fast_hash256_update(psync_fast_hash256_ctx *ctx, const void *data, size_t len);
+void pcrc32c_fast_hash256_final(void *hash, psync_fast_hash256_ctx *ctx);
 
 #endif

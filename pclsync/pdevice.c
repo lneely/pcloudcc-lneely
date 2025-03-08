@@ -30,6 +30,8 @@
 */
 
 #include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "pdevice.h"
 #include "plibs.h"

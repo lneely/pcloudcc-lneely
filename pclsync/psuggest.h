@@ -29,17 +29,11 @@
    DAMAGE.
 */
 
-#pragma once
+#ifndef _PSYNC_SCANNER_H
+#define _PSYNC_SCANNER_H
 
-#ifndef _PDEVICE_MONITOR
-#define _PDEVICE_MONITOR
+#include "pfoldersync.h"
 
-#ifdef __cplusplus
-extern "C" {
+psuggested_folders_t *psuggest_scan_folder(const char *path);
+
 #endif
-void psync_devmon_init();
-#ifdef __cplusplus
-}
-#endif
-
-#endif //_PDEVICE_MONITOR

@@ -59,6 +59,7 @@
 #include "psynclib.h"
 #include <stddef.h>
 #include <string.h>
+#include <unistd.h>
 
 // HACK: This function is duplicated from
 // mbedtls-2.1.14/library/pkparse.c, because it is needed to properly
@@ -358,7 +359,7 @@ static void psync_ssl_save_session(ssl_connection_t *conn) {
   if (mbedtls_ssl_get_session(&conn->ssl, sess))
     psync_free(sess);
   else
-    psync_cache_add(conn->cachekey, sess, PSYNC_SSL_SESSION_CACHE_TIMEOUT,
+    pcache_add(conn->cachekey, sess, PSYNC_SSL_SESSION_CACHE_TIMEOUT,
                     psync_ssl_free_session, PSYNC_MAX_SSL_SESSIONS_PER_DOMAIN);
 }
 
@@ -434,7 +435,7 @@ int psync_ssl_connect(int sock, void **sslconn,
 
   mbedtls_ssl_setup(&conn->ssl, &conn->cfg); // attach config to ssl
 
-  if ((sess = (mbedtls_ssl_session *)psync_cache_get(conn->cachekey))) {
+  if ((sess = (mbedtls_ssl_session *)pcache_get(conn->cachekey))) {
     debug(D_NOTICE, "reusing cached session for %s", hostname);
     if (mbedtls_ssl_set_session(&conn->ssl, sess)) {
       debug(D_WARNING, "ssl_set_session failed");
