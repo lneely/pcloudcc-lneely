@@ -104,6 +104,7 @@ typedef off_t fuse_off_t;
 #define PSYNC_FS_ERR_MOVE_ACROSS_CRYPTO EXDEV
 #endif
 
+static int shutdown_in_progress = 0;
 static struct fuse_chan *psync_fuse_channel = NULL;
 static struct fuse *psync_fuse = NULL;
 static char *psync_current_mountpoint = NULL;
@@ -3457,6 +3458,11 @@ static void psync_fs_dump_internals() {
 #endif
 
 static void psync_fs_do_stop(void) {
+  if (!__sync_bool_compare_and_swap(&shutdown_in_progress, 0, 1)) {
+    // prevent multiple executions
+    return;
+  }
+
   debug(D_NOTICE, "stopping");
   pthread_mutex_lock(&start_mutex);
   if (started == 1) {
@@ -3521,8 +3527,7 @@ void psync_fs_stop() { psync_fs_do_stop(); }
 
 static void psync_signal_handler(int sig) {
   debug(D_NOTICE, "got signal %d", sig);
-  psync_fs_do_stop();
-  exit(1);
+  exit(1); // invoke psync_do_stop via atexit()
 }
 
 #if IS_DEBUG
