@@ -7,9 +7,9 @@
 #include <stdbool.h>
 #include <errno.h>
 
+#include "pshm.h"
 #include "ppath.h"
 #include "plibs.h"
-#include "pshm.h"
 
 key_t pshm_get_key() {
     char path[PATH_MAX];

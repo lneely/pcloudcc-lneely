@@ -2,12 +2,12 @@ CC			:= gcc
 CXX			:= g++
 AR			:= ar
 COMMONFLAGS	= -fsanitize=address
-CFLAGS		= -fPIC $(COMMONFLAGS) -I./pclsync -I/usr/include
+CFLAGS		= -fPIC $(COMMONFLAGS) -I./pclsync -I/usr/include -I/usr/include/mbedtls2
 ifneq (,$(filter clang%,$(CC)))
     CFLAGS += -Wthread-safety
 endif
 CXXFLAGS	= $(CFLAGS)
-LIBLDFLAGS	= $(COMMONFLAGS) -lpthread -ludev -lsqlite3 -lz -lmbedtls -lmbedx509 -lmbedcrypto
+LIBLDFLAGS	= $(COMMONFLAGS) -lpthread -ludev -lsqlite3 -lz -l:libmbedtls.so.14 -l:libmbedx509.so.1 -l:libmbedcrypto.so.7
 EXECLDFLAGS	= $(COMMONFLAGS) -lboost_program_options -lfuse
 
 SCAN		:= 0
