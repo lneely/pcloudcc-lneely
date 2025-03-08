@@ -398,7 +398,6 @@ static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
   return -1;
 }
 
-// FIXME
 int psync_ssl_connect(int sock, void **sslconn,
                       const char *hostname) {
   ssl_connection_t *conn;
