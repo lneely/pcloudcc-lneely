@@ -37,10 +37,12 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "pcryptofolder.h"
 #include "prpc.h"
 #include "psynclib.h"
 #include "pshm.h"
 #include "pdevice.h"
+#include "pcommands.h"
 
 #include "pclsync_lib.h"
 
@@ -199,28 +201,35 @@ void event_handler(psync_eventtype_t event, psync_eventdata_t eventdata) {
 }
 
 static int lib_setup_cripto() {
-  int ret = 0;
-  ret = psync_crypto_issetup();
-  if (ret) {
-    ret = psync_crypto_start(
-        clib::pclsync_lib::get_lib().get_crypto_pass().c_str());
-    std::cout << "crypto is setup, login result=" << ret << std::endl;
-  } else {
-    std::cout << "crypto is not setup" << std::endl;
-    ret = psync_crypto_setup(
-        clib::pclsync_lib::get_lib().get_crypto_pass().c_str(), "no hint");
-    if (ret) {
-      std::cout << "crypto setup failed" << std::endl;
-    } else {
-      ret = psync_crypto_start(
-          clib::pclsync_lib::get_lib().get_crypto_pass().c_str());
-      std::cout << "crypto setup successful, start=" << ret << std::endl;
-      ret = psync_crypto_mkdir(0, "Crypto", NULL, NULL);
-      std::cout << "creating folder=" << ret << std::endl;
-    }
+  const char *pwd = clib::pclsync_lib::get_lib().get_crypto_pass().c_str();
+
+  if(pstatus_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_OFFLINE) {
+    std::cout << "Cannot unlock crypto folder, pcloudcc is offline" << std::endl;
+    return PSYNC_CRYPTO_CANT_CONNECT;
   }
+
+  if(!psync_crypto_issetup()) {
+    std::cout << "crypto is not setup, setting it up now..." << std::endl;
+    if(int ret = pcryptofolder_setup(pwd, "no hint") != PSYNC_CRYPTO_SETUP_SUCCESS) {
+      std::cout << "crypto setup failed, error code was " << ret << std::endl;
+      return ret;
+    }
+    if(int ret = pcryptofolder_mkdir(0, "Crypto", NULL, NULL) != PSYNC_CRYPTO_SUCCESS) {
+      std::cout << "failed to create crypto directory, error code was" << ret << std::endl;
+      return ret;
+    }
+    std::cout << "crypto folder was setup using the provided password, "
+      << "you may want to change your password hint on the "
+      << "pcloud website." << std::endl;
+  }
+
+  if(int ret = pcryptofolder_unlock(pwd) != PSYNC_CRYPTO_START_SUCCESS) {
+    std::cout << "Failed to unlock crypto folder: error code was " << ret << std::endl;
+    return ret;
+  }
+
   clib::pclsync_lib::get_lib().crypto_on_ = true;
-  return ret;
+  return 0;
 }
 
 static const char *status2string(uint32_t status) {
@@ -450,12 +459,12 @@ int clib::pclsync_lib::init() {
     psync_free(username_old);
   }
 
-  psync_overlay_register_callback(20, &clib::pclsync_lib::start_crypto);
-  psync_overlay_register_callback(21, &clib::pclsync_lib::stop_crypto);
-  psync_overlay_register_callback(22, &clib::pclsync_lib::finalize);
-  psync_overlay_register_callback(23, &clib::pclsync_lib::list_sync_folders);
-  psync_overlay_register_callback(24, &clib::pclsync_lib::add_sync_folder);
-  psync_overlay_register_callback(25, &clib::pclsync_lib::remove_sync_folder);
+  psync_overlay_register_callback(STARTCRYPTO, &clib::pclsync_lib::start_crypto);
+  psync_overlay_register_callback(STOPCRYPTO, &clib::pclsync_lib::stop_crypto);
+  psync_overlay_register_callback(FINALIZE, &clib::pclsync_lib::finalize);
+  psync_overlay_register_callback(LISTSYNC, &clib::pclsync_lib::list_sync_folders);
+  psync_overlay_register_callback(ADDSYNC, &clib::pclsync_lib::add_sync_folder);
+  psync_overlay_register_callback(STOPSYNC, &clib::pclsync_lib::remove_sync_folder);
 
   return 0;
 }

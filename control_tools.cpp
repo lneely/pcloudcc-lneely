@@ -43,6 +43,7 @@
 #include "pclsync/pshm.h"
 #include "pclsync/pfoldersync.h"
 #include "pclsync/rpcclient.h"
+#include "pclsync/pcommands.h"
 
 #include "CLI11.hpp"
 
@@ -51,15 +52,6 @@ namespace cc = console_client;
 namespace control_tools {
 
 static const int STOP = 0;
-
-enum command_ids_ {
-  STARTCRYPTO = 20,
-  STOPCRYPTO,
-  FINALIZE,
-  LISTSYNC,
-  ADDSYNC,
-  STOPSYNC
-};
 
 int list_sync_folders() {
   int ret;
