@@ -32,10 +32,14 @@
 #ifndef __PCRYPTOFOLDER_H
 #define __PCRYPTOFOLDER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "papi.h"
 #include "pcrypto.h"
+#include "pfoldersync.h"
 #include "pfsfolder.h"
-#include "psynclib.h"
 
 #define PSYNC_CRYPTO_SYM_FLAG_ISDIR 1
 
@@ -73,5 +77,9 @@ int pcryptofolder_mkdir(psync_folderid_t folderid, const char *name, const char 
 int pcryptofolder_reset();
 int pcryptofolder_setup(const char *password, const char *hint);
 int pcryptofolder_unlock(const char *password);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

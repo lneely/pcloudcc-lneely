@@ -31,6 +31,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stddef.h>
+#include <sys/stat.h>
 
 #include "pqevent.h"
 #include "pdownload.h"
@@ -48,6 +49,7 @@
 #include "ptimer.h"
 #include "pupload.h"
 #include "ppath.h"
+#include "pfile.h"
 
 extern const unsigned char pfile_invalid_chars[];
 

@@ -1055,3 +1055,30 @@ int ptask_download_needed_async(psync_fileid_t fileid,
   task.request.cbext = cbext;
   return task_send_async(&task, sizeof(task));
 }
+
+void ptask_cfldr_save_fldrkey(void *ptr) {
+  insert_folder_key_task *t;
+  psync_sql_res *res;
+  t = (insert_folder_key_task *)ptr;
+  res = psync_sql_prep_statement(
+      "REPLACE INTO cryptofolderkey (folderid, enckey) VALUES (?, ?)");
+  psync_sql_bind_uint(res, 1, t->id);
+  psync_sql_bind_blob(res, 2, (const char *)t->key->data, t->key->datalen);
+  psync_sql_run_free(res);
+  psync_free(t->key);
+  psync_free(t);
+}
+
+void ptask_cfldr_save_filekey(void *ptr) {
+  insert_file_key_task *t;
+  psync_sql_res *res;
+  t = (insert_file_key_task *)ptr;
+  res = psync_sql_prep_statement(
+      "REPLACE INTO cryptofilekey (fileid, hash, enckey) VALUES (?, ?, ?)");
+  psync_sql_bind_uint(res, 1, t->id);
+  psync_sql_bind_uint(res, 2, t->hash);
+  psync_sql_bind_blob(res, 3, (const char *)t->key->data, t->key->datalen);
+  psync_sql_run_free(res);
+  psync_free(t->key);
+  psync_free(t);
+}

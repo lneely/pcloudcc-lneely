@@ -35,10 +35,12 @@
 #include <pthread.h>
 
 #include "pcompiler.h"
+#include "pstatus.h"
 #include "putil.h"
-#include "psynclib.h"
+#include "psynclib.h" // need for macros...
 
 #include <sqlite3.h>
+#include <stdint.h>
 #include <string.h>
 
 #define D_NONE 0

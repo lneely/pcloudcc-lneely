@@ -32,7 +32,7 @@
 #ifndef _PSYNC_FSUPLOAD_H
 #define _PSYNC_FSUPLOAD_H
 
-#include "psynclib.h"
+#include <stdint.h>
 
 void psync_fsupload_init();
 void psync_fsupload_wake();

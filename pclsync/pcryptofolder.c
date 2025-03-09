@@ -52,6 +52,7 @@
 #include "pssl.h"
 #include "prun.h"
 #include "psys.h"
+#include "ptask.h"
 
 #include <string.h>
 
@@ -94,22 +95,22 @@ typedef struct {
   unsigned char hmackey[PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN];
 } sym_key_ver1;
 
-void sha1_hex_null_term(const void *data, size_t len, char *out);
+static void sha1hex(const void *data, size_t len, char *out);
 
 void pcryptofolder_cache_clean() {
   const char *prefixes[] = {"DKEY", "FKEY", "FLDE", "FLDD", "SEEN"};
   pcache_clean_oneof(prefixes, ARRAY_SIZE(prefixes));
 }
 
-static inline int psync_crypto_is_error(const void *ptr) {
+static inline int is_err(const void *ptr) {
   return (uintptr_t)ptr <= PSYNC_CRYPTO_MAX_ERROR;
 }
 
-static inline int psync_crypto_to_error(const void *ptr) {
+static inline int to_err(const void *ptr) {
   return -((int)(uintptr_t)ptr);
 }
 
-static void psync_cloud_crypto_setup_save_to_db(
+static void save_to_db(
     const unsigned char *rsapriv, size_t rsaprivlen,
     const unsigned char *rsapub, size_t rsapublen, const unsigned char *salt,
     size_t saltlen, size_t iterations, time_t expires, const char *publicsha1,
@@ -150,7 +151,7 @@ static void psync_cloud_crypto_setup_save_to_db(
   psync_sql_commit_transaction();
 }
 
-static int psync_cloud_crypto_setup_do_upload(const unsigned char *rsapriv,
+static int setup_do_upload(const unsigned char *rsapriv,
                                               size_t rsaprivlen,
                                               const unsigned char *rsapub,
                                               size_t rsapublen,
@@ -210,7 +211,7 @@ static void load_str_to(const psync_variant *v, unsigned char **ptr,
   *len = l;
 }
 
-static int psync_cloud_crypto_download_keys(
+static int download_keys(
     unsigned char **rsapriv, size_t *rsaprivlen, unsigned char **rsapub,
     size_t *rsapublen, unsigned char **salt, size_t *saltlen,
     size_t *iterations, char *publicsha1, char *privatesha1, uint32_t *flags) {
@@ -259,8 +260,8 @@ static int psync_cloud_crypto_download_keys(
   rsapubstruct = psync_base64_decode((const unsigned char *)data->str,
                                      data->length, &rsapubstructlen);
   psync_free(res);
-  sha1_hex_null_term(rsaprivstruct, rsaprivstructlen, privatesha1);
-  sha1_hex_null_term(rsapubstruct, rsapubstructlen, publicsha1);
+  sha1hex(rsaprivstruct, rsaprivstructlen, privatesha1);
+  sha1hex(rsapubstruct, rsapubstructlen, publicsha1);
   debug(D_NOTICE, "rsapubstruct=%s", rsapubstruct);
   switch (*((uint32_t *)rsapubstruct)) {
   case PSYNC_CRYPTO_PUB_TYPE_RSA4096:
@@ -319,7 +320,7 @@ static binresult *psync_get_keys_bin_auth(const char *auth) {
 }
 
 static int
-psync_cloud_crypto_setup_upload(const unsigned char *rsapriv, size_t rsaprivlen,
+setup_upload(const unsigned char *rsapriv, size_t rsaprivlen,
                                 const unsigned char *rsapub, size_t rsapublen,
                                 const unsigned char *salt, const char *hint,
                                 time_t *cryptoexpires, char *publicsha1,
@@ -340,9 +341,9 @@ psync_cloud_crypto_setup_upload(const unsigned char *rsapriv, size_t rsaprivlen,
   pub->type = PSYNC_CRYPTO_PUB_TYPE_RSA4096;
   pub->flags = 0;
   memcpy(pub->key, rsapub, rsapublen);
-  sha1_hex_null_term(priv, offsetof(priv_key_ver1, key) + rsaprivlen,
+  sha1hex(priv, offsetof(priv_key_ver1, key) + rsaprivlen,
                      privatesha1);
-  sha1_hex_null_term(pub, offsetof(pub_key_ver1, key) + rsapublen, publicsha1);
+  sha1hex(pub, offsetof(pub_key_ver1, key) + rsapublen, publicsha1);
   b64priv = psync_base64_encode((unsigned char *)priv,
                                 offsetof(priv_key_ver1, key) + rsaprivlen,
                                 &b64privlen);
@@ -351,7 +352,7 @@ psync_cloud_crypto_setup_upload(const unsigned char *rsapriv, size_t rsaprivlen,
                           offsetof(pub_key_ver1, key) + rsapublen, &b64publen);
   psync_free(priv);
   psync_free(pub);
-  ret = psync_cloud_crypto_setup_do_upload(b64priv, b64privlen, b64pub,
+  ret = setup_do_upload(b64priv, b64privlen, b64pub,
                                            b64publen, hint, cryptoexpires);
   psync_free(b64priv);
   psync_free(b64pub);
@@ -432,7 +433,7 @@ int pcryptofolder_setup(const char *password, const char *hint) {
                                                 rsaprivatebin->datalen, 0);
   pcrypto_ctr_encdec_free(enc);
   debug(D_NOTICE, "encoded private key, uploading keys");
-  ret = psync_cloud_crypto_setup_upload(
+  ret = setup_upload(
       rsaprivatebin->data, rsaprivatebin->datalen, rsapublicbin->data,
       rsapublicbin->datalen, salt, hint, &cryptoexpires, publicsha1,
       privatesha1);
@@ -443,7 +444,7 @@ int pcryptofolder_setup(const char *password, const char *hint) {
     return ret;
   }
   debug(D_NOTICE, "keys uploaded");
-  psync_cloud_crypto_setup_save_to_db(
+  save_to_db(
       rsaprivatebin->data, rsaprivatebin->datalen, rsapublicbin->data,
       rsapublicbin->datalen, salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN,
       PSYNC_CRYPTO_PASS_TO_KEY_ITERATIONS, cryptoexpires, publicsha1,
@@ -548,21 +549,22 @@ int pcryptofolder_unlock(const char *password) {
    * to have some thread to hold sql_lock and wait for read lock. This will
    * normally deadlock with us holding writelock and waiting for sql_lock.
    * Therefore we use sql_trylock here.
-   *
    */
-retry:
-  pthread_rwlock_wrlock(&crypto_lock);
-  if (crypto_started_l) {
-    pthread_rwlock_unlock(&crypto_lock);
-    return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_ALREADY_STARTED);
-  }
-  rowcnt = 0;
-  rsapriv = rsapub = salt = NULL;
-  iterations = 0;
-  if (psync_sql_trylock()) {
-    pthread_rwlock_unlock(&crypto_lock);
-    psys_sleep_milliseconds(1);
-    goto retry;
+  while (1) {
+    pthread_rwlock_wrlock(&crypto_lock);
+    if (crypto_started_l) {
+      pthread_rwlock_unlock(&crypto_lock);
+      return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_ALREADY_STARTED);
+    }
+    rowcnt = 0;
+    rsapriv = rsapub = salt = NULL;
+    iterations = 0;
+    if (psync_sql_trylock()) {
+      pthread_rwlock_unlock(&crypto_lock);
+      psys_sleep_milliseconds(1);
+      continue;
+    }
+    break;
   }
   res = psync_sql_query_nolock(
       "SELECT id, value FROM setting WHERE id IN ('crypto_private_key', "
@@ -591,7 +593,7 @@ retry:
       psync_free(rsapub);
       psync_free(salt);
     }
-    ret = psync_cloud_crypto_download_keys(
+    ret = download_keys(
         &rsapriv, &rsaprivlen, &rsapub, &rsapublen, &salt, &saltlen,
         &iterations, publicsha1, privatesha1, &flags);
     if (ret != PSYNC_CRYPTO_START_SUCCESS) {
@@ -604,6 +606,8 @@ retry:
     debug(D_NOTICE, "got keys from the database");
     assert(rowcnt == 4);
   }
+
+  debug(D_NOTICE, "trying to load public key");
   crypto_pubkey = psync_ssl_rsa_load_public(rsapub, rsapublen);
   if (crypto_pubkey == PSYNC_INVALID_RSA) {
     pthread_rwlock_unlock(&crypto_lock);
@@ -613,6 +617,10 @@ retry:
     psync_free(salt);
     return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_UNKNOWN_KEY_FORMAT);
   }
+  debug(D_NOTICE, "successfully loaded public key");
+
+
+  debug(D_NOTICE, "generating symmetric key");
   aeskey = psync_ssl_gen_symmetric_key_from_pass(
       password, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE, salt, saltlen,
       iterations);
@@ -622,19 +630,26 @@ retry:
   memcpy(rsaprivdec, rsapriv, rsaprivlen);
   pcrypto_ctr_encdec_decode(enc, rsaprivdec, rsaprivlen, 0);
   pcrypto_ctr_encdec_free(enc);
+  debug(D_NOTICE, "successfully generated symmetric key");
+
+
+  debug(D_NOTICE, "trying to load private key");
   crypto_privkey = psync_ssl_rsa_load_private(rsaprivdec, rsaprivlen);
   psync_ssl_memclean(rsaprivdec, rsaprivlen);
   pmemlock_free(rsaprivdec);
   if (crypto_privkey == PSYNC_INVALID_RSA) {
+    debug(D_NOTICE, "failed to load private key");
     psync_ssl_rsa_free_public(crypto_pubkey);
     crypto_pubkey = PSYNC_INVALID_RSA;
     pthread_rwlock_unlock(&crypto_lock);
-    debug(D_NOTICE, "bad password");
     psync_free(rsapriv);
     psync_free(rsapub);
     psync_free(salt);
     return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_BAD_PASSWORD);
   }
+  debug(D_NOTICE, "successfully loaded private key");
+
+  debug(D_NOTICE, "verify matching public and private key");
   if (!crypto_keys_match()) {
     psync_ssl_rsa_free_public(crypto_pubkey);
     crypto_pubkey = PSYNC_INVALID_RSA;
@@ -647,13 +662,17 @@ retry:
     psync_free(salt);
     return PRINT_RETURN_CONST(PSYNC_CRYPTO_START_KEYS_DONT_MATCH);
   }
+  debug(D_NOTICE, "public and private keys match, setting crypto started");
+
   crypto_started_l = 1;
   crypto_started_un = 1;
   pthread_rwlock_unlock(&crypto_lock);
-  if (rowcnt < 4)
-    psync_cloud_crypto_setup_save_to_db(rsapriv, rsaprivlen, rsapub, rsapublen,
+  if (rowcnt < 4) {
+    debug(D_NOTICE, "saving crypto setup to database");
+    save_to_db(rsapriv, rsaprivlen, rsapub, rsapublen,
                                         salt, saltlen, iterations, 0,
                                         publicsha1, privatesha1, flags);
+  }
   psync_free(rsapriv);
   psync_free(rsapub);
   psync_free(salt);
@@ -740,7 +759,16 @@ int pcryptofolder_reset() {
   }
 }
 
-static void *err_to_ptr(int err) { return (void *)(uintptr_t)(-err); }
+static void sha1hex(const void *data, size_t len, char *out) {
+  unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN + 1];
+  psync_sha1((const unsigned char *)data, len, (unsigned char *)sha1bin);
+  psync_binhex(out, sha1bin, PSYNC_SHA1_DIGEST_LEN);
+  out[PSYNC_SHA1_DIGEST_HEXLEN] = 0; // add null terminator
+}
+
+static void *errptr(int err) { 
+  return (void *)(uintptr_t)(-err); 
+}
 
 static void set_crypto_err_msg(const binresult *res) {
   const binresult *msg;
@@ -752,25 +780,7 @@ static void set_crypto_err_msg(const binresult *res) {
   memcpy(crypto_api_err, msg->str, l);
 }
 
-typedef struct {
-  psync_encrypted_symmetric_key_t key;
-  psync_folderid_t id;
-} insert_folder_key_task;
-
-static void save_folder_key_task(void *ptr) {
-  insert_folder_key_task *t;
-  psync_sql_res *res;
-  t = (insert_folder_key_task *)ptr;
-  res = psync_sql_prep_statement(
-      "REPLACE INTO cryptofolderkey (folderid, enckey) VALUES (?, ?)");
-  psync_sql_bind_uint(res, 1, t->id);
-  psync_sql_bind_blob(res, 2, (const char *)t->key->data, t->key->datalen);
-  psync_sql_run_free(res);
-  psync_free(t->key);
-  psync_free(t);
-}
-
-static void save_folder_key_to_db(psync_folderid_t folderid,
+static void save_folder_key(psync_folderid_t folderid,
                                   psync_encrypted_symmetric_key_t enckey) {
   // we are likely holding (few) read locks on the database, so executing here
   // will deadlock
@@ -778,27 +788,7 @@ static void save_folder_key_to_db(psync_folderid_t folderid,
   t = psync_new(insert_folder_key_task);
   t->key = psync_ssl_copy_encrypted_symmetric_key(enckey);
   t->id = folderid;
-  prun_thread1("save folder key to db task", save_folder_key_task, t);
-}
-
-typedef struct {
-  psync_encrypted_symmetric_key_t key;
-  psync_fileid_t id;
-  uint64_t hash;
-} insert_file_key_task;
-
-static void save_file_key_task(void *ptr) {
-  insert_file_key_task *t;
-  psync_sql_res *res;
-  t = (insert_file_key_task *)ptr;
-  res = psync_sql_prep_statement(
-      "REPLACE INTO cryptofilekey (fileid, hash, enckey) VALUES (?, ?, ?)");
-  psync_sql_bind_uint(res, 1, t->id);
-  psync_sql_bind_uint(res, 2, t->hash);
-  psync_sql_bind_blob(res, 3, (const char *)t->key->data, t->key->datalen);
-  psync_sql_run_free(res);
-  psync_free(t->key);
-  psync_free(t);
+  prun_thread1("save folder key to db task", ptask_cfldr_save_fldrkey, t);
 }
 
 static void save_file_key_to_db(psync_fileid_t fileid, uint64_t hash,
@@ -808,11 +798,10 @@ static void save_file_key_to_db(psync_fileid_t fileid, uint64_t hash,
   t->key = psync_ssl_copy_encrypted_symmetric_key(enckey);
   t->id = fileid;
   t->hash = hash;
-  prun_thread1("save file key to db task", save_file_key_task, t);
+  prun_thread1("save file key to db task", ptask_cfldr_save_filekey, t);
 }
 
-static psync_encrypted_symmetric_key_t
-psync_crypto_download_folder_enc_key(psync_folderid_t folderid) {
+static psync_encrypted_symmetric_key_t download_fldr_enckey(psync_folderid_t folderid) {
   binparam params[] = {PAPI_STR("auth", psync_my_auth),
                        PAPI_NUM("folderid", folderid)};
   psock_t *api;
@@ -828,13 +817,13 @@ psync_crypto_download_folder_enc_key(psync_folderid_t folderid) {
   while (1) {
     api = psync_apipool_get();
     if (!api)
-      return (psync_encrypted_symmetric_key_t)err_to_ptr(
+      return (psync_encrypted_symmetric_key_t)errptr(
           PRINT_RETURN_CONST(PSYNC_CRYPTO_CANT_CONNECT));
     res = papi_send2(api, "crypto_getfolderkey", params);
     if (unlikely_log(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
-        return (psync_encrypted_symmetric_key_t)err_to_ptr(
+        return (psync_encrypted_symmetric_key_t)errptr(
             PRINT_RETURN_CONST(PSYNC_CRYPTO_CANT_CONNECT));
     } else {
       psync_apipool_release(api);
@@ -849,7 +838,7 @@ psync_crypto_download_folder_enc_key(psync_folderid_t folderid) {
     set_crypto_err_msg(res);
     psync_free(res);
     psync_process_api_error(result);
-    return (psync_encrypted_symmetric_key_t)err_to_ptr(
+    return (psync_encrypted_symmetric_key_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_API_ERR_INTERNAL));
   }
   b64key = papi_find_result2(res, "key", PARAM_STR);
@@ -857,17 +846,16 @@ psync_crypto_download_folder_enc_key(psync_folderid_t folderid) {
                             &keylen);
   psync_free(res);
   if (!key)
-    return (psync_encrypted_symmetric_key_t)err_to_ptr(
+    return (psync_encrypted_symmetric_key_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   ret = psync_ssl_alloc_encrypted_symmetric_key(keylen);
   memcpy(ret->data, key, keylen);
   psync_free(key);
-  save_folder_key_to_db(folderid, ret);
+  save_folder_key(folderid, ret);
   return ret;
 }
 
-static psync_encrypted_symmetric_key_t
-psync_crypto_download_file_enc_key(psync_fileid_t fileid) {
+static psync_encrypted_symmetric_key_t download_file_enckey(psync_fileid_t fileid) {
   binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("fileid", fileid)};
   psock_t *api;
   binresult *res;
@@ -882,13 +870,13 @@ psync_crypto_download_file_enc_key(psync_fileid_t fileid) {
   while (1) {
     api = psync_apipool_get();
     if (!api)
-      return (psync_encrypted_symmetric_key_t)err_to_ptr(
+      return (psync_encrypted_symmetric_key_t)errptr(
           PRINT_RETURN_CONST(PSYNC_CRYPTO_CANT_CONNECT));
     res = papi_send2(api, "crypto_getfilekey", params);
     if (unlikely_log(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
-        return (psync_encrypted_symmetric_key_t)err_to_ptr(
+        return (psync_encrypted_symmetric_key_t)errptr(
             PRINT_RETURN_CONST(PSYNC_CRYPTO_CANT_CONNECT));
     } else {
       psync_apipool_release(api);
@@ -902,7 +890,7 @@ psync_crypto_download_file_enc_key(psync_fileid_t fileid) {
     crypto_api_errno = result;
     set_crypto_err_msg(res);
     psync_free(res);
-    return (psync_encrypted_symmetric_key_t)err_to_ptr(
+    return (psync_encrypted_symmetric_key_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_API_ERR_INTERNAL));
   }
   result = papi_find_result2(res, "hash", PARAM_NUM)->num;
@@ -911,7 +899,7 @@ psync_crypto_download_file_enc_key(psync_fileid_t fileid) {
                             &keylen);
   psync_free(res);
   if (!key)
-    return (psync_encrypted_symmetric_key_t)err_to_ptr(
+    return (psync_encrypted_symmetric_key_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   ret = psync_ssl_alloc_encrypted_symmetric_key(keylen);
   memcpy(ret->data, key, keylen);
@@ -920,8 +908,7 @@ psync_crypto_download_file_enc_key(psync_fileid_t fileid) {
   return ret;
 }
 
-static psync_encrypted_symmetric_key_t
-psync_crypto_get_folder_enc_key(psync_folderid_t folderid) {
+static psync_encrypted_symmetric_key_t get_fldr_enckey(psync_folderid_t folderid) {
   psync_encrypted_symmetric_key_t enckey;
   psync_sql_res *res;
   psync_variant_row row;
@@ -938,11 +925,10 @@ psync_crypto_get_folder_enc_key(psync_folderid_t folderid) {
     return enckey;
   }
   psync_sql_free_result(res);
-  return psync_crypto_download_folder_enc_key(folderid);
+  return download_fldr_enckey(folderid);
 }
 
-static psync_encrypted_symmetric_key_t
-psync_crypto_get_file_enc_key(psync_fileid_t fileid, uint64_t hash,
+static psync_encrypted_symmetric_key_t get_file_enckey(psync_fileid_t fileid, uint64_t hash,
                               int nonetwork) {
   psync_encrypted_symmetric_key_t enckey;
   psync_sql_res *res;
@@ -967,11 +953,10 @@ psync_crypto_get_file_enc_key(psync_fileid_t fileid, uint64_t hash,
     return (
         psync_encrypted_symmetric_key_t)PSYNC_CRYPTO_UNLOADED_SECTOR_ENCODER;
   } else
-    return psync_crypto_download_file_enc_key(fileid);
+    return download_file_enckey(fileid);
 }
 
-static psync_symmetric_key_t
-psync_crypto_get_folder_symkey_locked(psync_folderid_t folderid) {
+static psync_symmetric_key_t get_fldr_symkey_safe(psync_folderid_t folderid) {
   char buff[16];
   psync_encrypted_symmetric_key_t enckey;
   psync_symmetric_key_t symkey;
@@ -979,21 +964,20 @@ psync_crypto_get_folder_symkey_locked(psync_folderid_t folderid) {
   symkey = (psync_symmetric_key_t)pcache_get(buff);
   if (symkey)
     return symkey;
-  enckey = psync_crypto_get_folder_enc_key(folderid);
-  if (psync_crypto_is_error(enckey))
+  enckey = get_fldr_enckey(folderid);
+  if (is_err(enckey))
     return (psync_symmetric_key_t)enckey;
 
   symkey = psync_ssl_rsa_decrypt_symm_key_lock(&crypto_privkey, &enckey);
 
   psync_free(enckey);
   if (symkey == PSYNC_INVALID_SYM_KEY)
-    return (psync_symmetric_key_t)err_to_ptr(
+    return (psync_symmetric_key_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   return symkey;
 }
 
-static psync_symmetric_key_t
-psync_crypto_get_file_symkey_locked(psync_fileid_t fileid, uint64_t hash,
+static psync_symmetric_key_t get_file_symkey_safe(psync_fileid_t fileid, uint64_t hash,
                                     int nonetwork) {
   char buff[32];
   psync_encrypted_symmetric_key_t enckey;
@@ -1004,8 +988,8 @@ psync_crypto_get_file_symkey_locked(psync_fileid_t fileid, uint64_t hash,
     debug(D_NOTICE, "got key for file %lu from cache", (unsigned long)fileid);
     return symkey;
   }
-  enckey = psync_crypto_get_file_enc_key(fileid, hash, nonetwork);
-  if (unlikely_log(psync_crypto_is_error(enckey)))
+  enckey = get_file_enckey(fileid, hash, nonetwork);
+  if (unlikely_log(is_err(enckey)))
     return (psync_symmetric_key_t)enckey;
   if (nonetwork &&
       enckey ==
@@ -1016,12 +1000,12 @@ psync_crypto_get_file_symkey_locked(psync_fileid_t fileid, uint64_t hash,
 
   psync_free(enckey);
   if (unlikely_log(symkey == PSYNC_INVALID_SYM_KEY))
-    return (psync_symmetric_key_t)err_to_ptr(
+    return (psync_symmetric_key_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   return symkey;
 }
 
-static void psync_crypto_release_symkey_ptr(void *ptr) {
+static void free_symkey(void *ptr) {
   psync_ssl_free_symmetric_key((psync_symmetric_key_t)ptr);
 }
 
@@ -1031,7 +1015,7 @@ psync_crypto_release_folder_symkey_locked(psync_folderid_t folderid,
   char buff[16];
   psync_get_string_id(buff, "FKEY", folderid);
   pcache_add(buff, key, PSYNC_CRYPTO_CACHE_DIR_SYM_KEY,
-                  psync_crypto_release_symkey_ptr, 2);
+                  free_symkey, 2);
 }
 
 static void psync_crypto_release_file_symkey_locked(psync_fileid_t fileid,
@@ -1040,11 +1024,10 @@ static void psync_crypto_release_file_symkey_locked(psync_fileid_t fileid,
   char buff[32];
   psync_get_string_id2(buff, "DKEY", fileid, hash);
   pcache_add(buff, key, PSYNC_CRYPTO_CACHE_FILE_SYM_KEY,
-                  psync_crypto_release_symkey_ptr, 2);
+                  free_symkey, 2);
 }
 
-static psync_symmetric_key_t
-psync_crypto_sym_key_ver1_to_sym_key(sym_key_ver1 *v1) {
+static psync_symmetric_key_t symkeyv1_to_symkey(sym_key_ver1 *v1) {
   psync_symmetric_key_t key;
   key = (psync_symmetric_key_t)pmemlock_malloc(
       offsetof(psync_symmetric_key_struct_t, key) + PSYNC_AES256_KEY_SIZE +
@@ -1056,13 +1039,12 @@ psync_crypto_sym_key_ver1_to_sym_key(sym_key_ver1 *v1) {
   return key;
 }
 
-static pcrypto_textenc_t
-psync_crypto_get_folder_encoder_locked(psync_folderid_t folderid) {
+static pcrypto_textenc_t get_fldr_encoder(psync_folderid_t folderid) {
   pcrypto_textenc_t enc;
   psync_symmetric_key_t symkey, realkey;
   sym_key_ver1 *skv1;
-  symkey = psync_crypto_get_folder_symkey_locked(folderid);
-  if (psync_crypto_is_error(symkey))
+  symkey = get_fldr_symkey_safe(folderid);
+  if (is_err(symkey))
     return (pcrypto_textenc_t)symkey;
   skv1 = (sym_key_ver1 *)symkey->key;
   switch (skv1->type) {
@@ -1078,7 +1060,7 @@ psync_crypto_get_folder_encoder_locked(psync_folderid_t folderid) {
             (unsigned long)folderid);
       goto def1;
     }
-    realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
+    realkey = symkeyv1_to_symkey(skv1);
     psync_crypto_release_folder_symkey_locked(folderid, symkey);
     enc = pcrypto_textenc_create(realkey);
     psync_ssl_free_symmetric_key(realkey);
@@ -1087,13 +1069,12 @@ psync_crypto_get_folder_encoder_locked(psync_folderid_t folderid) {
     debug(D_WARNING, "unkown key type %u", (unsigned)skv1->type);
   def1:
     psync_ssl_free_symmetric_key(symkey);
-    return (pcrypto_textenc_t)err_to_ptr(
+    return (pcrypto_textenc_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   }
 }
 
-static pcrypto_textenc_t
-psync_crypto_get_folder_encoder_check_cache_locked(psync_folderid_t folderid) {
+static pcrypto_textenc_t get_fldr_encoder_cache(psync_folderid_t folderid) {
   char buff[16];
   pcrypto_textenc_t enc;
   psync_get_string_id(buff, "FLDE", folderid);
@@ -1101,16 +1082,15 @@ psync_crypto_get_folder_encoder_check_cache_locked(psync_folderid_t folderid) {
   if (enc)
     return enc;
   else
-    return psync_crypto_get_folder_encoder_locked(folderid);
+    return get_fldr_encoder(folderid);
 }
 
-static pcrypto_textdec_t
-psync_crypto_get_folder_decoder_locked(psync_folderid_t folderid) {
+static pcrypto_textdec_t get_fldrdecoder_safe(psync_folderid_t folderid) {
   pcrypto_textdec_t dec;
   psync_symmetric_key_t symkey, realkey;
   sym_key_ver1 *skv1;
-  symkey = psync_crypto_get_folder_symkey_locked(folderid);
-  if (psync_crypto_is_error(symkey))
+  symkey = get_fldr_symkey_safe(folderid);
+  if (is_err(symkey))
     return (pcrypto_textenc_t)symkey;
   skv1 = (sym_key_ver1 *)symkey->key;
   switch (skv1->type) {
@@ -1120,7 +1100,7 @@ psync_crypto_get_folder_decoder_locked(psync_folderid_t folderid) {
             (unsigned long)sizeof(sym_key_ver1), (unsigned long)symkey->keylen);
       goto def1;
     }
-    realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
+    realkey = symkeyv1_to_symkey(skv1);
     psync_crypto_release_folder_symkey_locked(folderid, symkey);
     dec = pcrypto_textdec_create(realkey);
     psync_ssl_free_symmetric_key(realkey);
@@ -1129,13 +1109,12 @@ psync_crypto_get_folder_decoder_locked(psync_folderid_t folderid) {
     debug(D_WARNING, "unkown key type %u", (unsigned)skv1->type);
   def1:
     psync_ssl_free_symmetric_key(symkey);
-    return (pcrypto_textdec_t)err_to_ptr(
+    return (pcrypto_textdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   }
 }
 
-static pcrypto_textenc_t
-psync_crypto_get_temp_folder_encoder_locked(psync_fsfolderid_t folderid) {
+static pcrypto_textenc_t get_tmp_fldrencoder_safe(psync_fsfolderid_t folderid) {
   pcrypto_textenc_t enc;
   psync_symmetric_key_t symkey, realkey;
   sym_key_ver1 *skv1;
@@ -1150,7 +1129,7 @@ psync_crypto_get_temp_folder_encoder_locked(psync_fsfolderid_t folderid) {
     ;
     if (psync_is_null(row[0])) {
       psync_sql_free_result(res);
-      return (pcrypto_textenc_t)err_to_ptr(
+      return (pcrypto_textenc_t)errptr(
           PRINT_RETURN_CONST(PSYNC_CRYPTO_FOLDER_NOT_ENCRYPTED));
     }
     b64enckey = (const unsigned char *)psync_get_lstring(row[0], &b64enckeylen);
@@ -1163,11 +1142,11 @@ psync_crypto_get_temp_folder_encoder_locked(psync_fsfolderid_t folderid) {
       symkey = PSYNC_INVALID_SYM_KEY;
   } else {
     psync_sql_free_result(res);
-    return (pcrypto_textenc_t)err_to_ptr(
+    return (pcrypto_textenc_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_FOLDER_NOT_FOUND));
   }
   if (symkey == PSYNC_INVALID_SYM_KEY)
-    return (pcrypto_textenc_t)err_to_ptr(
+    return (pcrypto_textenc_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   skv1 = (sym_key_ver1 *)symkey->key;
   switch (skv1->type) {
@@ -1177,7 +1156,7 @@ psync_crypto_get_temp_folder_encoder_locked(psync_fsfolderid_t folderid) {
             (unsigned long)sizeof(sym_key_ver1), (unsigned long)symkey->keylen);
       goto def1;
     }
-    realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
+    realkey = symkeyv1_to_symkey(skv1);
     psync_ssl_free_symmetric_key(symkey);
     enc = pcrypto_textenc_create(realkey);
     psync_ssl_free_symmetric_key(realkey);
@@ -1186,13 +1165,12 @@ psync_crypto_get_temp_folder_encoder_locked(psync_fsfolderid_t folderid) {
     debug(D_WARNING, "unkown key type %u", (unsigned)skv1->type);
   def1:
     psync_ssl_free_symmetric_key(symkey);
-    return (pcrypto_textenc_t)err_to_ptr(
+    return (pcrypto_textenc_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   }
 }
 
-static pcrypto_textdec_t
-psync_crypto_get_temp_folder_decoder_locked(psync_fsfolderid_t folderid) {
+static pcrypto_textdec_t get_tmp_fldrdecoder_safe(psync_fsfolderid_t folderid) {
   pcrypto_textdec_t dec;
   psync_symmetric_key_t symkey, realkey;
   sym_key_ver1 *skv1;
@@ -1207,7 +1185,7 @@ psync_crypto_get_temp_folder_decoder_locked(psync_fsfolderid_t folderid) {
     ;
     if (psync_is_null(row[0])) {
       psync_sql_free_result(res);
-      return (pcrypto_textdec_t)err_to_ptr(
+      return (pcrypto_textdec_t)errptr(
           PRINT_RETURN_CONST(PSYNC_CRYPTO_FOLDER_NOT_ENCRYPTED));
     }
     b64enckey = (const unsigned char *)psync_get_lstring(row[0], &b64enckeylen);
@@ -1225,11 +1203,11 @@ psync_crypto_get_temp_folder_decoder_locked(psync_fsfolderid_t folderid) {
     }
   } else {
     psync_sql_free_result(res);
-    return (pcrypto_textdec_t)err_to_ptr(
+    return (pcrypto_textdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_FOLDER_NOT_FOUND));
   }
   if (symkey == PSYNC_INVALID_SYM_KEY)
-    return (pcrypto_textdec_t)err_to_ptr(
+    return (pcrypto_textdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   skv1 = (sym_key_ver1 *)symkey->key;
   switch (skv1->type) {
@@ -1239,7 +1217,7 @@ psync_crypto_get_temp_folder_decoder_locked(psync_fsfolderid_t folderid) {
             (unsigned long)sizeof(sym_key_ver1), (unsigned long)symkey->keylen);
       goto def1;
     }
-    realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
+    realkey = symkeyv1_to_symkey(skv1);
     psync_ssl_free_symmetric_key(symkey);
     dec = pcrypto_textdec_create(realkey);
     psync_ssl_free_symmetric_key(realkey);
@@ -1248,17 +1226,16 @@ psync_crypto_get_temp_folder_decoder_locked(psync_fsfolderid_t folderid) {
     debug(D_WARNING, "unkown key type %u", (unsigned)skv1->type);
   def1:
     psync_ssl_free_symmetric_key(symkey);
-    return (pcrypto_textdec_t)err_to_ptr(
+    return (pcrypto_textdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   }
 }
 
-pcrypto_textdec_t
-pcryptofolder_flddecoder_get(psync_fsfolderid_t folderid) {
+pcrypto_textdec_t pcryptofolder_flddecoder_get(psync_fsfolderid_t folderid) {
   char buff[16];
   pcrypto_textdec_t dec;
   if (!crypto_started_un)
-    return (pcrypto_textdec_t)err_to_ptr(
+    return (pcrypto_textdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   if (folderid >= 0) {
     psync_get_string_id(buff, "FLDD", folderid);
@@ -1268,14 +1245,14 @@ pcryptofolder_flddecoder_get(psync_fsfolderid_t folderid) {
   }
   pthread_rwlock_rdlock(&crypto_lock);
   if (!crypto_started_l) {
-    dec = (pcrypto_textdec_t)err_to_ptr(
+    dec = (pcrypto_textdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   } else if (folderid > 0) {
-    dec = psync_crypto_get_folder_decoder_locked(folderid);
+    dec = get_fldrdecoder_safe(folderid);
   } else if (folderid < 0) {
-    dec = psync_crypto_get_temp_folder_decoder_locked(folderid);
+    dec = get_tmp_fldrdecoder_safe(folderid);
   } else {
-    dec = (pcrypto_textdec_t)err_to_ptr(
+    dec = (pcrypto_textdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_FOLDER_NOT_ENCRYPTED));
   }
   pthread_rwlock_unlock(&crypto_lock);
@@ -1298,8 +1275,7 @@ void pcryptofolder_flddecoder_release(
     pcrypto_textdec_free(decoder);
 }
 
-char *
-pcryptofolder_flddecode_filename(pcrypto_textdec_t decoder,
+char *pcryptofolder_flddecode_filename(pcrypto_textdec_t decoder,
                                    const char *name) {
   unsigned char *filenameenc, *filenamedec;
   size_t filenameenclen;
@@ -1313,25 +1289,22 @@ pcryptofolder_flddecode_filename(pcrypto_textdec_t decoder,
   return (char *)filenamedec;
 }
 
-static void psync_crypto_free_folder_encoder(void *ptr) {
-  pcrypto_textenc_free(
-      (pcrypto_textenc_t)ptr);
+static void proc_free_direncoder(void *ptr) {
+  pcrypto_textenc_free((pcrypto_textenc_t)ptr);
 }
 
-static void psync_crypto_release_folder_encoder_locked(
+static void free_direncoder(
     psync_folderid_t folderid, pcrypto_textenc_t enc) {
   char buff[16];
   psync_get_string_id(buff, "FLDE", folderid);
-  pcache_add(buff, enc, PSYNC_CRYPTO_CACHE_DIR_ECODER_SEC,
-                  psync_crypto_free_folder_encoder, 2);
+  pcache_add(buff, enc, PSYNC_CRYPTO_CACHE_DIR_ECODER_SEC, proc_free_direncoder, 2);
 }
 
-pcrypto_textenc_t
-pcryptofolder_fldencoder_get(psync_fsfolderid_t folderid) {
+pcrypto_textenc_t pcryptofolder_fldencoder_get(psync_fsfolderid_t folderid) {
   char buff[16];
   pcrypto_textenc_t enc;
   if (!crypto_started_un) {
-    return (pcrypto_textenc_t)err_to_ptr(
+    return (pcrypto_textenc_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   }
 
@@ -1345,14 +1318,14 @@ pcryptofolder_fldencoder_get(psync_fsfolderid_t folderid) {
 
   pthread_rwlock_rdlock(&crypto_lock);
   if (!crypto_started_l) {
-    enc = (pcrypto_textenc_t)err_to_ptr(
+    enc = (pcrypto_textenc_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   } else if (folderid > 0) {
-    enc = psync_crypto_get_folder_encoder_locked(folderid);
+    enc = get_fldr_encoder(folderid);
   } else if (folderid < 0) {
-    enc = psync_crypto_get_temp_folder_encoder_locked(folderid);
+    enc = get_tmp_fldrencoder_safe(folderid);
   } else {
-    enc = (pcrypto_textenc_t)err_to_ptr(
+    enc = (pcrypto_textenc_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_FOLDER_NOT_ENCRYPTED));
   }
   pthread_rwlock_unlock(&crypto_lock);
@@ -1365,13 +1338,12 @@ void pcryptofolder_fldencoder_release(
   if (crypto_started_un && folderid >= 0) {
     psync_get_string_id(buff, "FLDE", folderid);
     pcache_add(buff, encoder, PSYNC_CRYPTO_CACHE_DIR_ECODER_SEC,
-                    psync_crypto_free_folder_encoder, 2);
+                    proc_free_direncoder, 2);
   } else
     pcrypto_textenc_free(encoder);
 }
 
-char *
-pcryptofolder_fldencode_filename(pcrypto_textenc_t encoder,
+char * pcryptofolder_fldencode_filename(pcrypto_textenc_t encoder,
                                    const char *name) {
   unsigned char *filenameenc, *filenameb32;
   size_t filenameenclen;
@@ -1383,14 +1355,13 @@ pcryptofolder_fldencode_filename(pcrypto_textenc_t encoder,
   return (char *)filenameb32;
 }
 
-static pcrypto_sector_encdec_t
-psync_crypto_get_file_encoder_locked(psync_fileid_t fileid, uint64_t hash,
+static pcrypto_sector_encdec_t get_fileencoder(psync_fileid_t fileid, uint64_t hash,
                                      int nonetwork) {
   pcrypto_sector_encdec_t enc;
   psync_symmetric_key_t symkey, realkey;
   sym_key_ver1 *skv1;
-  symkey = psync_crypto_get_file_symkey_locked(fileid, hash, nonetwork);
-  if (unlikely_log(psync_crypto_is_error(symkey)))
+  symkey = get_file_symkey_safe(fileid, hash, nonetwork);
+  if (unlikely_log(is_err(symkey)))
     return (pcrypto_sector_encdec_t)symkey;
   if (nonetwork && (pcrypto_sector_encdec_t)symkey ==
                        PSYNC_CRYPTO_UNLOADED_SECTOR_ENCODER)
@@ -1409,7 +1380,7 @@ psync_crypto_get_file_encoder_locked(psync_fileid_t fileid, uint64_t hash,
             (unsigned long)fileid);
       goto def1;
     }
-    realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
+    realkey = symkeyv1_to_symkey(skv1);
     psync_crypto_release_file_symkey_locked(fileid, hash, symkey);
     enc = pcrypto_sec_encdec_create(realkey);
     psync_ssl_free_symmetric_key(realkey);
@@ -1418,13 +1389,12 @@ psync_crypto_get_file_encoder_locked(psync_fileid_t fileid, uint64_t hash,
     debug(D_WARNING, "unkown key type %u", (unsigned)skv1->type);
   def1:
     psync_ssl_free_symmetric_key(symkey);
-    return (pcrypto_sector_encdec_t)err_to_ptr(
+    return (pcrypto_sector_encdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   }
 }
 
-static pcrypto_sector_encdec_t
-psync_crypto_get_temp_file_encoder_locked(psync_fsfileid_t fileid,
+static pcrypto_sector_encdec_t get_fileencoder_tmp(psync_fsfileid_t fileid,
                                           int nonetwork) {
   uint64_t hash;
   psync_sql_res *res;
@@ -1442,7 +1412,7 @@ psync_crypto_get_temp_file_encoder_locked(psync_fsfileid_t fileid,
   row = psync_sql_fetch_row(res);
   if (unlikely_log(!row)) {
     psync_sql_free_result(res);
-    return (pcrypto_sector_encdec_t)err_to_ptr(
+    return (pcrypto_sector_encdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_FILE_NOT_FOUND));
   }
   switch (psync_get_number(row[0])) {
@@ -1457,7 +1427,7 @@ psync_crypto_get_temp_file_encoder_locked(psync_fsfileid_t fileid,
     } else
       symkey = PSYNC_INVALID_SYM_KEY;
     if (symkey == PSYNC_INVALID_SYM_KEY)
-      return (pcrypto_sector_encdec_t)err_to_ptr(
+      return (pcrypto_sector_encdec_t)errptr(
           PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
     skv1 = (sym_key_ver1 *)symkey->key;
     switch (skv1->type) {
@@ -1468,7 +1438,7 @@ psync_crypto_get_temp_file_encoder_locked(psync_fsfileid_t fileid,
               (unsigned long)symkey->keylen);
         goto def1;
       }
-      realkey = psync_crypto_sym_key_ver1_to_sym_key(skv1);
+      realkey = symkeyv1_to_symkey(skv1);
       psync_ssl_free_symmetric_key(symkey);
       enc = pcrypto_sec_encdec_create(realkey);
       psync_ssl_free_symmetric_key(realkey);
@@ -1477,28 +1447,27 @@ psync_crypto_get_temp_file_encoder_locked(psync_fsfileid_t fileid,
       debug(D_WARNING, "unkown key type %u", (unsigned)skv1->type);
     def1:
       psync_ssl_free_symmetric_key(symkey);
-      return (pcrypto_sector_encdec_t)err_to_ptr(
+      return (pcrypto_sector_encdec_t)errptr(
           PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
     }
   case PSYNC_FS_TASK_MODIFY:
     fileid = psync_get_number(row[1]);
     hash = psync_get_number(row[3]);
     psync_sql_free_result(res);
-    return psync_crypto_get_file_encoder_locked(fileid, hash, nonetwork);
+    return get_fileencoder(fileid, hash, nonetwork);
   default:
     psync_sql_free_result(res);
-    return (pcrypto_sector_encdec_t)err_to_ptr(
+    return (pcrypto_sector_encdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INTERNAL_ERROR));
   }
 }
 
-pcrypto_sector_encdec_t
-pcryptofolder_filencoder_get(psync_fsfileid_t fileid, uint64_t hash,
+pcrypto_sector_encdec_t pcryptofolder_filencoder_get(psync_fsfileid_t fileid, uint64_t hash,
                                     int nonetwork) {
   char buff[32];
   pcrypto_sector_encdec_t enc;
   if (!crypto_started_un)
-    return (pcrypto_sector_encdec_t)err_to_ptr(
+    return (pcrypto_sector_encdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   if (fileid >= 0) {
     psync_get_string_id2(buff, "SEEN", fileid, hash);
@@ -1508,22 +1477,21 @@ pcryptofolder_filencoder_get(psync_fsfileid_t fileid, uint64_t hash,
   }
   pthread_rwlock_rdlock(&crypto_lock);
   if (!crypto_started_l) {
-    enc = (pcrypto_sector_encdec_t)err_to_ptr(
+    enc = (pcrypto_sector_encdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   } else if (fileid > 0) {
-    enc = psync_crypto_get_file_encoder_locked(fileid, hash, nonetwork);
+    enc = get_fileencoder(fileid, hash, nonetwork);
   } else if (fileid < 0) {
-    enc = psync_crypto_get_temp_file_encoder_locked(fileid, nonetwork);
+    enc = get_fileencoder_tmp(fileid, nonetwork);
   } else {
-    enc = (pcrypto_sector_encdec_t)err_to_ptr(
+    enc = (pcrypto_sector_encdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_FOLDER_NOT_ENCRYPTED));
   }
   pthread_rwlock_unlock(&crypto_lock);
   return enc;
 }
 
-pcrypto_sector_encdec_t
-pcryptofolder_filencoder_from_binresult(psync_fileid_t fileid,
+pcrypto_sector_encdec_t pcryptofolder_filencoder_from_binresult(psync_fileid_t fileid,
                                                    binresult *res) {
   const binresult *b64key;
   unsigned char *key;
@@ -1536,7 +1504,7 @@ pcryptofolder_filencoder_from_binresult(psync_fileid_t fileid,
   key = psync_base64_decode((const unsigned char *)b64key->str, b64key->length,
                             &keylen);
   if (!key)
-    return (pcrypto_sector_encdec_t)err_to_ptr(
+    return (pcrypto_sector_encdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_INVALID_KEY));
   esym = psync_ssl_alloc_encrypted_symmetric_key(keylen);
   memcpy(esym->data, key, keylen);
@@ -1545,16 +1513,16 @@ pcryptofolder_filencoder_from_binresult(psync_fileid_t fileid,
   save_file_key_to_db(fileid, hash, esym);
   pthread_rwlock_rdlock(&crypto_lock);
   if (!crypto_started_l)
-    enc = (pcrypto_sector_encdec_t)err_to_ptr(
+    enc = (pcrypto_sector_encdec_t)errptr(
         PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   else {
     // save_file_key_to_db runs thread to save to db, that's why we insert
-    // decrypted key to cache, so psync_crypto_get_file_encoder_locked finds
+    // decrypted key to cache, so get_fileencoder finds
     // it
     symkey = psync_ssl_rsa_decrypt_symm_key_lock(&crypto_privkey, &esym);
 
     psync_crypto_release_file_symkey_locked(fileid, hash, symkey);
-    enc = psync_crypto_get_file_encoder_locked(fileid, hash, 0);
+    enc = get_fileencoder(fileid, hash, 0);
   }
   pthread_rwlock_unlock(&crypto_lock);
   psync_free(esym);
@@ -1578,19 +1546,19 @@ void pcryptofolder_filencoder_release(
     pcrypto_sec_encdec_free(encoder);
 }
 
-char *psync_crypto_get_name_encoded_locked(psync_folderid_t folderid,
+static char *get_name_encoded(psync_folderid_t folderid,
                                            const char *name) {
   pcrypto_textenc_t enc;
   unsigned char *nameenc;
   char *ret;
   size_t nameenclen;
-  enc = psync_crypto_get_folder_encoder_check_cache_locked(folderid);
-  if (psync_crypto_is_error(enc))
+  enc = get_fldr_encoder_cache(folderid);
+  if (is_err(enc))
     return (char *)enc;
   pcrypto_encode_text(enc, (const unsigned char *)name,
                                   strlen(name), &nameenc, &nameenclen);
   ret = (char *)psync_base32_encode(nameenc, nameenclen, &nameenclen);
-  psync_crypto_release_folder_encoder_locked(folderid, enc);
+  free_direncoder(folderid, enc);
   psync_free(nameenc);
   return ret;
 }
@@ -1610,18 +1578,19 @@ static int set_err(int ret, const char **err) {
   return ret;
 }
 
-static int get_name_for_enc_folder_locked(psync_folderid_t folderid,
+static int get_cfldr_name(psync_folderid_t folderid,
                                           const char *name, char **ename,
                                           const char **err) {
-  char *encname;
-  encname = psync_crypto_get_name_encoded_locked(folderid, name);
-  if (psync_crypto_is_error(encname))
-    return set_err(psync_crypto_to_error(encname), err);
+  char *encname;  
+
+  encname = get_name_encoded(folderid, name);
+  if (is_err(encname))
+    return set_err(to_err(encname), err);
   *ename = encname;
   return PSYNC_CRYPTO_SUCCESS;
 }
 
-static int get_name_for_folder_locked(psync_folderid_t folderid,
+static int get_fldr_name(psync_folderid_t folderid,
                                       const char *name, char **ename,
                                       const char **err) {
   if (folderid == 0) {
@@ -1639,7 +1608,7 @@ static int get_name_for_folder_locked(psync_folderid_t folderid,
     if (!row)
       return set_err(PRINT_RETURN_CONST(PSYNC_CRYPTO_FOLDER_NOT_FOUND), err);
     if (enc)
-      return get_name_for_enc_folder_locked(folderid, name, ename, err);
+      return get_cfldr_name(folderid, name, ename, err);
     else {
       *ename = psync_strdup(name);
       return PSYNC_CRYPTO_SUCCESS;
@@ -1693,7 +1662,7 @@ int psync_cloud_crypto_send_mkdir(psync_folderid_t folderid, const char *name,
     *newfolderid = papi_find_result2(meta, "folderid", PARAM_NUM)->num;
   psync_sql_start_transaction();
   pfileops_create_fldr(meta);
-  save_folder_key_to_db(papi_find_result2(meta, "folderid", PARAM_NUM)->num,
+  save_folder_key(papi_find_result2(meta, "folderid", PARAM_NUM)->num,
                         encsym);
   psync_sql_commit_transaction();
   psync_free(res);
@@ -1705,9 +1674,9 @@ char *pcryptofolder_filencoder_key_get(psync_fsfileid_t fileid,
   psync_encrypted_symmetric_key_t encsym;
   char *ret;
   if (fileid < 0)
-    return (char *)err_to_ptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_FILE_NOT_FOUND));
-  encsym = psync_crypto_get_file_enc_key(fileid, hash, 0);
-  if (psync_crypto_is_error(encsym))
+    return (char *)errptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_FILE_NOT_FOUND));
+  encsym = get_file_enckey(fileid, hash, 0);
+  if (is_err(encsym))
     return (char *)encsym;
   ret = (char *)psync_base64_encode(encsym->data, encsym->datalen, keylen);
   psync_free(encsym);
@@ -1719,7 +1688,7 @@ char *pcryptofolder_filencoder_key_new(uint32_t flags, size_t *keylen) {
   sym_key_ver1 sym;
   char *ret;
   if (!crypto_started_un)
-    return (char *)err_to_ptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
+    return (char *)errptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   sym.type = PSYNC_CRYPTO_SYM_AES256_1024BIT_HMAC;
   sym.flags = flags;
   psync_ssl_rand_strong(sym.hmackey, PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN);
@@ -1727,14 +1696,14 @@ char *pcryptofolder_filencoder_key_new(uint32_t flags, size_t *keylen) {
   pthread_rwlock_rdlock(&crypto_lock);
   if (!crypto_started_l) {
     pthread_rwlock_unlock(&crypto_lock);
-    return (char *)err_to_ptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
+    return (char *)errptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   }
   encsym = psync_ssl_rsa_encrypt_data(crypto_pubkey, (unsigned char *)&sym,
                                       sizeof(sym));
   pthread_rwlock_unlock(&crypto_lock);
   if (encsym == PSYNC_INVALID_ENC_SYM_KEY) {
     debug(D_ERROR, "RSA encryption failed");
-    return (char *)err_to_ptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_RSA_ERROR));
+    return (char *)errptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_RSA_ERROR));
   }
   psync_ssl_memclean(&sym, sizeof(sym));
   ret = (char *)psync_base64_encode(encsym->data, encsym->datalen, keylen);
@@ -1748,7 +1717,7 @@ char *pcryptofolder_filencoder_key_newplain(
   sym_key_ver1 sym;
   char *ret;
   if (!crypto_started_un)
-    return (char *)err_to_ptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
+    return (char *)errptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   sym.type = PSYNC_CRYPTO_SYM_AES256_1024BIT_HMAC;
   sym.flags = flags;
   psync_ssl_rand_strong(sym.hmackey, PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN);
@@ -1756,16 +1725,16 @@ char *pcryptofolder_filencoder_key_newplain(
   pthread_rwlock_rdlock(&crypto_lock);
   if (!crypto_started_l) {
     pthread_rwlock_unlock(&crypto_lock);
-    return (char *)err_to_ptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
+    return (char *)errptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_NOT_STARTED));
   }
   encsym = psync_ssl_rsa_encrypt_data(crypto_pubkey, (unsigned char *)&sym,
                                       sizeof(sym));
   pthread_rwlock_unlock(&crypto_lock);
   if (encsym == PSYNC_INVALID_ENC_SYM_KEY) {
     debug(D_ERROR, "RSA encryption failed");
-    return (char *)err_to_ptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_RSA_ERROR));
+    return (char *)errptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_RSA_ERROR));
   }
-  *deckey = psync_crypto_sym_key_ver1_to_sym_key(&sym);
+  *deckey = symkeyv1_to_symkey(&sym);
   psync_ssl_memclean(&sym, sizeof(sym));
   ret = (char *)psync_base64_encode(encsym->data, encsym->datalen, keylen);
   psync_free(encsym);
@@ -1795,7 +1764,7 @@ int pcryptofolder_mkdir(psync_folderid_t folderid, const char *name,
   encsym = psync_ssl_rsa_encrypt_data(crypto_pubkey, (unsigned char *)&sym,
                                       sizeof(sym));
   psync_ssl_memclean(&sym, sizeof(sym));
-  ret = get_name_for_folder_locked(folderid, name, &ename, err);
+  ret = get_fldr_name(folderid, name, &ename, err);
   pthread_rwlock_unlock(&crypto_lock);
   if (ret) {
     if (encsym != PSYNC_INVALID_ENC_SYM_KEY)
@@ -1910,11 +1879,11 @@ int psync_pcloud_crypto_reencode_key(
     goto err_ph_2;
   psync_sha256(newpriv, newprivlen, newprivsha);
   rsasign = psync_ssl_rsa_sign_sha256_hash(priv, newprivsha);
-  if (psync_crypto_is_error(rsasign)) {
-    psync_free(newpriv);
+  if (is_err(rsasign)) {
+    psync_free(is_err);
     psync_ssl_rsa_free_public(pub);
     psync_ssl_rsa_free_private(priv);
-    return psync_crypto_to_error(rsasign);
+    return to_err(rsasign);
   }
   *privenc = (char *)psync_base64_encode(newpriv, newprivlen, &dummy);
   *sign = (char *)psync_base64_encode(rsasign->data, rsasign->datalen, &dummy);
@@ -1985,10 +1954,10 @@ int psync_pcloud_crypto_encode_key(const char *newpassphrase, uint32_t flags,
 
   psync_sha256(newpriv, rsaprivlen, newprivsha);
   rsasign = psync_ssl_rsa_sign_sha256_hash(crypto_privkey, newprivsha);
-  if (psync_crypto_is_error(rsasign)) {
+  if (is_err(rsasign)) {
     psync_free(newpriv);
     psync_ssl_rsa_free_binary(rsapriv);
-    return psync_crypto_to_error(rsasign);
+    return to_err(rsasign);
   }
   *privenc = (char *)psync_base64_encode(newpriv, rsaprivlen, &dummy);
   *sign = (char *)psync_base64_encode(rsasign->data, rsasign->datalen, &dummy);
@@ -2031,10 +2000,8 @@ int pcryptofolder_change_pass(const char *oldpassphrase,
 
   if (!newpassphrase || !newpassphrase[0])
     return PSYNC_CRYPTO_BAD_PASSPHRASE;
-retry:
-  if (psync_sql_trylock()) {
+  while (psync_sql_trylock()) {
     psys_sleep_milliseconds(1);
-    goto retry;
   }
   rowcnt = 0;
   res = psync_sql_query_nolock(
@@ -2147,11 +2114,4 @@ int pcryptofolder_change_pass_unlocked(const char *newpassphrase,
     return PSYNC_CRYPTO_BAD_PASSPHRASE;
   cres = psync_pcloud_crypto_encode_key(newpassphrase, flags, privenc, sign);
   return cres;
-}
-
-void sha1_hex_null_term(const void *data, size_t len, char *out) {
-  unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
-  psync_sha1((const unsigned char *)data, len, (unsigned char *)sha1bin);
-  psync_binhex(out, sha1bin, PSYNC_SHA1_DIGEST_LEN);
-  out[PSYNC_SHA1_DIGEST_HEXLEN] = 0;
 }

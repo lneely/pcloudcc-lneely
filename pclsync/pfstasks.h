@@ -36,9 +36,9 @@
 #include <string.h>
 #include <time.h>
 
+#include "pfoldersync.h"
 #include "pfsfolder.h"
 #include "plibs.h"
-#include "psynclib.h"
 #include "ptree.h"
 
 #define PSYNC_FS_TASK_MKDIR 1
