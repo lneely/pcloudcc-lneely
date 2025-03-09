@@ -42,9 +42,9 @@
 #include "pclsync_lib.h"
 #include "pclsync/pshm.h"
 #include "pclsync/pfoldersync.h"
-#include "pclsync/rpcclient.h"
 #include "pclsync/pcommands.h"
 
+#include "rpcclient.h"
 #include "CLI11.hpp"
 
 namespace cc = console_client;
@@ -112,7 +112,9 @@ void setup_app(CLI::App *app) {
   app->add_subcommand("finalize", "Finalize and exit")->alias("f")->callback([] {
     char *errm = NULL;
     size_t errm_size = 0;
-    rpc_call(FINALIZE, "", &errm, &errm_size);
+    RpcClient *rpc = new RpcClient();
+    rpc->Call(FINALIZE, "", &errm, &errm_size);
+    delete rpc;
     std::cout << "Exiting ..." << std::endl;
     if (errm) { free(errm); }
     exit(0);
@@ -129,11 +131,14 @@ void setup_app(CLI::App *app) {
   start_crypto_cmd->callback([] { 
     char *errm = NULL;
     size_t errm_size = 0;
-    if(int result = rpc_call(STARTCRYPTO, start_crypto_pwd.c_str(), &errm, &errm_size) != 0) {
+    RpcClient *rpc = new RpcClient();
+    if(int result = rpc->Call(STARTCRYPTO, start_crypto_pwd.c_str(), &errm, &errm_size) != 0) {
       std::cout << "Start Crypto failed: " << (errm ? errm : "no message") << std::endl;
       if (errm) { free(errm); }
+      delete rpc;
       return result;
     }
+    delete rpc;
     std::cout << "Crypto started." << std::endl;
     if (errm) { free(errm); }
     return 0;
@@ -143,12 +148,14 @@ void setup_app(CLI::App *app) {
   crypto_cmd->add_subcommand("stop", "Stop crypto")->callback([] {
     char *errm = NULL;
     size_t errm_size = 0;
-    if(int result = rpc_call(STOPCRYPTO, "", &errm, &errm_size) != 0) {
+    RpcClient *rpc = new RpcClient();
+    if(int result = rpc->Call(STOPCRYPTO, "", &errm, &errm_size) != 0) {
       std::cout << "Stop Crypto failed: "<< (errm ? errm : "no message") << std::endl;
       if (errm) { free(errm); }
+      delete rpc;
       return result;
     }
-
+    delete rpc;
     std::cout << "Crypto Stopped." << std::endl;  
     if (errm) { free(errm); }
     return 0;
@@ -158,12 +165,15 @@ void setup_app(CLI::App *app) {
   sync_cmd->add_subcommand("list", "List sync folders")->alias("ls")->callback([] {
     char *errm = NULL;
     size_t errmsz = 0;
+    RpcClient *rpc = new RpcClient();
 
-    if(int result = rpc_call(LISTSYNC, "", &errm, &errmsz) != 0) {
+    if(int result = rpc->Call(LISTSYNC, "", &errm, &errmsz) != 0) {
       std::cout << "List Sync Folders failed: " << (errm ? errm : "no message") << std::endl;
       if (errm) { free(errm); }
+      delete rpc;
       return result;
     } 
+    delete rpc;
 
     psync_folder_list_t *flist = NULL;
     if(pshm_read((void**)&flist, NULL)) {
@@ -206,16 +216,18 @@ void setup_app(CLI::App *app) {
     size_t errmsz = 0;
 
     std::string combinedPaths = localpath + '|' + remotepath;
-    if(int result = rpc_call(ADDSYNC, combinedPaths.c_str(), &errm, &errmsz) != 0) {      
+    RpcClient *rpc = new RpcClient();
+    if(int result = rpc->Call(ADDSYNC, combinedPaths.c_str(), &errm, &errmsz) != 0) {      
       if (result == -1) {
         std::cout << "Add Sync Folders failed: remote folder " << remotepath << " not found." << std::endl;
       } else {
         std::cout << "Add Sync Folders failed:" << (errm ? errm : "no message") << std::endl;
       }
       if (errm) { free(errm); }
+      delete rpc;
       return result;
     }
-
+    delete rpc;
     if(errm) { free(errm); }
     return 0;
   });
@@ -229,11 +241,14 @@ void setup_app(CLI::App *app) {
     size_t errmsz = 0;
     const char *folderid = syncrm_fid.c_str();
 
-    if(int result = rpc_call(STOPSYNC, folderid, &errm, &errmsz) != 0) {
+    RpcClient *rpc = new RpcClient();
+    if(int result = rpc->Call(STOPSYNC, folderid, &errm, &errmsz) != 0) {
       std::cout << "Remove Sync Folder failed: " << (errm ? errm : "no message") << std::endl;
       if (errm) { free(errm); }
+      delete rpc;
       return result;
     }
+    delete rpc;
     std::cout << "Successfully removed sync folder with folderid " << folderid << std::endl;
     
     if(errm) { free(errm); }
