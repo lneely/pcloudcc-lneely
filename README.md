@@ -65,9 +65,10 @@ I aim to support as many distributions as possible, and maintain an [AUR](https:
 - boost (-lboost_system, -lboost_program_options)
 - pthread (lpthread)
 - udev (-ludev)
-- libfuse (-lfuse)
-- libsqlite (-lsqlite3)
-- libmbedtls (3.x)
+- fuse (-lfuse)
+- sqlite (-lsqlite3)
+- mbedtls (-lmbedtls -lmbedcrypto -lmbedx509)
+- readline (-lreadline)
 
 ## Building
 
