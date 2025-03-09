@@ -70,7 +70,6 @@ int main(int argc, char **argv) {
     ("commands ,o", po::bool_switch(&commands), "Keep parent process alive and process commands. ")
     ("mountpoint,m", po::value<std::string>(), "Specify where pCloud filesystem is mounted.")
     ("commands_only,k", po::bool_switch(&commands_only), "Open command prompt to interact with running daemon.")
-    ("command,c", po::value<std::string>(), "Execute a single command and exit.")
     ("newuser,n", po::bool_switch(&newuser), "Register a new pCloud user account.")
     ("savepassword,s", po::bool_switch(&save_pass), "Save user password in the database.");
 
@@ -98,11 +97,6 @@ int main(int argc, char **argv) {
       if (std::getline(std::cin, line) && !line.empty()) {
         return ct::process_command(line);
       }
-    }
-
-    if (vm.count("command")) {
-      std::string command = vm["command"].as<std::string>();
-      return ct::process_command(command);
     }
 
 
