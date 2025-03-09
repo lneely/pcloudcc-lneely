@@ -77,8 +77,7 @@
 // specified sockpath. it may write an error message and error message
 // size to out and out_size, and a "ret" value to ret (i think this is
 // redundant maybe...)
-static int socket_connect(const char *sockpath, char **out, size_t *out_size,
-                   int *ret) {
+static int socket_connect(const char *sockpath, char **out, size_t *out_size) {
   int fd;
   struct sockaddr_un addr;
   const char *error_msg;
@@ -87,7 +86,6 @@ static int socket_connect(const char *sockpath, char **out, size_t *out_size,
     error_msg = "Unable to create unix socket";
     *out = strdup(error_msg);
     *out_size = strlen(error_msg) + 1;
-    *ret = POVERLAY_SOCKET_CREATE_FAILED;
     return POVERLAY_SOCKET_CREATE_FAILED;
   }
 
@@ -98,43 +96,36 @@ static int socket_connect(const char *sockpath, char **out, size_t *out_size,
     error_msg = "Unable to connect to UNIX socket";
     *out = strdup(error_msg);
     *out_size = strlen(error_msg) + 1;
-    *ret = POVERLAY_SOCKET_CONNECT_FAILED;
     return POVERLAY_SOCKET_CONNECT_FAILED;
   }
   return fd;
 }
 
-static int write_request(int fd, int msgtype, const char *value, char **out,
-                  size_t *out_size, int *ret) {
+static int write_request(int fd, int msgtype, const char *value, char **out, size_t *out_size) {
   uint64_t bytes_written;
-  int rc;
-  int len;
-  int size;
-  char *buf;
-  const char *err;
-  rpc_message_t *request;
-  char *curbuf;
+  int len = strlen(value);
+  int size = sizeof(rpc_message_t) + len + 1;
+  char *buf = (char *)malloc(size);
 
-  *ret = 0; // Initialize ret to 0
-
-  len = strlen(value);
-  size = sizeof(rpc_message_t) + len + 1;
-  buf = (char *)malloc(size);
-  request = (rpc_message_t *)buf;
+  // prepare the message
+  rpc_message_t *request = (rpc_message_t *)buf;
   memset(request, 0, size);
   request->type = msgtype;
   strncpy(request->value, value, len + 1);
   request->length = size;
   bytes_written = 0;
-  curbuf = (char *)request;
 
-  while (bytes_written < request->length && *ret == 0) {
-    rc = write(fd, curbuf, (request->length - bytes_written));
+  // write to the socket
+  char *curbuf = (char *)request;
+  int writeerr = 0;
+  while (bytes_written < request->length && !writeerr) {
+    int rc = write(fd, curbuf, (request->length - bytes_written));
     if (rc <= 0) {
       if (errno != EINTR) {
-        err = "failed to write to socket.";
+        const char *err = "failed to write to socket.";
         *out = strdup(err);
-        *ret = POVERLAY_WRITE_SOCK_ERR;
+        *out_size = strlen(err) + 1;
+        writeerr = POVERLAY_WRITE_SOCK_ERR;
       }
     } else {
       bytes_written += rc;
@@ -142,91 +133,86 @@ static int write_request(int fd, int msgtype, const char *value, char **out,
     }
   }
 
-  if (*ret == 0 && bytes_written != request->length) {
-    err = "Communication error";
+  // return error if only partial data written
+  if (!writeerr && bytes_written != request->length) {
+    const char *err = "communication error";
     *out = strdup(err);
     *out_size = strlen(err) + 1;
-    *ret = POVERLAY_WRITE_COMM_ERR;
+    writeerr = POVERLAY_WRITE_COMM_ERR;
   }
 
   free(buf);
-  return *ret;
+  return writeerr;
 }
 
-static int read_response(int fd, char **out, size_t *out_size, int *ret) {
-    rpc_message_t *msg;
-    ssize_t bytes_read;
+static int read_response(int fd, char **out, size_t *out_size) {
 
-    msg = (rpc_message_t *)malloc(POVERLAY_BUFSIZE);
+    rpc_message_t *msg = (rpc_message_t *)malloc(POVERLAY_BUFSIZE);
     if (msg == NULL) {
         const char *error_msg = "Memory allocation failed";
         *out = strdup(error_msg);
         *out_size = strlen(error_msg) + 1;
-        *ret = -1;
         return -1;
     }
 
-    bytes_read = read(fd, msg, POVERLAY_BUFSIZE);
+    ssize_t bytes_read = read(fd, msg, POVERLAY_BUFSIZE);
     if (bytes_read <= 0) {
         const char *error_msg = (bytes_read == 0) ? "Connection closed" : "Read error";
-        free(msg);
         *out = strdup(error_msg);
         *out_size = strlen(error_msg) + 1;
-        *ret = -1;
+        free(msg);
         return -1;
     }
 
     *out = (char *)malloc(msg->length);
     memcpy(*out, msg->value, msg->length);
     *out_size = msg->length;
-    *ret = msg->type;
 
     free(msg); 
     return 0;
 }
 
 int rpc_get_state(pCloud_FileState *state, char *path) {
+  char *errm = NULL;
+  size_t errm_size = 0;
   int rep = 0;
-  char *errm;
-  size_t errm_size;
 
-  if (!rpc_call(4, path /*IN*/, &rep, &errm, &errm_size)) {
+  if ((rep = rpc_call(4, path, &errm, &errm_size) == 0)) {
     debug(D_NOTICE, "rpc_get_state responese rep[%d] path[%s]", rep, path);
-    if (errm)
+    if (errm) {
       debug(D_NOTICE, "The error is %s", errm);
-    if (rep == 10)
+    }
+    if (rep == 10) {
       *state = FileStateInSync;
-    else if (rep == 12)
+    } else if (rep == 12) {
       *state = FileStateInProgress;
-    else if (rep == 11)
+    } else if (rep == 11) {
       *state = FileStateNoSync;
-    else
+    } else {
       *state = FileStateInvalid;
-  } else
+    }
+  } else {
     debug(D_ERROR, "rpc_get_state ERROR rep[%d] path[%s]", rep, path);
-  free(errm);
+  }
+  if(errm) {
+    free(errm);    
+  }
   return 0;
 }
 
 // path contains the input argument(s). 
-int rpc_call(int id, const char *path, int *ret, char **errm, size_t *errmsz) {
-  int result;
-  int sockfd;
+int rpc_call(int id, const char *path, char **errm, size_t *errmsz) {
+  int result = 0;
+  int sockfd = -1;
 
-  sockfd = -1;
-  result = 0;
-  *errm = NULL;
-  *errmsz = 0;
-  *ret = 0;
-
-  sockfd = socket_connect(PRPC_SOCK_PATH, errm, errmsz, ret);
+  sockfd = socket_connect(PRPC_SOCK_PATH, errm, errmsz);
   if (sockfd >= 0) {
-    if ((result = write_request(sockfd, id, path, errm, errmsz, ret)) == 0) {
-      result = read_response(sockfd, errm, errmsz, ret);
+    if ((result = write_request(sockfd, id, path, errm, errmsz)) == 0) {
+      result = read_response(sockfd, errm, errmsz);
     }
     close(sockfd);
   } else {
     result = -1;
   }
-  return *ret; // always 0 on success
+  return result; // always 0 on success
 }
