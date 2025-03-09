@@ -3367,7 +3367,7 @@ void psync_fs_refresh_folder(psync_folderid_t folderid) {
       pfolder_path_sep(folderid, "/", NULL);
   if (path == PSYNC_INVALID_PATH)
     return;
-  psync_ssl_rand_weak(rndbuff, sizeof(rndbuff));
+  psync_ssl_rand_strong(rndbuff, sizeof(rndbuff));
   psync_binhex(rndhex, rndbuff, sizeof(rndbuff));
   rndhex[2 * sizeof(rndbuff)] = 0;
   pthread_mutex_lock(&start_mutex);
@@ -3565,7 +3565,7 @@ static void psync_fs_init_once() {
 #if psync_fs_need_per_folder_refresh_const()
   unsigned char rndbuff[16];
   char rndhex[34];
-  psync_ssl_rand_weak(rndbuff, sizeof(rndbuff));
+  psync_ssl_rand_strong(rndbuff, sizeof(rndbuff));
   psync_binhex(rndhex, rndbuff, sizeof(rndbuff));
   rndhex[2 * sizeof(rndbuff)] = 0;
   psync_fake_prefix = psync_strcat(".refresh", rndhex, NULL);

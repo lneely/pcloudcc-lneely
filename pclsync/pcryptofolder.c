@@ -32,6 +32,7 @@
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
 #include <mbedtls/entropy.h>
+#include <mbedtls/pk.h>
 #include <mbedtls/pkcs5.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
@@ -211,10 +212,7 @@ static void load_str_to(const psync_variant *v, unsigned char **ptr,
   *len = l;
 }
 
-static int download_keys(
-    unsigned char **rsapriv, size_t *rsaprivlen, unsigned char **rsapub,
-    size_t *rsapublen, unsigned char **salt, size_t *saltlen,
-    size_t *iterations, char *publicsha1, char *privatesha1, uint32_t *flags) {
+static int download_keys(unsigned char **rsapriv, size_t *rsaprivlen, unsigned char **rsapub, size_t *rsapublen, unsigned char **salt, size_t *saltlen, size_t *iterations, char *publicsha1, char *privatesha1, uint32_t *flags) {
   binparam params[] = {PAPI_STR("auth", psync_my_auth)};
   psock_t *api;
   binresult *res;
@@ -503,7 +501,7 @@ static int crypto_keys_match() {
   key = (psync_symmetric_key_t)psync_malloc(
       offsetof(psync_symmetric_key_struct_t, key) + 64);
   key->keylen = 64;
-  psync_ssl_rand_weak(key->key, key->keylen);
+  psync_ssl_rand_strong(key->key, key->keylen);
   enckey = psync_ssl_rsa_encrypt_symmetric_key(crypto_pubkey, key);
   if (enckey == PSYNC_INVALID_ENC_SYM_KEY) {
     psync_free(key);
@@ -619,11 +617,8 @@ int pcryptofolder_unlock(const char *password) {
   }
   debug(D_NOTICE, "successfully loaded public key");
 
-
   debug(D_NOTICE, "generating symmetric key");
-  aeskey = psync_ssl_gen_symmetric_key_from_pass(
-      password, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE, salt, saltlen,
-      iterations);
+  aeskey = psync_ssl_gen_symmetric_key_from_pass(password, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE, salt, saltlen, iterations);
   enc = pcrypto_ctr_encdec_create(aeskey);
   psync_ssl_free_symmetric_key(aeskey);
   rsaprivdec = (unsigned char *)pmemlock_malloc(rsaprivlen);
@@ -1848,7 +1843,7 @@ int psync_pcloud_crypto_reencode_key(
     rsapriv_struct = (priv_key_ver1 *)newpriv;
     rsapriv_struct->type = PSYNC_CRYPTO_TYPE_RSA4096_64BYTESALT_20000IT;
     rsapriv_struct->flags = flags;
-    psync_ssl_rand_weak(rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN);
+    psync_ssl_rand_strong(rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN);
     aeskey = psync_ssl_gen_symmetric_key_from_pass(
         newpassphrase, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE,
         rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN, 20000);
@@ -1936,7 +1931,7 @@ int psync_pcloud_crypto_encode_key(const char *newpassphrase, uint32_t flags,
   rsapriv_struct = (priv_key_ver1 *)newpriv;
   rsapriv_struct->type = PSYNC_CRYPTO_TYPE_RSA4096_64BYTESALT_20000IT;
   rsapriv_struct->flags = flags;
-  psync_ssl_rand_weak(rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN);
+  psync_ssl_rand_strong(rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN);
   aeskey = psync_ssl_gen_symmetric_key_from_pass(
       newpassphrase, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE,
       rsapriv_struct->salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN, 20000);

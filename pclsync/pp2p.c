@@ -221,7 +221,7 @@ static void psync_p2p_check(const packet_check *packet) {
   else
     return;
   resp.port = tcpport;
-  psync_ssl_rand_weak(resp.rand, sizeof(resp.rand));
+  psync_ssl_rand_strong(resp.rand, sizeof(resp.rand));
   memcpy(hashsource, hashhex, PSYNC_HASH_DIGEST_HEXLEN);
   memcpy(hashsource + PSYNC_HASH_DIGEST_HEXLEN, resp.rand, sizeof(resp.rand));
   psync_hash(hashsource, PSYNC_HASH_BLOCK_SIZE, hashbin);
@@ -550,7 +550,7 @@ static void psync_p2p_wake() {
 
 void pp2p_init() {
   unsigned char computerbin[PSYNC_HASH_DIGEST_LEN];
-  psync_ssl_rand_weak(computerbin, PSYNC_HASH_DIGEST_LEN);
+  psync_ssl_rand_strong(computerbin, PSYNC_HASH_DIGEST_LEN);
   psync_binhex(computername, computerbin, PSYNC_HASH_DIGEST_LEN);
   ptimer_exception_handler(psync_p2p_wake);
   if (!psync_setting_get_bool(_PS(p2psync)))
@@ -754,7 +754,7 @@ int pp2p_check_download(psync_fileid_t fileid,
   pct1.type = P2P_CHECK;
   memcpy(pct1.hashstart, filehashhex, PSYNC_P2P_HEXHASH_BYTES);
   pct1.filesize = fsize;
-  psync_ssl_rand_weak(pct1.rand, sizeof(pct1.rand));
+  psync_ssl_rand_strong(pct1.rand, sizeof(pct1.rand));
   memcpy(hashsource, filehashhex, PSYNC_HASH_DIGEST_HEXLEN);
   memcpy(hashsource + PSYNC_HASH_DIGEST_HEXLEN, pct1.rand, sizeof(pct1.rand));
   psync_hash(hashsource, PSYNC_HASH_BLOCK_SIZE, hashbin);
@@ -841,7 +841,7 @@ int pp2p_check_download(psync_fileid_t fileid,
     goto err_perm2;
   else if (bresp == P2P_RESP_WAIT) {
     uint32_t rnd;
-    psync_ssl_rand_weak((unsigned char *)&rnd, sizeof(rnd));
+    psync_ssl_rand_strong((unsigned char *)&rnd, sizeof(rnd));
     rnd &= 0x7ff;
     psys_sleep_milliseconds(PSYNC_P2P_SLEEP_WAIT_DOWNLOAD + rnd);
     goto err_temp2;

@@ -174,16 +174,16 @@ psync_symmetric_key_t pcrypto_key() {
                                          PSYNC_AES256_BLOCK_SIZE);
 }
 
-pcrypto_ctr_encdec_t
-pcrypto_ctr_encdec_create(psync_symmetric_key_t key) {
+pcrypto_ctr_encdec_t pcrypto_ctr_encdec_create(psync_symmetric_key_t key) {
   psync_aes256_encoder enc;
   pcrypto_ctr_encdec_t ret;
-  if (unlikely_log(key->keylen <
-                   PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE))
+  if (unlikely_log(key->keylen < PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE)) {
     return PSYNC_CRYPTO_INVALID_ENCODER;
+  }
   enc = psync_ssl_aes256_create_encoder(key);
-  if (unlikely_log(enc == PSYNC_INVALID_ENCODER))
+  if (unlikely_log(enc == PSYNC_INVALID_ENCODER)) {
     return PSYNC_CRYPTO_INVALID_ENCODER;
+  }
   ret = psync_new(pcrypto_key_t);
   ret->encoder = enc;
   memcpy(ret->iv, key->key + PSYNC_AES256_KEY_SIZE, PSYNC_AES256_BLOCK_SIZE);
@@ -504,7 +504,7 @@ void pcrypto_encode_sec(
   aessrc = ALIGN_PTR_A256_BS(buff);
   aesdst = aessrc + PSYNC_AES256_BLOCK_SIZE;
   assert(PSYNC_CRYPTO_AUTH_SIZE == 2 * PSYNC_AES256_BLOCK_SIZE);
-  psync_ssl_rand_weak(rnd, PSYNC_AES256_BLOCK_SIZE);
+  psync_ssl_rand_strong(rnd, PSYNC_AES256_BLOCK_SIZE);
   psync_hmac_sha512_init(&ctx, enc->iv, enc->ivlen);
   psync_hmac_sha512_update(&ctx, data, datalen);
   psync_hmac_sha512_update(&ctx, &sectorid, sizeof(sectorid));
