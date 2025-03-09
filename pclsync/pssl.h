@@ -88,8 +88,8 @@ typedef mbedtls_aes_context *psync_aes256_decoder;
 // ctx, level, message, ???, ???
 typedef void (*psync_ssl_debug_callback_t)(void *, int, const char *, int,
                                            const char *);
-void psync_ssl_set_log_threshold(int threshold);
-void psync_ssl_set_debug_callback(psync_ssl_debug_callback_t cb, void *ctx);
+void pssl_log_threshold(int threshold);
+void pssl_debug_cb(psync_ssl_debug_callback_t cb, void *ctx);
 
 #if defined(__GNUC__) &&                                                       \
     (defined(__amd64__) || defined(__x86_64__) || defined(__i386__))

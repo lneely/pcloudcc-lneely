@@ -194,11 +194,11 @@ int psync_ssl_hw_aes;
 static psync_ssl_debug_callback_t debug_cb = NULL;
 static void *debug_ctx = NULL;
 
-void psync_ssl_set_log_threshold(int threshold) {
+void pssl_log_threshold(int threshold) {
   mbedtls_debug_set_threshold(threshold);
 }
 
-void psync_ssl_set_debug_callback(psync_ssl_debug_callback_t cb, void *ctx) {
+void pssl_debug_cb(psync_ssl_debug_callback_t cb, void *ctx) {
   debug_cb = cb;
   debug_ctx = ctx;
 }
@@ -215,7 +215,7 @@ int ctr_drbg_random_locked(void *p_rng, unsigned char *output,
 }
 
 #if defined(PSYNC_AES_HW_GCC)
-static int psync_ssl_detect_aes_hw() {
+static int detect_aes_hw() {
   uint32_t eax, ecx;
   eax = 1;
   __asm__("cpuid" : "=c"(ecx) : "a"(eax) : "%ebx", "%edx");
@@ -227,7 +227,7 @@ static int psync_ssl_detect_aes_hw() {
   return ecx;
 }
 #elif defined(PSYNC_AES_HW_MSC)
-static int psync_ssl_detect_aes_hw() {
+static int detect_aes_hw() {
   int info[4];
   int ret;
   __cpuid(info, 1);
@@ -246,7 +246,7 @@ int psync_ssl_init() {
   int result;
 
 #if defined(PSYNC_AES_HW)
-  psync_ssl_hw_aes = psync_ssl_detect_aes_hw();
+  psync_ssl_hw_aes = detect_aes_hw();
 #else
   debug(D_NOTICE, "hardware AES is not supported for this compiler");
 #endif
@@ -296,7 +296,7 @@ static ssl_connection_t *psync_ssl_alloc_conn(const char *hostname) {
   return conn;
 }
 
-static void psync_set_ssl_error(ssl_connection_t *conn, int err) {
+static void set_error(ssl_connection_t *conn, int err) {
   if (err == MBEDTLS_ERR_SSL_WANT_READ)
     psync_ssl_errno = PSYNC_SSL_ERR_WANT_READ;
   else if (err == MBEDTLS_ERR_SSL_WANT_WRITE)
@@ -313,7 +313,7 @@ static void psync_set_ssl_error(ssl_connection_t *conn, int err) {
   }
 }
 
-static int psync_mbed_read(void *ptr, unsigned char *buf, size_t len) {
+static int mbed_read(void *ptr, unsigned char *buf, size_t len) {
   ssl_connection_t *conn;
   ssize_t ret;
   int err;
@@ -329,7 +329,7 @@ static int psync_mbed_read(void *ptr, unsigned char *buf, size_t len) {
     return (int)ret;
 }
 
-static int psync_mbed_write(void *ptr, const unsigned char *buf, size_t len) {
+static int mbed_write(void *ptr, const unsigned char *buf, size_t len) {
   ssl_connection_t *conn;
   ssize_t ret;
   int err;
@@ -345,12 +345,12 @@ static int psync_mbed_write(void *ptr, const unsigned char *buf, size_t len) {
     return (int)ret;
 }
 
-static void psync_ssl_free_session(void *ptr) {
+static void free_session(void *ptr) {
   mbedtls_ssl_session_free((mbedtls_ssl_session *)ptr);
   psync_free(ptr);
 }
 
-static void psync_ssl_save_session(ssl_connection_t *conn) {
+static void save_session(ssl_connection_t *conn) {
   mbedtls_ssl_session *sess;
   sess = psync_new(mbedtls_ssl_session);
   // mbedtls_ssl_get_session seems to copy all elements, instead of referencing
@@ -360,10 +360,10 @@ static void psync_ssl_save_session(ssl_connection_t *conn) {
     psync_free(sess);
   else
     pcache_add(conn->cachekey, sess, PSYNC_SSL_SESSION_CACHE_TIMEOUT,
-                    psync_ssl_free_session, PSYNC_MAX_SSL_SESSIONS_PER_DOMAIN);
+                    free_session, PSYNC_MAX_SSL_SESSIONS_PER_DOMAIN);
 }
 
-static int psync_ssl_check_peer_public_key(ssl_connection_t *conn) {
+static int chcek_peer_pubkey(ssl_connection_t *conn) {
   const mbedtls_x509_crt *cert;
   unsigned char buff[1024], sigbin[32];
   char sighex[66];
@@ -428,7 +428,7 @@ int psync_ssl_connect(int sock, void **sslconn,
   mbedtls_ssl_conf_ciphersuites(&conn->cfg, psync_mbed_ciphersuite);
   mbedtls_ssl_conf_rng(&conn->cfg, ctr_drbg_random_locked, &psync_mbed_rng);
 
-  mbedtls_ssl_set_bio(&conn->ssl, &conn->srv, psync_mbed_write, psync_mbed_read,
+  mbedtls_ssl_set_bio(&conn->ssl, &conn->srv, mbed_write, mbed_read,
                       NULL);
   mbedtls_ssl_set_hostname(&conn->ssl, hostname);
 
@@ -445,16 +445,16 @@ int psync_ssl_connect(int sock, void **sslconn,
 
   ret = mbedtls_ssl_handshake(&conn->ssl);
   if (ret == 0) {
-    if ((psync_ssl_check_peer_public_key(conn))) {
+    if ((chcek_peer_pubkey(conn))) {
       goto err1;
     }
     *sslconn = conn;
 
-    psync_ssl_save_session(conn);
+    save_session(conn);
     return PSYNC_SSL_SUCCESS;
   }
 
-  psync_set_ssl_error(conn, ret);
+  set_error(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
                  ret == MBEDTLS_ERR_SSL_WANT_WRITE)) {
     *sslconn = conn;
@@ -474,15 +474,15 @@ int psync_ssl_connect_finish(void *sslconn, const char *hostname) {
   conn = (ssl_connection_t *)sslconn;
   ret = mbedtls_ssl_handshake(&conn->ssl);
   if (ret == 0) {
-    if ((psync_ssl_check_peer_public_key(conn))) {
+    if ((chcek_peer_pubkey(conn))) {
       goto fail;
     }
-    psync_ssl_save_session(conn);
+    save_session(conn);
     return PSYNC_SSL_SUCCESS;
   } else {
     debug(D_ERROR, "handshake failed, return code was %d", ret);
   }
-  psync_set_ssl_error(conn, ret);
+  set_error(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
                  ret == MBEDTLS_ERR_SSL_WANT_WRITE))
     return PSYNC_SSL_NEED_FINISH;
@@ -501,7 +501,7 @@ int psync_ssl_shutdown(void *sslconn) {
   ret = mbedtls_ssl_close_notify(&conn->ssl);
   if (ret == 0)
     goto noshutdown;
-  psync_set_ssl_error(conn, ret);
+  set_error(conn, ret);
   if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
                  ret == MBEDTLS_ERR_SSL_WANT_WRITE))
     return PSYNC_SSL_NEED_FINISH;
@@ -529,7 +529,7 @@ int psync_ssl_read(void *sslconn, void *buf, int num) {
   res = mbedtls_ssl_read(&conn->ssl, (unsigned char *)buf, num);
   if (res >= 0)
     return res;
-  psync_set_ssl_error(conn, res);
+  set_error(conn, res);
   return PSYNC_SSL_FAIL;
 }
 
@@ -540,7 +540,7 @@ int psync_ssl_write(void *sslconn, const void *buf, int num) {
   res = mbedtls_ssl_write(&conn->ssl, (const unsigned char *)buf, num);
   if (res >= 0)
     return res;
-  psync_set_ssl_error(conn, res);
+  set_error(conn, res);
   return PSYNC_SSL_FAIL;
 }
 

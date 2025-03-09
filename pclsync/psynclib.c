@@ -229,13 +229,8 @@ static void ssl_debug_cb(void *ctx, int level, const char *msg, int TODO1,
 }
 
 void psync_set_ssl_debug_callback(psync_ssl_debug_callback_t cb) {
-  if (cb) {
-    psync_ssl_set_log_threshold(PSYNC_SSL_DEBUG_LEVEL);
-    psync_ssl_set_debug_callback(cb, NULL);
-  } else {
-    psync_ssl_set_log_threshold(0);
-    psync_ssl_set_debug_callback(NULL, NULL);
-  }
+  pssl_log_threshold(PSYNC_SSL_DEBUG_LEVEL);
+  pssl_debug_cb(cb, NULL);
 }
 
 void psync_set_apiserver(const char *binapi, uint32_t locationid) {
