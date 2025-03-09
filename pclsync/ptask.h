@@ -32,15 +32,12 @@
 #ifndef _PSYNC_TASKS_H
 #define _PSYNC_TASKS_H
 
-#include "psynclib.h"
+#include "pfoldersync.h"
+#include "pssl.h"
 
-#define PSYNC_ASYNC_ERR_FLAG_PERM                                              \
-  0x01 // the error is permanent(ish) and there is no reason to retry
-#define PSYNC_ASYNC_ERR_FLAG_RETRY_AS_IS                                       \
-  0x02 // same request may succeed in the future if retried as is
-#define PSYNC_ASYNC_ERR_FLAG_SUCCESS                                           \
-  0x04 // like no action performed because of no need - file already exists and
-       // so on
+#define PSYNC_ASYNC_ERR_FLAG_PERM 0x01        // the error is permanent(ish) and there is no reason to retry
+#define PSYNC_ASYNC_ERR_FLAG_RETRY_AS_IS 0x02 // same request may succeed in the future if retried as is
+#define PSYNC_ASYNC_ERR_FLAG_SUCCESS 0x04     // like no action performed because of no need - file already exists and so on
 
 #define PSYNC_ASYNC_ERROR_NET 1
 #define PSYNC_ASYNC_ERROR_FILE 2
@@ -119,6 +116,17 @@ typedef struct {
   };
 } psync_async_result_t;
 
+typedef struct {
+  psync_encrypted_symmetric_key_t key;
+  psync_fileid_t id;
+  uint64_t hash;
+} insert_file_key_task;
+
+typedef struct {
+  psync_encrypted_symmetric_key_t key;
+  psync_folderid_t id;
+} insert_folder_key_task;
+
 typedef void (*psync_async_callback_t)(void *, psync_async_result_t *);
 
 
@@ -153,5 +161,9 @@ void ptask_download(psync_syncid_t syncid, psync_fileid_t fileid, psync_folderid
 void ptask_download_q(psync_syncid_t syncid, psync_fileid_t fileid, psync_folderid_t localfolderid, const char *name);
 void ptask_upload(psync_syncid_t syncid, psync_fileid_t localfileid, const char *name);
 void ptask_upload_q(psync_syncid_t syncid, psync_fileid_t localfileid, const char *name);
+
+// crypto folder
+void ptask_cfldr_save_fldrkey(void *ptr);
+void ptask_cfldr_save_filekey(void *ptr);
 
 #endif
