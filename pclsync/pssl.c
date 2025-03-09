@@ -715,9 +715,11 @@ psync_ssl_gen_symmetric_key_from_pass(const char *password, size_t keylen,
   mbedtls_md_init(&ctx);
   mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1);
   key->keylen = keylen;
-  mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char *)password,
-                            strlen(password), salt, saltlen, iterations, keylen,
-                            key->key);
+  const mbedtls_md_info_t *md_info = mbedtls_md_info_from_ctx(&ctx);
+  mbedtls_md_type_t md_type = mbedtls_md_get_type(md_info);
+  mbedtls_pkcs5_pbkdf2_hmac_ext(md_type, (const unsigned char *)password,
+                               strlen(password), salt, saltlen, iterations, keylen,
+                               key->key);
   mbedtls_md_free(&ctx);
   return key;
 }
@@ -739,9 +741,10 @@ char *psync_ssl_derive_password_from_passphrase(const char *username,
   psync_free(usercopy);
   mbedtls_md_init(&ctx);
   mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1);
-  mbedtls_pkcs5_pbkdf2_hmac(
-      &ctx, (const unsigned char *)passphrase, strlen(passphrase), usersha512,
-      PSYNC_SHA512_DIGEST_LEN, 5000, sizeof(passwordbin), passwordbin);
+  const mbedtls_md_info_t *md_info = mbedtls_md_info_from_ctx(&ctx);
+  mbedtls_md_type_t md_type = mbedtls_md_get_type(md_info);
+  mbedtls_pkcs5_pbkdf2_hmac_ext(md_type, (const unsigned char *)passphrase, strlen(passphrase), usersha512, 
+    PSYNC_SHA512_DIGEST_LEN, 5000, sizeof(passwordbin), passwordbin);
   mbedtls_md_free(&ctx);
   usercopy = psync_base64_encode(passwordbin, sizeof(passwordbin), &userlen);
   return (char *)usercopy;
