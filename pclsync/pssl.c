@@ -36,7 +36,7 @@
 #include <mbedtls/entropy.h>
 #include <mbedtls/error.h>
 #include <mbedtls/md.h>
-#include <mbedtls/net.h>
+#include <mbedtls/net_sockets.h>
 #include <mbedtls/pkcs5.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/ssl.h>
@@ -385,7 +385,7 @@ static int chcek_peer_pubkey(ssl_connection_t *conn) {
     debug(D_WARNING, "pk_write_pubkey_der returned error %d", i);
     return -1;
   }
-  mbedtls_sha256(buff + sizeof(buff) - i, i, sigbin, 0);
+  mbedtls_sha256_ret(buff + sizeof(buff) - i, i, sigbin, 0);
   psync_binhex(sighex, sigbin, 32);
   sighex[64] = 0;
   for (i = 0; i < ARRAY_SIZE(psync_ssl_trusted_pk_sha256); i++)
@@ -750,7 +750,8 @@ psync_ssl_gen_symmetric_key_from_pass(const char *password, size_t keylen,
   psync_symmetric_key_t key = (psync_symmetric_key_t)pmemlock_malloc(
       keylen + offsetof(psync_symmetric_key_struct_t, key));
   mbedtls_md_context_t ctx;
-  mbedtls_md_init_ctx(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512));
+  mbedtls_md_init(&ctx);
+  mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1);
   key->keylen = keylen;
   mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char *)password,
                             strlen(password), salt, saltlen, iterations, keylen,
@@ -774,7 +775,8 @@ char *psync_ssl_derive_password_from_passphrase(const char *username,
       usercopy[i] = '*';
   psync_sha512(usercopy, userlen, usersha512);
   psync_free(usercopy);
-  mbedtls_md_init_ctx(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512));
+  mbedtls_md_init(&ctx);
+  mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1);
   mbedtls_pkcs5_pbkdf2_hmac(
       &ctx, (const unsigned char *)passphrase, strlen(passphrase), usersha512,
       PSYNC_SHA512_DIGEST_LEN, 5000, sizeof(passwordbin), passwordbin);
