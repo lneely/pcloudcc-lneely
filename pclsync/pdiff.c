@@ -45,6 +45,7 @@
 #include "papi.h"
 #include "pbusinessaccount.h"
 #include "pcache.h"
+#include "pcryptofolder.h"
 #include "pqevent.h"
 #include "pcontacts.h"
 #include "pdevice.h"
@@ -1646,7 +1647,7 @@ static void start_download() {
 }
 
 static void stop_crypto_thread() {
-  psync_crypto_stop();
+  pcryptofolder_lock();
   psync_delete_cached_crypto_keys();
 }
 

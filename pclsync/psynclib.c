@@ -216,7 +216,7 @@ void psync_set_alloc(psync_malloc_t malloc_call, psync_realloc_t realloc_call,
 
 static void psync_stop_crypto_on_sleep() {
   if (psync_setting_get_bool(_PS(sleepstopcrypto)) &&
-      psync_crypto_isstarted()) {
+      pcryptofolder_is_unlocked()) {
     pcryptofolder_lock();
     debug(D_NOTICE, "stopped crypto due to sleep");
   }
@@ -2180,27 +2180,12 @@ char *psync_derive_password_from_passphrase(const char *username,
   return psymkey_derive(username, passphrase);
 }
 
-int psync_crypto_setup(const char *password, const char *hint) {
-  if (psync_status_is_offline())
-    return PSYNC_CRYPTO_SETUP_CANT_CONNECT;
-  else
-    return pcryptofolder_setup(password, hint);
-}
-
 int psync_crypto_get_hint(char **hint) {
   if (psync_status_is_offline())
     return PSYNC_CRYPTO_HINT_CANT_CONNECT;
   else
     return pcryptofolder_get_hint(hint);
 }
-
-int psync_crypto_start(const char *password) {
-  return pcryptofolder_unlock(password);
-}
-
-int psync_crypto_stop() { return pcryptofolder_lock(); }
-
-int psync_crypto_isstarted() { return pcryptofolder_is_unlocked(); }
 
 int psync_crypto_mkdir(psync_folderid_t folderid, const char *name,
                        const char **err, psync_folderid_t *newfolderid) {

@@ -645,7 +645,7 @@ pfolder_list_t *pfolder_remote_folders(psync_folderid_t folderid,
       entry.folder.canshare = (psync_my_userid == psync_get_number(row[3]));
       entry.folder.isencrypted =
           (psync_get_number(row[4]) & PSYNC_FOLDER_FLAG_ENCRYPTED) ? 1 : 0;
-      if (parentencrypted && psync_crypto_isstarted()) {
+      if (parentencrypted && pcryptofolder_is_unlocked()) {
         tmp = (char *)psync_get_lstring(row[2], &namelen);
         entry.name = get_decname_for_folder(folderid, tmp, namelen);
         if (!entry.name) {

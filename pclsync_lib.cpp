@@ -350,7 +350,7 @@ int clib::pclsync_lib::start_crypto(const char *pass) {
 int clib::pclsync_lib::stop_crypto(const char *path) {
   (void)path;
 
-  psync_crypto_stop();
+  pcryptofolder_lock();
   get_lib().crypto_on_ = false;
   return 0;
 }

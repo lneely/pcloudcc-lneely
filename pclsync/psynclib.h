@@ -1324,11 +1324,7 @@ char *psync_derive_password_from_passphrase(const char *username,
 
  */
 
-int psync_crypto_setup(const char *password, const char *hint);
 int psync_crypto_get_hint(char **hint);
-int psync_crypto_start(const char *password);
-int psync_crypto_stop();
-int psync_crypto_isstarted();
 int psync_crypto_mkdir(psync_folderid_t folderid, const char *name,
                        const char **err, psync_folderid_t *newfolderid);
 int psync_crypto_issetup();
