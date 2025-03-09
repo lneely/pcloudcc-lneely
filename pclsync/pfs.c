@@ -1468,7 +1468,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
           goto ex0;
         }
         encoder = pcrypto_sec_encdec_create(symkey);
-        psync_ssl_free_symmetric_key(symkey);
+        psymkey_free(symkey);
         if (unlikely_log(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
           psync_free(encsymkey);
           ret = -ENOMEM;
@@ -1639,7 +1639,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
       return -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encsymkey));
     }
     encoder = pcrypto_sec_encdec_create(symkey);
-    psync_ssl_free_symmetric_key(symkey);
+    psymkey_free(symkey);
     if (unlikely_log(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
       psync_fstask_release_folder_tasks_locked(folder);
       psync_sql_unlock();
@@ -3367,7 +3367,7 @@ void psync_fs_refresh_folder(psync_folderid_t folderid) {
       pfolder_path_sep(folderid, "/", NULL);
   if (path == PSYNC_INVALID_PATH)
     return;
-  psync_ssl_rand_strong(rndbuff, sizeof(rndbuff));
+  pssl_rand_strong(rndbuff, sizeof(rndbuff));
   psync_binhex(rndhex, rndbuff, sizeof(rndbuff));
   rndhex[2 * sizeof(rndbuff)] = 0;
   pthread_mutex_lock(&start_mutex);
@@ -3565,7 +3565,7 @@ static void psync_fs_init_once() {
 #if psync_fs_need_per_folder_refresh_const()
   unsigned char rndbuff[16];
   char rndhex[34];
-  psync_ssl_rand_strong(rndbuff, sizeof(rndbuff));
+  pssl_rand_strong(rndbuff, sizeof(rndbuff));
   psync_binhex(rndhex, rndbuff, sizeof(rndbuff));
   rndhex[2 * sizeof(rndbuff)] = 0;
   psync_fake_prefix = psync_strcat(".refresh", rndhex, NULL);

@@ -68,7 +68,7 @@ static void psync_hmac_sha512_init(psync_hmac_sha512_ctx *ctx,
   }
   psync_sha512_init(&ctx->sha1ctx);
   psync_sha512_update(&ctx->sha1ctx, keyxor, PSYNC_SHA512_BLOCK_LEN);
-  psync_ssl_memclean(keyxor, PSYNC_SHA512_BLOCK_LEN);
+  pssl_memclean(keyxor, PSYNC_SHA512_BLOCK_LEN);
 }
 
 static void psync_hmac_sha512_update(psync_hmac_sha512_ctx *ctx,
@@ -81,7 +81,7 @@ static void psync_hmac_sha512_final(unsigned char *result,
   psync_sha512_final(ctx->final + PSYNC_SHA512_BLOCK_LEN, &ctx->sha1ctx);
   psync_sha512(ctx->final, PSYNC_SHA512_BLOCK_LEN + PSYNC_SHA512_DIGEST_LEN,
                result);
-  psync_ssl_memclean(ctx->final,
+  pssl_memclean(ctx->final,
                      PSYNC_SHA512_BLOCK_LEN + PSYNC_SHA512_DIGEST_LEN);
 }
 
@@ -107,8 +107,8 @@ static void psync_hmac_sha512(const unsigned char *msg, size_t msglen,
   psync_sha512_update(&sha1ctx, msg, msglen);
   psync_sha512_final(final + PSYNC_SHA512_BLOCK_LEN, &sha1ctx);
   psync_sha512(final, PSYNC_SHA512_BLOCK_LEN + PSYNC_SHA512_DIGEST_LEN, result);
-  psync_ssl_memclean(keyxor, PSYNC_SHA512_BLOCK_LEN);
-  psync_ssl_memclean(final, PSYNC_SHA512_BLOCK_LEN + PSYNC_SHA512_DIGEST_LEN);
+  pssl_memclean(keyxor, PSYNC_SHA512_BLOCK_LEN);
+  pssl_memclean(final, PSYNC_SHA512_BLOCK_LEN + PSYNC_SHA512_DIGEST_LEN);
 }
 
 #define ALIGN_A256_BS(n)                                                       \
@@ -165,7 +165,7 @@ psync_symmetric_key_t pcrypto_key_len(size_t len) {
   key = (psync_symmetric_key_t)pmemlock_malloc(
       offsetof(psync_symmetric_key_struct_t, key) + len);
   key->keylen = len;
-  psync_ssl_rand_strong(key->key, len);
+  pssl_rand_strong(key->key, len);
   return key;
 }
 
@@ -180,7 +180,7 @@ pcrypto_ctr_encdec_t pcrypto_ctr_encdec_create(psync_symmetric_key_t key) {
   if (unlikely_log(key->keylen < PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE)) {
     return PSYNC_CRYPTO_INVALID_ENCODER;
   }
-  enc = psync_ssl_aes256_create_encoder(key);
+  enc = paes_create_encoder(key);
   if (unlikely_log(enc == PSYNC_INVALID_ENCODER)) {
     return PSYNC_CRYPTO_INVALID_ENCODER;
   }
@@ -192,8 +192,8 @@ pcrypto_ctr_encdec_t pcrypto_ctr_encdec_create(psync_symmetric_key_t key) {
 
 void pcrypto_ctr_encdec_free(
     pcrypto_ctr_encdec_t enc) {
-  psync_ssl_aes256_free_encoder(enc->encoder);
-  psync_ssl_memclean(enc->iv, PSYNC_AES256_BLOCK_SIZE);
+  paes_free_encoder(enc->encoder);
+  pssl_memclean(enc->iv, PSYNC_AES256_BLOCK_SIZE);
   psync_free(enc);
 }
 
@@ -404,7 +404,7 @@ pcrypto_textenc_create(psync_symmetric_key_t key) {
   if (unlikely_log(key->keylen <
                    PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE))
     return PSYNC_CRYPTO_INVALID_ENCODER;
-  enc = psync_ssl_aes256_create_encoder(key);
+  enc = paes_create_encoder(key);
   if (unlikely_log(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
   ret = (pcrypto_textenc_t)pmemlock_malloc(
@@ -418,8 +418,8 @@ pcrypto_textenc_create(psync_symmetric_key_t key) {
 
 void pcrypto_textenc_free(
     pcrypto_textenc_t enc) {
-  psync_ssl_aes256_free_encoder(enc->encoder);
-  psync_ssl_memclean(enc->iv, enc->ivlen);
+  paes_free_encoder(enc->encoder);
+  pssl_memclean(enc->iv, enc->ivlen);
   pmemlock_free(enc);
 }
 
@@ -430,7 +430,7 @@ pcrypto_textdec_create(psync_symmetric_key_t key) {
   if (unlikely_log(key->keylen <
                    PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE))
     return PSYNC_CRYPTO_INVALID_ENCODER;
-  enc = psync_ssl_aes256_create_decoder(key);
+  enc = paes_create_decoder(key);
   if (unlikely_log(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
   ret = (pcrypto_textenc_t)pmemlock_malloc(
@@ -444,8 +444,8 @@ pcrypto_textdec_create(psync_symmetric_key_t key) {
 
 void pcrypto_textdec_free(
     pcrypto_textdec_t enc) {
-  psync_ssl_aes256_free_encoder(enc->encoder);
-  psync_ssl_memclean(enc->iv, enc->ivlen);
+  paes_free_encoder(enc->encoder);
+  pssl_memclean(enc->iv, enc->ivlen);
   pmemlock_free(enc);
 }
 
@@ -456,12 +456,12 @@ pcrypto_sec_encdec_create(psync_symmetric_key_t key) {
   pcrypto_sector_encdec_t ret;
   if (unlikely_log(key->keylen < PSYNC_AES256_KEY_SIZE))
     return PSYNC_CRYPTO_INVALID_ENCODER;
-  enc = psync_ssl_aes256_create_encoder(key);
+  enc = paes_create_encoder(key);
   if (unlikely_log(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
-  dec = psync_ssl_aes256_create_decoder(key);
+  dec = paes_create_decoder(key);
   if (unlikely_log(enc == PSYNC_INVALID_ENCODER)) {
-    psync_ssl_aes256_free_encoder(enc);
+    paes_free_encoder(enc);
     return PSYNC_CRYPTO_INVALID_ENCODER;
   }
   ret = (pcrypto_sector_encdec_t)pmemlock_malloc(
@@ -476,9 +476,9 @@ pcrypto_sec_encdec_create(psync_symmetric_key_t key) {
 
 void pcrypto_sec_encdec_free(
     pcrypto_sector_encdec_t enc) {
-  psync_ssl_aes256_free_encoder(enc->encoder);
-  psync_ssl_aes256_free_decoder(enc->decoder);
-  psync_ssl_memclean(enc->iv, enc->ivlen);
+  paes_free_encoder(enc->encoder);
+  paes_free_decoder(enc->decoder);
+  pssl_memclean(enc->iv, enc->ivlen);
   pmemlock_free(enc);
 }
 
@@ -504,7 +504,7 @@ void pcrypto_encode_sec(
   aessrc = ALIGN_PTR_A256_BS(buff);
   aesdst = aessrc + PSYNC_AES256_BLOCK_SIZE;
   assert(PSYNC_CRYPTO_AUTH_SIZE == 2 * PSYNC_AES256_BLOCK_SIZE);
-  psync_ssl_rand_strong(rnd, PSYNC_AES256_BLOCK_SIZE);
+  pssl_rand_strong(rnd, PSYNC_AES256_BLOCK_SIZE);
   psync_hmac_sha512_init(&ctx, enc->iv, enc->ivlen);
   psync_hmac_sha512_update(&ctx, data, datalen);
   psync_hmac_sha512_update(&ctx, &sectorid, sizeof(sectorid));

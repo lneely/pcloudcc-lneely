@@ -228,7 +228,7 @@ static void ssl_debug_cb(void *ctx, int level, const char *msg, int TODO1,
         TODO1); // trying to figure out what these are...
 }
 
-void psync_set_ssl_debug_callback(psync_ssl_debug_callback_t cb) {
+void psync_set_ssl_debug_callback(pssl_debug_callback_t cb) {
   pssl_log_threshold(PSYNC_SSL_DEBUG_LEVEL);
   pssl_debug_cb(cb, NULL);
 }
@@ -278,7 +278,7 @@ int psync_init() {
   }
   psync_sql_statement("UPDATE task SET inprogress=0 WHERE inprogress=1");
   ptimer_init();
-  if (unlikely_log(psync_ssl_init())) {
+  if (unlikely_log(pssl_init())) {
     if (IS_DEBUG)
       pthread_mutex_unlock(&psync_libstate_mutex);
     return_error(PERROR_SSL_INIT_FAILED);
@@ -2177,7 +2177,7 @@ int psync_password_quality10000(const char *password) {
 
 char *psync_derive_password_from_passphrase(const char *username,
                                             const char *passphrase) {
-  return psync_ssl_derive_password_from_passphrase(username, passphrase);
+  return psymkey_derive(username, passphrase);
 }
 
 int psync_crypto_setup(const char *password, const char *hint) {

@@ -330,7 +330,7 @@ static psock_t *get_connected_socket() {
     psync_sql_res *q;
     unsigned char deviceidbin[16];
     char deviceidhex[32 + 2];
-    psync_ssl_rand_strong(deviceidbin, sizeof(deviceidbin));
+    pssl_rand_strong(deviceidbin, sizeof(deviceidbin));
     psync_binhex(deviceidhex, deviceidbin, sizeof(deviceidbin));
     deviceidhex[sizeof(deviceidbin) * 2] = 0;
     q = psync_sql_prep_statement(
