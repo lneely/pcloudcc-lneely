@@ -208,7 +208,7 @@ static int lib_setup_cripto() {
     return PSYNC_CRYPTO_CANT_CONNECT;
   }
 
-  if(!psync_crypto_issetup()) {
+  if(!pcryptofolder_issetup()) {
     std::cout << "crypto is not setup, setting it up now..." << std::endl;
     if(int ret = pcryptofolder_setup(pwd, "no hint") != PSYNC_CRYPTO_SETUP_SUCCESS) {
       std::cout << "crypto setup failed, error code was " << ret << std::endl;
@@ -342,34 +342,34 @@ static void status_change(pstatus_t *status) {
     psync_free(err);
 }
 
-int clib::pclsync_lib::start_crypto(const char *pass) {
-  get_lib().crypto_pass_ = pass;
+int clib::pclsync_lib::start_crypto(const char *pwd) {
+  get_lib().crypto_pass_ = pwd;
   return lib_setup_cripto();
 }
 
-int clib::pclsync_lib::stop_crypto(const char *path) {
-  (void)path;
+int clib::pclsync_lib::stop_crypto(const char *unused) {
+  (void)unused;
 
-  psync_crypto_stop();
+  pcryptofolder_lock();
   get_lib().crypto_on_ = false;
   return 0;
 }
 
-int clib::pclsync_lib::finalize(const char *path) {
-  (void)path;
+int clib::pclsync_lib::finalize(const char *unused) {
+  (void)unused;
 
   psync_destroy();
   exit(0);
 }
 
 // path is the local and remote path delimited by '|'
-int clib::pclsync_lib::add_sync_folder(const char *path) {
-  if (path == nullptr) {
+int clib::pclsync_lib::add_sync_folder(const char *combined_path) {
+  if (combined_path == nullptr) {
     std::cerr << "Error: path is nullptr" << std::endl;
     return -255;
   }
   const char delimiter = '|';
-  std::string combined(path);
+  std::string combined(combined_path);
   size_t delimiter_pos = combined.find(delimiter);
   if (delimiter_pos == std::string::npos) {
     std::cerr << "Error: Invalid path format. Expected 'localpath|remotepath'"
@@ -395,15 +395,15 @@ int clib::pclsync_lib::add_sync_folder(const char *path) {
 }
 
 // path is the folderid to remove
-int clib::pclsync_lib::remove_sync_folder(const char *path) {
+int clib::pclsync_lib::remove_sync_folder(const char *fid) {
   psync_folderid_t folderid;
-  folderid = static_cast<psync_folderid_t>(std::stoull(path, nullptr, 10));
+  folderid = static_cast<psync_folderid_t>(std::stoull(fid, nullptr, 10));
   return psync_delete_sync_by_folderid(folderid);
 }
 
 // path is not used
-int clib::pclsync_lib::list_sync_folders(const char *path) {
-  (void)path;
+int clib::pclsync_lib::list_sync_folders(const char *unused) {
+  (void)unused;
 
   psync_folder_list_t *folders;
   size_t folderssz;
@@ -459,12 +459,12 @@ int clib::pclsync_lib::init() {
     psync_free(username_old);
   }
 
-  prpc_register(STARTCRYPTO, &clib::pclsync_lib::start_crypto);
-  prpc_register(STOPCRYPTO, &clib::pclsync_lib::stop_crypto);
-  prpc_register(FINALIZE, &clib::pclsync_lib::finalize);
-  prpc_register(LISTSYNC, &clib::pclsync_lib::list_sync_folders);
-  prpc_register(ADDSYNC, &clib::pclsync_lib::add_sync_folder);
-  prpc_register(STOPSYNC, &clib::pclsync_lib::remove_sync_folder);
+  prpc_register(STARTCRYPTO, &start_crypto);
+  prpc_register(STOPCRYPTO, &stop_crypto);
+  prpc_register(FINALIZE, &finalize);
+  prpc_register(LISTSYNC, &list_sync_folders);
+  prpc_register(ADDSYNC, &add_sync_folder);
+  prpc_register(STOPSYNC, &remove_sync_folder);
 
   return 0;
 }

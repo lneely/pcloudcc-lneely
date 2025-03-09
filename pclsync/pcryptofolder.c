@@ -357,6 +357,11 @@ setup_upload(const unsigned char *rsapriv, size_t rsaprivlen,
   return ret;
 }
 
+int pcryptofolder_issetup() {
+  return psync_sql_cellint("SELECT value FROM setting WHERE id='cryptosetup'", 0);
+}
+
+
 /*
  * generate 64 byte (512 bit) salt for PBKDF2
  * generate AES key and IV with PBKDF2
@@ -364,7 +369,6 @@ setup_upload(const unsigned char *rsapriv, size_t rsaprivlen,
  * upload to server salt, encrypted private and public
  *
  */
-
 int pcryptofolder_setup(const char *password, const char *hint) {
   unsigned char salt[PSYNC_CRYPTO_PBKDF2_SALT_LEN];
   char publicsha1[PSYNC_SHA1_DIGEST_HEXLEN + 2],
@@ -719,7 +723,7 @@ int pcryptofolder_reset() {
   binresult *res;
   uint32_t result;
   int tries;
-  if (!psync_crypto_issetup())
+  if (!pcryptofolder_issetup())
     return PRINT_RETURN_CONST(PSYNC_CRYPTO_RESET_NOT_SETUP);
   debug(D_NOTICE, "resetting crypto");
   tries = 0;
