@@ -58,31 +58,21 @@ int main(int argc, char **argv) {
 
   try {
     po::options_description desc("Allowed options");
-    desc.add_options()("help,h", "Show this help message.")(
-        "username,u", po::value<std::string>(&username),
-        "pCloud account name.")(
-        "password,p", po::bool_switch(&passwordsw),
-        "Ask for pCloud account password.")(
-        "tfa_code,t", po::value<std::string>(&tfa_code),
-        "pCloud tfa code")(
-        "trusted_device,r", po::bool_switch(&trusted_device),
-        "Trust this device.")(
-        "crypto,c", po::bool_switch(&crypto),
-        "Ask for crypto password.")(
-        "passascrypto,y", po::value<std::string>(),
-        "User password is the same as crypto password.")(
-        "daemonize,d", po::bool_switch(&daemon),
-        "Run the process as a background daemon.")(
-        "commands ,o", po::bool_switch(&commands),
-        "Keep parent process alive and process commands. ")(
-        "mountpoint,m", po::value<std::string>(),
-        "Specify where pCloud filesystem is mounted.")(
-        "commands_only,k", po::bool_switch(&commands_only),
-        "Open command prompt to interact with running daemon.")(
-        "newuser,n", po::bool_switch(&newuser),
-        "Register a new pCloud user account.")(
-        "savepassword,s", po::bool_switch(&save_pass),
-        "Save user password in the database.");
+    desc.add_options()
+    ("help,h", "Show this help message.")
+    ("username,u", po::value<std::string>(&username), "pCloud account name.")
+    ("password,p", po::bool_switch(&passwordsw), "Ask for pCloud account password.")
+    ("tfa_code,t", po::value<std::string>(&tfa_code), "pCloud tfa code")
+    ("trusted_device,r", po::bool_switch(&trusted_device), "Trust this device.")
+    ("crypto,c", po::bool_switch(&crypto), "Ask for crypto password.")
+    ("passascrypto,y", po::value<std::string>(), "User password is the same as crypto password.")
+    ("daemonize,d", po::bool_switch(&daemon), "Run the process as a background daemon.")
+    ("commands ,o", po::bool_switch(&commands), "Keep parent process alive and process commands. ")
+    ("mountpoint,m", po::value<std::string>(), "Specify where pCloud filesystem is mounted.")
+    ("commands_only,k", po::bool_switch(&commands_only), "Open command prompt to interact with running daemon.")
+    ("command,c", po::value<std::string>(), "Execute a single command and exit.")
+    ("newuser,n", po::bool_switch(&newuser), "Register a new pCloud user account.")
+    ("savepassword,s", po::bool_switch(&save_pass), "Save user password in the database.");
 
     po::command_line_parser parser{argc, argv};
     po::positional_options_description p;
@@ -101,6 +91,20 @@ int main(int argc, char **argv) {
       ct::process_commands();
       exit(0);
     }
+
+    bool has_piped_input = !isatty(STDIN_FILENO);
+    if (has_piped_input && !vm.count("help")) {
+      std::string line;
+      if (std::getline(std::cin, line) && !line.empty()) {
+        return ct::process_command(line);
+      }
+    }
+
+    if (vm.count("command")) {
+      std::string command = vm["command"].as<std::string>();
+      return ct::process_command(command);
+    }
+
 
     if ((!vm.count("username"))) {
       std::cout << "Username option is required, specify with "

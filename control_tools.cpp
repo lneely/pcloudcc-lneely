@@ -85,13 +85,12 @@ static char** command_completion(const char* text, int start, int end) {
   return nullptr;
 }
 
-void process_commands() {
-  CLI::App app{"pcloudcc-lneely"};
-  app.fallthrough();
-  app.footer("Type 'help' or '?' for a list of supported commands.");
+void setup_app(CLI::App *app) {
+  app->fallthrough();
+  app->footer("Type 'help' or '?' for a list of supported commands.");
 
   // top-level commands
-  app.add_subcommand("help", "Show help")->alias("?")->callback([] {
+  app->add_subcommand("help", "Show help")->alias("?")->callback([] {
     std::cout << "Supported commands are:" << std::endl
               << "  help(?): Show this help message" << std::endl
               << "  crypto(c):" << std::endl
@@ -104,13 +103,13 @@ void process_commands() {
               << "  finalize(f): Kill daemon and quit" << std::endl
               << "  quit(q): Exit this program" << std::endl;
   });
-  auto crypto_cmd = app.add_subcommand("crypto", "Crypto-related commands")->alias("c");
+  auto crypto_cmd = app->add_subcommand("crypto", "Crypto-related commands")->alias("c");
   crypto_cmd->require_subcommand();
-  auto sync_cmd = app.add_subcommand("sync", "Sync-related commands")->alias("s");
+  auto sync_cmd = app->add_subcommand("sync", "Sync-related commands")->alias("s");
   sync_cmd->require_subcommand();
 
   // finalize command
-  app.add_subcommand("finalize", "Finalize and exit")->alias("f")->callback([] {
+  app->add_subcommand("finalize", "Finalize and exit")->alias("f")->callback([] {
     char *errm = NULL;
     size_t errm_size = 0;
     rpc_call(FINALIZE, "", &errm, &errm_size);
@@ -119,15 +118,15 @@ void process_commands() {
     exit(0);
   });
 
-  app.add_subcommand("quit", "Quit the program")->alias("q")->callback([] {
+  app->add_subcommand("quit", "Quit the program")->alias("q")->callback([] {
     exit(0);
   });
 
   // crypto start
   auto start_crypto_cmd = crypto_cmd->add_subcommand("start", "Start crypto");
-  std::string start_crypto_pwd;
+  static std::string start_crypto_pwd;
   start_crypto_cmd->add_option("password", start_crypto_pwd, "Crypto password")->required();
-  start_crypto_cmd->callback([&] { 
+  start_crypto_cmd->callback([] { 
     char *errm = NULL;
     size_t errm_size = 0;
     if(int result = rpc_call(STARTCRYPTO, start_crypto_pwd.c_str(), &errm, &errm_size) != 0) {
@@ -144,7 +143,7 @@ void process_commands() {
   crypto_cmd->add_subcommand("stop", "Stop crypto")->callback([] {
     char *errm = NULL;
     size_t errm_size = 0;
-    if(int result = rpc_call(STOPCRYPTO, "", &errm, &errm_size) == 0) {
+    if(int result = rpc_call(STOPCRYPTO, "", &errm, &errm_size) != 0) {
       std::cout << "Stop Crypto failed: "<< (errm ? errm : "no message") << std::endl;
       if (errm) { free(errm); }
       return result;
@@ -187,9 +186,10 @@ void process_commands() {
       } else {
         std::cout << "No synchronized folders found." << std::endl;
       }
-      free(flist);
+      if(flist) { free(flist); }
     } else {
       std::cout << "failed to read folder list from shm" << std::endl;
+      if(flist) { free(flist); }
       return -1;
     }
     if(errm) { free(errm); }
@@ -198,10 +198,10 @@ void process_commands() {
 
   // sync add
   auto sync_add_cmd = sync_cmd->add_subcommand("add", "Add sync folder");
-  std::string localpath, remotepath;
+  static std::string localpath, remotepath;
   sync_add_cmd->add_option("localpath", localpath, "Local Path")->required();
   sync_add_cmd->add_option("remotepath", remotepath, "Remote Path")->required();
-  sync_add_cmd->callback([&] {
+  sync_add_cmd->callback([] {
     char *errm = NULL;
     size_t errmsz = 0;
 
@@ -222,9 +222,9 @@ void process_commands() {
 
   // sync remove
   auto sync_remove_cmd = sync_cmd->add_subcommand("remove", "Remove sync folder (use ls to get folder ID)")->alias("rm");
-  std::string syncrm_fid;
+  static std::string syncrm_fid;
   sync_remove_cmd->add_option("folderid", syncrm_fid, "Folder ID")->required();
-  sync_remove_cmd->callback([&] {
+  sync_remove_cmd->callback([] {
     char *errm = NULL;
     size_t errmsz = 0;
     const char *folderid = syncrm_fid.c_str();
@@ -239,6 +239,23 @@ void process_commands() {
     if(errm) { free(errm); }
     return 0;
   });
+}
+
+int process_command(const std::string &command) {
+  CLI::App app = CLI::App{"pcloudcc-lneely"};
+  setup_app(&app);
+  try {
+    app.parse(command);
+    return 0;
+  } catch (const CLI::ParseError &e) {
+    std::cerr << "Invalid command: '" << command << "'" << std::endl;
+    return 1;
+  }
+}
+
+void process_commands() {
+  CLI::App app = CLI::App{"pcloudcc-lneely"};
+  setup_app(&app);
 
   // enable command history and auto-completion
   using_history();
@@ -266,7 +283,7 @@ void process_commands() {
         args.push_back(arg);
       }
 
-      invs  << "Invalid command: '" << "line" 
+      invs  << "Invalid command: '" << line 
             << "'. Type 'help' or '?' to get a list of valid commands.";
       if (!args.empty()) {
         try {

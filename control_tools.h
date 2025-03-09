@@ -29,10 +29,13 @@
 #ifndef CONTROL_TOOLS_H
 #define CONTROL_TOOLS_H
 
+#include <string>
+
 namespace control_tools {
 
 void process_commands();
 int daemonize(bool do_commands);
+int process_command(const std::string &command);
 
 } // namespace control_tools
 
