@@ -36,6 +36,8 @@
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #include "control_tools.h"
 
@@ -227,7 +229,7 @@ int finalize() {
   return ret;
 }
 
-void help() {
+static void help() {
   std::cout << "Supported commands are:" << std::endl
             << "  help(?): Show this help message" << std::endl
             << "  crypto(c):" << std::endl
@@ -239,6 +241,45 @@ void help() {
             << "    remove(rm) <folderid>: Remove sync folder" << std::endl
             << "  finalize(f): Kill daemon and quit" << std::endl
             << "  quit(q): Exit this program" << std::endl;
+}
+
+static char* command_generator(const char* text, int state) {
+  static int list_index, len;
+  static const char* commands[] = {
+    "help", "?",
+    "crypto", "crypto start", "crypto stop", 
+    "c", "c start", "c stop",
+    "sync", "sync ls", "sync add", "sync remove", "sync rm",
+    "s", "s ls", "s add", "s remove", "s rm",
+    "finalize", "f",
+    "quit", "q",
+    nullptr
+  };
+  
+  // If this is a new word to complete, initialize
+  if (!state) {
+    list_index = 0;
+    len = strlen(text);
+  }
+  
+  // Return the next name which partially matches
+  while (const char* command = commands[list_index++]) {
+    if (strncmp(command, text, len) == 0) {
+      return strdup(command); // Caller frees this with free()
+    }
+  }
+  
+  return nullptr; // No more matches
+}
+
+static char** command_completion(const char* text, int start, int end) {
+  // If this is the start of line, complete commands
+  if (start == 0) {
+    return rl_completion_matches(text, command_generator);
+  }
+  
+  // Otherwise, don't complete
+  return nullptr;
 }
 
 void process_commands() {
@@ -290,12 +331,19 @@ void process_commands() {
   sync_remove_cmd->add_option("folderid", syncrm_fid, "Folder ID")->required();
   sync_remove_cmd->callback([&] { remove_sync_folder(syncrm_fid.c_str()); });
 
+  using_history();
+
   // command loop
+  rl_attempted_completion_function = command_completion;
   while (true) {
-    std::cout << "pcloud> ";
-    std::string line;
-    if (!std::getline(std::cin, line))
-      break;
+    char* line_read = readline("pcloud> ");
+    if (!line_read) break;
+    if (line_read[0]) {
+      add_history(line_read);
+    }
+    std::string line(line_read);
+    free(line_read); 
+
     try {
       app.parse(line);
     } catch (const CLI::ParseError &e) {
