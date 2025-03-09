@@ -610,9 +610,8 @@ psync_rsa_publickey_t prsa_load_public(const unsigned char *keydata,
 // function gets the actual key length from the ASN.1 header, trims any bytes
 // that exceed that length, and writes the trimmed key and length to keydata
 // and keylen.
-static unsigned char* trim_der_key(const unsigned char *keydata, size_t *keylen) {
+static void trim_der_key(unsigned char *keydata, size_t *keylen) {
     size_t len, header_size, correct_len;
-    unsigned char tag;
     unsigned char *p = (unsigned char *)keydata;
     const unsigned char *end;
     int ret;
@@ -621,17 +620,16 @@ static unsigned char* trim_der_key(const unsigned char *keydata, size_t *keylen)
     end = keydata + *keylen;
     ret = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE);
     if (ret != 0) {
-        return NULL;
+        return;
     }
     header_size = p - keydata;
     correct_len = header_size + len;
     trimmed = malloc(correct_len);
-    if (!trimmed) return NULL;
-
+    if (!trimmed) return;
     memcpy(trimmed, keydata, correct_len);
+    memcpy(keydata, trimmed, correct_len);
+    free(trimmed);
     *keylen = correct_len;
-    
-    return trimmed;
 }
 
 psync_rsa_privatekey_t prsa_load_private(const unsigned char *keydata, size_t keylen) {
@@ -639,8 +637,8 @@ psync_rsa_privatekey_t prsa_load_private(const unsigned char *keydata, size_t ke
   mbedtls_rsa_context *rsa;
   int ret;
 
-  trim_der_key(keydata, &keylen);
-
+  trim_der_key((unsigned char *)keydata, &keylen);
+  
   mbedtls_pk_init(&ctx);
   ret = mbedtls_pk_parse_key(&ctx, keydata, keylen, NULL, 0, rng_get, &rng);
   if(unlikely(ret)) {

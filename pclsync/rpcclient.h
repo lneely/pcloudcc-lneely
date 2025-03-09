@@ -49,7 +49,7 @@ typedef enum _pCloud_FileState {
 } pCloud_FileState;
 
 int rpc_get_state(pCloud_FileState *, char *);
-int rpc_call(int id, const char *, int *, char **, size_t *);
+int rpc_call(int id, const char *path, char **errm, size_t *errmsz);
 
 #ifdef __cplusplus
 }

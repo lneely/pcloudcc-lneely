@@ -191,11 +191,12 @@ char *ppath_private(char *name) {
   if (!path)
     return NULL;
   rpath = psync_strcat(path, "/", name, NULL);
-  free(path);
   if (stat(rpath, &st) && mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE)) {
     psync_free(rpath);
+    free(path);
     return NULL;
   }
+  free(path);
   return rpath;
 }
 
