@@ -50,28 +50,28 @@
 #define PSYNC_SHA1_DIGEST_LEN 20
 #define PSYNC_SHA1_DIGEST_HEXLEN 40
 #define psync_sha1_ctx mbedtls_sha1_context
-#define psync_sha1(data, datalen, checksum) mbedtls_sha1(data, datalen, checksum)
-#define psync_sha1_init(pctx) mbedtls_sha1_starts(pctx)
-#define psync_sha1_update(pctx, data, datalen) mbedtls_sha1_update(pctx, (const unsigned char *)data, datalen)
-#define psync_sha1_final(checksum, pctx) mbedtls_sha1_finish(pctx, checksum)
+#define psync_sha1(data, datalen, checksum) mbedtls_sha1_ret(data, datalen, checksum)
+#define psync_sha1_init(pctx) mbedtls_sha1_starts_ret(pctx)
+#define psync_sha1_update(pctx, data, datalen) mbedtls_sha1_update_ret(pctx, (const unsigned char *)data, datalen)
+#define psync_sha1_final(checksum, pctx) mbedtls_sha1_finish_ret(pctx, checksum)
 
 #define PSYNC_SHA256_BLOCK_LEN 64
 #define PSYNC_SHA256_DIGEST_LEN 32
 #define PSYNC_SHA256_DIGEST_HEXLEN 64
 #define psync_sha256_ctx mbedtls_sha256_context
-#define psync_sha256(data, datalen, checksum) mbedtls_sha256(data, datalen, checksum, 0)
-#define psync_sha256_init(pctx) mbedtls_sha256_starts(pctx, 0)
-#define psync_sha256_update(pctx, data, datalen) mbedtls_sha256_update(pctx, (const unsigned char *)data, datalen)
-#define psync_sha256_final(checksum, pctx) mbedtls_sha256_finish(pctx, checksum)
+#define psync_sha256(data, datalen, checksum) mbedtls_sha256_ret(data, datalen, checksum, 0)
+#define psync_sha256_init(pctx) mbedtls_sha256_starts_ret(pctx, 0)
+#define psync_sha256_update(pctx, data, datalen) mbedtls_sha256_update_ret(pctx, (const unsigned char *)data, datalen)
+#define psync_sha256_final(checksum, pctx) mbedtls_sha256_finish_ret(pctx, checksum)
 
 #define PSYNC_SHA512_BLOCK_LEN 128
 #define PSYNC_SHA512_DIGEST_LEN 64
 #define PSYNC_SHA512_DIGEST_HEXLEN 128
 #define psync_sha512_ctx mbedtls_sha512_context
-#define psync_sha512(data, datalen, checksum) mbedtls_sha512(data, datalen, checksum, 0)
-#define psync_sha512_init(pctx) mbedtls_sha512_starts(pctx, 0)
-#define psync_sha512_update(pctx, data, datalen) mbedtls_sha512_update(pctx, (const unsigned char *)data, datalen)
-#define psync_sha512_final(checksum, pctx) mbedtls_sha512_finish(pctx, checksum)
+#define psync_sha512(data, datalen, checksum) mbedtls_sha512_ret(data, datalen, checksum, 0)
+#define psync_sha512_init(pctx) mbedtls_sha512_starts_ret(pctx, 0)
+#define psync_sha512_update(pctx, data, datalen) mbedtls_sha512_update_ret(pctx, (const unsigned char *)data, datalen)
+#define psync_sha512_final(checksum, pctx) mbedtls_sha512_finish_ret(pctx, checksum)
 
 typedef mbedtls_rsa_context *psync_rsa_t;
 typedef mbedtls_rsa_context *psync_rsa_publickey_t;
