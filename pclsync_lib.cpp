@@ -459,12 +459,12 @@ int clib::pclsync_lib::init() {
     psync_free(username_old);
   }
 
-  psync_overlay_register_callback(STARTCRYPTO, &clib::pclsync_lib::start_crypto);
-  psync_overlay_register_callback(STOPCRYPTO, &clib::pclsync_lib::stop_crypto);
-  psync_overlay_register_callback(FINALIZE, &clib::pclsync_lib::finalize);
-  psync_overlay_register_callback(LISTSYNC, &clib::pclsync_lib::list_sync_folders);
-  psync_overlay_register_callback(ADDSYNC, &clib::pclsync_lib::add_sync_folder);
-  psync_overlay_register_callback(STOPSYNC, &clib::pclsync_lib::remove_sync_folder);
+  prpc_register(STARTCRYPTO, &clib::pclsync_lib::start_crypto);
+  prpc_register(STOPCRYPTO, &clib::pclsync_lib::stop_crypto);
+  prpc_register(FINALIZE, &clib::pclsync_lib::finalize);
+  prpc_register(LISTSYNC, &clib::pclsync_lib::list_sync_folders);
+  prpc_register(ADDSYNC, &clib::pclsync_lib::add_sync_folder);
+  prpc_register(STOPSYNC, &clib::pclsync_lib::remove_sync_folder);
 
   return 0;
 }

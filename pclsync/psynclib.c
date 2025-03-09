@@ -294,8 +294,8 @@ int psync_init() {
     pthread_mutex_unlock(&psync_libstate_mutex);
   }
 
-  prun_thread("Overlay main thread", psync_overlay_main_loop);
-  psync_overlay_init_callbacks();
+  prun_thread("Overlay main thread", prpc_main_loop);
+  prpc_init();
   if (PSYNC_SSL_DEBUG_LEVEL)
     psync_set_ssl_debug_callback(ssl_debug_cb);
 

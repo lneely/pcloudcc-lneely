@@ -33,22 +33,15 @@
 #ifndef POVERLAY_H
 #define POVERLAY_H
 
-#ifndef VOID
-#define VOID void
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-#ifndef LPVOID
-#define LPVOID void *
+#include <stdint.h>
+
+#ifndef PRPC_SOCK_PATH
+#define PRPC_SOCK_PATH "/tmp/pcloud_unix_soc.sock"
 #endif
-
-#ifndef POVERLAY_SOCK_PATH
-#define POVERLAY_SOCK_PATH "/tmp/pcloud_unix_soc.sock"
-#endif
-
-#include "psynclib.h"
-
-extern int overlays_running;
-extern int callbacks_running;
 
 typedef struct _rpc_message_t {
   uint32_t type;
@@ -56,17 +49,29 @@ typedef struct _rpc_message_t {
   char value[];
 } rpc_message_t;
 
-void psync_overlay_main_loop(VOID);
-void psync_overlay_handle_request(LPVOID);
-void psync_overlay_get_response(rpc_message_t*, rpc_message_t*);
-void psync_overlay_stop_overlays();
-void psync_overlay_start_overlays();
-void psync_overlay_stop_overlay_callbacks();
-void psync_overlay_start_overlay_callbacks();
-int psync_overlay_overlays_running();
-int psync_overlay_callbacks_running();
 
-void psync_overlay_init_callbacks();
-int psync_overlay_register_callback(int, poverlay_callback);
+// Defines the function signature of an overlay server-side
+// callback. prpc_handler implementations must satisfy the
+// following:
+//
+// - Accepts request data as a string.
+//
+// - Returns 0 on success, and non-zero on failure
+//
+// - If the function invoked by the callback function returns data
+//   that can be used by the client (e.g., list_sync_folders), then
+//   allocate the void** pointer and write the data there. If the
+//   void** pointer is null, then do not write any data back out for
+//   the client.
+//
+typedef int (*prpc_handler)(const char *);
+
+void prpc_main_loop(void);
+void prpc_init();
+int prpc_register(int cmdid, prpc_handler h);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // POVERLAY_H

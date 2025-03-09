@@ -52,52 +52,17 @@
 
 #define POVERLAY_BUFSIZE 512
 
-int overlays_running = 1;
-int callbacks_running = 1;
+static int overlays_running = 1;
+static int handlers_running = 1;
 
-void psync_overlay_main_loop() {
-  struct sockaddr_un addr;
-  int fd, cl;
+static void respond(rpc_message_t*, rpc_message_t*);
+static void on_request(void *lpvParam);
 
-  if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-    debug(D_ERROR, "Unix socket error failed to open %s", POVERLAY_SOCK_PATH);
-    return;
-  }
+prpc_handler *handlers = NULL;
+static int handlers_size = 15;
+static const int calbacks_lower_band = 20;
 
-  memset(&addr, 0, sizeof(addr));
-  addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, POVERLAY_SOCK_PATH, sizeof(addr.sun_path) - 1);
-
-  unlink(POVERLAY_SOCK_PATH);
-
-  if (bind(fd, (struct sockaddr *)&addr,
-           strlen(POVERLAY_SOCK_PATH) + sizeof(addr.sun_family)) == -1) {
-    debug(D_ERROR, "Unix socket bind error");
-    return;
-  }
-
-  if (listen(fd, 5) == -1) {
-    debug(D_ERROR, "Unix socket listen error");
-    return;
-  }
-
-  while (1) {
-    if ((cl = accept(fd, NULL, NULL)) == -1) {
-      debug(D_ERROR, "Unix socket accept error");
-      continue;
-    }
-
-    // handle the request in a new thread
-    prun_thread1("Pipe request handle routine",
-                      psync_overlay_handle_request, // thread proc
-                      (LPVOID)&cl                   // thread parameter
-    );
-  }
-
-  return;
-}
-
-void psync_overlay_handle_request(void *lpvParam) {
+static void on_request(void *lpvParam) {
   int *sockfd;                  // pcloud socket file descriptor
   int rc;                       // bytes read / written per iteration
   int readbytes;                // total bytes read from request
@@ -134,7 +99,7 @@ void psync_overlay_handle_request(void *lpvParam) {
   request = (rpc_message_t *)rqbuf;
   response = (rpc_message_t *)malloc(POVERLAY_BUFSIZE);
   if (request) {
-    psync_overlay_get_response(request, response);
+    respond(request, response);
 
     ssize_t total_size = sizeof(uint32_t) + sizeof(uint64_t) + response->length;
     ssize_t bytes_written = write(*sockfd, response, total_size);
@@ -163,36 +128,7 @@ cleanup:
   debug(D_NOTICE, "InstanceThread exiting.");
 }
 
-poverlay_callback *callbacks;
-static int callbacks_size = 15;
-static const int calbacks_lower_band = 20;
-
-// registers an overlay callback for a given message type.
-int psync_overlay_register_callback(int msgtype, poverlay_callback callback) {
-  poverlay_callback *callbacks_old = callbacks;
-  int callbacks_size_old = callbacks_size;
-  if (msgtype < calbacks_lower_band)
-    return -1;
-  if (msgtype > (calbacks_lower_band + callbacks_size)) {
-    callbacks_size = msgtype - calbacks_lower_band + 1;
-    psync_overlay_init_callbacks();
-    memcpy(callbacks, callbacks_old,
-           callbacks_size_old * sizeof(poverlay_callback));
-    psync_free(callbacks_old);
-  }
-  callbacks[msgtype - calbacks_lower_band] = callback;
-  return 0;
-}
-
-void psync_overlay_init_callbacks() {
-  callbacks = (poverlay_callback *)psync_malloc(sizeof(poverlay_callback) *
-                                                callbacks_size);
-  memset(callbacks, 0, sizeof(poverlay_callback) * callbacks_size);
-}
-
-static void psync_overlay_get_status_response(rpc_message_t *request,
-                                              rpc_message_t *response,
-                                              size_t available_space) {
+static void respond_status(rpc_message_t *request, rpc_message_t *response, size_t available_space) {
   psync_path_status_t stat;
 
   stat = PSYNC_PATH_STATUS_NOT_OURS;
@@ -218,24 +154,22 @@ static void psync_overlay_get_status_response(rpc_message_t *request,
   }
 }
 
-static void psync_overlay_get_overlay_response(rpc_message_t *request,
-                                               rpc_message_t *response,
-                                               size_t available_space) {
+static void respond_api(rpc_message_t *request, rpc_message_t *response, size_t available_space) {
   int cbidx; // callback index (based on message type)
   int cbret; // callback return value
 
   cbidx = request->type - 20;
   cbret = 0;
 
-  if (!callbacks_running || (request->type >= ((uint32_t)calbacks_lower_band +
-                                               (uint32_t)callbacks_size))) {
+  if (!handlers_running || (request->type >= ((uint32_t)calbacks_lower_band +
+                                               (uint32_t)handlers_size))) {
     response->type = 13;
     snprintf(response->value, available_space, "Invalid type.");
     debug(D_NOTICE, "Invalid request type: %u", request->type);
     return;
   }
 
-  if (!callbacks[cbidx]) {
+  if (!handlers[cbidx]) {
     response->type = 13;
     snprintf(response->value, available_space,
              "No callback with this id registered.");
@@ -243,7 +177,7 @@ static void psync_overlay_get_overlay_response(rpc_message_t *request,
     return;
   }
 
-  cbret = callbacks[cbidx](request->value);
+  cbret = handlers[cbidx](request->value);
   if (cbret == 0) {
     response->type = 0;
   } else {
@@ -254,9 +188,7 @@ static void psync_overlay_get_overlay_response(rpc_message_t *request,
   }
 }
 
-void psync_overlay_get_response(rpc_message_t *request,
-                                rpc_message_t *response) {
-
+static void respond(rpc_message_t *request, rpc_message_t *response) {
   const char *dbgmsg; // debug messages
   size_t value_avail; // space available to store value (flexible array)
 
@@ -267,13 +199,11 @@ void psync_overlay_get_response(rpc_message_t *request,
 
   // never print the crypto password to the logs in plain text
   dbgmsg = (request->type == 20) ? "REDACTED" : request->value;
-  debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]",
-        request->type, request->length, dbgmsg);
-
+  debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]", request->type, request->length, dbgmsg);
   if (request->type < 20) {
-    psync_overlay_get_status_response(request, response, value_avail);
+    respond_status(request, response, value_avail);
   } else {
-    psync_overlay_get_overlay_response(request, response, value_avail);
+    respond_api(request, response, value_avail);
   }
 
   // a message with a type != 13 and a null string value after
@@ -281,10 +211,7 @@ void psync_overlay_get_response(rpc_message_t *request,
   if (response->type != 13 && response->value[0] == '\0') {
     snprintf(response->value, value_avail, "Ok.");
   } else {
-    debug(D_WARNING,
-          "not updating value to Ok: response->msg->type=%d, "
-          "response->msg->value=%s",
-          response->type, response->value);
+    debug(D_WARNING, "not updating value to Ok: response->msg->type=%d, " "response->msg->value=%s", response->type, response->value);
   }
 
   // truncate messages that exceed the buffer boundaries
@@ -297,9 +224,65 @@ void psync_overlay_get_response(rpc_message_t *request,
   }
 }
 
-void psync_overlay_stop_overlays() { overlays_running = 0; }
-void psync_overlay_start_overlays() { overlays_running = 1; }
-void psync_overlay_stop_overlay_callbacks() { callbacks_running = 0; }
-void psync_overlay_start_overlay_callbacks() { callbacks_running = 1; }
-int psync_overlay_overlays_running() { return overlays_running; }
-int psync_overlay_callbacks_running() { return callbacks_running; }
+void prpc_main_loop() {
+  struct sockaddr_un addr;
+  int fd, cl;
+
+  if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+    debug(D_ERROR, "Unix socket error failed to open %s", PRPC_SOCK_PATH);
+    return;
+  }
+
+  memset(&addr, 0, sizeof(addr));
+  addr.sun_family = AF_UNIX;
+  strncpy(addr.sun_path, PRPC_SOCK_PATH, sizeof(addr.sun_path) - 1);
+
+  unlink(PRPC_SOCK_PATH);
+
+  if (bind(fd, (struct sockaddr *)&addr,
+           strlen(PRPC_SOCK_PATH) + sizeof(addr.sun_family)) == -1) {
+    debug(D_ERROR, "Unix socket bind error");
+    return;
+  }
+
+  if (listen(fd, 5) == -1) {
+    debug(D_ERROR, "Unix socket listen error");
+    return;
+  }
+
+  while (1) {
+    if ((cl = accept(fd, NULL, NULL)) == -1) {
+      debug(D_ERROR, "Unix socket accept error");
+      continue;
+    }
+
+    // handle the request in a new thread
+    prun_thread1("Pipe request handle routine",
+                      on_request, // thread proc
+                      (void *)&cl                   // thread parameter
+    );
+  }
+
+  return;
+}
+
+int prpc_register(int cmdid, prpc_handler h) {
+  prpc_handler *handlers_old = handlers;
+  int handlers_size_old = handlers_size;
+  if (cmdid < calbacks_lower_band)
+    return -1;
+  if (cmdid > (calbacks_lower_band + handlers_size)) {
+    handlers_size = cmdid - calbacks_lower_band + 1;
+    prpc_init();
+    memcpy(handlers, handlers_old,
+           handlers_size_old * sizeof(prpc_handler));
+    psync_free(handlers_old);
+  }
+  handlers[cmdid - calbacks_lower_band] = h;
+  return 0;
+}
+
+void prpc_init() {
+  handlers = (prpc_handler *)psync_malloc(sizeof(prpc_handler) * handlers_size);
+  memset(handlers, 0, sizeof(prpc_handler) * handlers_size);
+}

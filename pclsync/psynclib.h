@@ -1592,22 +1592,6 @@ void psync_get_current_userid(psync_userid_t * /*OUT*/ ret);
 void psync_get_folder_ownerid(psync_folderid_t folderid,
                               psync_userid_t * /*OUT*/ ret);
 
-// Defines the function signature of an overlay server-side
-// callback. poverlay_callback implementations must satisfy the
-// following:
-//
-// - Accepts request data as a string.
-//
-// - Returns 0 on success, and non-zero on failure
-//
-// - If the function invoked by the callback function returns data
-//   that can be used by the client (e.g., list_sync_folders), then
-//   allocate the void** pointer and write the data there. If the
-//   void** pointer is null, then do not write any data back out for
-//   the client.
-//
-typedef int (*poverlay_callback)(const char *);
-
 /* Registers file manager extension callback that will be called when packet
  * with id equals to the give one had arrived from extension. The id must be
  * over or equal to 20 or -1 will be returned. There is a hard coded maximum of
@@ -1617,12 +1601,6 @@ typedef int (*poverlay_callback)(const char *);
  * WARNING this functions are not thread-safe. Use them in single thread or
  * synchronize.
  */
-
-int psync_overlay_register_callback(int id, poverlay_callback callback);
-void psync_overlay_stop_overlays();
-void psync_overlay_start_overlays();
-void psync_overlay_stop_overlay_callbacks();
-void psync_overlay_start_overlay_callbacks();
 
 int psync_setlanguage(const char *language, char **err);
 

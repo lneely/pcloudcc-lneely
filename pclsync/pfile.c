@@ -422,6 +422,4 @@ int pfile_run_update(const char *path) {
 
 int pfile_invalidate_os_cache_needed() { return 0; }
 
-extern int overlays_running;
-
 int pfile_invalidate_os_cache(const char *path) { return 0; }
