@@ -104,7 +104,7 @@ build_container() {
         bash-completion ca-certificates openssh-server \
         gcc gcc-c++ make fuse-devel systemd-devel sqlite-devel \
         mbedtls-devel zlib-devel boost-devel fuse llvm gdb iproute \
-        rsync
+        rsync readline-devel
 
     # verify fuse
     if ! podman exec "$CONTAINER_NAME" ls /dev/fuse > /dev/null 2>&1; then

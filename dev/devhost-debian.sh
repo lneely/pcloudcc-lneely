@@ -108,7 +108,7 @@ build_container() {
         build-essential libfuse-dev libudev-dev libsqlite3-dev \
         libmbedtls-dev zlib1g-dev libboost-system-dev \
         libboost-program-options-dev fuse llvm gdb iproute2 \
-        openssh-server rsync
+        openssh-server rsync libreadline-dev
 
     # verify fuse
     if ! podman exec "$CONTAINER_NAME" ls /dev/fuse > /dev/null 2>&1; then
