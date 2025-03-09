@@ -77,6 +77,7 @@ int pcryptofolder_mkdir(psync_folderid_t folderid, const char *name, const char 
 int pcryptofolder_reset();
 int pcryptofolder_setup(const char *password, const char *hint);
 int pcryptofolder_unlock(const char *password);
+int pcryptofolder_issetup();
 
 #ifdef __cplusplus
 }

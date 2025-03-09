@@ -2195,11 +2195,6 @@ int psync_crypto_mkdir(psync_folderid_t folderid, const char *name,
     return pcryptofolder_mkdir(folderid, name, err, newfolderid);
 }
 
-int psync_crypto_issetup() {
-  return psync_sql_cellint("SELECT value FROM setting WHERE id='cryptosetup'",
-                           0);
-}
-
 int psync_crypto_hassubscription() {
   return psync_sql_cellint(
       "SELECT value FROM setting WHERE id='cryptosubscription'", 0);
