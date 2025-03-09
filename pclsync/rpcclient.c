@@ -219,7 +219,7 @@ int rpc_call(int id, const char *path, int *ret, char **errm, size_t *errmsz) {
   *errmsz = 0;
   *ret = 0;
 
-  sockfd = socket_connect(POVERLAY_SOCK_PATH, errm, errmsz, ret);
+  sockfd = socket_connect(PRPC_SOCK_PATH, errm, errmsz, ret);
   if (sockfd >= 0) {
     if ((result = write_request(sockfd, id, path, errm, errmsz, ret)) == 0) {
       result = read_response(sockfd, errm, errmsz, ret);
