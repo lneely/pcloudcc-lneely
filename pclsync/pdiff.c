@@ -29,6 +29,7 @@
    DAMAGE.
 */
 
+#include <errno.h>
 #include <ctype.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
@@ -2534,9 +2535,16 @@ static void check_overquota() {
 
 static void diff_exception_handler() {
   debug(D_NOTICE, "got exception");
-  if (likely(exceptionsockwrite != INVALID_SOCKET))
-    write(exceptionsockwrite, "e", 1);
+  if (likely(exceptionsockwrite != INVALID_SOCKET)) {
+    ssize_t ret = write(exceptionsockwrite, "e", 1);
+    if (ret == -1) {
+      perror("write failed");
+    } else if (ret != 1) {
+      fprintf(stderr, "Partial write occurred\n");
+    }
+  }
 }
+
 
 static int setup_exeptions() {
   int pfds[2];
@@ -2862,9 +2870,16 @@ static void psync_diff_adapter_timer(psync_timer_t timer, void *ptr) {
   if (memcmp(adapter_hash, hash, PSYNC_FAST_HASH256_LEN)) {
     memcpy(adapter_hash, hash, PSYNC_FAST_HASH256_LEN);
     debug(D_NOTICE, "network adapter list changed, sending exception");
-    write(exceptionsockwrite, "e", 1);
+    
+    ssize_t ret = write(exceptionsockwrite, "e", 1);
+    if (ret == -1) {
+      debug(D_ERROR, "Failed to write exception: %s", strerror(errno));
+    } else if (ret != 1) {
+      debug(D_WARNING, "Partial write occurred when sending exception");
+    }
   }
 }
+
 
 static void psync_diff_thread() {
   psock_t *sock;
@@ -3094,9 +3109,16 @@ void pdiff_init() {
 }
 
 void pdiff_wake() {
-  if (last_event >= ptimer_time() - 1)
+  if (last_event >= ptimer_time() - 1) {
     return;
-  write(exceptionsockwrite, "c", 1);
+  }
+
+  ssize_t ret = write(exceptionsockwrite, "c", 1);
+  if (ret == -1) {
+    debug(D_ERROR, "Failed to write wake signal: %s", strerror(errno));
+  } else if (ret != 1) {
+    debug(D_WARNING, "Partial write occurred when sending wake signal");
+  }
 }
 
 void pdiff_file_create(const binresult *meta) {
