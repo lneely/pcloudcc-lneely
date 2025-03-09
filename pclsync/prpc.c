@@ -58,7 +58,7 @@ static int handlers_running = 1;
 static void respond(rpc_message_t*, rpc_message_t*);
 static void on_request(void *lpvParam);
 
-prpc_handler *handlers;
+prpc_handler *handlers = NULL;
 static int handlers_size = 15;
 static const int calbacks_lower_band = 20;
 
