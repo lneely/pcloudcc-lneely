@@ -32,6 +32,10 @@
 #ifndef _PSYNC_LIBS_H
 #define _PSYNC_LIBS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <pthread.h>
 
 #include "pcompiler.h"
@@ -536,4 +540,9 @@ static inline size_t psync_strlcpy(char *dst, const char *src, size_t size) {
   } else
     return 0;
 }
+
+#ifdef __cplusplus 
+}
+#endif
+
 #endif

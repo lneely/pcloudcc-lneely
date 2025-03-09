@@ -1,53 +1,3 @@
-/*
-  Copyright (c) 2013-2015 pCloud Ltd.  All rights reserved.
-
-  Redistribution and use in source and binary forms, with or without
-  modification, are permitted provided that the following conditions
-  are met: Redistributions of source code must retain the above
-  copyright notice, this list of conditions and the following
-  disclaimer.  Redistributions in binary form must reproduce the above
-  copyright notice, this list of conditions and the following
-  disclaimer in the documentation and/or other materials provided with
-  the distribution.  Neither the name of pCloud Ltd nor the names of
-  its contributors may be used to endorse or promote products derived
-  from this software without specific prior written permission.
-
-  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL pCloud
-  Ltd BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-  OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
-  USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
-  DAMAGE.
-*/
-
-/*
-  overlay_client is responsible for invoking the pCloud API and
-  directing the result back to the calling function. It defines the
-  core logic of the request-response flow:
-
-  - SendCall (this function) writes the request to the socket.
-
-  - instance_thread reads the request from the socket and calls
-  get_response (see poverlay.c).
-
-  - get_response invokes the appropriate callback function and
-  generates a response_message. The callback functions are
-  registered in pclsync_lib.cpp using psync_add_overlay_callback
-  (see poverlay.c).
-
-  - instance_thread writes the resulting response_message to the
-  socket (see poverlay.c).
-
-  - SendCall reads the response from the socket. It writes the
-  response output data back to its caller (see control_tools.cpp).
-*/
-
 #include <errno.h>
 #include <netinet/in.h>
 #include <stdbool.h>
@@ -62,9 +12,9 @@
 #include "plibs.h"
 #include "prpc.h"
 
+
 #define POVERLAY_BUFSIZE 512
 
-// for easier error tracing...
 #define POVERLAY_SOCKET_CREATE_FAILED -100
 #define POVERLAY_SOCKET_CONNECT_FAILED -101
 #define POVERLAY_WRITE_SOCK_ERR -102
@@ -73,11 +23,17 @@
 #define POVERLAY_READ_INCOMPLETE -105
 #define POVERLAY_READ_INVALID_RESPONSE -106
 
+RpcClient::RpcClient() {
+  this->sockpath = "/tmp/pcloud_unix_soc.sock";
+}
+
+RpcClient::~RpcClient() {}
+
 // socket_connect creates and connects to a unix socket at the
 // specified sockpath. it may write an error message and error message
 // size to out and out_size, and a "ret" value to ret (i think this is
 // redundant maybe...)
-static int socket_connect(const char *sockpath, char **out, size_t *out_size) {
+int RpcClient::connectSocket(const char *sockpath, char **out, size_t *out_size) {
   int fd;
   struct sockaddr_un addr;
   const char *error_msg;
@@ -101,7 +57,7 @@ static int socket_connect(const char *sockpath, char **out, size_t *out_size) {
   return fd;
 }
 
-static int write_request(int fd, int msgtype, const char *value, char **out, size_t *out_size) {
+int RpcClient::writeRequest(int fd, int msgtype, const char *value, char **out, size_t *out_size) {
   uint64_t bytes_written;
   int len = strlen(value);
   int size = sizeof(rpc_message_t) + len + 1;
@@ -145,7 +101,7 @@ static int write_request(int fd, int msgtype, const char *value, char **out, siz
   return writeerr;
 }
 
-static int read_response(int fd, char **out, size_t *out_size) {
+int RpcClient::readResponse(int fd, char **out, size_t *out_size) {
 
     rpc_message_t *msg = (rpc_message_t *)malloc(POVERLAY_BUFSIZE);
     if (msg == NULL) {
@@ -172,12 +128,12 @@ static int read_response(int fd, char **out, size_t *out_size) {
     return 0;
 }
 
-int rpc_get_state(pCloud_FileState *state, char *path) {
+int RpcClient::GetState(pCloud_FileState *state, char *path) {
   char *errm = NULL;
   size_t errm_size = 0;
   int rep = 0;
 
-  if ((rep = rpc_call(4, path, &errm, &errm_size) == 0)) {
+  if ((rep = this->Call(4, path, &errm, &errm_size) == 0)) {
     debug(D_NOTICE, "rpc_get_state responese rep[%d] path[%s]", rep, path);
     if (errm) {
       debug(D_NOTICE, "The error is %s", errm);
@@ -200,15 +156,14 @@ int rpc_get_state(pCloud_FileState *state, char *path) {
   return 0;
 }
 
-// path contains the input argument(s). 
-int rpc_call(int id, const char *path, char **errm, size_t *errmsz) {
+int RpcClient::Call(int id, const char *path, char **errm, size_t *errmsz) {
   int result = 0;
   int sockfd = -1;
 
-  sockfd = socket_connect(PRPC_SOCK_PATH, errm, errmsz);
+  sockfd = this->connectSocket(PRPC_SOCK_PATH, errm, errmsz);
   if (sockfd >= 0) {
-    if ((result = write_request(sockfd, id, path, errm, errmsz)) == 0) {
-      result = read_response(sockfd, errm, errmsz);
+    if ((result = this->writeRequest(sockfd, id, path, errm, errmsz)) == 0) {
+      result = this->readResponse(sockfd, errm, errmsz);
     }
     close(sockfd);
   } else {
