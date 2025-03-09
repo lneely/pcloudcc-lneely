@@ -387,7 +387,6 @@ int psync_ssl_connect(int sock, void **sslconn,
   mbedtls_ssl_conf_endpoint(&conn->cfg, MBEDTLS_SSL_IS_CLIENT);
   mbedtls_ssl_conf_dbg(&conn->cfg, debug_cb, debug_ctx);
   mbedtls_ssl_conf_authmode(&conn->cfg, MBEDTLS_SSL_VERIFY_REQUIRED);
-  mbedtls_ssl_conf_min_version(&conn->cfg, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);
   mbedtls_ssl_conf_ca_chain(&conn->cfg, &psync_mbed_trusted_certs_x509, NULL);
   mbedtls_ssl_conf_ciphersuites(&conn->cfg, psync_mbed_ciphersuite);
   mbedtls_ssl_conf_rng(&conn->cfg, rng_get, &psync_mbed_rng);
