@@ -149,7 +149,6 @@ typedef psync_encrypted_data_t psync_rsa_signature_t;
 // Lock used to serialize access to RSA decrypt key function
 
 int pssl_init();
-void pssl_memclean(void *ptr, size_t len);
 int pssl_connect(int sock, void **sslconn, const char *hostname);
 int pssl_connect_finish(void *sslconn, const char *hostname);
 void pssl_free(void *sslconn);

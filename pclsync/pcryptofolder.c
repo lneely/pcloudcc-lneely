@@ -634,7 +634,7 @@ int pcryptofolder_unlock(const char *password) {
 
   debug(D_NOTICE, "trying to load private key");
   crypto_privkey = prsa_load_private(rsaprivdec, rsaprivlen);
-  pssl_memclean(rsaprivdec, rsaprivlen);
+  putil_wipe(rsaprivdec, rsaprivlen);
   pmemlock_free(rsaprivdec);
   if (crypto_privkey == PSYNC_INVALID_RSA) {
     debug(D_NOTICE, "failed to load private key");
@@ -1704,7 +1704,7 @@ char *pcryptofolder_filencoder_key_new(uint32_t flags, size_t *keylen) {
     debug(D_ERROR, "RSA encryption failed");
     return (char *)errptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_RSA_ERROR));
   }
-  pssl_memclean(&sym, sizeof(sym));
+  putil_wipe(&sym, sizeof(sym));
   ret = (char *)psync_base64_encode(encsym->data, encsym->datalen, keylen);
   psync_free(encsym);
   return ret;
@@ -1734,7 +1734,7 @@ char *pcryptofolder_filencoder_key_newplain(
     return (char *)errptr(PRINT_RETURN_CONST(PSYNC_CRYPTO_RSA_ERROR));
   }
   *deckey = symkeyv1_to_symkey(&sym);
-  pssl_memclean(&sym, sizeof(sym));
+  putil_wipe(&sym, sizeof(sym));
   ret = (char *)psync_base64_encode(encsym->data, encsym->datalen, keylen);
   psync_free(encsym);
   return ret;
@@ -1762,7 +1762,7 @@ int pcryptofolder_mkdir(psync_folderid_t folderid, const char *name,
   }
   encsym = prsa_encrypt_data(crypto_pubkey, (unsigned char *)&sym,
                                       sizeof(sym));
-  pssl_memclean(&sym, sizeof(sym));
+  putil_wipe(&sym, sizeof(sym));
   ret = get_fldr_name(folderid, name, &ename, err);
   pthread_rwlock_unlock(&crypto_lock);
   if (ret) {
@@ -1864,7 +1864,7 @@ int psync_pcloud_crypto_reencode_key(
     pcrypto_ctr_encdec_free(enc);
     newprivlen = offsetof(priv_key_ver1, key) + rsaprivlen;
     priv = prsa_load_private(rsaprivdec, rsaprivlen);
-    pssl_memclean(rsaprivdec, rsaprivlen);
+    putil_wipe(rsaprivdec, rsaprivlen);
     psync_free(rsaprivdec);
     if (unlikely(priv == PSYNC_INVALID_RSA))
       goto err_ph_1;

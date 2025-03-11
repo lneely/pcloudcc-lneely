@@ -58,6 +58,7 @@
 #include "pssl.h"
 #include "psslcerts.h"
 #include "psynclib.h"
+#include "putil.h"
 
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -69,7 +70,7 @@ static void ssl_debug(int loglevel, int errnum, const char *msg) {
 }
 
 static void free_encrypted(psync_encrypted_data_t e) {
-  pssl_memclean(e->data, e->datalen);
+  putil_wipe(e->data, e->datalen);
   pmemlock_free(e);
 }
 
@@ -78,7 +79,7 @@ void prsa_free_binary(psync_binary_rsa_key_t bin) {
 }
 
 void psymkey_free(psync_symmetric_key_t key) {
-  pssl_memclean(key->key, key->keylen);
+  putil_wipe(key->key, key->keylen);
   pmemlock_free(key);
 }
 
@@ -205,12 +206,6 @@ int pssl_init() {
   }
 
   return 0;
-}
-
-void pssl_memclean(void *ptr, size_t len) {
-  volatile unsigned char *p = ptr;
-  while (len--)
-    *p++ = 0;
 }
 
 static ssl_connection_t *conn_alloc(const char *hostname) {
@@ -574,7 +569,7 @@ prsa_private_to_binary(psync_rsa_privatekey_t rsa) {
       pmemlock_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   memcpy(ret->data, buff + sizeof(buff) - len, len);
-  pssl_memclean(buff + sizeof(buff) - len, len);
+  putil_wipe(buff + sizeof(buff) - len, len);
   return ret;
 }
 
@@ -754,7 +749,7 @@ psync_symmetric_key_t prsa_decrypt_data(psync_rsa_privatekey_t rsa,
       offsetof(psync_symmetric_key_struct_t, key) + len);
   ret->keylen = len;
   memcpy(ret->key, buff, len);
-  pssl_memclean(buff, len);
+  putil_wipe(buff, len);
   return ret;
 }
 
@@ -779,7 +774,7 @@ paes_create_encoder(psync_symmetric_key_t key) {
 }
 
 void paes_free_encoder(psync_aes256_encoder aes) {
-  pssl_memclean(aes, sizeof(mbedtls_aes_context));
+  putil_wipe(aes, sizeof(mbedtls_aes_context));
   psync_free(aes);
 }
 
@@ -793,7 +788,7 @@ paes_create_decoder(psync_symmetric_key_t key) {
 }
 
 void paes_free_decoder(psync_aes256_encoder aes) {
-  pssl_memclean(aes, sizeof(mbedtls_aes_context));
+  putil_wipe(aes, sizeof(mbedtls_aes_context));
   psync_free(aes);
 }
 
