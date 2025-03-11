@@ -133,7 +133,7 @@ void setup_app(CLI::App *app) {
     size_t errm_size = 0;
     RpcClient *rpc = new RpcClient();
     if(int result = rpc->Call(STARTCRYPTO, start_crypto_pwd.c_str(), &errm, &errm_size) != 0) {
-      std::cout << "Start Crypto failed: " << (errm ? errm : "no message") << std::endl;
+      std::cerr << "Start Crypto failed: " << (errm ? errm : "no message") << std::endl;
       if (errm) { free(errm); }
       delete rpc;
       return result;
@@ -150,7 +150,7 @@ void setup_app(CLI::App *app) {
     size_t errm_size = 0;
     RpcClient *rpc = new RpcClient();
     if(int result = rpc->Call(STOPCRYPTO, "", &errm, &errm_size) != 0) {
-      std::cout << "Stop Crypto failed: "<< (errm ? errm : "no message") << std::endl;
+      std::cerr << "Stop Crypto failed: "<< (errm ? errm : "no message") << std::endl;
       if (errm) { free(errm); }
       delete rpc;
       return result;
@@ -168,7 +168,7 @@ void setup_app(CLI::App *app) {
     RpcClient *rpc = new RpcClient();
 
     if(int result = rpc->Call(LISTSYNC, "", &errm, &errmsz) != 0) {
-      std::cout << "List Sync Folders failed: " << (errm ? errm : "no message") << std::endl;
+      std::cerr << "List Sync Folders failed: " << (errm ? errm : "no message") << std::endl;
       if (errm) { free(errm); }
       delete rpc;
       return result;
@@ -194,11 +194,11 @@ void setup_app(CLI::App *app) {
                     << std::setw(path_width) << folder->remotepath << std::endl;
         }
       } else {
-        std::cout << "No synchronized folders found." << std::endl;
+        std::cerr << "No synchronized folders found." << std::endl;
       }
       if(flist) { free(flist); }
     } else {
-      std::cout << "failed to read folder list from shm" << std::endl;
+      std::cerr << "failed to read folder list from shm" << std::endl;
       if(flist) { free(flist); }
       return -1;
     }
@@ -219,9 +219,9 @@ void setup_app(CLI::App *app) {
     RpcClient *rpc = new RpcClient();
     if(int result = rpc->Call(ADDSYNC, combinedPaths.c_str(), &errm, &errmsz) != 0) {      
       if (result == -1) {
-        std::cout << "Add Sync Folders failed: remote folder " << remotepath << " not found." << std::endl;
+        std::cerr << "Add Sync Folders failed: remote folder " << remotepath << " not found." << std::endl;
       } else {
-        std::cout << "Add Sync Folders failed:" << (errm ? errm : "no message") << std::endl;
+        std::cerr << "Add Sync Folders failed:" << (errm ? errm : "no message") << std::endl;
       }
       if (errm) { free(errm); }
       delete rpc;
@@ -243,7 +243,7 @@ void setup_app(CLI::App *app) {
 
     RpcClient *rpc = new RpcClient();
     if(int result = rpc->Call(STOPSYNC, folderid, &errm, &errmsz) != 0) {
-      std::cout << "Remove Sync Folder failed: " << (errm ? errm : "no message") << std::endl;
+      std::cerr << "Remove Sync Folder failed: " << (errm ? errm : "no message") << std::endl;
       if (errm) { free(errm); }
       delete rpc;
       return result;
@@ -261,61 +261,61 @@ int process_command(const std::string &command) {
   setup_app(&app);
   try {
     app.parse(command);
-    return 0;
   } catch (const CLI::ParseError &e) {
-    std::cerr << "Invalid command: '" << command << "'" << std::endl;
-    return 1;
+    std::vector<std::string> args;
+    std::istringstream iss(command);
+    std::string arg;
+    std::ostringstream invs;
+
+    while (iss >> arg) {
+      args.push_back(arg);
+    }
+
+    invs  << "Invalid command: '" << command 
+          << "'. Type 'help' or '?' to get a list of valid commands.";
+    if (!args.empty()) {
+      try {
+        auto *subcom = app.get_subcommand(args[0]);
+        if (subcom) {
+          std::cerr << "Usage for '" << args[0] << "':" << std::endl;
+          std::cerr << subcom->help() << std::endl;
+          return -1;
+        } else {
+          std::cerr << invs.str() << std::endl;
+          return -1;
+        }
+      } catch (...) {
+        std::cerr << invs.str() << std::endl;
+        return -1;
+      }
+    } else {
+      std::cerr << invs.str() << std::endl;
+      return -1;
+    }
   }
+  return 0;
 }
 
 void process_commands() {
   CLI::App app = CLI::App{"pcloudcc-lneely"};
   setup_app(&app);
 
-  // enable command history and auto-completion
   using_history();
   rl_attempted_completion_function = command_completion;
 
   // command loop
   while (true) {
     char* line_read = readline("pcloud> ");
-    if (!line_read) break;
+    if (!line_read) {
+      break;
+    }
     if (line_read[0]) {
       add_history(line_read);
     }
     std::string line(line_read);
     free(line_read); 
 
-    try {
-      app.parse(line);
-    } catch (const CLI::ParseError &e) {
-      std::vector<std::string> args;
-      std::istringstream iss(line);
-      std::string arg;
-      std::ostringstream invs;
-
-      while (iss >> arg) {
-        args.push_back(arg);
-      }
-
-      invs  << "Invalid command: '" << line 
-            << "'. Type 'help' or '?' to get a list of valid commands.";
-      if (!args.empty()) {
-        try {
-          auto *subcom = app.get_subcommand(args[0]);
-          if (subcom) {
-            std::cout << "Usage for '" << args[0] << "':" << std::endl;
-            std::cout << subcom->help() << std::endl;
-          } else {
-            std::cout << invs.str() << std::endl;
-          }
-        } catch (...) {
-          std::cout << invs.str() << std::endl;
-        }
-      } else {
-        std::cout << invs.str() << std::endl;
-      }
-    }
+    process_command(line);
   }
 }
 
