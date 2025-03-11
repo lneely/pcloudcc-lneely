@@ -40,11 +40,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
 
 #include "prpc.h"
+#include "ppath.h"
 #include "ppathstatus.h"
 
 #include "plibs.h"
@@ -228,22 +230,29 @@ void prpc_main_loop() {
   struct sockaddr_un addr;
   int fd, cl;
 
+  char *sockpath = prpc_sockpath();
   if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-    debug(D_ERROR, "Unix socket error failed to open %s", PRPC_SOCK_PATH);
+    debug(D_ERROR, "Unix socket error failed to open %s", sockpath);
+    return;
+  }
+
+  if (fchmod(fd, 0600) == -1) {
+    debug(D_ERROR, "Failed to set socket permissions");
     return;
   }
 
   memset(&addr, 0, sizeof(addr));
   addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, PRPC_SOCK_PATH, sizeof(addr.sun_path) - 1);
+  strncpy(addr.sun_path, sockpath, sizeof(addr.sun_path) - 1);
 
-  unlink(PRPC_SOCK_PATH);
+  unlink(sockpath);
 
-  if (bind(fd, (struct sockaddr *)&addr,
-           strlen(PRPC_SOCK_PATH) + sizeof(addr.sun_family)) == -1) {
+  if (bind(fd, (struct sockaddr *)&addr, strlen(sockpath) + sizeof(addr.sun_family)) == -1) {
     debug(D_ERROR, "Unix socket bind error");
     return;
   }
+  
+  free(sockpath);
 
   if (listen(fd, 5) == -1) {
     debug(D_ERROR, "Unix socket listen error");
@@ -285,4 +294,21 @@ int prpc_register(int cmdid, prpc_handler h) {
 void prpc_init() {
   handlers = (prpc_handler *)psync_malloc(sizeof(prpc_handler) * handlers_size);
   memset(handlers, 0, sizeof(prpc_handler) * handlers_size);
+}
+
+char *prpc_sockpath() {
+    char *home = ppath_home();
+    if (!home) {
+        return NULL;
+    }
+
+    const char *subdir = "/.pcloud/prpc.sock";
+    size_t len = strlen(home) + strlen(subdir) + 1;
+    char *sockpath = (char *)malloc(len);
+    if (!sockpath) {
+        return NULL;
+    }
+
+    snprintf(sockpath, len, "%s%s", home, subdir);
+    return sockpath;
 }

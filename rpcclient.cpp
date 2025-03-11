@@ -163,7 +163,9 @@ int RpcClient::Call(int id, const char *path, char **errm, size_t *errmsz) {
   int result = 0;
   int sockfd = -1;
 
-  sockfd = this->connectSocket(PRPC_SOCK_PATH, errm, errmsz);
+  char *sockpath = prpc_sockpath();
+  sockfd = this->connectSocket(sockpath, errm, errmsz);
+  free(sockpath);
   if (sockfd >= 0) {
     if ((result = this->writeRequest(sockfd, id, path, errm, errmsz)) == 0) {
       result = this->readResponse(sockfd, errm, errmsz);

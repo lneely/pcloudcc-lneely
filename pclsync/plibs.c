@@ -34,6 +34,7 @@
 #include "pdatabase.h"
 #include "plocks.h"
 #include "pnetlibs.h"
+#include "ppath.h"
 #include "prun.h"
 #include "psettings.h"
 #include "ptimer.h"
@@ -2575,6 +2576,23 @@ static void time_format(time_t tm, unsigned long ns, char *result) {
   memcpy(result, " +0000", 7); // copies the null byte
 }
 
+char *psync_debug_path() {
+    char *home = ppath_home();
+    if (!home) {
+        return NULL;
+    }
+
+    const char *subdir = "/.pcloud/debug.log";
+    size_t len = strlen(home) + strlen(subdir) + 1;
+    char *sockpath = (char *)malloc(len);
+    if (!sockpath) {
+        return NULL;
+    }
+
+    snprintf(sockpath, len, "%s%s", home, subdir);
+    return sockpath;
+}
+
 int psync_debug(const char *file, const char *function, int unsigned line,
                 int unsigned level, const char *fmt, ...) {
   if (!IS_DEBUG)
@@ -2599,7 +2617,7 @@ int psync_debug(const char *file, const char *function, int unsigned line,
       break;
     }
   if (unlikely(!log)) {
-    log = fopen(DEBUG_FILE, "a+");
+    log = fopen(psync_debug_path(), "a+");
     if (!log)
       return 1;
   }

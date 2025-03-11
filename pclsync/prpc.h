@@ -39,10 +39,6 @@ extern "C" {
 
 #include <stdint.h>
 
-#ifndef PRPC_SOCK_PATH
-#define PRPC_SOCK_PATH "/tmp/pcloud_unix_soc.sock"
-#endif
-
 typedef struct _rpc_message_t {
   uint32_t type;
   uint64_t length;
@@ -69,6 +65,7 @@ typedef int (*prpc_handler)(const char *);
 void prpc_main_loop(void);
 void prpc_init();
 int prpc_register(int cmdid, prpc_handler h);
+char *prpc_sockpath();
 
 #ifdef __cplusplus
 }
