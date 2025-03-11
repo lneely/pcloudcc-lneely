@@ -312,7 +312,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     while (**indata != RPARAM_END) {
       if (cnt == alloc) {
         alloc *= 2;
-        arr = (binresult **)psync_realloc(arr, sizeof(binresult *) * alloc);
+        arr = (binresult **)realloc(arr, sizeof(binresult *) * alloc);
       }
       arr[cnt++] = do_parse_result(indata, odata, strings, nextstrid);
     }
@@ -337,7 +337,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     while (**indata != RPARAM_END) {
       if (cnt == alloc) {
         alloc *= 2;
-        arr = (struct _hashpair *)psync_realloc(arr, sizeof(struct _hashpair) *
+        arr = (struct _hashpair *)realloc(arr, sizeof(struct _hashpair) *
                                                          alloc);
       }
       key = do_parse_result(indata, odata, strings, nextstrid);

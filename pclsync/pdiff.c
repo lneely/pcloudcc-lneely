@@ -2711,7 +2711,7 @@ static void psync_diff_refresh_fs_add_folder(psync_folderid_t folderid) {
         refresh_allocated *= 2;
       else
         refresh_allocated = 8;
-      refresh_folders = (psync_folderid_t *)psync_realloc(
+      refresh_folders = (psync_folderid_t *)realloc(
           refresh_folders, sizeof(psync_folderid_t) * refresh_allocated);
     }
     refresh_folders[refresh_last++] = folderid;

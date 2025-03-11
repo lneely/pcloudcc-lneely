@@ -1698,7 +1698,7 @@ psync_full_result_int *psync_sql_fetchall_int(psync_sql_res *res) {
   while ((code = sqlite3_step(res->stmt)) == SQLITE_ROW) {
     if (rows >= all) {
       all = 10 + all * 2;
-      data = (uint64_t *)psync_realloc(data, sizeof(uint64_t) * cols * all);
+      data = (uint64_t *)realloc(data, sizeof(uint64_t) * cols * all);
     }
     for (i = 0; i < cols; i++)
       data[off + i] = sqlite3_column_int64(res->stmt, i);

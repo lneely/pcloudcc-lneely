@@ -165,15 +165,6 @@ PSYNC_NOINLINE void *psync_emergency_realloc(void *ptr, size_t size) {
   }
 }
 
-void *psync_realloc(void *ptr, size_t size) {
-  void *ret;
-  ret = psync_real_realloc(ptr, size);
-  if (likely(ret))
-    return ret;
-  else
-    return psync_emergency_realloc(ptr, size);
-}
-
 uint32_t psync_get_last_error() { return psync_error; }
 
 void psync_set_database_path(const char *databasepath) {
@@ -1993,7 +1984,7 @@ psync_folderid_t *psync_crypto_folderids() {
     ret[l] = row[0];
     if (++l == alloc) {
       alloc *= 2;
-      ret = (psync_folderid_t *)psync_realloc(ret,
+      ret = (psync_folderid_t *)realloc(ret,
                                               sizeof(psync_folderid_t) * alloc);
     }
   }
