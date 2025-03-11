@@ -52,7 +52,6 @@
 #include "pcache.h"
 #include "pcompiler.h"
 #include "plibs.h"
-#include "pmemlock.h"
 #include "prand.h"
 #include "psettings.h"
 #include "pssl.h"
@@ -71,7 +70,7 @@ static void ssl_debug(int loglevel, int errnum, const char *msg) {
 
 static void free_encrypted(psync_encrypted_data_t e) {
   putil_wipe(e->data, e->datalen);
-  pmemlock_free(e);
+  free(e);
 }
 
 void prsa_free_binary(psync_binary_rsa_key_t bin) {
@@ -80,7 +79,7 @@ void prsa_free_binary(psync_binary_rsa_key_t bin) {
 
 void psymkey_free(psync_symmetric_key_t key) {
   putil_wipe(key->key, key->keylen);
-  pmemlock_free(key);
+  free(key);
 }
 
 psync_encrypted_symmetric_key_t
@@ -545,7 +544,7 @@ prsa_public_to_binary(psync_rsa_publickey_t rsa) {
   if (len <= 0)
     return PSYNC_INVALID_BIN_RSA;
   ret =
-      pmemlock_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
+      malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   memcpy(ret->data, buff + sizeof(buff) - len, len);
   return ret;
@@ -566,7 +565,7 @@ prsa_private_to_binary(psync_rsa_privatekey_t rsa) {
   if (len <= 0)
     return PSYNC_INVALID_BIN_RSA;
   ret =
-      pmemlock_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
+      malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   memcpy(ret->data, buff + sizeof(buff) - len, len);
   putil_wipe(buff + sizeof(buff) - len, len);
@@ -670,7 +669,7 @@ psync_symmetric_key_t
 psymkey_generate(const char *password, size_t keylen,
                                       const unsigned char *salt, size_t saltlen,
                                       size_t iterations) {
-  psync_symmetric_key_t key = (psync_symmetric_key_t)pmemlock_malloc(
+  psync_symmetric_key_t key = (psync_symmetric_key_t)malloc(
       keylen + offsetof(psync_symmetric_key_struct_t, key));
   mbedtls_md_context_t ctx;
   mbedtls_md_init(&ctx);
@@ -745,7 +744,7 @@ psync_symmetric_key_t prsa_decrypt_data(psync_rsa_privatekey_t rsa,
                                      &rng, NULL,
                                      0, &len, data, buff, sizeof(buff)))
     return PSYNC_INVALID_SYM_KEY;
-  ret = (psync_symmetric_key_t)pmemlock_malloc(
+  ret = (psync_symmetric_key_t)malloc(
       offsetof(psync_symmetric_key_struct_t, key) + len);
   ret->keylen = len;
   memcpy(ret->key, buff, len);

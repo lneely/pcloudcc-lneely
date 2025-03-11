@@ -47,7 +47,6 @@
 #include "pfoldersync.h"
 #include "pfs.h"
 #include "plibs.h"
-#include "pmemlock.h"
 #include "pnetlibs.h"
 #include "psettings.h"
 #include "pssl.h"
@@ -631,7 +630,7 @@ int pcryptofolder_unlock(const char *password) {
   aeskey = psymkey_generate(password, PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE, salt, saltlen, iterations);
   enc = pcrypto_ctr_encdec_create(aeskey);
   psymkey_free(aeskey);
-  rsaprivdec = (unsigned char *)pmemlock_malloc(rsaprivlen);
+  rsaprivdec = (unsigned char *)malloc(rsaprivlen);
   memcpy(rsaprivdec, rsapriv, rsaprivlen);
   pcrypto_ctr_encdec_decode(enc, rsaprivdec, rsaprivlen, 0);
   pcrypto_ctr_encdec_free(enc);
@@ -641,7 +640,7 @@ int pcryptofolder_unlock(const char *password) {
   debug(D_NOTICE, "trying to load private key");
   crypto_privkey = prsa_load_private(rsaprivdec, rsaprivlen);
   putil_wipe(rsaprivdec, rsaprivlen);
-  pmemlock_free(rsaprivdec);
+  free(rsaprivdec);
   if (crypto_privkey == PSYNC_INVALID_RSA) {
     debug(D_NOTICE, "failed to load private key");
     prsa_free_public(crypto_pubkey);
@@ -1040,7 +1039,7 @@ static void psync_crypto_release_file_symkey_locked(psync_fileid_t fileid,
 
 static psync_symmetric_key_t symkeyv1_to_symkey(sym_key_ver1 *v1) {
   psync_symmetric_key_t key;
-  key = (psync_symmetric_key_t)pmemlock_malloc(
+  key = (psync_symmetric_key_t)malloc(
       offsetof(psync_symmetric_key_struct_t, key) + PSYNC_AES256_KEY_SIZE +
       PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN);
   key->keylen = PSYNC_AES256_KEY_SIZE + PSYNC_CRYPTO_HMAC_SHA512_KEY_LEN;

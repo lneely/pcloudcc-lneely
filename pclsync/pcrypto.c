@@ -42,7 +42,6 @@
 
 #include "pcrypto.h"
 #include "plibs.h"
-#include "pmemlock.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -161,7 +160,7 @@ static void copy_iv_and_xor_with_counter(unsigned char *dest,
 
 psync_symmetric_key_t pcrypto_key_len(size_t len) {
   psync_symmetric_key_t key;
-  key = (psync_symmetric_key_t)pmemlock_malloc(
+  key = (psync_symmetric_key_t)malloc(
       offsetof(psync_symmetric_key_struct_t, key) + len);
   key->keylen = len;
   pssl_rand_strong(key->key, len);
@@ -406,7 +405,7 @@ pcrypto_textenc_create(psync_symmetric_key_t key) {
   enc = paes_create_encoder(key);
   if (unlikely_log(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
-  ret = (pcrypto_textenc_t)pmemlock_malloc(
+  ret = (pcrypto_textenc_t)malloc(
       offsetof(pcrypto_key_iv_t, iv) + key->keylen -
       PSYNC_AES256_KEY_SIZE);
   ret->encoder = enc;
@@ -419,7 +418,7 @@ void pcrypto_textenc_free(
     pcrypto_textenc_t enc) {
   paes_free_encoder(enc->encoder);
   putil_wipe(enc->iv, enc->ivlen);
-  pmemlock_free(enc);
+  free(enc);
 }
 
 pcrypto_textdec_t
@@ -432,7 +431,7 @@ pcrypto_textdec_create(psync_symmetric_key_t key) {
   enc = paes_create_decoder(key);
   if (unlikely_log(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
-  ret = (pcrypto_textenc_t)pmemlock_malloc(
+  ret = (pcrypto_textenc_t)malloc(
       offsetof(pcrypto_key_iv_t, iv) + key->keylen -
       PSYNC_AES256_KEY_SIZE);
   ret->encoder = enc;
@@ -445,7 +444,7 @@ void pcrypto_textdec_free(
     pcrypto_textdec_t enc) {
   paes_free_encoder(enc->encoder);
   putil_wipe(enc->iv, enc->ivlen);
-  pmemlock_free(enc);
+  free(enc);
 }
 
 pcrypto_sector_encdec_t
@@ -463,7 +462,7 @@ pcrypto_sec_encdec_create(psync_symmetric_key_t key) {
     paes_free_encoder(enc);
     return PSYNC_CRYPTO_INVALID_ENCODER;
   }
-  ret = (pcrypto_sector_encdec_t)pmemlock_malloc(
+  ret = (pcrypto_sector_encdec_t)malloc(
       offsetof(pcrypto_encdec_iv_t, iv) + key->keylen -
       PSYNC_AES256_KEY_SIZE);
   ret->encoder = enc;
@@ -478,7 +477,7 @@ void pcrypto_sec_encdec_free(
   paes_free_encoder(enc->encoder);
   paes_free_decoder(enc->decoder);
   putil_wipe(enc->iv, enc->ivlen);
-  pmemlock_free(enc);
+  free(enc);
 }
 
 static int memcmp_const(const unsigned char *s1, const unsigned char *s2,

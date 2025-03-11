@@ -60,7 +60,6 @@
 #include "plist.h"
 #include "plocalnotify.h"
 #include "plocalscan.h"
-#include "pmemlock.h"
 #include "pnetlibs.h"
 #include "pnotify.h"
 #include "prpc.h"
@@ -174,7 +173,6 @@ int psync_init() {
       return 0;
     }
   }
-  pmemlock_init();
   pcache_init();
   psys_init();
 
