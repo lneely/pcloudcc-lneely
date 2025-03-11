@@ -71,8 +71,6 @@ extern "C" {
 
 #define IS_DEBUG (DEBUG_LEVEL >= D_WARNING)
 
-#define DEBUG_FILE "/tmp/psync_err.log"
-
 #if defined(assert)
 #undef assert
 #endif
