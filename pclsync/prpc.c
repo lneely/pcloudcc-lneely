@@ -124,7 +124,7 @@ cleanup:
     close(*sockfd);
   }
   if (response) {
-    psync_free(response);
+    free(response);
   }
 
   debug(D_NOTICE, "InstanceThread exiting.");
@@ -285,14 +285,14 @@ int prpc_register(int cmdid, prpc_handler h) {
     prpc_init();
     memcpy(handlers, handlers_old,
            handlers_size_old * sizeof(prpc_handler));
-    psync_free(handlers_old);
+    free(handlers_old);
   }
   handlers[cmdid - calbacks_lower_band] = h;
   return 0;
 }
 
 void prpc_init() {
-  handlers = (prpc_handler *)psync_malloc(sizeof(prpc_handler) * handlers_size);
+  handlers = (prpc_handler *)malloc(sizeof(prpc_handler) * handlers_size);
   memset(handlers, 0, sizeof(prpc_handler) * handlers_size);
 }
 

@@ -4,7 +4,6 @@
 #include <sys/resource.h>
 
 #include "plibs.h"
-#include "pmemlock.h"
 #include "psys.h"
 
 static uid_t psync_uid;
@@ -51,8 +50,7 @@ void psys_init() {
   psync_gids = psync_new_cnt(gid_t, psync_gids_cnt);
   if (unlikely_log(getgroups(psync_gids_cnt, psync_gids) != psync_gids_cnt))
     psync_gids_cnt = 0;
-  pmemlock_set_pagesize(sysconf(_SC_PAGESIZE));
-  debug(D_NOTICE, "detected page size %d", pmemlock_get_pagesize());
+  debug(D_NOTICE, "detected page size %ld", sysconf(_SC_PAGESIZE));
 }
 
 time_t psys_time_seconds() {

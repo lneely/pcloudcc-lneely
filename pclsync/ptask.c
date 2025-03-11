@@ -254,7 +254,7 @@ static int download_send_error(stream_t *s, async_params_t *prms,
   ptree_del(&prms->streams, &s->tree);
   if (s->free)
     s->free(s, error);
-  psync_free(s);
+  free(s);
   return 0;
 }
 
@@ -599,7 +599,7 @@ static void proc_async_transfer(void *ptr) {
   pdeflate_destroy(prms->dec);
   ptree_for_each_element_call_safe(prms->streams, stream_t, tree,
                                         stream_destroy);
-  psync_free(prms);
+  free(prms);
 }
 
 static int proc_start_async_transfer() {
@@ -636,11 +636,11 @@ static int proc_start_async_transfer() {
           (int)papi_find_result2(res, "result", PARAM_NUM)->num,
           papi_find_result2(res, "error", PARAM_STR)->str);
     psync_process_api_error(papi_find_result2(res, "result", PARAM_NUM)->num);
-    psync_free(res);
+    free(res);
     psync_apipool_release(api);
     goto err0;
   }
-  psync_free(res);
+  free(res);
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair)) {
     debug(D_NOTICE, "socketpair() failed");
     goto err1;
@@ -723,7 +723,7 @@ static int sock_writeall(int sock, const void *buff, size_t len) {
 static stream_t *stream_create(async_params_t *prms, size_t addsize) {
   psync_tree *parent;
   stream_t *ret;
-  ret = (stream_t *)psync_malloc(sizeof(stream_t) + addsize);
+  ret = (stream_t *)malloc(sizeof(stream_t) + addsize);
   ret->streamid = ++prms->laststreamid;
   ret->flags = 0;
   ret->free = NULL;
@@ -747,7 +747,7 @@ static void stream_destroy(stream_t *s) {
   }
   if (s->free)
     s->free(s, PSYNC_ASYNC_ERROR_NET);
-  psync_free(s);
+  free(s);
 }
 
 static int stream_process_data(async_params_t *prms) {
@@ -1065,8 +1065,8 @@ void ptask_cfldr_save_fldrkey(void *ptr) {
   psync_sql_bind_uint(res, 1, t->id);
   psync_sql_bind_blob(res, 2, (const char *)t->key->data, t->key->datalen);
   psync_sql_run_free(res);
-  psync_free(t->key);
-  psync_free(t);
+  free(t->key);
+  free(t);
 }
 
 void ptask_cfldr_save_filekey(void *ptr) {
@@ -1079,6 +1079,6 @@ void ptask_cfldr_save_filekey(void *ptr) {
   psync_sql_bind_uint(res, 2, t->hash);
   psync_sql_bind_blob(res, 3, (const char *)t->key->data, t->key->datalen);
   psync_sql_run_free(res);
-  psync_free(t->key);
-  psync_free(t);
+  free(t->key);
+  free(t);
 }

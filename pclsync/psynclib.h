@@ -514,10 +514,6 @@ typedef void (*psync_free_t)(void *);
 
 typedef void (*psync_generic_callback_t)();
 
-void *psync_malloc(size_t size);
-void *psync_realloc(void *ptr, size_t size);
-void psync_free(void *ptr);
-
 /* Event callback is called every time a download/upload is started/finished,
  * quota is changed, folder is shared or similar. Look at the PEVENT_ constants
  * for a list of possible events.
@@ -668,7 +664,7 @@ void psync_unlink();
  * psync_tfa_send_nofification() - sends notification with two factor
  * authentication code to all already logged in devices. If devices_list is not
  * null it is filled in with list of user's devices. In this case the caller is
- * supposed to free the list with a single call to psync_free(). Returns -1 in
+ * supposed to free the list with a single call to free(). Returns -1 in
  * case of network error or one of the positive error codes listed at
  * https://docsqa2.pcloud.com/methods/auth/tfa_sendcodeviasysnotification.html
  *

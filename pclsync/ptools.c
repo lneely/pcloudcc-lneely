@@ -411,7 +411,7 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
   int intRes;
   int syncCnt = 0;
 
-  errMsg = (char *)psync_malloc(1024 * sizeof(char));
+  errMsg = (char *)malloc(1024 * sizeof(char));
   errMsg[0] = 0;
 
   time(&rawtime);
@@ -425,7 +425,7 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
 
     if (syncCnt < 1) {
       debug(D_NOTICE, "No syncs, skip the event.");
-      psync_free(errMsg);
+      free(errMsg);
       return;
     }
 
@@ -447,7 +447,7 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
     psync_sql_run_free(sql);
   }
 
-  psync_free(errMsg);
+  free(errMsg);
 }
 
 int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {

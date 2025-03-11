@@ -87,7 +87,7 @@ static void cache_timer(psync_timer_t timer, void *ptr) {
   psync_list_del(&he->list);
   pthread_mutex_unlock(&cachelocks[hash_to_lock(he->hash)]);
   he->free(he->value);
-  psync_free(he);
+  free(he);
   ptimer_stop(timer);
 }
 
@@ -131,7 +131,7 @@ void *pcache_get(const char *key) {
     psync_list_del(&he->list);
     pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
     val = he->value;
-    psync_free(he);
+    free(he);
     return val;
   }
   pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
@@ -164,7 +164,7 @@ void pcache_add(const char *key, void *ptr, time_t freeafter,
   uint32_t h;
   h = compute_hash(key, &l);
   l++;
-  he = (cache_entry_t *)psync_malloc(offsetof(cache_entry_t, key) + l);
+  he = (cache_entry_t *)malloc(offsetof(cache_entry_t, key) + l);
   he->value = ptr;
   he->free = freefunc;
   he->hash = h;
@@ -178,7 +178,7 @@ void pcache_add(const char *key, void *ptr, time_t freeafter,
                                                    !strcmp(key, he2->key) &&
                                                    ++l == maxkeys)) {
       pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
-      psync_free(he);
+      free(he);
       freefunc(ptr);
       //        debug(D_NOTICE, "not adding key %s to cache as there already %u
       //        elements present", key, (unsigned int)maxkeys);
@@ -218,7 +218,7 @@ restart:
     psync_list_del(&he->list);
     pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
     he->free(he->value);
-    psync_free(he);
+    free(he);
     goto restart;
   }
   pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
@@ -235,7 +235,7 @@ void pcache_clean() {
       if (!ptimer_stop(he->timer)) {
         psync_list_del(l1);
         he->free(he->value);
-        psync_free(he);
+        free(he);
       }
     }
     pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
@@ -262,7 +262,7 @@ void pcache_clean_oneof(const char **prefixes, size_t cnt) {
       if (!ptimer_stop(he->timer)) {
         psync_list_del(l1);
         he->free(he->value);
-        psync_free(he);
+        free(he);
       }
     }
     pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);

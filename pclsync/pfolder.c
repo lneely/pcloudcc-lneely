@@ -195,9 +195,9 @@ psync_folderid_t pfolder_id_create(const char *path) {
                 ->num;
         if (papi_find_result2(bres, "created", PARAM_BOOL)->num)
           pdiff_wake();
-        psync_free(bres);
+        free(bres);
       } else {
-        psync_free(bres);
+        free(bres);
         psync_process_api_error(result);
         if (psync_handle_api_result(result) == PSYNC_NET_TEMPFAIL)
           goto errnet;
@@ -220,12 +220,12 @@ errnet:
 }
 
 static void psync_free_string_list(psync_list *lst) {
-  psync_list_for_each_element_call(lst, string_list, list, psync_free);
+  psync_list_for_each_element_call(lst, string_list, list, free);
 }
 
 static string_list *str_to_list_element(const char *str, size_t len) {
   string_list *le;
-  le = (string_list *)psync_malloc(sizeof(string_list) + len + 1);
+  le = (string_list *)malloc(sizeof(string_list) + len + 1);
   le->str = (char *)(le + 1);
   le->len = len;
   memcpy(le->str, str, len + 1);
@@ -240,7 +240,7 @@ static int psync_add_path_to_list(psync_list *lst, psync_folderid_t folderid) {
   size_t len;
   while (1) {
     if (folderid == 0) {
-      e = (string_list *)psync_malloc(sizeof(string_list));
+      e = (string_list *)malloc(sizeof(string_list));
       e->str = (char *)e;
       e->len = 0;
       psync_list_add_head(lst, &e->list);
@@ -268,18 +268,18 @@ static string_list *str_list_decode(psync_folderid_t folderid, string_list *e) {
   char *fn;
   dec = pcryptofolder_flddecoder_get(folderid);
   if (psync_crypto_is_error(dec)) {
-    psync_free(e);
+    free(e);
     debug(D_WARNING, "got error %d getting decoder for folderid %lu",
           psync_crypto_to_error(dec), (unsigned long)folderid);
     return NULL;
   }
   fn = pcryptofolder_flddecode_filename(dec, e->str);
   pcryptofolder_flddecoder_release(folderid, dec);
-  psync_free(e);
+  free(e);
   if (unlikely_log(!fn))
     return NULL;
   e = str_to_list_element(fn, strlen(fn));
-  psync_free(fn);
+  free(fn);
   return e;
 }
 
@@ -297,7 +297,7 @@ static int psync_add_path_to_list_decode(psync_list *lst,
     if (folderid == 0) {
       if (e)
         psync_list_add_head(lst, &e->list);
-      e = (string_list *)psync_malloc(sizeof(string_list));
+      e = (string_list *)malloc(sizeof(string_list));
       e->str = (char *)e;
       e->len = 0;
       psync_list_add_head(lst, &e->list);
@@ -343,7 +343,7 @@ char *psync_join_string_list(const char *sep, psync_list *lst, size_t *retlen) {
   if (unlikely(!cnt))
     return psync_strdup("");
   seplen = strlen(sep);
-  ret = str = psync_malloc(slen + cnt * seplen + 1);
+  ret = str = malloc(slen + cnt * seplen + 1);
   psync_list_for_each_element(e, lst, string_list, list) {
     memcpy(str, e->str, e->len);
     str += e->len;
@@ -372,7 +372,7 @@ char *pfolder_path(psync_folderid_t folderid, size_t *retlen) {
   ret = psync_join_string_list("/", &folderlist, retlen);
   psync_free_string_list(&folderlist);
   if (!ret[0]) {
-    psync_free(ret);
+    free(ret);
     ret = psync_strdup("/");
     if (retlen)
       *retlen = 1;
@@ -394,7 +394,7 @@ char *pfolder_path_sep(psync_folderid_t folderid, const char *sep,
   ret = psync_join_string_list(sep, &folderlist, retlen);
   psync_free_string_list(&folderlist);
   if (!ret[0]) {
-    psync_free(ret);
+    free(ret);
     ret = psync_strdup(sep);
     if (retlen)
       *retlen = 1;
@@ -542,10 +542,10 @@ char *pfolder_lpath_lfile(psync_fileid_t localfileid,
 
 static folder_list *folder_list_init() {
   folder_list *list;
-  list = (folder_list *)psync_malloc(sizeof(folder_list));
+  list = (folder_list *)malloc(sizeof(folder_list));
   list->entries =
-      (pentry_t *)psync_malloc(sizeof(pentry_t) * INITIAL_ENTRY_CNT);
-  list->namebuff = (char *)psync_malloc(INITIAL_NAME_BUFF);
+      (pentry_t *)malloc(sizeof(pentry_t) * INITIAL_ENTRY_CNT);
+  list->namebuff = (char *)malloc(INITIAL_NAME_BUFF);
   list->nameoff = 0;
   list->namealloc = INITIAL_NAME_BUFF;
   list->entriescnt = 0;
@@ -556,12 +556,12 @@ static folder_list *folder_list_init() {
 static void folder_list_add(folder_list *list, pentry_t *entry) {
   if (list->entriescnt >= list->entriesalloc) {
     list->entriesalloc *= 2;
-    list->entries = (pentry_t *)psync_realloc(
+    list->entries = (pentry_t *)realloc(
         list->entries, sizeof(pentry_t) * list->entriesalloc);
   }
   while (list->nameoff + entry->namelen >= list->namealloc) {
     list->namealloc *= 2;
-    list->namebuff = (char *)psync_realloc(list->namebuff, list->namealloc);
+    list->namebuff = (char *)realloc(list->namebuff, list->namealloc);
   }
   memcpy(&list->entries[list->entriescnt++], entry, sizeof(pentry_t));
   memcpy(list->namebuff + list->nameoff, entry->name, entry->namelen);
@@ -570,9 +570,9 @@ static void folder_list_add(folder_list *list, pentry_t *entry) {
 }
 
 static void folder_list_free(folder_list *list) {
-  psync_free(list->entries);
-  psync_free(list->namebuff);
-  psync_free(list);
+  free(list->entries);
+  free(list->namebuff);
+  free(list);
 }
 
 static pfolder_list_t *folder_list_finalize(folder_list *list) {
@@ -583,7 +583,7 @@ static pfolder_list_t *folder_list_finalize(folder_list *list) {
         (unsigned)(offsetof(pfolder_list_t, entries) +
                    sizeof(pentry_t) * list->entriescnt + list->nameoff),
         (unsigned)list->nameoff);
-  ret = (pfolder_list_t *)psync_malloc(offsetof(pfolder_list_t, entries) +
+  ret = (pfolder_list_t *)malloc(offsetof(pfolder_list_t, entries) +
                                        sizeof(pentry_t) * list->entriescnt +
                                        list->nameoff);
   name = ((char *)ret) + offsetof(pfolder_list_t, entries) +
@@ -748,7 +748,7 @@ pentry_t *pfolder_stat(const char *remotepath) {
     memcpy(cremotepath, remotepath, len + 1);
     cremotepath[len] = 0;
     folderid = pfolder_id(cremotepath);
-    psync_free(cremotepath);
+    free(cremotepath);
     if (folderid == PSYNC_INVALID_FOLDERID)
       return NULL;
   }
@@ -759,7 +759,7 @@ pentry_t *pfolder_stat(const char *remotepath) {
   psync_sql_bind_uint(res, 1, folderid);
   psync_sql_bind_lstring(res, 2, remotepath + len, olen);
   if ((row = psync_sql_fetch_rowint(res))) {
-    ret = (pentry_t *)psync_malloc(sizeof(pentry_t) + olen + 1);
+    ret = (pentry_t *)malloc(sizeof(pentry_t) + olen + 1);
     ret->folder.folderid = row[0];
     ret->folder.cansyncup = ((row[1] & PSYNC_PERM_WRITE) == PSYNC_PERM_WRITE);
     ret->folder.cansyncdown = ((row[1] & PSYNC_PERM_READ) == PSYNC_PERM_READ);
@@ -778,7 +778,7 @@ pentry_t *pfolder_stat(const char *remotepath) {
   psync_sql_bind_uint(res, 1, folderid);
   psync_sql_bind_lstring(res, 2, remotepath + len, olen);
   if ((row = psync_sql_fetch_rowint(res))) {
-    ret = (pentry_t *)psync_malloc(sizeof(pentry_t) + olen + 1);
+    ret = (pentry_t *)malloc(sizeof(pentry_t) + olen + 1);
     ret->file.fileid = row[0];
     ret->file.size = row[1];
     ret->name = (char *)(ret + 1);
@@ -835,12 +835,12 @@ psync_folder_list_t *pfolder_sync_folders(char *syncTypes) {
   while ((row = psync_sql_fetch_row(res))) {
     if (alloced == lastfolder) {
       alloced = (alloced + 32) * 2;
-      folders = (psync_tmp_folder_t *)psync_realloc(
+      folders = (psync_tmp_folder_t *)realloc(
           folders, sizeof(psync_tmp_folder_t) * alloced);
     }
     cstr = psync_get_lstring(row[2], &l);
     l++;
-    str = (char *)psync_malloc(l);
+    str = (char *)malloc(l);
     memcpy(str, cstr, l);
 
     strlens += l;
@@ -864,14 +864,14 @@ psync_folder_list_t *pfolder_sync_folders(char *syncTypes) {
   psync_sql_free_result(res);
   l = offsetof(psync_folder_list_t, folders) +
       sizeof(psync_folder_t) * lastfolder;
-  ret = (psync_folder_list_t *)psync_malloc(l + strlens);
+  ret = (psync_folder_list_t *)malloc(l + strlens);
   str = ((char *)ret) + l;
   ret->foldercnt = lastfolder;
 
   for (i = 0; i < lastfolder; i++) {
     l = folders[i].locallen;
     memcpy(str, folders[i].localpath, l);
-    psync_free(folders[i].localpath);
+    free(folders[i].localpath);
     strncpy(ret->folders[i].localpath, str,
             sizeof(ret->folders[i].localpath) - 1);
     ret->folders[i].localpath[sizeof(ret->folders[i].localpath) - 1] = '\0';
@@ -891,7 +891,7 @@ psync_folder_list_t *pfolder_sync_folders(char *syncTypes) {
 
     l = folders[i].remotelen;
     memcpy(str, folders[i].remotepath, l);
-    psync_free(folders[i].remotepath);
+    free(folders[i].remotepath);
     strncpy(ret->folders[i].remotepath, str,
             sizeof(ret->folders[i].remotepath) - 1);
     ret->folders[i].remotepath[sizeof(ret->folders[i].remotepath) - 1] = '\0';
@@ -914,7 +914,7 @@ psync_folder_list_t *pfolder_sync_folders(char *syncTypes) {
     ret->folders[i].synctype = folders[i].synctype;
   }
 
-  psync_free(folders);
+  free(folders);
 
   return ret;
 }

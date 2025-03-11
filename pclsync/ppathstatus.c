@@ -165,8 +165,7 @@ void ppathstatus_init() {
     psync_list_add_tail(&parent_cache_lru, &parent_cache_entries[i].list_lru);
     psync_list_add_tail(&cache_free, &parent_cache_entries[i].list_hash);
   }
-  ptree_for_each_element_call_safe(folder_tasks, folder_tasks_t, tree,
-                                        psync_free);
+  ptree_for_each_element_call_safe(folder_tasks, folder_tasks_t, tree, free);
   folder_tasks = PSYNC_TREE_EMPTY;
   ptree_for_each_element_call_safe(sync_data, sync_data_t, tree,
                                         sync_data_free);
@@ -302,7 +301,7 @@ static folder_tasks_t *get_folder_tasks(psync_folderid_t folderid, int create) {
 static void free_folder_tasks(folder_tasks_t *ft) {
   debug(D_NOTICE, "marking folderid %lu as clean", (unsigned long)ft->folderid);
   ptree_del(&folder_tasks, &ft->tree);
-  psync_free(ft);
+  free(ft);
 }
 
 static psync_folderid_t get_parent_folder(psync_folderid_t folderid) {
@@ -413,7 +412,7 @@ static void folder_moved(psync_folderid_t folderid,
 static void folder_moved_commit(void *ptr) {
   folder_moved_params_t *mp = (folder_moved_params_t *)ptr;
   folder_moved(mp->folderid, mp->old_parent_folderid, mp->new_parent_folderid);
-  psync_free(mp);
+  free(mp);
 }
 
 void ppathstatus_fldr_moved(psync_folderid_t folderid,
@@ -429,7 +428,7 @@ void ppathstatus_fldr_moved(psync_folderid_t folderid,
   mp->folderid = folderid;
   mp->old_parent_folderid = old_parent_folderid;
   mp->new_parent_folderid = new_parent_folderid;
-  psync_sql_transation_add_callbacks(folder_moved_commit, psync_free, mp);
+  psync_sql_transation_add_callbacks(folder_moved_commit, free, mp);
 }
 
 void ppathstatus_fldr_deleted(psync_folderid_t folderid) {
@@ -451,9 +450,8 @@ void ppathstatus_fldr_deleted(psync_folderid_t folderid) {
 }
 
 static void sync_data_free(sync_data_t *sd) {
-  ptree_for_each_element_call_safe(sd->folder_tasks, folder_tasks_t, tree,
-                                        psync_free);
-  psync_free(sd);
+  ptree_for_each_element_call_safe(sd->folder_tasks, folder_tasks_t, tree, free);
+  free(sd);
 }
 
 static sync_data_t *get_sync_data(psync_syncid_t syncid, int create) {
@@ -662,7 +660,7 @@ static void free_sync_folder_tasks(sync_data_t *sd, folder_tasks_t *ft) {
   debug(D_NOTICE, "marking folderid %lu from syncid %u as clean",
         (unsigned long)ft->folderid, (unsigned)sd->syncid);
   ptree_del(&sd->folder_tasks, &ft->tree);
-  psync_free(ft);
+  free(ft);
 }
 
 void ppathstatus_syncfldr_task_completed(
@@ -757,7 +755,7 @@ static void sync_folder_moved_commit(void *ptr) {
   sync_folder_moved_params_t *mp = (sync_folder_moved_params_t *)ptr;
   sync_folder_moved(mp->folderid, mp->old_syncid, mp->old_parent_folderid,
                     mp->new_syncid, mp->new_parent_folderid);
-  psync_free(mp);
+  free(mp);
 }
 
 void ppathstatus_syncfldr_moved(psync_folderid_t folderid,
@@ -781,7 +779,7 @@ void ppathstatus_syncfldr_moved(psync_folderid_t folderid,
   mp->new_parent_folderid = new_parent_folderid;
   mp->old_syncid = old_syncid;
   mp->new_syncid = new_syncid;
-  psync_sql_transation_add_callbacks(sync_folder_moved_commit, psync_free, mp);
+  psync_sql_transation_add_callbacks(sync_folder_moved_commit, free, mp);
 }
 
 void ppathstatus_syncfldr_deleted(psync_syncid_t syncid,
@@ -900,7 +898,7 @@ static int move_encname_to_buff(psync_folderid_t folderid, char *buff,
   if (unlikely(len >= sizeof(buff)))
     return -1;
   memcpy(buff, encname, len + 1);
-  psync_free(encname);
+  free(encname);
   return 0;
 }
 
@@ -1442,7 +1440,7 @@ psync_path_status_t ppathstatus_get(const char *path) {
         dp = NULL;
       }
       psync_sql_unlock();
-      psync_free(dp);
+      free(dp);
       if (len >= drive_path_len && !memcmp(drive_path, path, drive_path_len) &&
           valid_last_char(path[drive_path_len]))
         return psync_path_status_drive(path + drive_path_len,

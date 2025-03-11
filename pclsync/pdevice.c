@@ -59,7 +59,7 @@ char *pdevice_id() {
         path =
             psync_strcat("/sys/class/power_supply/", de->d_name, "/type", NULL);
         fd = open(path, O_RDONLY);
-        psync_free(path);
+        free(path);
         if (fd == -1)
           continue;
         if (read(fd, buf, 7) == 7 && !memcmp(buf, "Battery", 7)) {

@@ -172,7 +172,7 @@ static struct addrinfo *addr_load(const char *host, const char *port) {
     psync_sql_rdunlock();
     return NULL;
   }
-  ret = (struct addrinfo *)psync_malloc(sizeof(struct addrinfo) * row[0] +
+  ret = (struct addrinfo *)malloc(sizeof(struct addrinfo) * row[0] +
                                         row[1]);
   data = (char *)(ret + row[0]);
   for (i = 0; i < row[0] - 1; i++)
@@ -275,7 +275,7 @@ static void cb_connect_res(void *h, void *ptr) {
   res = (struct addrinfo *)ptr;
   sock = connect_res(res);
   r = psync_task_complete(h, (void *)(uintptr_t)sock);
-  psync_free(res);
+  free(res);
   if (r && sock != INVALID_SOCKET)
     close(sock);
 }
@@ -380,7 +380,7 @@ int psock_try_write_buffer(psock_t *sock) {
     while ((b = sock->buffer)) {
       if (b->roffset == b->woffset) {
         sock->buffer = b->next;
-        psync_free(b);
+        free(b);
         continue;
       }
       if (sock->ssl) {
@@ -502,7 +502,7 @@ void psock_close(psock_t *sock) {
       }
   psock_clear_write_buffered(sock);
   close(sock->sock);
-  psync_free(sock);
+  free(sock);
 }
 
 void psock_close_bad(psock_t *sock) {
@@ -510,14 +510,14 @@ void psock_close_bad(psock_t *sock) {
     pssl_free(sock->ssl);
   psock_clear_write_buffered(sock);
   close(sock->sock);
-  psync_free(sock);
+  free(sock);
 }
 
 void psock_set_write_buffered(psock_t *sock) {
   psock_buf_t *sb;
   if (sock->buffer)
     return;
-  sb = (psock_buf_t *)psync_malloc(offsetof(psock_buf_t, buff) +
+  sb = (psock_buf_t *)malloc(offsetof(psock_buf_t, buff) +
                                    PSYNC_FIRST_SOCK_WRITE_BUFF_SIZE);
   sb->next = NULL;
   sb->size = PSYNC_FIRST_SOCK_WRITE_BUFF_SIZE;
@@ -773,7 +773,7 @@ static int psync_socket_write_to_buf(psock_t *sock, const void *buff, int num) {
     do {
       wr = b->size - b->woffset;
       if (!wr) {
-        b->next = (psock_buf_t *)psync_malloc(
+        b->next = (psock_buf_t *)malloc(
             offsetof(psock_buf_t, buff) + PSYNC_SECOND_SOCK_WRITE_BUFF_SIZE);
         b = b->next;
         b->next = NULL;
@@ -1107,7 +1107,7 @@ psock_ifaces_t *psock_list_adapters() {
     }
     addr = addr->ifa_next;
   }
-  ret = psync_malloc(offsetof(psock_ifaces_t, interfaces) +
+  ret = malloc(offsetof(psock_ifaces_t, interfaces) +
                      sizeof(psock_iface_t) * cnt);
   memset(ret, 0,
          offsetof(psock_ifaces_t, interfaces) + sizeof(psock_iface_t) * cnt);
@@ -1135,7 +1135,7 @@ psock_ifaces_t *psock_list_adapters() {
   freeifaddrs(addrs);
   return ret;
 empty:
-  ret = psync_malloc(offsetof(psock_ifaces_t, interfaces));
+  ret = malloc(offsetof(psock_ifaces_t, interfaces));
   ret->interfacecnt = 0;
   return ret;
 }

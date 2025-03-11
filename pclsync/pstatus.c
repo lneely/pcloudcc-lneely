@@ -221,7 +221,7 @@ void pstatus_upload_recalc() {
       filestou++;
       bytestou += pfile_stat_size(&st);
     }
-    psync_free(filename);
+    free(filename);
   }
   psync_sql_free_result(res);
   psync_status.filestoupload = filestou;

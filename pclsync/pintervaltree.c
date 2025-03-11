@@ -58,10 +58,10 @@ psync_interval_tree_consume_intervals(psync_interval_tree_t *tree,
     psync_interval_tree_del(&tree, next);
     if (next->to >= e->to) {
       e->to = next->to;
-      psync_free(next);
+      free(next);
       break;
     }
-    psync_free(next);
+    free(next);
   }
   return tree;
 }
@@ -144,8 +144,7 @@ void psync_interval_tree_remove(psync_interval_tree_t **tree, uint64_t from,
 
 void psync_interval_tree_free(psync_interval_tree_t *tree) {
   if (tree)
-    ptree_for_each_element_call_safe(&tree->tree, psync_interval_tree_t,
-                                          tree, psync_free);
+    ptree_for_each_element_call_safe(&tree->tree, psync_interval_tree_t, tree, free);
 }
 
 static psync_interval_tree_t *
@@ -160,7 +159,7 @@ psync_interval_tree_get_cut_end(psync_interval_tree_t *tree, uint64_t end) {
     prev = psync_interval_tree_get_prev(last);
     tree = psync_interval_tree_element(
         ptree_get_del(&tree->tree, &last->tree));
-    psync_free(last);
+    free(last);
     last = prev;
   }
   return tree;

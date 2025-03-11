@@ -1100,17 +1100,16 @@ static int psync_fs_crypto_do_finalize_log(psync_openfile_t *of, int fullsync) {
                                                   O_CREAT | O_TRUNC)) ==
                    INVALID_HANDLE_VALUE) ||
       unlikely_log(pfscrypto_init_log(of))) {
-    psync_free(olog);
-    psync_free(flog);
+    free(olog);
+    free(flog);
     return -EIO;
   }
-  ptree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t,
-                                        tree, psync_free);
+  ptree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t, tree, free);
   of->sectorsinlog = PSYNC_TREE_EMPTY;
   ret = psync_fs_crypto_log_flush_and_process(of, flog, 0, 1);
   pfile_delete(flog);
-  psync_free(olog);
-  psync_free(flog);
+  free(olog);
+  free(flog);
   return PRINT_NEG_RETURN(ret);
 }
 
@@ -1626,8 +1625,8 @@ retry:
       // we are unlocked now
       psync_fs_lock_file(of);
       if (unlikely(ret)) {
-        psync_free(ranges);
-        psync_free(tmpbuf);
+        free(ranges);
+        free(tmpbuf);
         debug(D_NOTICE, "downloading of ranges failed");
         return ret;
       }
@@ -1646,8 +1645,8 @@ retry:
                 (unsigned long)ranges[l].offset,
                 (unsigned long)(ranges[l].offset + ranges[l].size),
                 (unsigned long)itr->from, (unsigned long)itr->to);
-          psync_free(ranges);
-          psync_free(tmpbuf);
+          free(ranges);
+          free(tmpbuf);
           goto retry;
         }
         debug(D_NOTICE, "wrote %u bytes to offset %lu",
@@ -1665,8 +1664,8 @@ retry:
       }
       // we do NOT need to fsync of->datafile, as we wrote to positions that
       // were empty
-      psync_free(ranges);
-      psync_free(tmpbuf);
+      free(ranges);
+      free(tmpbuf);
       if (unlikely(ret))
         return ret;
     }
@@ -1702,8 +1701,7 @@ static int pfscrypto_truncate_to_zero(psync_openfile_t *of) {
     psync_interval_tree_add(&of->writeintervals, 0,
                             pfscrypto_crypto_size(of->initialsize));
   }
-  ptree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t,
-                                        tree, psync_free);
+  ptree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t, tree, free);
   of->sectorsinlog = PSYNC_TREE_EMPTY;
   of->currentsize = 0;
   psync_fs_crypto_kill_extender_locked(of);
@@ -1791,7 +1789,7 @@ retry:
            ptree_element(tr, psync_sector_inlog_t, tree)->sectorid >
                ptree_element(ntr, psync_sector_inlog_t, tree)->sectorid);
     ptree_del(&of->sectorsinlog, tr);
-    psync_free(tr);
+    free(tr);
     tr = ntr;
   }
   ret = psync_fs_crypto_write_newfile_full_sector(of, buf, lastsectorid,
@@ -1873,7 +1871,7 @@ static void psync_fs_extender_thread(void *ptr) {
   of->extender = NULL;
   pthread_mutex_unlock(&of->mutex);
   pthread_cond_destroy(&ext->cond);
-  psync_free(ext);
+  free(ext);
   psync_fs_dec_of_refcnt(of);
 }
 
@@ -2093,7 +2091,7 @@ static void psync_fs_crypto_check_file(void *ptr, ppath_fast_stat *st) {
     path = psync_strcat((const char *)ptr, "/", st->name,
                         NULL);
     psync_fs_crypto_check_log(path, st->name);
-    psync_free(path);
+    free(path);
   }
 }
 

@@ -71,7 +71,7 @@ psync_deflate_t *pdeflate_init(int level) {
   if (likely_log(ret == Z_OK))
     return def;
   else {
-    psync_free(def);
+    free(def);
     return NULL;
   }
 }
@@ -81,8 +81,8 @@ void pdeflate_destroy(psync_deflate_t *def) {
     deflateEnd(&def->stream);
   else
     inflateEnd(&def->stream);
-  psync_free(def->flushbuff);
-  psync_free(def);
+  free(def->flushbuff);
+  free(def);
 }
 
 static int psync_deflate_set_out_buff(psync_deflate_t *def) {
@@ -150,7 +150,7 @@ static int psync_deflate_finish_flush_add_buffer(psync_deflate_t *def,
       if (ret != Z_BUF_ERROR)
         return ret;
       if (used == 0) {
-        psync_free(buff);
+        free(buff);
         return Z_OK;
       }
       def->flushbuff = buff;
@@ -168,7 +168,7 @@ static int psync_deflate_finish_flush_add_buffer(psync_deflate_t *def,
     }
     used += current;
     alloced *= 2;
-    buff = (unsigned char *)psync_realloc(buff, alloced);
+    buff = (unsigned char *)realloc(buff, alloced);
     current = alloced - used;
   }
 }
@@ -212,7 +212,7 @@ int pdeflate_read(psync_deflate_t *def, void *data, int len) {
       memcpy(data, def->flushbuff + def->flushbuffoff, len);
       def->flushbuffoff += len;
       if (def->flushbuffoff == def->flushbufflen) {
-        psync_free(def->flushbuff);
+        free(def->flushbuff);
         def->flushbuff = NULL;
       }
       return len;

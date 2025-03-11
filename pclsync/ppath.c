@@ -19,24 +19,24 @@ char *ppath_default_db() {
   }
 
   dbp = psync_strcat(pcdir, "/", PSYNC_DEFAULT_DB_NAME, NULL);
-  psync_free(pcdir);
+  free(pcdir);
 
   if (stat(dbp, &st)) {
     // Inline the old database path function here
     if ((home = ppath_home())) {
       oldp = psync_strcat(home, "/", PSYNC_DEFAULT_POSIX_DBNAME, NULL);
-      psync_free(home);
+      free(home);
 
       if (oldp) {
         if (!stat(oldp, &st)) {
           if (psync_sql_reopen(oldp)) {
-            psync_free(dbp);
+            free(dbp);
             return oldp;
           } else {
             pfile_rename(oldp, dbp);
           }
         }
-        psync_free(oldp);
+        free(oldp);
       }
     }
   }
@@ -85,7 +85,7 @@ int ppath_ls(const char *path, ppath_ls_cb callback, void *ptr) {
   }
 
   pl = strlen(path);
-  cpath = (char *)psync_malloc(pl + NAME_MAX + 2);
+  cpath = (char *)malloc(pl + NAME_MAX + 2);
   memcpy(cpath, path, pl);
   if (!pl || cpath[pl - 1] != '/')
     cpath[pl++] = '/';
@@ -107,7 +107,7 @@ int ppath_ls(const char *path, ppath_ls_cb callback, void *ptr) {
     }
   }
 
-  psync_free(cpath);
+  free(cpath);
   closedir(dh);
   return 0;
 }
@@ -127,7 +127,7 @@ int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback, void *ptr) {
   }
 
   pl = strlen(path);
-  cpath = (char *)psync_malloc(pl + NAME_MAX + 2);
+  cpath = (char *)malloc(pl + NAME_MAX + 2);
   memcpy(cpath, path, pl);
   if (!pl || cpath[pl - 1] != '/')
     cpath[pl++] = '/';
@@ -157,7 +157,7 @@ int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback, void *ptr) {
     // Ignore other file types
   }
 
-  psync_free(cpath);
+  free(cpath);
   closedir(dh);
   return 0;
 }
@@ -171,14 +171,14 @@ char *ppath_pcloud() {
   }
 
   path = psync_strcat(homedir, "/", PSYNC_DEFAULT_POSIX_DIR, NULL);
-  psync_free(homedir);
+  free(homedir);
   if (unlikely_log(!path)) {
     return NULL;
   }
 
   if (stat(path, &st) &&
       unlikely_log(mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE))) {
-    psync_free(path);
+    free(path);
     return NULL;
   }
   return path;
@@ -192,7 +192,7 @@ char *ppath_private(char *name) {
     return NULL;
   rpath = psync_strcat(path, "/", name, NULL);
   if (stat(rpath, &st) && mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE)) {
-    psync_free(rpath);
+    free(rpath);
     free(path);
     return NULL;
   }

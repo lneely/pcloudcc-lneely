@@ -120,7 +120,7 @@ void psyncer_dl_queue_del(psync_folderid_t folderid) {
       f = ptree_element(f->tree.right, synced_down_folder, tree);
     else {
       ptree_del(&synced_down_folders, &f->tree);
-      psync_free(f);
+      free(f);
       break;
     }
   }
@@ -129,8 +129,7 @@ void psyncer_dl_queue_del(psync_folderid_t folderid) {
 
 void psyncer_dl_queue_clear() {
   pthread_mutex_lock(&sync_down_mutex);
-  ptree_for_each_element_call_safe(synced_down_folders, synced_down_folder,
-                                        tree, psync_free);
+  ptree_for_each_element_call_safe(synced_down_folders, synced_down_folder, tree, free);
   synced_down_folders = PSYNC_TREE_EMPTY;
   pthread_mutex_unlock(&sync_down_mutex);
 }
@@ -212,7 +211,7 @@ psync_folderid_t psyncer_db_folder_create(
   if (psync_sql_affected_rows() > 0) {
     lfolderid = psync_sql_insertid();
     psync_sql_free_result(res);
-    psync_free(vname);
+    free(vname);
     return lfolderid;
   }
   psync_sql_free_result(res);
@@ -242,7 +241,7 @@ psync_folderid_t psyncer_db_folder_create(
     psync_sql_run_free(res);
   }
   psyncer_folder_inc_tasks(lfolderid);
-  psync_free(vname);
+  free(vname);
   return lfolderid;
 }
 
@@ -342,12 +341,12 @@ static void psync_sync_newsyncedfolder(psync_syncid_t syncid) {
     }
   } else
     psync_sql_rollback_transaction();
-  psync_free(localpath);
+  free(localpath);
 }
 
 static void psync_do_sync_thread(void *ptr) {
   psync_sync_newsyncedfolder(*((psync_syncid_t *)ptr));
-  psync_free(ptr);
+  free(ptr);
 }
 
 void psyncer_create(psync_syncid_t syncid) {
@@ -474,8 +473,8 @@ re:
     folderid = pfolder_id_create(remotepath);
     if (unlikely(folderid == PSYNC_INVALID_FOLDERID)) {
       debug(D_WARNING, "could not get folderid/create folder %s", remotepath);
-      psync_free(localpath);
-      psync_free(remotepath);
+      free(localpath);
+      free(remotepath);
       if (psync_error != PERROR_OFFLINE) {
         delete_delayed_sync(id);
         goto re;
@@ -490,8 +489,8 @@ re:
     psync_sql_free_result(stmt);
     if (!urow) {
       psync_sql_commit_transaction();
-      psync_free(localpath);
-      psync_free(remotepath);
+      free(localpath);
+      free(remotepath);
       goto re;
     }
     stmt = psync_sql_prep_statement(
@@ -508,8 +507,8 @@ re:
     else
       syncid = -1;
     psync_sql_free_result(stmt);
-    psync_free(localpath);
-    psync_free(remotepath);
+    free(localpath);
+    free(remotepath);
     if (!psync_sql_commit_transaction() && syncid != -1) {
       ppathstatus_reload_syncs();
       psyncer_create(syncid);

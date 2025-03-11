@@ -289,7 +289,7 @@ static void status_change(pstatus_t *status) {
   static int cryptocheck = 0;
 
   char *err;
-  err = (char *)psync_malloc(1024);
+  err = (char *)malloc(1024);
 
   std::cout << "Down: " << status->downloadstr << "| Up: " << status->uploadstr
             << ", status is " << status2string(status->status) << std::endl;
@@ -348,8 +348,9 @@ static void status_change(pstatus_t *status) {
         (int)status->status, status2string(status->status));
   }
 
-  if (err)
-    psync_free(err);
+  if (err) {
+    free(err);
+  }
 }
 
 int clib::pclsync_lib::start_crypto(const char *pwd) {
@@ -429,7 +430,7 @@ int clib::pclsync_lib::list_sync_folders(const char *unused) {
   pshm_write(folders, folderssz);
   pthread_mutex_unlock(&mtx);
 
-  psync_free(folders);
+  free(folders);
 
   return 0;
 }
@@ -463,10 +464,10 @@ int clib::pclsync_lib::init() {
       std::cout << "logged in with user " << username_old << ", not "
                 << username_ << ", unlinking" << std::endl;
       psync_unlink();
-      psync_free(username_old);
+      free(username_old);
       return 2;
     }
-    psync_free(username_old);
+    free(username_old);
   }
 
   prpc_register(STARTCRYPTO, &start_crypto);

@@ -15,7 +15,7 @@ static void proc_send_data_event(void *ptr) {
   data_event_fptr(data->eventid, (char *)data->str1, (char *)data->str2,
                   data->uint1, data->uint2);
 
-  psync_free(ptr);
+  free(ptr);
 }
 
 void ptevent_init(void *ptr) {

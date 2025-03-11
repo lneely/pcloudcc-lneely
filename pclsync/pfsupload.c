@@ -175,7 +175,7 @@ static int psync_process_task_mkdir(fsupload_task_t *task) {
       psync_sql_bind_uint(res, 1, folderid);
       psync_sql_bind_blob(res, 2, (char *)enckey, enckeylen);
       psync_sql_run_free(res);
-      psync_free(enckey);
+      free(enckey);
     }
   }
   debug(D_NOTICE, "folder %lu/%s created", (unsigned long)task->folderid,
@@ -272,15 +272,15 @@ static int psync_send_task_creat_upload_small(psock_t *api,
   }
   if (unlikely_log(pfile_read(fd, data + len, size) != size) ||
       unlikely_log(psync_fs_get_file_writeid(task->id) != task->int1)) {
-    psync_free(data);
+    free(data);
     return -1;
   }
   size += len;
   if (unlikely_log(psync_socket_writeall_upload(api, data, size) != size)) {
-    psync_free(data);
+    free(data);
     return -1;
   } else {
-    psync_free(data);
+    free(data);
     return 0;
   }
 }
@@ -317,7 +317,7 @@ static int clean_uploads_for_task(psock_t *api, psync_uploadid_t taskid) {
       ret = -1;
       break;
     } else
-      psync_free(res);
+      free(res);
   }
   sql = psync_sql_prep_statement("DELETE FROM fstaskupload WHERE fstaskid=?");
   psync_sql_bind_uint(sql, 1, taskid);
@@ -340,7 +340,7 @@ static int large_upload_check_checksum(psock_t *api, uint64_t uploadid,
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
     debug(D_WARNING, "upload_info returned %lu", (long unsigned)result);
-    psync_free(res);
+    free(res);
     psync_apipool_release(api);
     psync_process_api_error(result);
     return -1;
@@ -348,11 +348,11 @@ static int large_upload_check_checksum(psock_t *api, uint64_t uploadid,
   if (memcmp(filehash, papi_find_result2(res, PSYNC_CHECKSUM, PARAM_STR)->str,
              PSYNC_HASH_DIGEST_HEXLEN)) {
     debug(D_WARNING, "upload_info returned different checksum");
-    psync_free(res);
+    free(res);
     psync_apipool_release(api);
     return -1;
   }
-  psync_free(res);
+  free(res);
   return 0;
 }
 
@@ -416,7 +416,7 @@ static void set_key_for_fileid(psync_fileid_t fileid, uint64_t hash,
     psync_sql_bind_uint(res, 2, hash);
     psync_sql_bind_blob(res, 3, (char *)enckey, enckeylen);
     psync_sql_run_free(res);
-    psync_free(enckey);
+    free(enckey);
   }
   psync_get_string_id(buff, "DKEY", fileid);
   pcache_del(buff);
@@ -575,14 +575,14 @@ static int large_upload_save(psock_t *api, uint64_t uploadid,
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
     debug(D_WARNING, "upload_save returned %lu", (long unsigned)result);
-    psync_free(res);
+    free(res);
     handle_upload_api_error_taskid(result, taskid);
     return -1;
   }
   debug(D_NOTICE, "sent mtime=%lu", (unsigned long)pfile_stat_mtime(&st));
   ret = save_meta(papi_find_result2(res, "metadata", PARAM_HASH), folderid,
                   name, taskid, writeid, newfile, oldhash, key);
-  psync_free(res);
+  free(res);
   pdiff_wake();
   return ret;
 }
@@ -639,7 +639,7 @@ static int copy_file(psock_t *api, const struct stat *st,
     return -1;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    psync_free(res);
+    free(res);
     debug(D_WARNING, "command copyfile returned code %u", (unsigned)result);
     psync_process_api_error(result);
     return 0;
@@ -647,7 +647,7 @@ static int copy_file(psock_t *api, const struct stat *st,
   meta = papi_find_result2(res, "metadata", PARAM_HASH);
   debug(D_NOTICE, "sent mtime=%lu", (unsigned long)pfile_stat_mtime(st));
   ret = save_meta(meta, folderid, name, taskid, writeid, 1, 0, NULL);
-  psync_free(res);
+  free(res);
   if (ret) // ret*2-1?
     return -1;
   else
@@ -671,7 +671,7 @@ static int copy_file_if_exists(psock_t *api, const char *filename,
     return -1;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    psync_free(res);
+    free(res);
     debug(D_WARNING, "command getfilesbychecksum returned code %u",
           (unsigned)result);
     psync_process_api_error(result);
@@ -679,12 +679,12 @@ static int copy_file_if_exists(psock_t *api, const char *filename,
   }
   metas = papi_find_result2(res, "metadata", PARAM_ARRAY);
   if (!metas->length) {
-    psync_free(res);
+    free(res);
     return 0;
   }
   meta = metas->array[0];
   if (stat(filename, &st)) {
-    psync_free(res);
+    free(res);
     return -1;
   }
   ret = copy_file(api, &st, papi_find_result2(meta, "fileid", PARAM_NUM)->num,
@@ -700,7 +700,7 @@ static int copy_file_if_exists(psock_t *api, const char *filename,
           (long unsigned)folderid, name);
     pdiff_wake();
   }
-  psync_free(res);
+  free(res);
   return ret;
 }
 
@@ -769,7 +769,7 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
       goto err0;
     result = papi_find_result2(res, "result", PARAM_NUM)->num;
     if (unlikely(result)) {
-      psync_free(res);
+      free(res);
       psync_apipool_release(api);
       debug(D_WARNING, "upload_create returned %lu", (unsigned long)result);
       psync_process_api_error(result);
@@ -779,7 +779,7 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
         return 0;
     }
     uploadid = papi_find_result2(res, "uploadid", PARAM_NUM)->num;
-    psync_free(res);
+    free(res);
     sql = psync_sql_prep_statement(
         "INSERT INTO fstaskupload (fstaskid, uploadid) VALUES (?, ?)");
     psync_sql_bind_uint(sql, 1, taskid);
@@ -796,7 +796,7 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
   }
   if (large_upload_creat_send_write(api, uploadid, usize, fsize - usize))
     goto err1;
-  buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
   if (usize) {
     asize = usize;
     pupload_bytes_add(asize);
@@ -820,13 +820,13 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
     asize += rrd;
     pupload_bytes_add(rrd);
   }
-  psync_free(buff);
+  free(buff);
   pfile_close(fd);
   res = papi_result(api);
   if (unlikely_log(!res))
     goto err0;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
-  psync_free(res);
+  free(res);
   if (result) {
     debug(D_WARNING, "upload_write returned error %lu", (long unsigned)result);
     psync_process_api_error(result);
@@ -870,7 +870,7 @@ ret0:
     pupload_bytes_sub(asize);
   return 0;
 err2:
-  psync_free(buff);
+  free(buff);
 err1:
   pfile_close(fd);
 err0:
@@ -924,7 +924,7 @@ static int upload_modify_send_local(psock_t *api,
     return PSYNC_NET_TEMPFAIL;
   bw = 0;
 
-  buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
   while (bw < length) {
     if (unlikely(stop_current_upload)) {
       debug(D_NOTICE, "got stop");
@@ -948,13 +948,13 @@ static int upload_modify_send_local(psock_t *api,
     *upl += rrd;
     pupload_bytes_add(rrd);
   }
-  psync_free(buff);
+  free(buff);
   return PSYNC_NET_OK;
 err0:
-  psync_free(buff);
+  free(buff);
   return PSYNC_NET_TEMPFAIL;
 errp:
-  psync_free(buff);
+  free(buff);
   return PSYNC_NET_PERMFAIL;
 }
 
@@ -965,7 +965,7 @@ static int upload_modify_read_req(psock_t *api) {
   if (!res)
     return PSYNC_NET_TEMPFAIL;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
-  psync_free(res);
+  free(res);
   if (result) {
     debug(D_WARNING, "got %lu from upload_writefromfile or upload_write",
           (unsigned long)result);
@@ -1022,7 +1022,7 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
     goto err2;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    psync_free(res);
+    free(res);
     psync_apipool_release(api);
     psync_interval_tree_free(tree);
     debug(D_WARNING, "upload_create returned %lu", (unsigned long)result);
@@ -1033,7 +1033,7 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
       return 0;
   }
   uploadid = papi_find_result2(res, "uploadid", PARAM_NUM)->num;
-  psync_free(res);
+  free(res);
   sql = psync_sql_prep_statement(
       "INSERT INTO fstaskupload (fstaskid, uploadid) VALUES (?, ?)");
   psync_sql_bind_uint(sql, 1, taskid);
@@ -1229,10 +1229,10 @@ static void large_upload() {
         psync_fsupload_wake();
       psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_UPLOAD);
     }
-    psync_free(indexname);
-    psync_free(filename);
-    psync_free(name);
-    psync_free(key);
+    free(indexname);
+    free(filename);
+    free(name);
+    free(key);
   }
   debug(D_NOTICE, "exited");
 }
@@ -1280,7 +1280,7 @@ int psync_fsupload_in_current_small_uploads_batch_locked(uint64_t taskid) {
     stret = stat(filename, &st);
     if (stret)
       debug(D_WARNING, "can not stat %s", filename);
-    psync_free(filename);
+    free(filename);
     if (stret)
       return 1;
     if (pfile_stat_size(&st) > PSYNC_FS_DIRECT_UPLOAD_LIMIT)
@@ -1305,7 +1305,7 @@ static int psync_send_task_creat(psock_t *api, fsupload_task_t *task) {
     filename = psync_strcat(psync_setting_get_string(_PS(fscachepath)),
                             "/", fileidhex, NULL);
     fd = pfile_open(filename, O_RDONLY, 0);
-    psync_free(filename);
+    free(filename);
     if (unlikely_log(fd == INVALID_HANDLE_VALUE) ||
         unlikely_log(fstat(fd, &st))) {
       if (fd != INVALID_HANDLE_VALUE)
@@ -1522,7 +1522,7 @@ int2, sfolderid FROM fstask WHERE id=?"); psync_sql_bind_uint(res, 1, id);
       size+=row[4].length+1;
     if (row[5].type==PSYNC_TSTRING)
       size+=row[5].length+1;
-    task=(fsupload_task_t *)psync_malloc(size);
+    task=(fsupload_task_t *)malloc(size);
     end=(char *)(task+1);
     task->res=NULL;
     task->id=psync_get_number(row[0]);
@@ -1612,7 +1612,7 @@ static void change_folder_name(fsupload_task_t *task) {
   psync_sql_run_free(res);
   debug(D_NOTICE, "changed target name of task %lu from %s to %s",
         (unsigned long)task->id, task->text1, nn);
-  psync_free(nn);
+  free(nn);
 }
 
 static int handle_rename_folder_api_error(uint64_t result,
@@ -1687,13 +1687,13 @@ static void psync_delete_write_cache_file(uint64_t taskid, int index) {
   filename =
       psync_strcat(cachepath, "/", fileidhex, NULL);
   assertw(pfile_delete(filename) == 0);
-  psync_free(filename);
+  free(filename);
   if (index) {
     fileidhex[sizeof(psync_fsfileid_t)] = 'i';
     filename =
         psync_strcat(cachepath, "/", fileidhex, NULL);
     assertw(pfile_delete(filename) == 0);
-    psync_free(filename);
+    free(filename);
   }
 }
 
@@ -1927,7 +1927,7 @@ static void psync_fsupload_process_tasks(psync_list *tasks) {
           dels++;
         }
       }
-      psync_free(task->res);
+      free(task->res);
     }
   }
 
@@ -2035,12 +2035,12 @@ static void clean_stuck_tasks() {
     filename =
         psync_strcat(cachepath, "/", fileidhex, NULL);
     pfile_delete(filename);
-    psync_free(filename);
+    free(filename);
     fileidhex[sizeof(psync_fsfileid_t)] = 'i';
     filename =
         psync_strcat(cachepath, "/", fileidhex, NULL);
     pfile_delete(filename);
-    psync_free(filename);
+    free(filename);
     psync_sql_start_transaction();
     res = psync_sql_prep_statement(
         "DELETE FROM fstaskdepend WHERE dependfstaskid=?");
@@ -2051,7 +2051,7 @@ static void clean_stuck_tasks() {
     psync_sql_run_free(res);
     psync_sql_commit_transaction();
   }
-  psync_free(fr);
+  free(fr);
 }
 
 static void psync_fsupload_check_tasks() {
@@ -2087,7 +2087,7 @@ static void psync_fsupload_check_tasks() {
       size += row[4].length + 1;
     if (row[5].type == PSYNC_TSTRING)
       size += row[5].length + 1;
-    task = (fsupload_task_t *)psync_malloc(size);
+    task = (fsupload_task_t *)malloc(size);
     end = (char *)(task + 1);
     task->res = NULL;
     task->id = psync_get_number(row[0]);
@@ -2122,7 +2122,7 @@ static void psync_fsupload_check_tasks() {
   psync_sql_lock();
   current_upload_batch = NULL;
   psync_sql_unlock();
-  psync_list_for_each_element_call(&tasks, fsupload_task_t, list, psync_free);
+  psync_list_for_each_element_call(&tasks, fsupload_task_t, list, free);
 }
 
 static void psync_fsupload_thread() {

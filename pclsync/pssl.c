@@ -52,7 +52,6 @@
 #include "pcache.h"
 #include "pcompiler.h"
 #include "plibs.h"
-#include "pmemlock.h"
 #include "prand.h"
 #include "psettings.h"
 #include "pssl.h"
@@ -71,7 +70,7 @@ static void ssl_debug(int loglevel, int errnum, const char *msg) {
 
 static void free_encrypted(psync_encrypted_data_t e) {
   putil_wipe(e->data, e->datalen);
-  pmemlock_free(e);
+  free(e);
 }
 
 void prsa_free_binary(psync_binary_rsa_key_t bin) {
@@ -80,13 +79,13 @@ void prsa_free_binary(psync_binary_rsa_key_t bin) {
 
 void psymkey_free(psync_symmetric_key_t key) {
   putil_wipe(key->key, key->keylen);
-  pmemlock_free(key);
+  free(key);
 }
 
 psync_encrypted_symmetric_key_t
 psymkey_alloc_encrypted(size_t len) {
   psync_encrypted_symmetric_key_t ret;
-  ret = psync_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
+  ret = malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   return ret;
 }
@@ -94,7 +93,7 @@ psymkey_alloc_encrypted(size_t len) {
 psync_encrypted_symmetric_key_t
 psymkey_copy_encrypted(psync_encrypted_symmetric_key_t src) {
   psync_encrypted_symmetric_key_t ret;
-  ret = psync_malloc(offsetof(psync_encrypted_data_struct_t, data) +
+  ret = malloc(offsetof(psync_encrypted_data_struct_t, data) +
                      src->datalen);
   ret->datalen = src->datalen;
   memcpy(ret->data, src->data, src->datalen);
@@ -212,7 +211,7 @@ static ssl_connection_t *conn_alloc(const char *hostname) {
   ssl_connection_t *conn;
   size_t len;
   len = strlen(hostname) + 1;
-  conn = (ssl_connection_t *)psync_malloc(offsetof(ssl_connection_t, cachekey) +
+  conn = (ssl_connection_t *)malloc(offsetof(ssl_connection_t, cachekey) +
                                           len + 4);
   conn->isbroken = 0;
   memcpy(conn->cachekey, "SSLS", 4);
@@ -271,7 +270,7 @@ static int mbed_write(void *ptr, const unsigned char *buf, size_t len) {
 
 static void free_session(void *ptr) {
   mbedtls_ssl_session_free((mbedtls_ssl_session *)ptr);
-  psync_free(ptr);
+  free(ptr);
 }
 
 static void save_session(ssl_connection_t *conn) {
@@ -281,7 +280,7 @@ static void save_session(ssl_connection_t *conn) {
   // them, therefore it is thread safe to add session upon connect
   memset(sess, 0, sizeof(mbedtls_ssl_session));
   if (mbedtls_ssl_get_session(&conn->ssl, sess))
-    psync_free(sess);
+    free(sess);
   else
     pcache_add(conn->cachekey, sess, PSYNC_SSL_SESSION_CACHE_TIMEOUT,
                     free_session, PSYNC_MAX_SSL_SESSIONS_PER_DOMAIN);
@@ -365,7 +364,7 @@ int pssl_connect(int sock, void **sslconn,
       debug(D_WARNING, "ssl_set_session failed");
     }
     mbedtls_ssl_session_free(sess);
-    psync_free(sess);
+    free(sess);
   }
 
   ret = mbedtls_ssl_handshake(&conn->ssl);
@@ -387,7 +386,7 @@ int pssl_connect(int sock, void **sslconn,
 err1:
   mbedtls_ssl_free(&conn->ssl);
 err0:
-  psync_free(conn);
+  free(conn);
   return PRINT_RETURN_CONST(PSYNC_SSL_FAIL);
 }
 
@@ -412,7 +411,7 @@ int pssl_connect_finish(void *sslconn, const char *hostname) {
     return PSYNC_SSL_NEED_FINISH;
 fail:
   mbedtls_ssl_free(&conn->ssl);
-  psync_free(conn);
+  free(conn);
   return PRINT_RETURN_CONST(PSYNC_SSL_FAIL);
 }
 
@@ -431,7 +430,7 @@ int pssl_shutdown(void *sslconn) {
     return PSYNC_SSL_NEED_FINISH;
 noshutdown:
   mbedtls_ssl_free(&conn->ssl);
-  psync_free(conn);
+  free(conn);
   return PSYNC_SSL_SUCCESS;
 }
 
@@ -439,7 +438,7 @@ void pssl_free(void *sslconn) {
   ssl_connection_t *conn;
   conn = (ssl_connection_t *)sslconn;
   mbedtls_ssl_free(&conn->ssl);
-  psync_free(conn);
+  free(conn);
 }
 
 int pssl_pendingdata(void *sslconn) {
@@ -485,7 +484,7 @@ psync_rsa_t pssl_gen_rsa(int bits) {
   if (mbedtls_rsa_gen_key(ctx, rng_get, &rng, bits,
                           65537)) {
     mbedtls_rsa_free(ctx);
-    psync_free(ctx);
+    free(ctx);
     return PSYNC_INVALID_RSA;
   } else
     return ctx;
@@ -493,7 +492,7 @@ psync_rsa_t pssl_gen_rsa(int bits) {
 
 void pssl_free_rsa(psync_rsa_t rsa) {
   mbedtls_rsa_free(rsa);
-  psync_free(rsa);
+  free(rsa);
 }
 
 psync_rsa_publickey_t prsa_get_public(psync_rsa_t rsa) {
@@ -519,7 +518,7 @@ psync_rsa_privatekey_t prsa_get_private(psync_rsa_t rsa) {
 
   if (unlikely(mbedtls_rsa_copy(ctx, rsa))) {
     mbedtls_rsa_free(ctx);
-    psync_free(ctx);
+    free(ctx);
     return PSYNC_INVALID_RSA;
   } else
     return ctx;
@@ -545,7 +544,7 @@ prsa_public_to_binary(psync_rsa_publickey_t rsa) {
   if (len <= 0)
     return PSYNC_INVALID_BIN_RSA;
   ret =
-      pmemlock_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
+      malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   memcpy(ret->data, buff + sizeof(buff) - len, len);
   return ret;
@@ -566,7 +565,7 @@ prsa_private_to_binary(psync_rsa_privatekey_t rsa) {
   if (len <= 0)
     return PSYNC_INVALID_BIN_RSA;
   ret =
-      pmemlock_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
+      malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   memcpy(ret->data, buff + sizeof(buff) - len, len);
   putil_wipe(buff + sizeof(buff) - len, len);
@@ -593,7 +592,7 @@ psync_rsa_publickey_t prsa_load_public(const unsigned char *keydata,
   if (unlikely(ret)) {
     debug(D_WARNING, "rsa_copy failed with code %d", ret);
     mbedtls_rsa_free(rsa);
-    psync_free(rsa);
+    free(rsa);
     return PSYNC_INVALID_RSA;
   } else {
     mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
@@ -648,7 +647,7 @@ psync_rsa_privatekey_t prsa_load_private(const unsigned char *keydata, size_t ke
   if (unlikely(ret)) {
     debug(D_WARNING, "rsa_copy failed with code %d", ret);
     mbedtls_rsa_free(rsa);
-    psync_free(rsa);
+    free(rsa);
     return PSYNC_INVALID_RSA;
   } else {
     mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
@@ -670,7 +669,7 @@ psync_symmetric_key_t
 psymkey_generate(const char *password, size_t keylen,
                                       const unsigned char *salt, size_t saltlen,
                                       size_t iterations) {
-  psync_symmetric_key_t key = (psync_symmetric_key_t)pmemlock_malloc(
+  psync_symmetric_key_t key = (psync_symmetric_key_t)malloc(
       keylen + offsetof(psync_symmetric_key_struct_t, key));
   mbedtls_md_context_t ctx;
   mbedtls_md_init(&ctx);
@@ -699,7 +698,7 @@ char *psymkey_derive(const char *username,
     else
       usercopy[i] = '*';
   psync_sha512(usercopy, userlen, usersha512);
-  psync_free(usercopy);
+  free(usercopy);
   mbedtls_md_init(&ctx);
   mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1);
   const mbedtls_md_info_t *md_info = mbedtls_md_info_from_ctx(&ctx);
@@ -718,12 +717,12 @@ prsa_encrypt_data(psync_rsa_publickey_t rsa, const unsigned char *data,
   int code;
   size_t rsalen = mbedtls_rsa_get_len(rsa);
 
-  ret = (psync_encrypted_symmetric_key_t)psync_malloc(
+  ret = (psync_encrypted_symmetric_key_t)malloc(
       offsetof(psync_encrypted_data_struct_t, data) + rsalen);
   if ((code = mbedtls_rsa_rsaes_oaep_encrypt(
            rsa, rng_get, &rng,
            NULL, 0, datalen, data, ret->data))) {
-    psync_free(ret);
+    free(ret);
     debug(
         D_WARNING,
         "rsa_rsaes_oaep_encrypt failed with error=%d, datalen=%lu, rsasize=%d",
@@ -745,7 +744,7 @@ psync_symmetric_key_t prsa_decrypt_data(psync_rsa_privatekey_t rsa,
                                      &rng, NULL,
                                      0, &len, data, buff, sizeof(buff)))
     return PSYNC_INVALID_SYM_KEY;
-  ret = (psync_symmetric_key_t)pmemlock_malloc(
+  ret = (psync_symmetric_key_t)malloc(
       offsetof(psync_symmetric_key_struct_t, key) + len);
   ret->keylen = len;
   memcpy(ret->key, buff, len);
@@ -775,7 +774,7 @@ paes_create_encoder(psync_symmetric_key_t key) {
 
 void paes_free_encoder(psync_aes256_encoder aes) {
   putil_wipe(aes, sizeof(mbedtls_aes_context));
-  psync_free(aes);
+  free(aes);
 }
 
 psync_aes256_encoder
@@ -789,7 +788,7 @@ paes_create_decoder(psync_symmetric_key_t key) {
 
 void paes_free_decoder(psync_aes256_encoder aes) {
   putil_wipe(aes, sizeof(mbedtls_aes_context));
-  psync_free(aes);
+  free(aes);
 }
 
 psync_rsa_signature_t
@@ -799,7 +798,7 @@ prsa_sign_sha256_hash(psync_rsa_privatekey_t rsa,
   int padding, hash_id;
   size_t rsalen = mbedtls_rsa_get_len(rsa);
 
-  ret = (psync_rsa_signature_t)psync_malloc(
+  ret = (psync_rsa_signature_t)malloc(
       offsetof(psync_symmetric_key_struct_t, key) + rsalen);
   if (!ret)
     return (psync_rsa_signature_t)(void *)PERROR_NO_MEMORY;
