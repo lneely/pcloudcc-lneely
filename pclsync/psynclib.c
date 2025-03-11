@@ -99,10 +99,6 @@ typedef struct {
 
 PSYNC_THREAD const char *psync_thread_name = "no name";
 
-static psync_malloc_t psync_real_malloc = malloc;
-static psync_realloc_t psync_real_realloc = realloc;
-static psync_free_t psync_real_free = free;
-
 const char *psync_database = NULL;
 
 static int psync_libstate = 0;
@@ -127,55 +123,10 @@ static inline int psync_status_is_offline() {
     return PSYNC_INVALID_SYNCID;                                               \
   } while (0)
 
-PSYNC_NOINLINE void *psync_emergency_malloc(size_t size) {
-  void *ret;
-  debug(D_WARNING, "could not allocate %lu bytes", size);
-  psync_try_free_memory();
-  ret = psync_real_malloc(size);
-  if (likely(ret))
-#if IS_DEBUG
-    return memset(ret, 0xfa, size);
-#else
-    return ret;
-#endif
-  else {
-    debug(
-        D_CRITICAL,
-        "could not allocate %lu bytes even after freeing some memory, aborting",
-        size);
-    abort();
-    return NULL;
-  }
-}
-
-PSYNC_NOINLINE void *psync_emergency_realloc(void *ptr, size_t size) {
-  void *ret;
-  debug(D_WARNING, "could not reallocate %lu bytes", size);
-  psync_try_free_memory();
-  ret = psync_real_realloc(ptr, size);
-  if (likely(ret))
-    return ret;
-  else {
-    debug(D_CRITICAL,
-          "could not reallocate %lu bytes even after freeing some memory, "
-          "aborting",
-          size);
-    abort();
-    return NULL;
-  }
-}
-
 uint32_t psync_get_last_error() { return psync_error; }
 
 void psync_set_database_path(const char *databasepath) {
   psync_database = psync_strdup(databasepath);
-}
-
-void psync_set_alloc(psync_malloc_t malloc_call, psync_realloc_t realloc_call,
-                     psync_free_t free_call) {
-  psync_real_malloc = malloc_call;
-  psync_real_realloc = realloc_call;
-  psync_real_free = free_call;
 }
 
 static void psync_stop_crypto_on_sleep() {
