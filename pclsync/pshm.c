@@ -11,7 +11,7 @@
 #include "ppath.h"
 #include "plibs.h"
 
-key_t pshm_get_key() {
+static key_t get_key() {
     char path[PATH_MAX];
     char *home;
     
@@ -25,10 +25,10 @@ key_t pshm_get_key() {
     return ftok(path, 'A');
 }
 
-int pshm_getid() {
+static int get_id() {
 	key_t key;
 
-	key = pshm_get_key();
+	key = get_key();
 	if(key == -1) {
 		debug(D_ERROR, "failed to get ipc key");
 		return -1;
@@ -43,7 +43,7 @@ bool pshm_read(void **data, size_t *datasz) {
     int flag;
     char *dataArea;
 
-    shmid = pshm_getid();
+    shmid = get_id();
     if (shmid == -1) {
         debug(D_ERROR, "Failed to get shared memory ID");
         return false;
@@ -91,7 +91,7 @@ void pshm_write(const void *data, size_t datasz) {
         return;
     }
 
-    shmid = pshm_getid();
+    shmid = get_id();
     if (shmid == -1) {
         debug(D_ERROR, "Failed to get shared memory ID");
         return;
@@ -125,5 +125,5 @@ void pshm_write(const void *data, size_t datasz) {
 }
 
 int pshm_cleanup() {
-	return shmctl(pshm_getid(), IPC_RMID, NULL);
+	return shmctl(get_id(), IPC_RMID, NULL);
 }
