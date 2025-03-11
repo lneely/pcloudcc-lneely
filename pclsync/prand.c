@@ -130,7 +130,7 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
     psync_lhash_update(&hctx, home, strlen(home));
     if (likely_log(!stat(home, &st)))
       psync_lhash_update(&hctx, &st, sizeof(st));
-    psync_free(home);
+    free(home);
   }
   if (!fast) {
     debug(D_NOTICE, "getting seed from database");

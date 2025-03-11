@@ -24,7 +24,7 @@ static void *thread_entry(void *data) {
     ((thread0_run)td->run)();
   }
   
-  psync_free(data);
+  free(data);
   return NULL;
 }
 

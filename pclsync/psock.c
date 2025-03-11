@@ -275,7 +275,7 @@ static void cb_connect_res(void *h, void *ptr) {
   res = (struct addrinfo *)ptr;
   sock = connect_res(res);
   r = psync_task_complete(h, (void *)(uintptr_t)sock);
-  psync_free(res);
+  free(res);
   if (r && sock != INVALID_SOCKET)
     close(sock);
 }
@@ -380,7 +380,7 @@ int psock_try_write_buffer(psock_t *sock) {
     while ((b = sock->buffer)) {
       if (b->roffset == b->woffset) {
         sock->buffer = b->next;
-        psync_free(b);
+        free(b);
         continue;
       }
       if (sock->ssl) {
@@ -502,7 +502,7 @@ void psock_close(psock_t *sock) {
       }
   psock_clear_write_buffered(sock);
   close(sock->sock);
-  psync_free(sock);
+  free(sock);
 }
 
 void psock_close_bad(psock_t *sock) {
@@ -510,7 +510,7 @@ void psock_close_bad(psock_t *sock) {
     pssl_free(sock->ssl);
   psock_clear_write_buffered(sock);
   close(sock->sock);
-  psync_free(sock);
+  free(sock);
 }
 
 void psock_set_write_buffered(psock_t *sock) {

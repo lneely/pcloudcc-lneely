@@ -198,11 +198,11 @@ static int is_downloading(const unsigned char *hashstart,
     if (!memcmp(hashhex, genhash, PSYNC_HASH_DIGEST_HEXLEN)) {
       if (realhash)
         memcpy(realhash, hashsource, PSYNC_HASH_DIGEST_HEXLEN);
-      psync_free(hashes);
+      free(hashes);
       return 1;
     }
   }
-  psync_free(hashes);
+  free(hashes);
   return 0;
 }
 
@@ -312,7 +312,7 @@ static int check_token(char *token, uint32_t tlen, unsigned char *key,
   }
   psync_apipool_release(api);
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
-  psync_free(res);
+  free(res);
   return result ? 0 : 1;
 }
 
@@ -332,7 +332,7 @@ static void psync_p2p_tcphandler(void *ptr) {
   uint32_t keylen, enctype;
   unsigned char hashhex[PSYNC_HASH_DIGEST_HEXLEN], buff[4096];
   sock = *((int *)ptr);
-  psync_free(ptr);
+  free(ptr);
   debug(D_NOTICE, "got tcp connection");
   if (unlikely_log(socket_read_all(sock, &packet, sizeof(packet))))
     goto err0;
@@ -349,20 +349,20 @@ static void psync_p2p_tcphandler(void *ptr) {
   binpubrsa = pssl_alloc_binary_rsa(packet.keylen);
   if (unlikely_log(
           socket_read_all(sock, binpubrsa->data, binpubrsa->datalen))) {
-    psync_free(binpubrsa);
+    free(binpubrsa);
     goto err0;
   }
   token = psync_new_cnt(char, packet.tokenlen);
   if (unlikely_log(socket_read_all(sock, token, packet.tokenlen)) ||
       unlikely_log(!check_token(token, packet.tokenlen, binpubrsa->data,
                                 packet.keylen, hashhex))) {
-    psync_free(binpubrsa);
-    psync_free(token);
+    free(binpubrsa);
+    free(token);
     goto err0;
   }
-  psync_free(token);
+  free(token);
   pubrsa = prsa_binary_to_public(binpubrsa);
-  psync_free(binpubrsa);
+  free(binpubrsa);
   if (unlikely_log(pubrsa == PSYNC_INVALID_RSA))
     goto err0;
   localpath = pfolder_lpath_lfile(localfileid, NULL);
@@ -370,7 +370,7 @@ static void psync_p2p_tcphandler(void *ptr) {
     goto err0;
   fd = pfile_open(localpath, O_RDONLY, 0);
   debug(D_NOTICE, "sending file %s to peer", localpath);
-  psync_free(localpath);
+  free(localpath);
   if (fd == INVALID_HANDLE_VALUE) {
     debug(D_WARNING, "could not open local file %lu",
           (unsigned long)localfileid);
@@ -389,13 +389,13 @@ static void psync_p2p_tcphandler(void *ptr) {
           socket_write_all(sock, &enctype, sizeof(enctype)) ||
           socket_write_all(sock, encaeskey->data, encaeskey->datalen))) {
     if (encaeskey != PSYNC_INVALID_ENC_SYM_KEY)
-      psync_free(encaeskey);
+      free(encaeskey);
     if (encoder != PSYNC_CRYPTO_INVALID_ENCODER)
       pcrypto_ctr_encdec_free(encoder);
     pfile_close(fd);
     goto err0;
   }
-  psync_free(encaeskey);
+  free(encaeskey);
   off = 0;
   while (off < packet.filesize) {
     if (packet.filesize - off < sizeof(buff))
@@ -511,7 +511,7 @@ static void psync_p2p_thread() {
       inconn = psync_new(int);
       *inconn = accept(tcpsock, NULL, NULL);
       if (unlikely_log(*inconn == INVALID_SOCKET))
-        psync_free(inconn);
+        free(inconn);
       else
         prun_thread1("p2p tcp", psync_p2p_tcphandler, inconn);
     }
@@ -635,14 +635,14 @@ static int psync_p2p_get_download_token(psync_fileid_t fileid,
   }
   psync_apipool_release(api);
   if (unlikely_log(papi_find_result2(res, "result", PARAM_NUM)->num != 0)) {
-    psync_free(res);
+    free(res);
     return PSYNC_NET_PERMFAIL;
   }
   ctoken = papi_find_result2(res, "token", PARAM_STR);
   *token = psync_malloc(ctoken->length + 1);
   memcpy(*token, ctoken->str, ctoken->length + 1);
   *tlen = ctoken->length;
-  psync_free(res);
+  free(res);
   return PSYNC_NET_OK;
 }
 
@@ -678,10 +678,10 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
                         &privkey, &ekey)) == PSYNC_INVALID_SYM_KEY)) {
     // unlikely_log((key=psymkey_decrypt(&psync_rsa_private,
     // &ekey))==PSYNC_INVALID_SYM_KEY)){
-    psync_free(ekey);
+    free(ekey);
     return PSYNC_NET_TEMPFAIL;
   }
-  psync_free(ekey);
+  free(ekey);
   decoder = pcrypto_ctr_encdec_create(key);
   psymkey_free(key);
   if (decoder == PSYNC_CRYPTO_INVALID_ENCODER)
@@ -835,8 +835,8 @@ int pp2p_check_download(psync_fileid_t fileid,
   for (i = 0; i < il->interfacecnt; i++)
     if (sockets[i] != INVALID_SOCKET)
       close(sockets[i]);
-  psync_free(il);
-  psync_free(sockets);
+  free(il);
+  free(sockets);
   if (bresp == P2P_RESP_NOPE)
     goto err_perm2;
   else if (bresp == P2P_RESP_WAIT) {
@@ -890,24 +890,24 @@ int pp2p_check_download(psync_fileid_t fileid,
     debug(D_WARNING, "writing to socket failed");
     goto err_temp3;
   }
-  psync_free(token);
+  free(token);
   sret = psync_p2p_download(sock, fileid, filehashhex, fsize, filename);
   close(sock);
   return sret;
 err_perm3:
-  psync_free(token);
+  free(token);
   goto err_perm2;
 err_perm:
   for (i = 0; i < il->interfacecnt; i++)
     if (sockets[i] != INVALID_SOCKET)
       close(sockets[i]);
-  psync_free(il);
-  psync_free(sockets);
+  free(il);
+  free(sockets);
 err_perm2:
   return PSYNC_NET_PERMFAIL;
 err_temp3:
   close(sock);
-  psync_free(token);
+  free(token);
 err_temp2:
   return PSYNC_NET_TEMPFAIL;
 }

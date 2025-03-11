@@ -122,8 +122,8 @@ static void add_dir_scan(localnotify_dir *dir, const char *path) {
           add_dir_scan(dir, cpath);
       }
     }
-    psync_free(entry);
-    psync_free(cpath);
+    free(entry);
+    free(cpath);
     closedir(dh);
   }
 }
@@ -165,7 +165,7 @@ static void add_syncid(psync_syncid_t syncid) {
 err2:
   close(dir->inotifyfd);
 err:
-  psync_free(dir);
+  free(dir);
 }
 
 static void del_syncid(psync_syncid_t syncid) {
@@ -180,13 +180,13 @@ static void del_syncid(psync_syncid_t syncid) {
       while (wch) {
         next = wch->next;
         inotify_rm_watch(dir->inotifyfd, wch->watchid);
-        psync_free(wch);
+        free(wch);
         wch = next;
       }
     }
     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, dir->inotifyfd, NULL);
     close(dir->inotifyfd);
-    psync_free(dir);
+    free(dir);
     return;
   }
 }
@@ -237,7 +237,7 @@ static uint32_t process_notification(localnotify_dir *dir) {
         if (wch->watchid == ev.wd) {
           *pwch = wch->next;
           inotify_rm_watch(dir->inotifyfd, wch->watchid);
-          psync_free(wch);
+          free(wch);
           break;
         } else {
           pwch = &wch->next;

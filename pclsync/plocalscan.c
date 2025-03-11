@@ -189,7 +189,7 @@ static void scanner_set_syncs_to_list(psync_list *lst,
     psync_list_add_tail(lst_deviceid_full, &l_full_deviceid->list);
   }
   psync_sql_free_result(res);
-  psync_free(syncmp);
+  free(syncmp);
 }
 
 static void add_ignored_dir(const char *path) {
@@ -268,9 +268,9 @@ static void reload_ignored_folders() {
     }
     if (dir)
       add_ignored_dir(dir);
-    psync_free(dir);
+    free(dir);
   }
-  psync_free(home);
+  free(home);
 }
 
 static int is_path_to_ignore(uint64_t deviceid, uint64_t inode) {
@@ -564,7 +564,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
     add_deleted_element(fdb, folderid, localfolderid, syncid, synctype);
     ldb = ldb->next;
   }
-  psync_list_for_each_element_call(&dblist, sync_folderlist, list, psync_free);
+  psync_list_for_each_element_call(&dblist, sync_folderlist, list, free);
   if (localsleepperfolder) {
     psys_sleep_milliseconds(localsleepperfolder);
     if (psync_current_time - starttime >=
@@ -577,11 +577,10 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
     subpath = psync_strcat(localpath, "/", l->name, NULL);
     scanner_scan_folder(subpath, l->remoteid, l->localid, syncid, synctype,
                         deviceid);
-    psync_free(subpath);
+    free(subpath);
   }
 
-  psync_list_for_each_element_call(&disklist, sync_folderlist, list,
-                                   psync_free);
+  psync_list_for_each_element_call(&disklist, sync_folderlist, list, free);
 }
 
 static int compare_sizeinodemtime(const psync_list *l1, const psync_list *l2) {
@@ -814,7 +813,7 @@ static void scan_created_folder(sync_folderlist *fl) {
           localpath, (unsigned long)fl->localid, fl->name);
     scanner_scan_folder(localpath, 0, fl->localid, fl->syncid, fl->synctype,
                         fl->deviceid);
-    psync_free(localpath);
+    free(localpath);
   }
 }
 
@@ -1043,9 +1042,8 @@ restart:
       break;
     }
   }
-  psync_list_for_each_element_call(&slist, sync_list, list, psync_free);
-  psync_list_for_each_element_call(&slist_full_deviceid, sync_list, list,
-                                   psync_free);
+  psync_list_for_each_element_call(&slist, sync_list, list, free);
+  psync_list_for_each_element_call(&slist_full_deviceid, sync_list, list, free);
   w = 0;
 
   do {
@@ -1053,8 +1051,7 @@ restart:
     if (unlikely(restart_scan)) {
       pthread_mutex_unlock(&scan_mutex);
       for (i = 0; i < SCAN_LIST_CNT; i++)
-        psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list,
-                                         psync_free);
+        psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list, free);
       psys_sleep_milliseconds(restartsleep);
       if (restartsleep < 16000)
         restartsleep *= 2;
@@ -1080,11 +1077,9 @@ restart:
         w++;
         check_for_query_cnt();
       }
-      psync_list_for_each_element_call(&scan_lists[SCAN_LIST_RENFOLDERSROM],
-                                       sync_folderlist, list, psync_free);
+      psync_list_for_each_element_call(&scan_lists[SCAN_LIST_RENFOLDERSROM], sync_folderlist, list, free);
       psync_list_init(&scan_lists[SCAN_LIST_RENFOLDERSROM]);
-      psync_list_for_each_element_call(&scan_lists[SCAN_LIST_RENFOLDERSTO],
-                                       sync_folderlist, list, psync_free);
+      psync_list_for_each_element_call(&scan_lists[SCAN_LIST_RENFOLDERSTO], sync_folderlist, list, free);
       psync_list_init(&scan_lists[SCAN_LIST_RENFOLDERSTO]);
       psync_list_for_each_element(fl, &scan_lists[SCAN_LIST_NEWFOLDERS],
                                   sync_folderlist, list) {
@@ -1102,8 +1097,7 @@ restart:
       }
       psync_list_for_each_element_call(&newtmp, sync_folderlist, list,
                                        scan_created_folder);
-      psync_list_for_each_element_call(&newtmp, sync_folderlist, list,
-                                       psync_free);
+      psync_list_for_each_element_call(&newtmp, sync_folderlist, list, free);
     }
     if (changes) {
       i++;
@@ -1115,8 +1109,7 @@ restart:
   if (unlikely(restart_scan)) {
     pthread_mutex_unlock(&scan_mutex);
     for (i = 0; i < SCAN_LIST_CNT; i++)
-      psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list,
-                                       psync_free);
+      psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list, free);
     psys_sleep_milliseconds(restartsleep);
     if (restartsleep < 16000)
       restartsleep *= 2;
@@ -1172,8 +1165,7 @@ restart:
     pstatus_upload_recalc_async();
   }
   for (i = 0; i < SCAN_LIST_CNT; i++)
-    psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list,
-                                     psync_free);
+    psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list, free);
   if (movedfolders) {
     starttime = psync_current_time;
     restartsleep = 1000;
@@ -1300,7 +1292,7 @@ void psync_restat_sync_folders_del(psync_syncid_t syncid) {
   }
   if (to_del) {
     psync_list_del(&to_del->list);
-    psync_free(to_del);
+    free(to_del);
   }
   pthread_mutex_unlock(&restat_mutex);
 }

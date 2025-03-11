@@ -321,7 +321,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     ret->array = (struct _binresult **)*odata;
     *odata += sizeof(struct _binresult *) * cnt;
     memcpy(ret->array, arr, sizeof(struct _binresult *) * cnt);
-    psync_free(arr);
+    free(arr);
     return ret;
   } else if (type == RPARAM_HASH) {
     struct _hashpair *arr;
@@ -352,7 +352,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     ret->hash = (struct _hashpair *)*odata;
     *odata += sizeof(struct _hashpair) * cnt;
     memcpy(ret->hash, arr, sizeof(struct _hashpair) * cnt);
-    psync_free(arr);
+    free(arr);
     return ret;
   } else if (type == RPARAM_DATA) {
     ret = (binresult *)(*odata);
@@ -381,7 +381,7 @@ static binresult *parse_result(unsigned char *data, size_t datalen) {
   strings = psync_new_cnt(binresult *, strcnt);
   strcnt = 0;
   res = do_parse_result(&data, &datac, strings, &strcnt);
-  psync_free(strings);
+  free(strings);
   return res;
 }
 
@@ -398,12 +398,12 @@ binresult *papi_result(psock_t *sock) {
   data = (unsigned char *)psync_malloc(ressize);
 
   if (unlikely_log(psock_readall(sock, data, ressize) != ressize)) {
-    psync_free(data);
+    free(data);
     return NULL;
   }
 
   res = parse_result(data, ressize);
-  psync_free(data);
+  free(data);
 
   return res;
 }
@@ -418,11 +418,11 @@ binresult *papi_result_thread(psock_t *sock) {
   data = (unsigned char *)psync_malloc(ressize);
   if (unlikely_log(psock_readall_thread(sock, data, ressize) !=
                    ressize)) {
-    psync_free(data);
+    free(data);
     return NULL;
   }
   res = parse_result(data, ressize);
-  psync_free(data);
+  free(data);
   return res;
 }
 
@@ -435,7 +435,7 @@ void papi_rdr_alloc(async_result_reader *reader) {
 
 void papi_rdr_free(async_result_reader *reader) {
   if (reader->state == 1)
-    psync_free(reader->data);
+    free(reader->data);
 }
 
 int papi_result_async(psock_t *sock, async_result_reader *reader) {
@@ -447,7 +447,7 @@ again:
     return ASYNC_RES_NEEDMORE;
   else if (rd == PSYNC_SOCKET_ERROR || rd == 0) {
     if (reader->state == 1)
-      psync_free(reader->data);
+      free(reader->data);
     papi_rdr_alloc(reader);
     reader->result = NULL;
     return ASYNC_RES_READY;
@@ -463,7 +463,7 @@ again:
     } else {
       assert(reader->state == 1);
       reader->result = parse_result(reader->data, reader->respsize);
-      psync_free(reader->data);
+      free(reader->data);
       papi_rdr_alloc(reader);
       return ASYNC_RES_READY;
     }
@@ -543,16 +543,16 @@ binresult *papi_send(psock_t *sock, const char *command,
 
   if (readres & 2) {
     if (unlikely_log(psock_writeall_thread(sock, sdata, plen) != plen)) {
-      psync_free(sdata);
+      free(sdata);
       return NULL;
     }
   } else {
     if (unlikely_log(psock_writeall(sock, sdata, plen) != plen)) {
-      psync_free(sdata);
+      free(sdata);
       return NULL;
     }
   }
-  psync_free(sdata);
+  free(sdata);
   if (readres & 1) {
     return papi_result(sock);
   } else {

@@ -177,12 +177,12 @@ int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
   }
 
   if (ids1)
-    psync_free(ids1);
+    free(ids1);
   if (ids2)
-    psync_free(ids2);
+    free(ids2);
 
-  psync_free(bres);
-  psync_free(t);
+  free(bres);
+  free(t);
 
   return result;
 }
@@ -306,16 +306,16 @@ int do_psync_account_modifyshare(psync_shareid_t usrshrids[], uint32_t uperms[],
   }
 
   if (ids1)
-    psync_free(ids1);
+    free(ids1);
   if (ids2)
-    psync_free(ids2);
+    free(ids2);
   if (perms1)
-    psync_free(perms1);
+    free(perms1);
   if (perms2)
-    psync_free(perms2);
+    free(perms2);
 
-  psync_free(bres);
-  psync_free(t);
+  free(bres);
+  free(t);
 
   return result;
 }
@@ -357,7 +357,7 @@ void get_ba_member_email(uint64_t userid, char **email /*OUT*/,
 
     users = papi_find_result2(bres, "users", PARAM_ARRAY);
     if (!users->length) {
-      psync_free(bres);
+      free(bres);
       debug(D_WARNING, "Account_users returned empty result!\n");
       return;
     } else {
@@ -368,7 +368,7 @@ void get_ba_member_email(uint64_t userid, char **email /*OUT*/,
       fname = papi_find_result2(users->array[0], "firstname", PARAM_STR)->str;
       lname = papi_find_result2(users->array[0], "lastname", PARAM_STR)->str;
     }
-    psync_free(bres);
+    free(bres);
 
     if (*length) {
       psync_sql_res *q;
@@ -422,7 +422,7 @@ void get_ba_team_name(uint64_t teamid, char **name /*OUT*/,
   // debug(D_NOTICE, "Result contains %d teams\n", users->length);
 
   if (!teams->length) {
-    psync_free(bres);
+    free(bres);
     debug(D_WARNING, "Account_teams returned empty result!\n");
     return;
   } else {
@@ -431,7 +431,7 @@ void get_ba_team_name(uint64_t teamid, char **name /*OUT*/,
     *length = strlen(teamret);
     *name = psync_strndup(teamret, *length);
   }
-  psync_free(bres);
+  free(bres);
 
   psync_sql_res *q;
   q = psync_sql_prep_statement(
@@ -515,7 +515,7 @@ void cache_account_emails() {
     psync_sql_commit_transaction();
   }
 end_close:
-  psync_free(bres);
+  free(bres);
 }
 
 void cache_account_teams() {
@@ -549,7 +549,7 @@ void cache_account_teams() {
   // debug(D_NOTICE, "Result contains %d teams\n", users->length);
 
   if (!users->length) {
-    psync_free(bres);
+    free(bres);
     debug(D_WARNING, "Account_teams returned empty result!\n");
     return;
   } else {
@@ -577,7 +577,7 @@ void cache_account_teams() {
     }
     psync_sql_commit_transaction();
   }
-  psync_free(bres);
+  free(bres);
   return;
 }
 
@@ -622,7 +622,7 @@ void cache_ba_my_teams() {
   users = papi_find_result2(bres, "users", PARAM_ARRAY);
 
   if (!users->length) {
-    psync_free(bres);
+    free(bres);
     debug(D_WARNING, "Account_users returned empty result!\n");
     return;
   }
@@ -634,7 +634,7 @@ void cache_ba_my_teams() {
   teams = papi_find_result2(user, "teams", PARAM_ARRAY);
   for (i = 0; i < teams->length; i++)
     cache_my_team(teams->array[i]);
-  psync_free(bres);
+  free(bres);
   psync_sql_unlock();
 }
 
@@ -642,7 +642,7 @@ int api_error_result(binresult *res) {
   uint64_t result;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
-    psync_free(res);
+    free(res);
     psync_process_api_error(result);
     return 1;
   }
@@ -748,13 +748,13 @@ static psync_folderid_t create_index_folder(const char *path) {
     folderid = pfolder_id(buff);
     if ((folderid != PSYNC_INVALID_FOLDERID) &&
         check_write_permissions(folderid)) {
-      psync_free(buff);
+      free(buff);
       break;
     }
     ++ind;
     if (err)
-      psync_free(err);
-    psync_free(buff);
+      free(err);
+    free(buff);
   }
   return folderid;
 }
@@ -765,7 +765,7 @@ psync_folderid_t psync_check_and_create_folder(const char *path) {
   if (folderid == PSYNC_INVALID_FOLDERID) {
     if (psync_create_remote_folder_by_path(path, &err) != 0) {
       debug(D_NOTICE, "Unable to create folder %s error is %s.", path, err);
-      psync_free(err);
+      free(err);
       folderid = create_index_folder(path);
     }
   } else if (!check_write_permissions(folderid))

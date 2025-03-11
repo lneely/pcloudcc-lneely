@@ -184,7 +184,7 @@ static int sort_comp_tuple_rev(const void *p1, const void *p2) {
 static void free_folder(scan_folder *f) {
   psync_list_for_each_element_call(&f->subfolders, scan_folder, nextfolder,
                                    free_folder);
-  psync_free(f);
+  free(f);
 }
 
 psuggested_folders_t *psuggest_scan_folder(const char *path) {
@@ -259,12 +259,11 @@ psuggested_folders_t *psuggest_scan_folder(const char *path) {
     ret->entries[i].description = str;
     memcpy(str, descs[i], descslen[i]);
     str += descslen[i];
-    psync_free(descs[i]);
+    free(descs[i]);
     debug(D_NOTICE, "suggesting %s (%s, %s)", ret->entries[i].localpath,
           ret->entries[i].name, ret->entries[i].description);
   }
-  psync_list_for_each_element_call(&suggestions, suggested_folder, list,
-                                   psync_free);
+  psync_list_for_each_element_call(&suggestions, suggested_folder, list, free);
   free_folder(f);
   return ret;
 }

@@ -271,7 +271,7 @@ static int mbed_write(void *ptr, const unsigned char *buf, size_t len) {
 
 static void free_session(void *ptr) {
   mbedtls_ssl_session_free((mbedtls_ssl_session *)ptr);
-  psync_free(ptr);
+  free(ptr);
 }
 
 static void save_session(ssl_connection_t *conn) {
@@ -281,7 +281,7 @@ static void save_session(ssl_connection_t *conn) {
   // them, therefore it is thread safe to add session upon connect
   memset(sess, 0, sizeof(mbedtls_ssl_session));
   if (mbedtls_ssl_get_session(&conn->ssl, sess))
-    psync_free(sess);
+    free(sess);
   else
     pcache_add(conn->cachekey, sess, PSYNC_SSL_SESSION_CACHE_TIMEOUT,
                     free_session, PSYNC_MAX_SSL_SESSIONS_PER_DOMAIN);
@@ -365,7 +365,7 @@ int pssl_connect(int sock, void **sslconn,
       debug(D_WARNING, "ssl_set_session failed");
     }
     mbedtls_ssl_session_free(sess);
-    psync_free(sess);
+    free(sess);
   }
 
   ret = mbedtls_ssl_handshake(&conn->ssl);
@@ -387,7 +387,7 @@ int pssl_connect(int sock, void **sslconn,
 err1:
   mbedtls_ssl_free(&conn->ssl);
 err0:
-  psync_free(conn);
+  free(conn);
   return PRINT_RETURN_CONST(PSYNC_SSL_FAIL);
 }
 
@@ -412,7 +412,7 @@ int pssl_connect_finish(void *sslconn, const char *hostname) {
     return PSYNC_SSL_NEED_FINISH;
 fail:
   mbedtls_ssl_free(&conn->ssl);
-  psync_free(conn);
+  free(conn);
   return PRINT_RETURN_CONST(PSYNC_SSL_FAIL);
 }
 
@@ -431,7 +431,7 @@ int pssl_shutdown(void *sslconn) {
     return PSYNC_SSL_NEED_FINISH;
 noshutdown:
   mbedtls_ssl_free(&conn->ssl);
-  psync_free(conn);
+  free(conn);
   return PSYNC_SSL_SUCCESS;
 }
 
@@ -439,7 +439,7 @@ void pssl_free(void *sslconn) {
   ssl_connection_t *conn;
   conn = (ssl_connection_t *)sslconn;
   mbedtls_ssl_free(&conn->ssl);
-  psync_free(conn);
+  free(conn);
 }
 
 int pssl_pendingdata(void *sslconn) {
@@ -485,7 +485,7 @@ psync_rsa_t pssl_gen_rsa(int bits) {
   if (mbedtls_rsa_gen_key(ctx, rng_get, &rng, bits,
                           65537)) {
     mbedtls_rsa_free(ctx);
-    psync_free(ctx);
+    free(ctx);
     return PSYNC_INVALID_RSA;
   } else
     return ctx;
@@ -493,7 +493,7 @@ psync_rsa_t pssl_gen_rsa(int bits) {
 
 void pssl_free_rsa(psync_rsa_t rsa) {
   mbedtls_rsa_free(rsa);
-  psync_free(rsa);
+  free(rsa);
 }
 
 psync_rsa_publickey_t prsa_get_public(psync_rsa_t rsa) {
@@ -519,7 +519,7 @@ psync_rsa_privatekey_t prsa_get_private(psync_rsa_t rsa) {
 
   if (unlikely(mbedtls_rsa_copy(ctx, rsa))) {
     mbedtls_rsa_free(ctx);
-    psync_free(ctx);
+    free(ctx);
     return PSYNC_INVALID_RSA;
   } else
     return ctx;
@@ -593,7 +593,7 @@ psync_rsa_publickey_t prsa_load_public(const unsigned char *keydata,
   if (unlikely(ret)) {
     debug(D_WARNING, "rsa_copy failed with code %d", ret);
     mbedtls_rsa_free(rsa);
-    psync_free(rsa);
+    free(rsa);
     return PSYNC_INVALID_RSA;
   } else {
     mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
@@ -648,7 +648,7 @@ psync_rsa_privatekey_t prsa_load_private(const unsigned char *keydata, size_t ke
   if (unlikely(ret)) {
     debug(D_WARNING, "rsa_copy failed with code %d", ret);
     mbedtls_rsa_free(rsa);
-    psync_free(rsa);
+    free(rsa);
     return PSYNC_INVALID_RSA;
   } else {
     mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
@@ -699,7 +699,7 @@ char *psymkey_derive(const char *username,
     else
       usercopy[i] = '*';
   psync_sha512(usercopy, userlen, usersha512);
-  psync_free(usercopy);
+  free(usercopy);
   mbedtls_md_init(&ctx);
   mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1);
   const mbedtls_md_info_t *md_info = mbedtls_md_info_from_ctx(&ctx);
@@ -723,7 +723,7 @@ prsa_encrypt_data(psync_rsa_publickey_t rsa, const unsigned char *data,
   if ((code = mbedtls_rsa_rsaes_oaep_encrypt(
            rsa, rng_get, &rng,
            NULL, 0, datalen, data, ret->data))) {
-    psync_free(ret);
+    free(ret);
     debug(
         D_WARNING,
         "rsa_rsaes_oaep_encrypt failed with error=%d, datalen=%lu, rsasize=%d",
@@ -775,7 +775,7 @@ paes_create_encoder(psync_symmetric_key_t key) {
 
 void paes_free_encoder(psync_aes256_encoder aes) {
   putil_wipe(aes, sizeof(mbedtls_aes_context));
-  psync_free(aes);
+  free(aes);
 }
 
 psync_aes256_encoder
@@ -789,7 +789,7 @@ paes_create_decoder(psync_symmetric_key_t key) {
 
 void paes_free_decoder(psync_aes256_encoder aes) {
   putil_wipe(aes, sizeof(mbedtls_aes_context));
-  psync_free(aes);
+  free(aes);
 }
 
 psync_rsa_signature_t

@@ -68,7 +68,7 @@ static void ratelimit_timer(psync_timer_t timer, void *ptr) {
     prun_thread(name, call);
   } else {
     ptimer_stop(timer);
-    psync_free(node);
+    free(node);
   }
 }
 

@@ -123,11 +123,11 @@ void psync_settings_reset() {
   home = ppath_home();
   defaultfs = psync_strcat(home, "/",
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
-  psync_free(home);
+  free(home);
   home = ppath_pcloud();
   defaultcache = psync_strcat(home, "/",
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
-  psync_free(home);
+  free(home);
   for (i = 0; i < ARRAY_SIZE(settings); i++)
     if (settings[i].type == PSYNC_TSTRING)
       psync_free_after_sec(settings[i].str, 60);
@@ -165,8 +165,8 @@ void psync_settings_reset() {
         settings[i].fix_callback(&settings[i].boolean);
     }
   }
-  psync_free(defaultfs);
-  psync_free(defaultcache);
+  free(defaultfs);
+  free(defaultcache);
 }
 
 void psync_settings_init() {
@@ -178,11 +178,11 @@ void psync_settings_init() {
   home = ppath_home();
   defaultfs = psync_strcat(home, "/",
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
-  psync_free(home);
+  free(home);
   home = ppath_pcloud();
   defaultcache = psync_strcat(home, "/",
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
-  psync_free(home);
+  free(home);
   settings[_PS(ignorepatterns)].str = PSYNC_IGNORE_PATTERNS_DEFAULT;
   settings[_PS(fsroot)].str = defaultfs;
   settings[_PS(fscachepath)].str = defaultcache;
@@ -209,15 +209,15 @@ void psync_settings_init() {
         settings[i].fix_callback(&settings[i].boolean);
     }
   }
-  psync_free(defaultfs);
-  psync_free(defaultcache);
+  free(defaultfs);
+  free(defaultcache);
   res = psync_sql_query("SELECT id, value FROM setting");
   while ((row = psync_sql_fetch_rowstr(res))) {
     name = row[0];
     for (i = 0; i < ARRAY_SIZE(settings); i++)
       if (!strcmp(name, settings[i].name)) {
         if (settings[i].type == PSYNC_TSTRING) {
-          psync_free(settings[i].str);
+          free(settings[i].str);
           settings[i].str = psync_strdup(row[1]);
           if (settings[i].fix_callback)
             settings[i].fix_callback(&settings[i].str);

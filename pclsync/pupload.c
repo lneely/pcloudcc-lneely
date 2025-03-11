@@ -174,7 +174,7 @@ static int64_t do_run_command_res(const char *cmd, size_t cmdlen,
   if (unlikely(!res))
     return -1;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
-  psync_free(res);
+  free(res);
   if (unlikely(result)) {
     psync_process_api_error(result);
     debug(D_WARNING, "command %s returned code %u", cmd, (unsigned)result);
@@ -240,7 +240,7 @@ static int task_createfolder(psync_syncid_t syncid,
             (unsigned)result, papi_find_result2(bres, "error", PARAM_STR)->str,
             (unsigned long)parentfolderid, name);
       psync_process_api_error(result);
-      psync_free(bres);
+      free(bres);
       if (psync_handle_api_result(result) == PSYNC_NET_TEMPFAIL)
         return -1;
       else
@@ -268,7 +268,7 @@ static int task_createfolder(psync_syncid_t syncid,
     pdiff_unlock();
     if (papi_find_result2(bres, "created", PARAM_BOOL)->num)
       pdiff_wake();
-    psync_free(bres);
+    free(bres);
     return ret;
   }
 }
@@ -375,7 +375,7 @@ int handle_api_errors(sync_err_struct *err_struct) {
 
     ptevent_process(event_data);
 
-    psync_free(event_data);
+    free(event_data);
     break;
 
   default:
@@ -432,7 +432,7 @@ static int task_renameremotefolder(psync_folderid_t folderid,
     ret = handle_api_errors(&err_struct);
   }
 
-  psync_free(res);
+  free(res);
 
   return ret;
 }
@@ -505,7 +505,7 @@ static void set_local_file_conflicted(psync_fileid_t localfileid,
     psync_sql_rollback_transaction();
   else
     psync_sql_commit_transaction();
-  psync_free(newpath);
+  free(newpath);
 }
 
 static int copy_file(psync_fileid_t fileid, uint64_t hash,
@@ -535,7 +535,7 @@ static int copy_file(psync_fileid_t fileid, uint64_t hash,
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
     pdiff_unlock();
-    psync_free(res);
+    free(res);
     debug(D_WARNING, "command copyfile returned code %u", (unsigned)result);
     psync_process_api_error(result);
     return 0;
@@ -545,7 +545,7 @@ static int copy_file(psync_fileid_t fileid, uint64_t hash,
                            papi_find_result2(meta, "fileid", PARAM_NUM)->num,
                            papi_find_result2(meta, "hash", PARAM_NUM)->num);
   pdiff_unlock();
-  psync_free(res);
+  free(res);
   pdiff_wake();
   return 1;
 }
@@ -607,7 +607,7 @@ static int copy_file_if_exists(const unsigned char *hashhex, uint64_t fsize,
     return -1;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    psync_free(res);
+    free(res);
     debug(D_WARNING, "command getfilesbychecksum returned code %u",
           (unsigned)result);
     psync_process_api_error(result);
@@ -615,7 +615,7 @@ static int copy_file_if_exists(const unsigned char *hashhex, uint64_t fsize,
   }
   metas = papi_find_result2(res, "metadata", PARAM_ARRAY);
   if (!metas->length) {
-    psync_free(res);
+    free(res);
     return 0;
   }
   meta = metas->array[0];
@@ -633,7 +633,7 @@ static int copy_file_if_exists(const unsigned char *hashhex, uint64_t fsize,
           (long unsigned)folderid, name);
   }
 
-  psync_free(res);
+  free(res);
   return ret;
 }
 
@@ -720,7 +720,7 @@ static int upload_file(const char *localpath, const unsigned char *hashhex,
     upload->uploaded += rrd;
     add_bytes_uploaded(rrd);
   }
-  psync_free(buff);
+  free(buff);
   pfile_close(fd);
   psync_set_default_sendbuf(api);
   pdiff_lock();
@@ -733,7 +733,7 @@ static int upload_file(const char *localpath, const unsigned char *hashhex,
   }
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
-    psync_free(res);
+    free(res);
     debug(D_WARNING, "command uploadfile returned code %u", (unsigned)result);
     psync_process_api_error(result);
     if (psync_handle_api_result(result) == PSYNC_NET_TEMPFAIL)
@@ -773,16 +773,16 @@ static int upload_file(const char *localpath, const unsigned char *hashhex,
           "uploaded file differs localsize=%lu, remotesize=%lu, localhash=%s, "
           "remotehash=%s",
           (unsigned long)fsize, (unsigned long)rsize, hashhex, hashhexsrv);
-    psync_free(res);
+    free(res);
     return -1;
   }
-  psync_free(res);
+  free(res);
   pdiff_wake();
   debug(D_NOTICE, "file %s uploaded to %lu/%s", localpath,
         (long unsigned)folderid, name);
   return 0;
 err2:
-  psync_free(buff);
+  free(buff);
 err1:
   psync_apipool_release_bad(api);
 err0:
@@ -829,10 +829,10 @@ static int upload_range(psock_t *api, psync_upload_range_list_t *r,
     upload->uploaded += rrd;
     add_bytes_uploaded(rrd);
   }
-  psync_free(buff);
+  free(buff);
   return PSYNC_NET_OK;
 err0:
-  psync_free(buff);
+  free(buff);
   return PSYNC_NET_TEMPFAIL;
 }
 
@@ -943,7 +943,7 @@ static int upload_save(psock_t *api, psync_fileid_t localfileid,
       ret = PSYNC_NET_OK;
       pdiff_wake();
     }
-    psync_free(res);
+    free(res);
   } else
     ret = PSYNC_NET_TEMPFAIL;
   pdiff_unlock();
@@ -986,7 +986,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
       goto err0;
     result = papi_find_result2(res, "result", PARAM_NUM)->num;
     if (unlikely(result)) {
-      psync_free(res);
+      free(res);
       psync_apipool_release(api);
       psync_process_api_error(result);
       debug(D_WARNING, "upload_create returned %lu", (unsigned long)result);
@@ -996,7 +996,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
         return 0;
     }
     uploadid = papi_find_result2(res, "uploadid", PARAM_NUM)->num;
-    psync_free(res);
+    free(res);
     psync_sql_start_transaction();
     sql = psync_sql_query_nolock("SELECT id FROM localfile WHERE id=?");
     psync_sql_bind_uint(sql, 1, localfileid);
@@ -1030,8 +1030,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
   if (unlikely(fd == INVALID_HANDLE_VALUE)) {
     debug(D_WARNING, "could not open local file %s", localpath);
     psync_apipool_release(api);
-    psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list,
-                                     psync_free);
+    psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free);
     return -1;
   }
   if (likely(uploadoffset < fsize)) {
@@ -1089,12 +1088,12 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
           if (fileid &&
               psync_net_scan_file_for_blocks(api, &rlist, fileid, hash, fd) ==
                   PSYNC_NET_TEMPFAIL) {
-            psync_free(nname);
+            free(nname);
             goto err1;
           }
         } else
           psync_sql_free_result(sql);
-        psync_free(nname);
+        free(nname);
       } else
         psync_sql_free_result(sql);
     }
@@ -1108,10 +1107,10 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
           psync_net_scan_upload_for_blocks(api, &rlist,
                                            psync_get_result_cell(fr, id, 0),
                                            fd) == PSYNC_NET_TEMPFAIL) {
-        psync_free(fr);
+        free(fr);
         goto err1;
       }
-    psync_free(fr);
+    free(fr);
   }
   rid = 0;
   respwait = 0;
@@ -1154,7 +1153,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
       result = papi_find_result2(res, "result", PARAM_NUM)->num;
       if (unlikely(result)) {
         id = papi_find_result2(res, "id", PARAM_NUM)->num;
-        psync_free(res);
+        free(res);
         psync_process_api_error(result);
         if (unlikely_log(!id))
           goto err1;
@@ -1163,7 +1162,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
           if (unlikely_log(!res))
             goto err1;
           respwait--;
-          psync_free(res);
+          free(res);
         }
         psync_list_for_each_element(le2, &rlist, psync_upload_range_list_t,
                                     list) if (le2->id == id) {
@@ -1193,7 +1192,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
                 "file size mismatch after upload, expected: %lu, got: %lu",
                 (unsigned long)fsize,
                 (unsigned long)papi_find_result2(res, "size", PARAM_NUM)->num);
-          psync_free(res);
+          free(res);
           goto err1;
         } else if (unlikely(memcmp(
                        papi_find_result2(res, PSYNC_CHECKSUM, PARAM_STR)->str,
@@ -1203,12 +1202,12 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
               "hash mismatch after upload, expected: %." NTO_STR(
                   PSYNC_HASH_DIGEST_HEXLEN) "s, got: %." NTO_STR(PSYNC_HASH_DIGEST_HEXLEN) "s",
               hashhex, papi_find_result2(res, PSYNC_CHECKSUM, PARAM_STR)->str);
-          psync_free(res);
+          free(res);
           goto err1;
         } else
           assert(respwait == 0);
       }
-      psync_free(res);
+      free(res);
     }
   restart:
     if (le->type == PSYNC_URANGE_UPLOAD) {
@@ -1244,8 +1243,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
     respwait++;
     uploadoffset += le->len;
   }
-  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list,
-                                   psync_free);
+  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free);
   if (pfile_size(fd) != fsize) {
     debug(D_NOTICE, "file %s changed filesize while uploading, restarting task",
           localpath);
@@ -1265,15 +1263,13 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
   }
 err1:
   pfile_close(fd);
-  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list,
-                                   psync_free);
+  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free);
 err0:
   psync_apipool_release_bad(api);
   return -1;
 errp:
   pfile_close(fd);
-  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list,
-                                   psync_free);
+  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free);
   psync_apipool_release_bad(api);
   return 0;
 }
@@ -1283,7 +1279,7 @@ static void delete_uploadid(psync_uploadid_t uploadid) {
                        PAPI_NUM("uploadid", uploadid)};
   binresult *res;
   res = psync_api_run_command("upload_delete", params);
-  psync_free(res);
+  free(res);
 }
 
 static void delete_uploadids(psync_fileid_t localfileid) {
@@ -1302,7 +1298,7 @@ static void delete_uploadids(psync_fileid_t localfileid) {
     psync_sql_bind_uint(res, 1, localfileid);
     psync_sql_run_free(res);
   }
-  psync_free(rows);
+  free(rows);
 }
 
 static void delete_from_localfile(psync_fileid_t localfileid) {
@@ -1373,7 +1369,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
         if (stat(localpath, &st)) {
           debug(D_NOTICE, "can not stat %s anymore, failing for now",
                 localpath);
-          psync_free(localpath);
+          free(localpath);
           return -1;
         }
         ctime = ptimer_time();
@@ -1382,7 +1378,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
       if (ret == 10) {
         debug(D_NOTICE, "file %s kept changing %d times, skipping for now",
               localpath, ret);
-        psync_free(localpath);
+        free(localpath);
         return -1;
       }
       debug(D_NOTICE, "file %s got old enough", localpath);
@@ -1391,7 +1387,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
   lock = psync_lock_file(localpath);
   if (!lock) {
     debug(D_NOTICE, "file %s is currently locked, skipping for now", localpath);
-    psync_free(localpath);
+    free(localpath);
     psys_sleep_milliseconds(PSYNC_SLEEP_ON_LOCKED_FILE);
     return -1;
   }
@@ -1408,7 +1404,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
     ret = psync_get_upload_checksum(uploadid, uhashhex, &ufsize);
     if (ret == PSYNC_NET_TEMPFAIL) {
       psync_unlock_file(lock);
-      psync_free(localpath);
+      free(localpath);
       return -1;
     } else if (ret == PSYNC_NET_PERMFAIL)
       uploadid = 0;
@@ -1422,7 +1418,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
     debug(D_WARNING, "could not open local file %s, deleting it from localfile",
           localpath);
     psync_unlock_file(lock);
-    psync_free(localpath);
+    free(localpath);
     delete_from_localfile(localfileid);
     return 0;
   }
@@ -1451,7 +1447,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
           (unsigned long)localfileid);
     psync_sql_free_result(res);
     psync_unlock_file(lock);
-    psync_free(localpath);
+    free(localpath);
     return 0;
   }
   psync_sql_free_result(res);
@@ -1487,8 +1483,8 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
 
   if (ret == 1 || ret == -1) {
     psync_unlock_file(lock);
-    psync_free(nname);
-    psync_free(localpath);
+    free(nname);
+    free(localpath);
     return ret == 1 ? 0 : -1;
   }
   memcpy(upload->hash, hashhex, PSYNC_HASH_DIGEST_HEXLEN);
@@ -1530,8 +1526,8 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
     }
   }
   psync_unlock_file(lock);
-  psync_free(nname);
-  psync_free(localpath);
+  free(nname);
+  free(localpath);
   if (!ret)
     delete_uploadids(localfileid);
   return ret;
@@ -1578,7 +1574,7 @@ static void task_run_upload_file_thread(void *ptr) {
   wake_upload_when_ready();
   pthread_mutex_unlock(&current_uploads_mutex);
   pstatus_upload_recalc_async();
-  psync_free(ut);
+  free(ut);
 }
 
 static int task_run_uploadfile(uint64_t taskid, psync_syncid_t syncid,
@@ -1636,7 +1632,7 @@ static int task_run_uploadfile(uint64_t taskid, psync_syncid_t syncid,
   }
   pthread_mutex_unlock(&current_uploads_mutex);
   if (stop) {
-    psync_free(ut);
+    free(ut);
     res = psync_sql_prep_statement("UPDATE task SET inprogress=0 WHERE id=?");
     psync_sql_bind_uint(res, 1, taskid);
     psync_sql_run_free(res);
@@ -1741,7 +1737,7 @@ static void upload_thread() {
         }
       } else if (type != PSYNC_UPLOAD_FILE)
         psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_UPLOAD);
-      psync_free(row);
+      free(row);
       continue;
     }
 

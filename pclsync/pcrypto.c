@@ -193,7 +193,7 @@ void pcrypto_ctr_encdec_free(
     pcrypto_ctr_encdec_t enc) {
   paes_free_encoder(enc->encoder);
   putil_wipe(enc->iv, PSYNC_AES256_BLOCK_SIZE);
-  psync_free(enc);
+  free(enc);
 }
 
 void pcrypto_ctr_encdec_decode(
@@ -343,7 +343,7 @@ pcrypto_decode_text(pcrypto_textdec_t enc,
     while (ret + len < outptr) {
       if (unlikely(ret[len] != 0)) {
         debug(D_WARNING, "non-zero in the padding found");
-        psync_free(ret);
+        free(ret);
         return NULL;
       }
       len++;
@@ -388,7 +388,7 @@ pcrypto_decode_text(pcrypto_textdec_t enc,
   while (ret + len < outptr) {
     if (unlikely(ret[len] != 0)) {
       debug(D_WARNING, "non-zero in the padding found");
-      psync_free(ret);
+      free(ret);
       return NULL;
     }
     len++;

@@ -310,9 +310,9 @@ static void proc_send_event(void *ptr) {
     callback(event->event, event->data);
 
     if (event->freedata)
-      psync_free(event->data.ptr);
+      free(event->data.ptr);
 
-    psync_free(event);
+    free(event);
   }
 }
 
@@ -360,7 +360,7 @@ void pqevent_queue_sync_event_id(psync_eventtype_t eventid, psync_syncid_t synci
     if (unlikely_log(!remotepath))
       return;
     pqevent_queue_sync_event_path(eventid, syncid, localpath, remoteid, remotepath);
-    psync_free(remotepath);
+    free(remotepath);
   }
 }
 
@@ -442,5 +442,5 @@ void pqevent_queue_event(psync_eventtype_t eventid, void *eventdata) {
     pthread_cond_signal(&eventcond);
     pthread_mutex_unlock(&eventmutex);
   } else
-    psync_free(eventdata);
+    free(eventdata);
 }

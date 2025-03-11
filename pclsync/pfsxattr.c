@@ -149,7 +149,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
   if (folder) {
     mk = psync_fstask_find_mkdir(folder, fspath->name, 0);
     if (mk) {
-      psync_free(fspath);
+      free(fspath);
       assertw(mk->folderid != 0);
       if (mk->folderid > 0)
         return folderid_to_objid(mk->folderid);
@@ -158,7 +158,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
     }
     cr = psync_fstask_find_creat(folder, fspath->name, 0);
     if (cr) {
-      psync_free(fspath);
+      free(fspath);
       if (cr->fileid > 0)
         return fileid_to_objid(cr->fileid);
       else if (cr->fileid == 0)
@@ -188,7 +188,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
     checkfile = !psync_fstask_find_unlink(folder, fspath->name, 0);
   }
   if (fspath->folderid < 0) {
-    psync_free(fspath);
+    free(fspath);
     debug(D_NOTICE, "path %s not found in temporary folder", path);
     return -1;
   }
@@ -203,7 +203,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
       ret = -1;
     psync_sql_free_result(res);
     if (ret != -1) {
-      psync_free(fspath);
+      free(fspath);
       return ret;
     }
   }
@@ -218,11 +218,11 @@ static int64_t xattr_get_object_id_locked(const char *path) {
       ret = -1;
     psync_sql_free_result(res);
     if (ret != -1) {
-      psync_free(fspath);
+      free(fspath);
       return ret;
     }
   }
-  psync_free(fspath);
+  free(fspath);
   debug(D_NOTICE, "path %s not found", path);
   return -1;
 }

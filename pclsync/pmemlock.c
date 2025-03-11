@@ -165,7 +165,7 @@ static int unlock_page(pageid_t pageid, int page_size) {
       ret = 0;
     } else {
       ptree_del(&locked_pages, tr);
-      psync_free(node);
+      free(node);
       // do not move out of the mutex, will create race conditions
       if (unlikely(pmem_munlock((void *)(pageid * page_size), page_size)))
         ret = PRINT_RETURN(-1);
@@ -347,7 +347,7 @@ void *pmemlock_malloc(size_t size) {
 }
 
 void pmemlock_free(void *ptr) {
-  psync_free(ptr);
+  free(ptr);
   return;
   allocator_range *range;
   psync_tree *tr;
@@ -395,7 +395,7 @@ found:
     if (range->locked)
       pmemlock_unlock(range->mem, range->size);
     pmem_munmap(range->mem, range->size);
-    psync_free(range);
+    free(range);
   }
 }
 

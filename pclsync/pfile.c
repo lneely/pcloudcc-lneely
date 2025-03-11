@@ -266,7 +266,7 @@ static void psync_file_preread_thread(void *ptr) {
     pr->count -= rd;
   }
   pfile_close(pr->fd);
-  psync_free(pr);
+  free(pr);
 }
 
 int pfile_preread(int fd, uint64_t offset, size_t count) {
@@ -415,7 +415,7 @@ int pfile_run_update(const char *path) {
     ex = psync_strcat(PSYNC_RUN_CMD " \"", path, "\"", NULL);
     execl("/bin/sh", "/bin/sh", "-c", ex, NULL);
     debug(D_ERROR, "exec of %s failed", ex);
-    psync_free(ex);
+    free(ex);
     exit(1);
   }
 }

@@ -69,7 +69,7 @@ int do_call_contactlist(result_visitor vis, void *param) {
   contacts = papi_find_result2(bres, "contacts", PARAM_ARRAY);
 
   if (!contacts->length) {
-    psync_free(bres);
+    free(bres);
     debug(D_WARNING, "Account_users returned empty result!\n");
     return -2;
   } else {
@@ -80,7 +80,7 @@ int do_call_contactlist(result_visitor vis, void *param) {
     psync_sql_commit_transaction();
   }
 
-  psync_free(bres);
+  free(bres);
   return 0;
 }
 
@@ -361,7 +361,7 @@ void cache_shares() {
     debug(D_WARNING, "command listshares returned error code %u message %s",
           (unsigned)result, errorret);
     psync_process_api_error(result);
-    psync_free(bres);
+    free(bres);
     return;
   }
 
@@ -406,5 +406,5 @@ void cache_shares() {
 
   psync_sql_commit_transaction();
 
-  psync_free(bres);
+  free(bres);
 }
