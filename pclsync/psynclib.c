@@ -428,21 +428,25 @@ static void psync_invalidate_auth(const char *auth) {
   psync_run_command("logout", params, NULL);
 }
 
-void psync_logout2(uint32_t auth_status, int doinvauth) {
+void psync_logout(uint32_t auth_status, int doinvauth) {
   tfa = 0;
   debug(D_NOTICE, "logout");
-  psync_sql_statement(
-      "DELETE FROM setting WHERE id IN ('pass', 'auth', 'saveauth')");
-  if (doinvauth)
+
+  psync_sql_statement("DELETE FROM setting WHERE id IN ('pass', 'auth', 'saveauth')");
+  if (doinvauth) {
     psync_invalidate_auth(psync_my_auth);
-  memset(psync_my_auth, 0, sizeof(psync_my_auth));
+  }
+  putil_wipe(psync_my_auth, sizeof(psync_my_auth));
   pcryptofolder_lock();
+
   pthread_mutex_lock(&psync_my_auth_mutex);
+  putil_wipe(psync_my_pass, sizeof(psync_my_pass));
   psync_free(psync_my_pass);
-  psync_my_pass = NULL;
   pthread_mutex_unlock(&psync_my_auth_mutex);
+
   pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   pstatus_set(PSTATUS_TYPE_AUTH, auth_status);
+
   psync_fs_pause_until_login();
   pdownload_stop_all();
   pupload_stop_all();
@@ -451,11 +455,10 @@ void psync_logout2(uint32_t auth_status, int doinvauth) {
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   psync_restart_localscan();
   ptimer_notify_exception();
-  if (psync_fs_need_per_folder_refresh())
+  if (psync_fs_need_per_folder_refresh()) {
     psync_fs_refresh_folder(0);
+  }
 }
-
-void psync_logout() { psync_logout2(PSTATUS_AUTH_REQUIRED, 1); }
 
 apiservers_list_t *psync_get_apiservers(char **err) {
   psock_t *api;
@@ -573,19 +576,19 @@ void psync_unlink() {
   ppagecache_clean();
   psync_sql_connect(psync_database);
   if (deviceid) {
-    res = psync_sql_prep_statement(
-        "REPLACE INTO setting (id, value) VALUES ('deviceid', ?)");
+    res = psync_sql_prep_statement("REPLACE INTO setting (id, value) VALUES ('deviceid', ?)");
     psync_sql_bind_string(res, 1, deviceid);
     psync_sql_run_free(res);
     psync_free(deviceid);
   }
   pthread_mutex_lock(&psync_my_auth_mutex);
-  memset(psync_my_auth, 0, sizeof(psync_my_auth));
+  putil_wipe(psync_my_auth, sizeof(psync_my_auth));
   psync_my_user = NULL;
-  psync_my_pass = NULL;
+  putil_wipe(psync_my_pass, sizeof(psync_my_pass));
   psync_my_userid = 0;
   pthread_mutex_unlock(&psync_my_auth_mutex);
   debug(D_NOTICE, "clearing database, finished");
+
   psync_fs_pause_until_login();
   psync_fs_clean_tasks();
   ppathstatus_init();
@@ -602,8 +605,9 @@ void psync_unlink() {
   pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
   pstatus_set(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN);
   psync_resume_localscan();
-  if (psync_fs_need_per_folder_refresh())
+  if (psync_fs_need_per_folder_refresh()) {
     psync_fs_refresh_folder(0);
+  }
 }
 
 int psync_tfa_has_devices() { return psync_my_2fa_has_devices; }

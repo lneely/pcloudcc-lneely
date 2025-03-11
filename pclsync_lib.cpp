@@ -94,9 +94,6 @@ void clib::pclsync_lib::set_tfa_code(const std::string &arg) {
 void clib::pclsync_lib::set_username(const std::string &arg) {
   username_ = arg;
 }
-void clib::pclsync_lib::set_password(const std::string &arg) {
-  password_ = arg;
-}
 void clib::pclsync_lib::set_crypto_pass(const std::string &arg) {
   crypto_pass_ = arg;
 };
@@ -116,30 +113,27 @@ clib::pclsync_lib &clib::pclsync_lib::get_lib() {
 
 char *clib::pclsync_lib::get_token() { return psync_get_token(); }
 
-void clib::pclsync_lib::get_pass_from_console() {
-  do_get_pass_from_console(password_);
+void clib::pclsync_lib::read_password() {
+  read_from_stdin(password_);
 }
 
-void clib::pclsync_lib::get_tfa_code_from_console()
+void clib::pclsync_lib::read_tfa_code()
 {
   if (daemon_) {
-    std::cout << "Not able to read 2fa code when started as daemon." 
-              << std::endl;
+    std::cout << "Not able to read 2fa code when started as daemon." << std::endl;
     exit(1);
   }
-  std::cout << "Please enter 2fa code" 
-            << std::endl;
+  std::cout << "Please enter 2fa code" << std::endl;
   getline(std::cin, tfa_code_);
 }
 
-void clib::pclsync_lib::get_cryptopass_from_console() {
-  do_get_pass_from_console(crypto_pass_);
+void clib::pclsync_lib::read_cryptopass() {
+  read_from_stdin(crypto_pass_);
 }
 
-void clib::pclsync_lib::do_get_pass_from_console(std::string &password) {
+void clib::pclsync_lib::read_from_stdin(std::string &s) {
   if (daemon_) {
-    std::cout << "Not able to read password when started as daemon."
-              << std::endl;
+    std::cout << "Not able to read password when started as daemon." << std::endl;
     exit(1);
   }
   termios oldt;
@@ -148,7 +142,7 @@ void clib::pclsync_lib::do_get_pass_from_console(std::string &password) {
   newt.c_lflag &= ~ECHO;
   tcsetattr(STDIN_FILENO, TCSANOW, &newt);
   std::cout << "Please, enter password" << std::endl;
-  getline(std::cin, password);
+  getline(std::cin, s);
   tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 }
 
@@ -302,7 +296,7 @@ static void status_change(pstatus_t *status) {
   *clib::pclsync_lib::get_lib().status_ = *status;
   if (status->status == PSTATUS_LOGIN_REQUIRED) {
     if (clib::pclsync_lib::get_lib().get_password().empty()) {
-      clib::pclsync_lib::get_lib().get_pass_from_console();
+      clib::pclsync_lib::get_lib().read_password();
     }
 
     psync_set_user_pass(clib::pclsync_lib::get_lib().get_username().c_str(),
@@ -311,7 +305,7 @@ static void status_change(pstatus_t *status) {
     std::cout << "logging in" << std::endl;
   } else if (status->status == PSTATUS_TFA_REQUIRED) {
     if (clib::pclsync_lib::get_lib().get_tfa_code().empty()) {
-      clib::pclsync_lib::get_lib().get_tfa_code_from_console();
+      clib::pclsync_lib::get_lib().read_tfa_code();
     }
 
     psync_tfa_set_code(clib::pclsync_lib::get_lib().get_tfa_code().c_str(),
@@ -319,7 +313,7 @@ static void status_change(pstatus_t *status) {
                        0);
   } else if (status->status == PSTATUS_BAD_LOGIN_DATA) {
     if (!clib::pclsync_lib::get_lib().newuser_) {
-      clib::pclsync_lib::get_lib().get_pass_from_console();
+      clib::pclsync_lib::get_lib().read_password();
       psync_set_user_pass(clib::pclsync_lib::get_lib().get_username().c_str(),
                           clib::pclsync_lib::get_lib().get_password().c_str(),
                           (int)clib::pclsync_lib::get_lib().save_pass_);
@@ -495,7 +489,7 @@ int clib::pclsync_lib::login(const char *user, const char *pass, int save) {
 
 int clib::pclsync_lib::logout() {
   wipe_password();
-  psync_logout();
+  psync_logout(PSTATUS_AUTH_REQUIRED, 1);
   return 0;
 }
 

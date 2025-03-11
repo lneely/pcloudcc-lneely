@@ -638,7 +638,7 @@ char *psync_get_username();
 void psync_set_user_pass(const char *username, const char *password, int save);
 void psync_set_pass(const char *password, int save);
 void psync_set_auth(const char *auth, int save);
-void psync_logout();
+void psync_logout(uint32_t auth_status, int doinvauth);
 void psync_unlink();
 
 /* Upon seein a status of PSTATUS_TFA_REQUIRED the application is supposed to

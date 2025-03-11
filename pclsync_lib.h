@@ -68,7 +68,6 @@ public:
   void set_trusted_device(bool arg);
   void set_tfa_code(const std::string& arg);
   void set_username(const std::string &arg);
-  void set_password(const std::string &arg);
   void set_crypto_pass(const std::string &arg);
   void set_mount(const std::string &arg);
   void set_savepass(bool s);
@@ -87,9 +86,9 @@ public:
   static pclsync_lib &get_lib();
 
   // Console
-  void get_tfa_code_from_console();
-  void get_pass_from_console();
-  void get_cryptopass_from_console();
+  void read_tfa_code();
+  void read_password();
+  void read_cryptopass();
 
   // API calls
   int init();
@@ -118,8 +117,8 @@ private:
   bool to_set_mount_;
   bool daemon_;
 
-  void do_get_pass_from_console(std::string &password);
-  void wipe(std::string& str);
+  void read_from_stdin(std::string &s);
+  void wipe(std::string& s);
 };
 } // namespace clibrary
 } // namespace console_client

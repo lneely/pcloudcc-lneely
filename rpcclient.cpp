@@ -11,6 +11,7 @@
 #include "rpcclient.h"
 #include "plibs.h"
 #include "prpc.h"
+#include "putil.h"
 
 
 #define POVERLAY_BUFSIZE 512
@@ -97,12 +98,12 @@ int RpcClient::writeRequest(int fd, int msgtype, const char *value, char **out, 
     writeerr = POVERLAY_WRITE_COMM_ERR;
   }
 
+  putil_wipe(buf, size);
   free(buf);
   return writeerr;
 }
 
 int RpcClient::readResponse(int fd, char **out, size_t *out_size) {
-
     rpc_message_t *msg = (rpc_message_t *)malloc(POVERLAY_BUFSIZE);
     if (msg == NULL) {
         const char *error_msg = "Memory allocation failed";
@@ -116,6 +117,7 @@ int RpcClient::readResponse(int fd, char **out, size_t *out_size) {
         const char *error_msg = (bytes_read == 0) ? "Connection closed" : "Read error";
         *out = strdup(error_msg);
         *out_size = strlen(error_msg) + 1;
+        putil_wipe(msg, POVERLAY_BUFSIZE);
         free(msg);
         return -1;
     }
@@ -124,6 +126,7 @@ int RpcClient::readResponse(int fd, char **out, size_t *out_size) {
     memcpy(*out, msg->value, msg->length);
     *out_size = msg->length;
 
+    putil_wipe(msg, POVERLAY_BUFSIZE);
     free(msg); 
     return 0;
 }

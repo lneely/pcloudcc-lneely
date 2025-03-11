@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
 
     cc::clibrary::pclsync_lib::get_lib().set_username(username);
     if (passwordsw) {
-      cc::clibrary::pclsync_lib::get_lib().get_pass_from_console();
+      cc::clibrary::pclsync_lib::get_lib().read_password();
     }
     cc::clibrary::pclsync_lib::get_lib().set_tfa_code(tfa_code);
     cc::clibrary::pclsync_lib::get_lib().set_trusted_device(trusted_device);
@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
         cc::clibrary::pclsync_lib::get_lib().set_crypto_pass(password);
       } else {
         std::cout << "Enter crypto password." << std::endl;
-        cc::clibrary::pclsync_lib::get_lib().get_cryptopass_from_console();
+        cc::clibrary::pclsync_lib::get_lib().read_cryptopass();
       }
     } else
       cc::clibrary::pclsync_lib::get_lib().setup_crypto_ = false;
