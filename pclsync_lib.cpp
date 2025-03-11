@@ -43,6 +43,7 @@
 #include "pshm.h"
 #include "pdevice.h"
 #include "pcommands.h"
+#include "putil.h"
 
 #include "pclsync_lib.h"
 
@@ -70,6 +71,18 @@ const std::string &clib::pclsync_lib::get_crypto_pass() {
   return crypto_pass_;
 };
 
+void clib::pclsync_lib::wipe_crypto_pass() {
+  this->wipe(crypto_pass_);
+}
+
+void clib::pclsync_lib::wipe_password() {
+  this->wipe(password_);
+}
+
+void clib::pclsync_lib::wipe_tfa_code() {
+  this->wipe(tfa_code_);
+}
+
 const std::string &clib::pclsync_lib::get_mount() { return mount_; }
 
 void clib::pclsync_lib::set_trusted_device(bool arg) {
@@ -80,9 +93,6 @@ void clib::pclsync_lib::set_tfa_code(const std::string &arg) {
 }
 void clib::pclsync_lib::set_username(const std::string &arg) {
   username_ = arg;
-}
-void clib::pclsync_lib::set_password(const std::string &arg) {
-  password_ = arg;
 }
 void clib::pclsync_lib::set_crypto_pass(const std::string &arg) {
   crypto_pass_ = arg;
@@ -103,30 +113,27 @@ clib::pclsync_lib &clib::pclsync_lib::get_lib() {
 
 char *clib::pclsync_lib::get_token() { return psync_get_token(); }
 
-void clib::pclsync_lib::get_pass_from_console() {
-  do_get_pass_from_console(password_);
+void clib::pclsync_lib::read_password() {
+  read_from_stdin(password_);
 }
 
-void clib::pclsync_lib::get_tfa_code_from_console()
+void clib::pclsync_lib::read_tfa_code()
 {
   if (daemon_) {
-    std::cout << "Not able to read 2fa code when started as daemon." 
-              << std::endl;
+    std::cout << "Not able to read 2fa code when started as daemon." << std::endl;
     exit(1);
   }
-  std::cout << "Please enter 2fa code" 
-            << std::endl;
+  std::cout << "Please enter 2fa code" << std::endl;
   getline(std::cin, tfa_code_);
 }
 
-void clib::pclsync_lib::get_cryptopass_from_console() {
-  do_get_pass_from_console(crypto_pass_);
+void clib::pclsync_lib::read_cryptopass() {
+  read_from_stdin(crypto_pass_);
 }
 
-void clib::pclsync_lib::do_get_pass_from_console(std::string &password) {
+void clib::pclsync_lib::read_from_stdin(std::string &s) {
   if (daemon_) {
-    std::cout << "Not able to read password when started as daemon."
-              << std::endl;
+    std::cout << "Not able to read password when started as daemon." << std::endl;
     exit(1);
   }
   termios oldt;
@@ -135,7 +142,7 @@ void clib::pclsync_lib::do_get_pass_from_console(std::string &password) {
   newt.c_lflag &= ~ECHO;
   tcsetattr(STDIN_FILENO, TCSANOW, &newt);
   std::cout << "Please, enter password" << std::endl;
-  getline(std::cin, password);
+  getline(std::cin, s);
   tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 }
 
@@ -201,21 +208,22 @@ void event_handler(psync_eventtype_t event, psync_eventdata_t eventdata) {
 }
 
 static int lib_setup_cripto() {
-  const char *pwd = clib::pclsync_lib::get_lib().get_crypto_pass().c_str();
-
   if(pstatus_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_OFFLINE) {
     std::cout << "Cannot unlock crypto folder, pcloudcc is offline" << std::endl;
     return PSYNC_CRYPTO_CANT_CONNECT;
   }
 
+  const char *pwd = clib::pclsync_lib::get_lib().get_crypto_pass().c_str();
   if(!pcryptofolder_issetup()) {
     std::cout << "crypto is not setup, setting it up now..." << std::endl;
     if(int ret = pcryptofolder_setup(pwd, "no hint") != PSYNC_CRYPTO_SETUP_SUCCESS) {
       std::cout << "crypto setup failed, error code was " << ret << std::endl;
+      clib::pclsync_lib::get_lib().wipe_crypto_pass();
       return ret;
     }
     if(int ret = pcryptofolder_mkdir(0, "Crypto", NULL, NULL) != PSYNC_CRYPTO_SUCCESS) {
       std::cout << "failed to create crypto directory, error code was" << ret << std::endl;
+      clib::pclsync_lib::get_lib().wipe_crypto_pass();
       return ret;
     }
     std::cout << "crypto folder was setup using the provided password, "
@@ -225,9 +233,11 @@ static int lib_setup_cripto() {
 
   if(int ret = pcryptofolder_unlock(pwd) != PSYNC_CRYPTO_START_SUCCESS) {
     std::cout << "Failed to unlock crypto folder: error code was " << ret << std::endl;
+    clib::pclsync_lib::get_lib().wipe_crypto_pass();
     return ret;
   }
 
+  clib::pclsync_lib::get_lib().wipe_crypto_pass();
   clib::pclsync_lib::get_lib().crypto_on_ = true;
   return 0;
 }
@@ -286,7 +296,7 @@ static void status_change(pstatus_t *status) {
   *clib::pclsync_lib::get_lib().status_ = *status;
   if (status->status == PSTATUS_LOGIN_REQUIRED) {
     if (clib::pclsync_lib::get_lib().get_password().empty()) {
-      clib::pclsync_lib::get_lib().get_pass_from_console();
+      clib::pclsync_lib::get_lib().read_password();
     }
 
     psync_set_user_pass(clib::pclsync_lib::get_lib().get_username().c_str(),
@@ -295,7 +305,7 @@ static void status_change(pstatus_t *status) {
     std::cout << "logging in" << std::endl;
   } else if (status->status == PSTATUS_TFA_REQUIRED) {
     if (clib::pclsync_lib::get_lib().get_tfa_code().empty()) {
-      clib::pclsync_lib::get_lib().get_tfa_code_from_console();
+      clib::pclsync_lib::get_lib().read_tfa_code();
     }
 
     psync_tfa_set_code(clib::pclsync_lib::get_lib().get_tfa_code().c_str(),
@@ -303,7 +313,7 @@ static void status_change(pstatus_t *status) {
                        0);
   } else if (status->status == PSTATUS_BAD_LOGIN_DATA) {
     if (!clib::pclsync_lib::get_lib().newuser_) {
-      clib::pclsync_lib::get_lib().get_pass_from_console();
+      clib::pclsync_lib::get_lib().read_password();
       psync_set_user_pass(clib::pclsync_lib::get_lib().get_username().c_str(),
                           clib::pclsync_lib::get_lib().get_password().c_str(),
                           (int)clib::pclsync_lib::get_lib().save_pass_);
@@ -470,22 +480,33 @@ int clib::pclsync_lib::init() {
 }
 
 int clib::pclsync_lib::login(const char *user, const char *pass, int save) {
-  set_username(user);
-  set_password(pass);
-  set_savepass(bool(save));
+  username_ = user;
+  password_ = pass;
+  save_pass_ = save;
   psync_set_user_pass(user, pass, save);
   return 0;
 }
 
 int clib::pclsync_lib::logout() {
-  set_password("");
-  psync_logout();
+  wipe_password();
+  psync_logout(PSTATUS_AUTH_REQUIRED, 1);
   return 0;
 }
 
 int clib::pclsync_lib::unlink() {
   set_username("");
-  set_password("");
+  wipe_password();
   psync_unlink();
   return 0;
+}
+
+void clib::pclsync_lib::wipe(std::string& s) {
+    if (s.empty()) {
+      return;
+    }
+
+    void* mem = &s[0];
+    size_t sz = s.size();
+    putil_wipe(mem, sz);
+    s.clear();
 }

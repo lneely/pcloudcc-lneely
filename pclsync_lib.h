@@ -68,7 +68,6 @@ public:
   void set_trusted_device(bool arg);
   void set_tfa_code(const std::string& arg);
   void set_username(const std::string &arg);
-  void set_password(const std::string &arg);
   void set_crypto_pass(const std::string &arg);
   void set_mount(const std::string &arg);
   void set_savepass(bool s);
@@ -77,13 +76,19 @@ public:
   void set_daemon(bool p);
   void set_status_callback(status_callback_t p);
 
+  // FIXME: not ideal, better if programmer does not have to remember to do
+  // this, but good enough for now...
+  void wipe_password();
+  void wipe_crypto_pass();
+  void wipe_tfa_code();
+
   // Singleton
   static pclsync_lib &get_lib();
 
   // Console
-  void get_tfa_code_from_console();
-  void get_pass_from_console();
-  void get_cryptopass_from_console();
+  void read_tfa_code();
+  void read_password();
+  void read_cryptopass();
 
   // API calls
   int init();
@@ -103,16 +108,17 @@ public:
 
 private:
   std::string username_;
-  std::string password_;
-  std::string tfa_code_;
-  std::string crypto_pass_;
+  std::string password_;    // SENSITIVE, use wipe function
+  std::string tfa_code_;    // SENSITIVE, use wipe function
+  std::string crypto_pass_; // SENSITIVE, use wipe function
   std::string mount_;
 
 
   bool to_set_mount_;
   bool daemon_;
 
-  void do_get_pass_from_console(std::string &password);
+  void read_from_stdin(std::string &s);
+  void wipe(std::string& s);
 };
 } // namespace clibrary
 } // namespace console_client
