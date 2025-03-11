@@ -2617,7 +2617,9 @@ int psync_debug(const char *file, const char *function, int unsigned line,
       break;
     }
   if (unlikely(!log)) {
-    log = fopen(psync_debug_path(), "a+");
+    char *path = psync_debug_path();
+    log = fopen(path, "a+");
+    free(path);
     if (!log)
       return 1;
   }
