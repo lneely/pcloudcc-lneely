@@ -695,7 +695,7 @@ static int upload_file(const char *localpath, const unsigned char *hashhex,
                                     params, ARRAY_SIZE(params), fsize, 0)))
     goto err1;
   bw = 0;
-  buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
   while (bw < fsize) {
     if (unlikely(upload->stop)) {
       debug(D_NOTICE, "upload of %s stopped", localpath);
@@ -809,7 +809,7 @@ static int upload_range(psock_t *api, psync_upload_range_list_t *r,
     return PSYNC_NET_TEMPFAIL;
   bw = 0;
 
-  buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
   while (bw < r->len) {
     if (unlikely(upload->stop)) {
       debug(D_NOTICE, "upload stopped");
@@ -1602,7 +1602,7 @@ static int task_run_uploadfile(uint64_t taskid, psync_syncid_t syncid,
   psync_sql_bind_uint(res, 1, taskid);
   psync_sql_run_free(res);
   len = strlen(filename);
-  ut = (upload_task_t *)psync_malloc(offsetof(upload_task_t, filename) + len +
+  ut = (upload_task_t *)malloc(offsetof(upload_task_t, filename) + len +
                                      1);
   ut->upllist.taskid = taskid;
   ut->upllist.localfileid = localfileid;

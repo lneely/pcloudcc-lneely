@@ -88,7 +88,7 @@ static psync_fspath_t *ret_folder_data(psync_fsfolderid_t folderid,
     encname = pcryptofolder_fldencode_filename(enc, name);
     pcryptofolder_fldencoder_release(folderid, enc);
     len = strlen(encname);
-    ret = (psync_fspath_t *)psync_malloc(sizeof(psync_fspath_t) + len + 1);
+    ret = (psync_fspath_t *)malloc(sizeof(psync_fspath_t) + len + 1);
     memcpy(ret + 1, encname, len + 1);
     free(encname);
     ret->folderid = folderid;

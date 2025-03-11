@@ -97,7 +97,7 @@ static void add_dir_scan(localnotify_dir *dir, const char *path) {
     namelen = 255;
   if (namelen < sizeof(de->d_name) - 1)
     namelen = sizeof(de->d_name) - 1;
-  wch = (localnotify_watch *)psync_malloc(offsetof(localnotify_watch, path) +
+  wch = (localnotify_watch *)malloc(offsetof(localnotify_watch, path) +
                                           pl + 1 + namelen + 1);
   wch->next = dir->watches[wid % WATCH_HASH];
   dir->watches[wid % WATCH_HASH] = wch;
@@ -107,8 +107,8 @@ static void add_dir_scan(localnotify_dir *dir, const char *path) {
   memcpy(wch->path, path, pl + 1);
   if (likely_log(dh = opendir(path))) {
     entrylen = offsetof(struct dirent, d_name) + namelen + 1;
-    cpath = (char *)psync_malloc(pl + namelen + 2);
-    entry = (struct dirent *)psync_malloc(entrylen);
+    cpath = (char *)malloc(pl + namelen + 2);
+    entry = (struct dirent *)malloc(entrylen);
     memcpy(cpath, path, pl);
     if (!pl || cpath[pl - 1] != '/')
       cpath[pl++] = '/';
@@ -141,7 +141,7 @@ static void add_syncid(psync_syncid_t syncid) {
     str = psync_get_lstring(row[0], &len);
     len++;
     dir =
-        (localnotify_dir *)psync_malloc(offsetof(localnotify_dir, path) + len);
+        (localnotify_dir *)malloc(offsetof(localnotify_dir, path) + len);
     memcpy(dir->path, str, len);
     psync_sql_free_result(res);
   } else {

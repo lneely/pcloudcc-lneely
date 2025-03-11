@@ -86,7 +86,7 @@ void psymkey_free(psync_symmetric_key_t key) {
 psync_encrypted_symmetric_key_t
 psymkey_alloc_encrypted(size_t len) {
   psync_encrypted_symmetric_key_t ret;
-  ret = psync_malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
+  ret = malloc(offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   return ret;
 }
@@ -94,7 +94,7 @@ psymkey_alloc_encrypted(size_t len) {
 psync_encrypted_symmetric_key_t
 psymkey_copy_encrypted(psync_encrypted_symmetric_key_t src) {
   psync_encrypted_symmetric_key_t ret;
-  ret = psync_malloc(offsetof(psync_encrypted_data_struct_t, data) +
+  ret = malloc(offsetof(psync_encrypted_data_struct_t, data) +
                      src->datalen);
   ret->datalen = src->datalen;
   memcpy(ret->data, src->data, src->datalen);
@@ -212,7 +212,7 @@ static ssl_connection_t *conn_alloc(const char *hostname) {
   ssl_connection_t *conn;
   size_t len;
   len = strlen(hostname) + 1;
-  conn = (ssl_connection_t *)psync_malloc(offsetof(ssl_connection_t, cachekey) +
+  conn = (ssl_connection_t *)malloc(offsetof(ssl_connection_t, cachekey) +
                                           len + 4);
   conn->isbroken = 0;
   memcpy(conn->cachekey, "SSLS", 4);
@@ -718,7 +718,7 @@ prsa_encrypt_data(psync_rsa_publickey_t rsa, const unsigned char *data,
   int code;
   size_t rsalen = mbedtls_rsa_get_len(rsa);
 
-  ret = (psync_encrypted_symmetric_key_t)psync_malloc(
+  ret = (psync_encrypted_symmetric_key_t)malloc(
       offsetof(psync_encrypted_data_struct_t, data) + rsalen);
   if ((code = mbedtls_rsa_rsaes_oaep_encrypt(
            rsa, rng_get, &rng,
@@ -799,7 +799,7 @@ prsa_sign_sha256_hash(psync_rsa_privatekey_t rsa,
   int padding, hash_id;
   size_t rsalen = mbedtls_rsa_get_len(rsa);
 
-  ret = (psync_rsa_signature_t)psync_malloc(
+  ret = (psync_rsa_signature_t)malloc(
       offsetof(psync_symmetric_key_struct_t, key) + rsalen);
   if (!ret)
     return (psync_rsa_signature_t)(void *)PERROR_NO_MEMORY;

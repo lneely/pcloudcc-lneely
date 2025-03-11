@@ -85,7 +85,7 @@ int ppath_ls(const char *path, ppath_ls_cb callback, void *ptr) {
   }
 
   pl = strlen(path);
-  cpath = (char *)psync_malloc(pl + NAME_MAX + 2);
+  cpath = (char *)malloc(pl + NAME_MAX + 2);
   memcpy(cpath, path, pl);
   if (!pl || cpath[pl - 1] != '/')
     cpath[pl++] = '/';
@@ -127,7 +127,7 @@ int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback, void *ptr) {
   }
 
   pl = strlen(path);
-  cpath = (char *)psync_malloc(pl + NAME_MAX + 2);
+  cpath = (char *)malloc(pl + NAME_MAX + 2);
   memcpy(cpath, path, pl);
   if (!pl || cpath[pl - 1] != '/')
     cpath[pl++] = '/';

@@ -639,7 +639,7 @@ static int psync_p2p_get_download_token(psync_fileid_t fileid,
     return PSYNC_NET_PERMFAIL;
   }
   ctoken = papi_find_result2(res, "token", PARAM_STR);
-  *token = psync_malloc(ctoken->length + 1);
+  *token = malloc(ctoken->length + 1);
   memcpy(*token, ctoken->str, ctoken->length + 1);
   *tlen = ctoken->length;
   free(res);

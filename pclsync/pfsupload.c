@@ -796,7 +796,7 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
   }
   if (large_upload_creat_send_write(api, uploadid, usize, fsize - usize))
     goto err1;
-  buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
   if (usize) {
     asize = usize;
     pupload_bytes_add(asize);
@@ -924,7 +924,7 @@ static int upload_modify_send_local(psock_t *api,
     return PSYNC_NET_TEMPFAIL;
   bw = 0;
 
-  buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
   while (bw < length) {
     if (unlikely(stop_current_upload)) {
       debug(D_NOTICE, "got stop");
@@ -1522,7 +1522,7 @@ int2, sfolderid FROM fstask WHERE id=?"); psync_sql_bind_uint(res, 1, id);
       size+=row[4].length+1;
     if (row[5].type==PSYNC_TSTRING)
       size+=row[5].length+1;
-    task=(fsupload_task_t *)psync_malloc(size);
+    task=(fsupload_task_t *)malloc(size);
     end=(char *)(task+1);
     task->res=NULL;
     task->id=psync_get_number(row[0]);
@@ -2087,7 +2087,7 @@ static void psync_fsupload_check_tasks() {
       size += row[4].length + 1;
     if (row[5].type == PSYNC_TSTRING)
       size += row[5].length + 1;
-    task = (fsupload_task_t *)psync_malloc(size);
+    task = (fsupload_task_t *)malloc(size);
     end = (char *)(task + 1);
     task->res = NULL;
     task->id = psync_get_number(row[0]);

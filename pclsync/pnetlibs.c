@@ -480,7 +480,7 @@ int psync_get_local_file_checksum(const char *restrict filename,
   fd = pfile_open(filename, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE)
     return PSYNC_NET_PERMFAIL;
-  buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
 retry:
   if (unlikely_log(fstat(fd, &st)))
     goto err1;
@@ -552,7 +552,7 @@ int psync_get_local_file_checksum_part(const char *restrict filename,
     return PSYNC_NET_PERMFAIL;
   if (unlikely_log(fstat(fd, &st)))
     goto err1;
-  buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
   psync_hash_init(&hctx);
   psync_hash_init(&hctxp);
   rsz = pfile_stat_size(&st);
@@ -636,7 +636,7 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
   if (unlikely_log(dfd == INVALID_HANDLE_VALUE))
     goto err1;
   psync_hash_init(&hctx);
-  buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
   while (fsize) {
     if (fsize > PSYNC_COPY_BUFFER_SIZE)
       rrd = PSYNC_COPY_BUFFER_SIZE;
@@ -926,7 +926,7 @@ psync_http_socket *psync_http_connect(const char *host, const char *path,
       goto err0;
   } else
     debug(D_NOTICE, "got connection to %s from cache", host);
-  readbuff = psync_malloc(PSYNC_HTTP_RESP_BUFFER);
+  readbuff = malloc(PSYNC_HTTP_RESP_BUFFER);
   if (!addhdr)
     addhdr = "";
   if (from || to) {
@@ -1013,7 +1013,7 @@ ex:
     free(readbuff);
     readbuff = NULL;
   }
-  hsock = (psync_http_socket *)psync_malloc(
+  hsock = (psync_http_socket *)malloc(
       offsetof(psync_http_socket, cachekey) + cl);
   hsock->sock = sock;
   hsock->readbuff = readbuff;
@@ -1138,7 +1138,7 @@ connect_cache_tree_node_t *connect_cache_create_node(const char *host) {
   connect_cache_tree_node_t *res;
   size_t len;
   len = strlen(host) + 1;
-  res = (connect_cache_tree_node_t *)psync_malloc(
+  res = (connect_cache_tree_node_t *)malloc(
       offsetof(connect_cache_tree_node_t, host) + len);
   res->usessl = psync_setting_get_bool(_PS(usessl));
   res->haswaiter = 0;
@@ -1326,10 +1326,10 @@ psync_http_socket *psync_http_connect_multihost(const binresult *hosts,
       }
     }
   }
-  hsock = (psync_http_socket *)psync_malloc(
+  hsock = (psync_http_socket *)malloc(
       offsetof(psync_http_socket, cachekey) + cl);
   hsock->sock = sock;
-  hsock->readbuff = psync_malloc(PSYNC_HTTP_RESP_BUFFER);
+  hsock->readbuff = malloc(PSYNC_HTTP_RESP_BUFFER);
   ;
   hsock->contentlength = -1;
   hsock->readbytes = 0;
@@ -1369,10 +1369,10 @@ psync_http_connect_multihost_from_cache(const binresult *hosts,
   }
   if (!sock)
     return NULL;
-  hsock = (psync_http_socket *)psync_malloc(
+  hsock = (psync_http_socket *)malloc(
       offsetof(psync_http_socket, cachekey) + cl);
   hsock->sock = sock;
-  hsock->readbuff = psync_malloc(PSYNC_HTTP_RESP_BUFFER);
+  hsock->readbuff = malloc(PSYNC_HTTP_RESP_BUFFER);
   ;
   hsock->contentlength = -1;
   hsock->readbytes = 0;
@@ -1563,7 +1563,7 @@ char *psync_url_decode(const char *s) {
   size_t slen;
   char unsigned ch1, ch2;
   slen = strlen(s);
-  ret = p = (char *)psync_malloc(slen + 1);
+  ret = p = (char *)malloc(slen + 1);
   while (slen--) {
     if (*s == '+')
       *p = ' ';
@@ -1644,7 +1644,7 @@ static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
     psync_http_close(http);
     return PSYNC_NET_OK;
   }
-  cs = (psync_file_checksums *)psync_malloc(
+  cs = (psync_file_checksums *)malloc(
       offsetof(psync_file_checksums, blocks) +
       (sizeof(psync_block_checksum) + sizeof(uint32_t)) * i);
   cs->filesize = hdr.filesize;
@@ -1708,7 +1708,7 @@ static int psync_net_get_upload_checksums(psock_t *api,
   }
   if (!hdr.filesize)
     return PSYNC_NET_PERMFAIL;
-  cs = (psync_file_checksums *)psync_malloc(
+  cs = (psync_file_checksums *)malloc(
       offsetof(psync_file_checksums, blocks) +
       (sizeof(psync_block_checksum) + sizeof(uint32_t)) * i);
   cs->filesize = hdr.filesize;
@@ -1779,7 +1779,7 @@ psync_net_create_hash(const psync_file_checksums *checksums) {
       break;
     cnt += 2;
   }
-  h = (psync_file_checksum_hash *)psync_malloc(
+  h = (psync_file_checksum_hash *)malloc(
       offsetof(psync_file_checksum_hash, elements) + sizeof(uint32_t) * cnt);
   h->elementcnt = cnt;
   memset(h->elements, 0, sizeof(uint32_t) * cnt);
@@ -1997,7 +1997,7 @@ static void psync_net_check_file_for_blocks(
   else
     buffersize = PSYNC_COPY_BUFFER_SIZE;
   hbuffersize = buffersize / 2;
-  buff = psync_malloc(buffersize);
+  buff = malloc(buffersize);
   rd = pfile_read(fd, buff, hbuffersize);
   if (unlikely(rd < (ssize_t)hbuffersize)) {
     if (rd < (ssize_t)checksums->blocksize) {
@@ -2165,7 +2165,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
   else
     buffersize = PSYNC_COPY_BUFFER_SIZE;
   hbuffersize = buffersize / 2;
-  buff = psync_malloc(buffersize);
+  buff = malloc(buffersize);
   rd = pfile_read(fd, buff, hbuffersize);
   if (unlikely(rd < (ssize_t)hbuffersize)) {
     free(buff);
@@ -2515,7 +2515,7 @@ psync_file_lock_t *psync_lock_file(const char *path) {
   size_t len;
   int cmp;
   len = strlen(path) + 1;
-  lock = psync_malloc(offsetof(psync_file_lock_t, filename) + len);
+  lock = malloc(offsetof(psync_file_lock_t, filename) + len);
   memcpy(lock->filename, path, len);
   pthread_mutex_lock(&file_lock_mutex);
   tr = file_lock_tree;

@@ -289,7 +289,7 @@ static void status_change(pstatus_t *status) {
   static int cryptocheck = 0;
 
   char *err;
-  err = (char *)psync_malloc(1024);
+  err = (char *)malloc(1024);
 
   std::cout << "Down: " << status->downloadstr << "| Up: " << status->uploadstr
             << ", status is " << status2string(status->status) << std::endl;

@@ -164,7 +164,7 @@ void pcache_add(const char *key, void *ptr, time_t freeafter,
   uint32_t h;
   h = compute_hash(key, &l);
   l++;
-  he = (cache_entry_t *)psync_malloc(offsetof(cache_entry_t, key) + l);
+  he = (cache_entry_t *)malloc(offsetof(cache_entry_t, key) + l);
   he->value = ptr;
   he->free = freefunc;
   he->hash = h;

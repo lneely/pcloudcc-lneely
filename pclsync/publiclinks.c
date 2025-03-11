@@ -110,7 +110,7 @@ static void modify_screenshot_public_link(void *par) {
 int64_t do_psync_screenshot_public_link(const char *path, int hasdelay,
                                         uint64_t delay, char **link /*OUT*/,
                                         char **err /*OUT*/) {
-  scr_params *params = psync_malloc(sizeof(scr_params));
+  scr_params *params = malloc(sizeof(scr_params));
   int64_t ret =
       do_psync_file_public_link(path, &params->linkid, link, err, 0, 0, 0);
   if (hasdelay) {
@@ -150,7 +150,7 @@ int64_t do_psync_file_public_link(const char *path, int64_t *plinkid,
     int numparam = 2 + !!expire + !!maxdownloads + !!maxtraffic;
     int pind = 1;
 
-    t = (binparam *)psync_malloc(numparam * sizeof(binparam));
+    t = (binparam *)malloc(numparam * sizeof(binparam));
     init_param_str(t, "auth", psync_my_auth);
     init_param_str(t + pind++, "path", path);
     if (expire)
@@ -227,7 +227,7 @@ int64_t do_psync_folder_public_link(const char *path, char **link /*OUT*/,
     int numparam = 2 + !!expire + !!maxdownloads + !!maxtraffic;
     int pind = 1;
 
-    t = (binparam *)psync_malloc(numparam * sizeof(binparam));
+    t = (binparam *)malloc(numparam * sizeof(binparam));
     init_param_str(t, "auth", psync_my_auth);
     init_param_str(t + pind++, "path", path);
     if (expire)
@@ -301,7 +301,7 @@ int64_t do_psync_folder_public_link_full(const char *path, char **link /*OUT*/,
     int numparam = 2 + !!expire + !!maxdownloads + !!maxtraffic + !!password;
     int pind = 1;
 
-    t = (binparam *)psync_malloc(numparam * sizeof(binparam));
+    t = (binparam *)malloc(numparam * sizeof(binparam));
     init_param_str(t, "auth", psync_my_auth);
     init_param_str(t + pind++, "path", path);
     if (password)
@@ -428,21 +428,21 @@ int64_t do_ptree_public_link(const char *linkname, const char *root,
   if (unlikely(!(!!root + !!numfolders + !!numfiles)))
     return -3;
 
-  t = (binparam *)psync_malloc(numparam * sizeof(binparam));
+  t = (binparam *)malloc(numparam * sizeof(binparam));
 
   init_param_str(t, "auth", psync_my_auth);
 
   init_param_str(t + pind++, "name", linkname);
 
   if (root) {
-    ids = (char *)psync_malloc(FOLDERID_ENTRY_SIZE);
+    ids = (char *)malloc(FOLDERID_ENTRY_SIZE);
     id = psync_fsfolderid_by_path(root, 0);
     k = sprintf(ids, "%lld", (long long)id);
     init_param_str(t + pind++, "folderid", ids);
   }
 
   if (numfolders) {
-    ids1 = (char *)psync_malloc(numfolders * FOLDERID_ENTRY_SIZE);
+    ids1 = (char *)malloc(numfolders * FOLDERID_ENTRY_SIZE);
     idsp = ids1;
     for (i = 0; i < numfolders; ++i) {
       id = psync_fsfolderid_by_path(folders[i], 0);
@@ -462,7 +462,7 @@ int64_t do_ptree_public_link(const char *linkname, const char *root,
     psync_uint_row row;
     psync_fspath_t *filep;
 
-    ids2 = (char *)psync_malloc(numfiles * FOLDERID_ENTRY_SIZE);
+    ids2 = (char *)malloc(numfiles * FOLDERID_ENTRY_SIZE);
     idsp = ids2;
     for (i = 0; i < numfiles; ++i) {
       psync_sql_rdlock();
@@ -798,7 +798,7 @@ int do_psync_change_link(unsigned long long linkid, unsigned long long expire,
   int numparam = 5; // +!!expire + !!maxdownloads + !!maxtraffic + !!password;
   int pind = 1;
 
-  t = (binparam *)psync_malloc(numparam * sizeof(binparam));
+  t = (binparam *)malloc(numparam * sizeof(binparam));
   init_param_str(t, "auth", psync_my_auth);
   init_param_num(t + pind++, "linkid", linkid);
   if (linkpassword)
@@ -953,7 +953,7 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
     int numparam = 3 + !!expire + !!maxspace + !!maxfiles;
     int pind = 1;
 
-    t = (binparam *)psync_malloc(numparam * sizeof(binparam));
+    t = (binparam *)malloc(numparam * sizeof(binparam));
     init_param_str(t, "auth", psync_my_auth);
     init_param_str(t + pind++, "path", path);
     init_param_str(t + pind++, "comment", comment);

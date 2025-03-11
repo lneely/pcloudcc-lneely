@@ -723,7 +723,7 @@ static int sock_writeall(int sock, const void *buff, size_t len) {
 static stream_t *stream_create(async_params_t *prms, size_t addsize) {
   psync_tree *parent;
   stream_t *ret;
-  ret = (stream_t *)psync_malloc(sizeof(stream_t) + addsize);
+  ret = (stream_t *)malloc(sizeof(stream_t) + addsize);
   ret->streamid = ++prms->laststreamid;
   ret->flags = 0;
   ret->free = NULL;

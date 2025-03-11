@@ -514,7 +514,6 @@ typedef void (*psync_free_t)(void *);
 
 typedef void (*psync_generic_callback_t)();
 
-void *psync_malloc(size_t size);
 void *psync_realloc(void *ptr, size_t size);
 
 /* Event callback is called every time a download/upload is started/finished,

@@ -411,7 +411,7 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
   int intRes;
   int syncCnt = 0;
 
-  errMsg = (char *)psync_malloc(1024 * sizeof(char));
+  errMsg = (char *)malloc(1024 * sizeof(char));
   errMsg[0] = 0;
 
   time(&rawtime);

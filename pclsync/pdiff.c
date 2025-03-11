@@ -1858,7 +1858,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     if ((row = psync_sql_fetch_row(res))) {
       cstr = psync_get_lstring(row[0], &sharenamelen);
       stringslen += ++sharenamelen;
-      sharename = (char *)psync_malloc(sharenamelen);
+      sharename = (char *)malloc(sharenamelen);
       memcpy(sharename, cstr, sharenamelen);
       freesharename = 1;
       ctime = psync_get_number(row[1]);
@@ -1871,7 +1871,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
       return;
     }
   }
-  e = (psync_share_event_t *)psync_malloc(sizeof(psync_share_event_t) +
+  e = (psync_share_event_t *)malloc(sizeof(psync_share_event_t) +
                                           stringslen);
   str = (char *)(e + 1);
   memset(e, 0, sizeof(psync_share_event_t));
@@ -1915,7 +1915,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     }
   }
   if (isba) {
-    notify_paramst *params = psync_malloc(sizeof(notify_paramst));
+    notify_paramst *params = malloc(sizeof(notify_paramst));
     params->eventid = eventid;
     params->event_data = e;
     params->touserid = touserid;

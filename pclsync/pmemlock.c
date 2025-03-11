@@ -229,7 +229,7 @@ static void mark_aligment_bytes(char *ptr, size_t from, size_t to) {
 #endif
 
 void *pmemlock_malloc(size_t size) {
-  return psync_malloc(size);
+  return malloc(size);
   allocator_range *range, *brange;
   psync_tree *tr, **addto;
   psync_interval_tree_t *interval;

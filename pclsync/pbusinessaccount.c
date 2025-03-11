@@ -102,12 +102,12 @@ int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
   if (unlikely(numparam == 1))
     return -3;
 
-  t = (binparam *)psync_malloc(numparam * sizeof(binparam));
+  t = (binparam *)malloc(numparam * sizeof(binparam));
 
   init_param_str(t, "auth", psync_my_auth);
 
   if (nusershareid) {
-    ids1 = (char *)psync_malloc(nusershareid * FOLDERID_ENTRY_SIZE);
+    ids1 = (char *)malloc(nusershareid * FOLDERID_ENTRY_SIZE);
     idsp = ids1;
     for (i = 0; i < nusershareid; ++i) {
       k = sprintf(idsp, "%lld", (long long)usershareids[i]);
@@ -123,7 +123,7 @@ int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
   }
 
   if (nteamshareid) {
-    ids2 = (char *)psync_malloc(nteamshareid * FOLDERID_ENTRY_SIZE);
+    ids2 = (char *)malloc(nteamshareid * FOLDERID_ENTRY_SIZE);
     idsp = ids2;
     for (i = 0; i < nteamshareid; ++i) {
       k = sprintf(idsp, "%lld", (long long)teamshareids[i]);
@@ -208,14 +208,14 @@ int do_psync_account_modifyshare(psync_shareid_t usrshrids[], uint32_t uperms[],
   if (unlikely(numparam == 1))
     return -3;
 
-  t = (binparam *)psync_malloc(numparam * sizeof(binparam));
+  t = (binparam *)malloc(numparam * sizeof(binparam));
 
   init_param_str(t, "auth", psync_my_auth);
 
   if (nushid) {
-    ids1 = (char *)psync_malloc(nushid * FOLDERID_ENTRY_SIZE);
+    ids1 = (char *)malloc(nushid * FOLDERID_ENTRY_SIZE);
     idsp = ids1;
-    perms1 = (char *)psync_malloc(nushid * FOLDERID_ENTRY_SIZE);
+    perms1 = (char *)malloc(nushid * FOLDERID_ENTRY_SIZE);
     permsp = perms1;
     for (i = 0; i < nushid; ++i) {
       k = sprintf(idsp, "%lld", (long long)usrshrids[i]);
@@ -240,9 +240,9 @@ int do_psync_account_modifyshare(psync_shareid_t usrshrids[], uint32_t uperms[],
   }
 
   if (ntmshid) {
-    ids2 = (char *)psync_malloc(ntmshid * FOLDERID_ENTRY_SIZE);
+    ids2 = (char *)malloc(ntmshid * FOLDERID_ENTRY_SIZE);
     idsp = ids2;
-    perms2 = (char *)psync_malloc(ntmshid * FOLDERID_ENTRY_SIZE);
+    perms2 = (char *)malloc(ntmshid * FOLDERID_ENTRY_SIZE);
     permsp = perms2;
 
     for (i = 0; i < ntmshid; ++i) {
@@ -330,7 +330,7 @@ void get_ba_member_email(uint64_t userid, char **email /*OUT*/,
   psync_sql_bind_uint(res, 1, userid);
   if ((row = psync_sql_fetch_row(res))) {
     cstr = psync_get_lstring(row[0], length);
-    *email = (char *)psync_malloc(*length);
+    *email = (char *)malloc(*length);
     memcpy(*email, cstr, *length);
     psync_sql_free_result(res);
     return;
@@ -396,7 +396,7 @@ void get_ba_team_name(uint64_t teamid, char **name /*OUT*/,
   psync_sql_bind_uint(res, 1, teamid);
   if ((row = psync_sql_fetch_row(res))) {
     cstr = psync_get_lstring(row[0], length);
-    *name = (char *)psync_malloc(*length);
+    *name = (char *)malloc(*length);
     memcpy(*name, cstr, *length);
     psync_sql_free_result(res);
     return;
@@ -741,7 +741,7 @@ static psync_folderid_t create_index_folder(const char *path) {
   while (ind < 100) {
     bufflen = strlen(path) + 1 /*zero char*/ + 3 /*parenthesis*/ +
               3 /*up to 3 digit index*/;
-    buff = (char *)psync_malloc(bufflen);
+    buff = (char *)malloc(bufflen);
     snprintf(buff, bufflen - 1, "%s (%d)", path, ind);
     if (psync_create_remote_folder_by_path(buff, &err) != 0)
       debug(D_NOTICE, "Unable to create folder %s error is %s.", buff, err);

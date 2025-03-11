@@ -115,7 +115,7 @@ static void dir_scan(void *ptr, ppath_fast_stat *st) {
     size_t l, o;
     l = strlen(st->name);
     o = f->pathlen;
-    nf = (scan_folder *)psync_malloc(sizeof(scan_folder) + o + l + 2);
+    nf = (scan_folder *)malloc(sizeof(scan_folder) + o + l + 2);
     psync_list_init(&nf->subfolders);
     path = (char *)(nf + 1);
     memcpy(path, f->path, o);
@@ -233,12 +233,12 @@ psuggested_folders_t *psuggest_scan_folder(const char *path) {
     ln += s->folder->pathlen + off + 2;
     sf[cnt] = s;
     descslen[cnt] = off + 1;
-    descs[cnt] = psync_malloc(descslen[cnt]);
+    descs[cnt] = malloc(descslen[cnt]);
     memcpy(descs[cnt], buff, descslen[cnt]);
     if (++cnt >= PSYNC_SCANNER_MAX_SUGGESTIONS)
       break;
   }
-  ret = psync_malloc(offsetof(psuggested_folders_t, entries) +
+  ret = malloc(offsetof(psuggested_folders_t, entries) +
                      sizeof(psuggested_folder_t) * cnt + ln);
   str = ((char *)ret) + offsetof(psuggested_folders_t, entries) +
         sizeof(psuggested_folder_t) * cnt;

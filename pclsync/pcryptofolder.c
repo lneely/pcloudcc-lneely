@@ -207,7 +207,7 @@ static void load_str_to(const psync_variant *v, unsigned char **ptr,
   const char *str;
   size_t l;
   str = psync_get_lstring(*v, &l);
-  *ptr = (unsigned char *)psync_malloc(l);
+  *ptr = (unsigned char *)malloc(l);
   memcpy(*ptr, str, l);
   *len = l;
 }
@@ -266,7 +266,7 @@ static int download_keys(unsigned char **rsapriv, size_t *rsaprivlen, unsigned c
     if (offsetof(pub_key_ver1, key) >= rsapubstructlen)
       goto def1;
     *rsapublen = rsapubstructlen - offsetof(pub_key_ver1, key);
-    *rsapub = (unsigned char *)psync_malloc(*rsapublen);
+    *rsapub = (unsigned char *)malloc(*rsapublen);
     memcpy(*rsapub, rsapubstruct + offsetof(pub_key_ver1, key), *rsapublen);
     break;
   default:
@@ -281,10 +281,10 @@ static int download_keys(unsigned char **rsapriv, size_t *rsaprivlen, unsigned c
     if (offsetof(priv_key_ver1, key) >= rsaprivstructlen)
       goto def2;
     *rsaprivlen = rsaprivstructlen - offsetof(priv_key_ver1, key);
-    *rsapriv = (unsigned char *)psync_malloc(*rsaprivlen);
+    *rsapriv = (unsigned char *)malloc(*rsaprivlen);
     memcpy(*rsapriv, rsaprivstruct + offsetof(priv_key_ver1, key), *rsaprivlen);
     *saltlen = PSYNC_CRYPTO_PBKDF2_SALT_LEN;
-    *salt = (unsigned char *)psync_malloc(PSYNC_CRYPTO_PBKDF2_SALT_LEN);
+    *salt = (unsigned char *)malloc(PSYNC_CRYPTO_PBKDF2_SALT_LEN);
     memcpy(*salt, rsaprivstruct + offsetof(priv_key_ver1, salt),
            PSYNC_CRYPTO_PBKDF2_SALT_LEN);
     *iterations = PSYNC_CRYPTO_PASS_TO_KEY_ITERATIONS;
@@ -333,12 +333,12 @@ setup_upload(const unsigned char *rsapriv, size_t rsaprivlen,
   int ret;
   *cryptoexpires = 0;
   priv =
-      (priv_key_ver1 *)psync_malloc(offsetof(priv_key_ver1, key) + rsaprivlen);
+      (priv_key_ver1 *)malloc(offsetof(priv_key_ver1, key) + rsaprivlen);
   priv->type = PSYNC_CRYPTO_TYPE_RSA4096_64BYTESALT_20000IT;
   priv->flags = 0;
   memcpy(priv->salt, salt, PSYNC_CRYPTO_PBKDF2_SALT_LEN);
   memcpy(priv->key, rsapriv, rsaprivlen);
-  pub = (pub_key_ver1 *)psync_malloc(offsetof(pub_key_ver1, key) + rsapublen);
+  pub = (pub_key_ver1 *)malloc(offsetof(pub_key_ver1, key) + rsapublen);
   pub->type = PSYNC_CRYPTO_PUB_TYPE_RSA4096;
   pub->flags = 0;
   memcpy(pub->key, rsapub, rsapublen);
@@ -505,7 +505,7 @@ static int crypto_keys_match() {
   psync_encrypted_symmetric_key_t enckey;
   int res;
   debug(D_NOTICE, "trying encrypt/decrypt operation with loaded keys");
-  key = (psync_symmetric_key_t)psync_malloc(
+  key = (psync_symmetric_key_t)malloc(
       offsetof(psync_symmetric_key_struct_t, key) + 64);
   key->keylen = 64;
   pssl_rand_strong(key->key, key->keylen);
@@ -1843,7 +1843,7 @@ int psync_pcloud_crypto_reencode_key(
     psymkey_free(aeskey);
     if (unlikely(enc == PSYNC_CRYPTO_INVALID_ENCODER))
       goto err_nm_1;
-    rsaprivdec = (unsigned char *)psync_malloc(rsaprivlen);
+    rsaprivdec = (unsigned char *)malloc(rsaprivlen);
     if (unlikely(!rsaprivdec)) {
       pcrypto_ctr_encdec_free(enc);
       goto err_nm_1;
@@ -1852,7 +1852,7 @@ int psync_pcloud_crypto_reencode_key(
     pcrypto_ctr_encdec_decode(enc, rsaprivdec, rsaprivlen,
                                                   0);
     pcrypto_ctr_encdec_free(enc);
-    newpriv = (unsigned char *)psync_malloc(offsetof(priv_key_ver1, key) +
+    newpriv = (unsigned char *)malloc(offsetof(priv_key_ver1, key) +
                                             rsaprivlen);
     if (unlikely(!newpriv))
       goto err_nm_1;
@@ -1941,7 +1941,7 @@ int psync_pcloud_crypto_encode_key(const char *newpassphrase, uint32_t flags,
     goto err_nm_0;
   rsaprivlen = rsapriv->datalen;
   newpriv =
-      (unsigned char *)psync_malloc(offsetof(priv_key_ver1, key) + rsaprivlen);
+      (unsigned char *)malloc(offsetof(priv_key_ver1, key) + rsaprivlen);
   if (unlikely(!newpriv))
     goto err_nm_1;
   rsapriv_struct = (priv_key_ver1 *)newpriv;
@@ -2026,7 +2026,7 @@ int pcryptofolder_change_pass(const char *oldpassphrase,
       rowcnt++;
       if (!strcmp(id, "crypto_private_key")) {
         load_str_to(&row[1], &privkey, &privkeylen);
-        privatekey_struct = (priv_key_ver1 *)psync_malloc(
+        privatekey_struct = (priv_key_ver1 *)malloc(
             offsetof(priv_key_ver1, key) + privkeylen);
         memset(privatekey_struct, 0, offsetof(priv_key_ver1, key) + privkeylen);
         memcpy(privatekey_struct->key, privkey, privkeylen);
@@ -2035,7 +2035,7 @@ int pcryptofolder_change_pass(const char *oldpassphrase,
         free(privkey);
       } else if (!strcmp(id, "crypto_public_key")) {
         load_str_to(&row[1], &pubkey, &pubkeylen);
-        pubkey_struct = (pub_key_ver1 *)psync_malloc(
+        pubkey_struct = (pub_key_ver1 *)malloc(
             offsetof(pub_key_ver1, key) + pubkeylen);
         memset(pubkey_struct, 0, offsetof(pub_key_ver1, key) + pubkeylen);
         memcpy(pubkey_struct->key, pubkey, pubkeylen);

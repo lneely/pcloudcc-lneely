@@ -1017,7 +1017,7 @@ psync_fs_create_file(psync_fsfileid_t fileid, psync_fsfileid_t remotefileid,
     }
   }
   if (encoder == PSYNC_CRYPTO_INVALID_ENCODER) {
-    fl = (psync_openfile_t *)psync_malloc(offsetof(psync_openfile_t, encoder));
+    fl = (psync_openfile_t *)malloc(offsetof(psync_openfile_t, encoder));
     memset(fl, 0, offsetof(psync_openfile_t, encoder));
   } else {
     fl = psync_new(psync_openfile_t);
@@ -1557,7 +1557,7 @@ static int psync_fs_creat_fake_locked(psync_fspath_t *fpath,
   size_t len;
   fileid = psync_fake_fileid++;
   len = strlen(fpath->name) + 1;
-  cr = (psync_fstask_creat_t *)psync_malloc(
+  cr = (psync_fstask_creat_t *)malloc(
       offsetof(psync_fstask_creat_t, name) + len);
   cr->fileid = fileid;
   cr->rfileid = 0;
@@ -2649,14 +2649,14 @@ static int psync_fs_rename_static_file(psync_fstask_folder_t *srcfolder,
     dstfolder->taskscnt--;
   }
   len = strlen(new_name) + 1;
-  un = (psync_fstask_unlink_t *)psync_malloc(
+  un = (psync_fstask_unlink_t *)malloc(
       offsetof(psync_fstask_unlink_t, name) + len);
   un->fileid = 0;
   un->taskid = srccr->taskid;
   memcpy(un->name, new_name, len);
   psync_fstask_inject_unlink(dstfolder, un);
   addlen = psync_fstask_creat_local_offset(len - 1);
-  cr = (psync_fstask_creat_t *)psync_malloc(addlen +
+  cr = (psync_fstask_creat_t *)malloc(addlen +
                                             sizeof(psync_fstask_local_creat_t));
   cr->fileid = 0;
   cr->rfileid = 0;

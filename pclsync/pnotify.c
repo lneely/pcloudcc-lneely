@@ -101,7 +101,7 @@ static void psync_notifications_download_thumb(const binresult *thumb,
     goto err3;
   if (unlikely_log(psync_http_next_request(sock)))
     goto err3;
-  buff = (char *)psync_malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = (char *)malloc(PSYNC_COPY_BUFFER_SIZE);
   while (1) {
     rd = psync_http_request_readall(sock, buff, PSYNC_COPY_BUFFER_SIZE);
     if (rd <= 0)
@@ -258,7 +258,7 @@ static void psync_notifications_thumb_dir_list(void *ptr,
   } else
     addto = tree;
   len = strlen(st->name) + 1;
-  tl = (psync_thumb_list_t *)psync_malloc(offsetof(psync_thumb_list_t, name) +
+  tl = (psync_thumb_list_t *)malloc(offsetof(psync_thumb_list_t, name) +
                                           len);
   memcpy(tl->name, st->name, len);
   *addto = &tl->tree;

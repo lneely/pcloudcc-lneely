@@ -379,7 +379,7 @@ void pqevent_queue_sync_event_path(psync_eventtype_t eventid, psync_syncid_t syn
     else
       slen = sizeof(psync_folder_event_t);
     event =
-        (event_list_t *)psync_malloc(sizeof(event_list_t) + slen + llen + rlen);
+        (event_list_t *)malloc(sizeof(event_list_t) + slen + llen + rlen);
     strct = (char *)(event + 1);
     lcopy = strct + slen;
     rcopy = lcopy + llen;

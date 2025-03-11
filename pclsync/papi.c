@@ -308,7 +308,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     arr = NULL;
     cnt = 0;
     alloc = 128;
-    arr = (binresult **)psync_malloc(sizeof(binresult *) * alloc);
+    arr = (binresult **)malloc(sizeof(binresult *) * alloc);
     while (**indata != RPARAM_END) {
       if (cnt == alloc) {
         alloc *= 2;
@@ -333,7 +333,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     arr = NULL;
     cnt = 0;
     alloc = 32;
-    arr = (struct _hashpair *)psync_malloc(sizeof(struct _hashpair) * alloc);
+    arr = (struct _hashpair *)malloc(sizeof(struct _hashpair) * alloc);
     while (**indata != RPARAM_END) {
       if (cnt == alloc) {
         alloc *= 2;
@@ -395,7 +395,7 @@ binresult *papi_result(psock_t *sock) {
     return NULL;
   }
 
-  data = (unsigned char *)psync_malloc(ressize);
+  data = (unsigned char *)malloc(ressize);
 
   if (unlikely_log(psock_readall(sock, data, ressize) != ressize)) {
     free(data);
@@ -415,7 +415,7 @@ binresult *papi_result_thread(psock_t *sock) {
   if (unlikely_log(psock_readall_thread(
                        sock, &ressize, sizeof(uint32_t)) != sizeof(uint32_t)))
     return NULL;
-  data = (unsigned char *)psync_malloc(ressize);
+  data = (unsigned char *)malloc(ressize);
   if (unlikely_log(psock_readall_thread(sock, data, ressize) !=
                    ressize)) {
     free(data);
@@ -458,7 +458,7 @@ again:
       reader->state = 1;
       reader->bytesread = 0;
       reader->bytestoread = reader->respsize;
-      reader->data = (unsigned char *)psync_malloc(reader->respsize);
+      reader->data = (unsigned char *)malloc(reader->respsize);
       goto again;
     } else {
       assert(reader->state == 1);
@@ -496,7 +496,7 @@ unsigned char *papi_prepare(const char *command, size_t cmdlen,
   }
   if (unlikely_log(plen > 0xffff))
     return NULL;
-  sdata = data = (unsigned char *)psync_malloc(plen + 2 + additionalalloc);
+  sdata = data = (unsigned char *)malloc(plen + 2 + additionalalloc);
   memcpy(data, &plen, 2);
   data += 2;
   if (datalen != -1) {

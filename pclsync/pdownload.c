@@ -740,7 +740,7 @@ static int task_download_file(download_task_t *dt) {
   requestpath = papi_find_result2(res, "path", PARAM_STR)->str;
   psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
                  papi_find_result2(res, "dwltag", PARAM_STR)->str);
-  buff = psync_malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
   http = NULL;
   psync_hash_init(&hashctx);
   psync_list_for_each_element(range, &ranges, psync_range_list_t, list) {
@@ -1199,7 +1199,7 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
   tmpname = psync_strcat(localpath, "/", filename,
                          PSYNC_APPEND_PARTIAL_FILES, NULL);
   len = strlen(filename);
-  dt = (download_task_t *)psync_malloc(offsetof(download_task_t, filename) +
+  dt = (download_task_t *)malloc(offsetof(download_task_t, filename) +
                                        len + 1);
   memset(dt, 0, offsetof(download_task_t, filename));
   dt->taskid = taskid;
@@ -1591,7 +1591,7 @@ download_hashes_t *pdownload_get_hashes() {
   cnt = 0;
   pthread_mutex_lock(&current_downloads_mutex);
   psync_list_for_each_element(dwl, &downloads, download_list_t, list) cnt++;
-  ret = (download_hashes_t *)psync_malloc(
+  ret = (download_hashes_t *)malloc(
       offsetof(download_hashes_t, hashes) +
       sizeof(psync_hex_hash) * cnt);
   cnt = 0;

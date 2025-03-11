@@ -1039,7 +1039,7 @@ static void clean_cache() {
   }
   clean_cache_in_progress = 1;
   psync_sql_sync();
-  entries = (pagecache_entry *)psync_malloc(cnt * sizeof(pagecache_entry));
+  entries = (pagecache_entry *)malloc(cnt * sizeof(pagecache_entry));
   i = 0;
   e = 0;
   while (i < cnt) {

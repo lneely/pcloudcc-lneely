@@ -148,31 +148,6 @@ PSYNC_NOINLINE void *psync_emergency_malloc(size_t size) {
   }
 }
 
-void *psync_malloc(size_t size) {
-  void *ptr;
-#if 1 == BUGHUNT
-  void *callstack[128];
-  int frames = backtrace(callstack, 128);
-  char **strs = backtrace_symbols(callstack, frames);
-#endif
-  ptr = psync_real_malloc(size);
-#if 1 == BUGHUNT
-  printf("Allocated %zu bytes at %p\n", size, ptr);
-  for (int i = 0; i < frames; i++) {
-    printf("%s\n", strs[i]);
-  }
-  free(strs);
-#endif
-  if (likely(ptr))
-#if IS_DEBUG
-    return memset(ptr, 0xfa, size);
-#else
-    return ptr;
-#endif
-  else
-    return psync_emergency_malloc(size);
-}
-
 PSYNC_NOINLINE void *psync_emergency_realloc(void *ptr, size_t size) {
   void *ret;
   debug(D_WARNING, "could not reallocate %lu bytes", size);
@@ -1065,7 +1040,7 @@ int psync_is_lname_to_ignore(const char *name, size_t namelen) {
   size_t ilen, off, pl;
   char buff[120];
   if (namelen >= sizeof(buff))
-    namelower = (char *)psync_malloc(namelen + 1);
+    namelower = (char *)malloc(namelen + 1);
   else
     namelower = buff;
   memcpy(namelower, name, namelen);
@@ -1850,7 +1825,7 @@ static int psync_load_file(const char *local_path, char **data,
     if (fstat(fd, &st1))
       goto err1;
     len = pfile_stat_size(&st1);
-    buff = psync_malloc(len);
+    buff = malloc(len);
     if (!buff)
       goto err1;
     off = 0;
@@ -2898,7 +2873,7 @@ userinfo_t *psync_get_userinfo() {
     language = cres->str;
     llanguage =
         (cres->length + sizeof(void *)) / sizeof(void *) * sizeof(void *);
-    info = (userinfo_t *)psync_malloc(sizeof(userinfo_t) + lemail + lcurrency +
+    info = (userinfo_t *)malloc(sizeof(userinfo_t) + lemail + lcurrency +
                                       llanguage);
     ptr = (char *)(info + 1);
     memcpy(ptr, email, lemail);

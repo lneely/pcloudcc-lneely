@@ -183,7 +183,7 @@ char *psync_strcat(const char *str, ...) {
     size += len;
   }
   va_end(ap);
-  ptr2 = ptr3 = (char *)psync_malloc(size);
+  ptr2 = ptr3 = (char *)malloc(size);
   for (size = 0; size < i; size++) {
     memcpy(ptr2, strs[size], lengths[size]);
     ptr2 += lengths[size];
@@ -211,7 +211,7 @@ unsigned char *psync_base32_encode(const unsigned char *str, size_t length,
   unsigned char *p;
   uint32_t bits, buff;
 
-  result = (unsigned char *)psync_malloc(((length + 4) / 5) * 8 + 1);
+  result = (unsigned char *)malloc(((length + 4) / 5) * 8 + 1);
   p = result;
 
   bits = 0;
@@ -247,7 +247,7 @@ unsigned char *psync_base32_decode(const unsigned char *str, size_t length,
   unsigned char *result, *p;
   uint32_t bits, buff;
   unsigned char ch;
-  result = (unsigned char *)psync_malloc((length + 7) / 8 * 5 + 1);
+  result = (unsigned char *)malloc((length + 7) / 8 * 5 + 1);
   p = result;
   bits = 0;
   buff = 0;
@@ -280,7 +280,7 @@ unsigned char *psync_base64_encode(const unsigned char *str, size_t length,
   unsigned char *p;
   unsigned char *result;
 
-  result = (unsigned char *)psync_malloc(((length + 2) / 3) * 4 + 1);
+  result = (unsigned char *)malloc(((length + 2) / 3) * 4 + 1);
   p = result;
 
   while (length > 2) {
@@ -313,7 +313,7 @@ unsigned char *psync_base64_decode(const unsigned char *str, size_t length,
   size_t i = 0, j = 0;
   ssize_t ch;
 
-  result = (unsigned char *)psync_malloc((length + 3) / 4 * 3 + 1);
+  result = (unsigned char *)malloc((length + 3) / 4 * 3 + 1);
 
   while (length-- > 0) {
     ch = base64_reverse_table[*current++];
@@ -1080,7 +1080,7 @@ char **psync_sql_rowstr(const char *sql) {
       lens[i] = l;
     }
     ln += (sizeof(char *) + 1) * cnt;
-    arr = (char **)psync_malloc(ln);
+    arr = (char **)malloc(ln);
     nstr = ((char *)arr) + sizeof(char *) * cnt;
     for (i = 0; i < cnt; i++) {
       str = (char *)sqlite3_column_blob(stmt, i);
@@ -1142,7 +1142,7 @@ psync_variant *psync_sql_row(const char *sql) {
         lens[i] = l;
       }
     }
-    arr = (psync_variant *)psync_malloc(ln);
+    arr = (psync_variant *)malloc(ln);
     nstr = ((char *)arr) + sizeof(psync_variant) * cnt;
     for (i = 0; i < cnt; i++) {
       t = types[i];
@@ -1212,7 +1212,7 @@ psync_sql_res *psync_sql_query_nocache(const char *sql) {
     return NULL;
   }
   cnt = sqlite3_column_count(stmt);
-  res = (psync_sql_res *)psync_malloc(sizeof(psync_sql_res) +
+  res = (psync_sql_res *)malloc(sizeof(psync_sql_res) +
                                       cnt * sizeof(psync_variant));
   res->stmt = stmt;
   res->sql = sql;
@@ -1280,7 +1280,7 @@ psync_sql_res *psync_sql_query_rdlock_nocache(const char *sql) {
     return NULL;
   }
   cnt = sqlite3_column_count(stmt);
-  res = (psync_sql_res *)psync_malloc(sizeof(psync_sql_res) +
+  res = (psync_sql_res *)malloc(sizeof(psync_sql_res) +
                                       cnt * sizeof(psync_variant));
   res->stmt = stmt;
   res->sql = sql;
@@ -1347,7 +1347,7 @@ psync_sql_res *psync_sql_query_nolock_nocache(const char *sql) {
     return NULL;
   }
   cnt = sqlite3_column_count(stmt);
-  res = (psync_sql_res *)psync_malloc(sizeof(psync_sql_res) +
+  res = (psync_sql_res *)malloc(sizeof(psync_sql_res) +
                                       cnt * sizeof(psync_variant));
   res->stmt = stmt;
   res->sql = sql;
@@ -1708,7 +1708,7 @@ psync_full_result_int *psync_sql_fetchall_int(psync_sql_res *res) {
   if (unlikely(code != SQLITE_DONE))
     debug(D_ERROR, "sqlite3_step returned error: %s", sqlite3_errmsg(psync_db));
   psync_sql_free_result(res);
-  ret = (psync_full_result_int *)psync_malloc(
+  ret = (psync_full_result_int *)malloc(
       offsetof(psync_full_result_int, data) + sizeof(uint64_t) * off);
   ret->rows = rows;
   ret->cols = cols;
@@ -1732,7 +1732,7 @@ int psync_rename_conflicted_file(const char *path) {
     dotidx--;
   if (!dotidx)
     dotidx = plen;
-  npath = (char *)psync_malloc(plen + 32);
+  npath = (char *)malloc(plen + 32);
   memcpy(npath, path, dotidx);
   num = 0;
   while (1) {
@@ -1919,7 +1919,7 @@ void psync_list_bulder_add_sql(psync_list_builder_t *builder,
   while ((row = psync_sql_fetch_row(res))) {
     if (!builder->last_elements ||
         builder->last_elements->used >= builder->elements_per_list) {
-      builder->last_elements = (psync_list_element_list *)psync_malloc(
+      builder->last_elements = (psync_list_element_list *)malloc(
           offsetof(psync_list_element_list, elements) +
           builder->element_size * builder->elements_per_list);
       psync_list_add_tail(&builder->element_list,
@@ -1946,7 +1946,7 @@ void psync_list_bulder_add_sql(psync_list_builder_t *builder,
 void *psync_list_bulder_add_element(psync_list_builder_t *builder) {
   if (!builder->last_elements ||
       builder->last_elements->used >= builder->elements_per_list) {
-    builder->last_elements = (psync_list_element_list *)psync_malloc(
+    builder->last_elements = (psync_list_element_list *)malloc(
         offsetof(psync_list_element_list, elements) +
         builder->element_size * builder->elements_per_list);
     psync_list_add_tail(&builder->element_list, &builder->last_elements->list);
@@ -1970,13 +1970,13 @@ void psync_list_add_lstring_offset(psync_list_builder_t *builder, size_t offset,
   str = (char **)(builder->current_element + offset);
   builder->stringalloc += length;
   if (unlikely(length > 2000)) {
-    l = (psync_list_string_list *)psync_malloc(sizeof(psync_list_string_list) +
+    l = (psync_list_string_list *)malloc(sizeof(psync_list_string_list) +
                                                length);
     s = (char *)(l + 1);
     psync_list_add_tail(&builder->string_list, &l->list);
   } else if (!builder->last_strings || builder->last_strings->next + length >
                                            builder->last_strings->end) {
-    l = (psync_list_string_list *)psync_malloc(sizeof(psync_list_string_list) +
+    l = (psync_list_string_list *)malloc(sizeof(psync_list_string_list) +
                                                4000);
     s = (char *)(l + 1);
     l->next = s + length;
@@ -2108,7 +2108,7 @@ psync_task_run_tasks(psync_task_callback_t const *callbacks,
   psync_task_manager_t ret;
   struct psync_task_t_ *t;
   int i;
-  ret = (psync_task_manager_t)psync_malloc(
+  ret = (psync_task_manager_t)malloc(
       offsetof(struct psync_task_manager_t_, tasks) +
       sizeof(struct psync_task_t_) * cnt);
   pthread_mutex_init(&ret->mutex, NULL);

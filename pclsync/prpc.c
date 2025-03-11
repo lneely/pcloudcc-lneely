@@ -292,7 +292,7 @@ int prpc_register(int cmdid, prpc_handler h) {
 }
 
 void prpc_init() {
-  handlers = (prpc_handler *)psync_malloc(sizeof(prpc_handler) * handlers_size);
+  handlers = (prpc_handler *)malloc(sizeof(prpc_handler) * handlers_size);
   memset(handlers, 0, sizeof(prpc_handler) * handlers_size);
 }
 

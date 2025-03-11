@@ -172,7 +172,7 @@ static void scanner_set_syncs_to_list(psync_list *lst,
       debug(D_WARNING, "folder %s deviceid is different, ignoring", lp);
       continue;
     }
-    l = (sync_list *)psync_malloc(offsetof(sync_list, localpath) + lplen + 1);
+    l = (sync_list *)malloc(offsetof(sync_list, localpath) + lplen + 1);
     l->folderid = psync_get_number(row[1]);
     l->deviceid = deviceid;
     l->syncid = psync_get_number(row[0]);
@@ -180,7 +180,7 @@ static void scanner_set_syncs_to_list(psync_list *lst,
     memcpy(l->localpath, lp, lplen + 1);
     psync_list_add_tail(lst, &l->list);
     l_full_deviceid =
-        (sync_list *)psync_malloc(offsetof(sync_list, localpath) + lplen + 1);
+        (sync_list *)malloc(offsetof(sync_list, localpath) + lplen + 1);
     l_full_deviceid->folderid = psync_get_number(row[1]);
     l_full_deviceid->deviceid = pfile_stat_device_full(&st);
     l_full_deviceid->syncid = psync_get_number(row[0]);
@@ -254,7 +254,7 @@ static void reload_ignored_folders() {
           homelen = strlen(home);
       }
       if (home) {
-        dir = (char *)psync_malloc(dirlen + homelen - 4);
+        dir = (char *)malloc(dirlen + homelen - 4);
         memcpy(dir, home, homelen);
         memcpy(dir + homelen, start + 5, dirlen - 5);
         dir[dirlen + homelen - 5] = 0;
@@ -262,7 +262,7 @@ static void reload_ignored_folders() {
         dir = NULL;
       }
     } else {
-      dir = (char *)psync_malloc(dirlen + 1);
+      dir = (char *)malloc(dirlen + 1);
       memcpy(dir, start, dirlen);
       dir[dirlen] = 0;
     }
@@ -297,7 +297,7 @@ static void scanner_local_entry_to_list(void *ptr, ppath_stat *st) {
 
   lst = (psync_list *)ptr;
   l = strlen(st->name) + 1;
-  e = (sync_folderlist *)psync_malloc(offsetof(sync_folderlist, name) + l);
+  e = (sync_folderlist *)malloc(offsetof(sync_folderlist, name) + l);
   e->localid = 0;
   e->remoteid = 0;
   e->inode = pfile_stat_inode(&st->stat);
@@ -361,7 +361,7 @@ static void scanner_db_folder_to_list(psync_syncid_t syncid,
       continue;
     }
     namelen++;
-    e = (sync_folderlist *)psync_malloc(offsetof(sync_folderlist, name) +
+    e = (sync_folderlist *)malloc(offsetof(sync_folderlist, name) +
                                         namelen);
     e->localid = psync_get_number(row[0]);
     e->remoteid = psync_get_number_or_null(row[1]);
@@ -390,7 +390,7 @@ static void scanner_db_folder_to_list(psync_syncid_t syncid,
       continue;
     }
     namelen++;
-    e = (sync_folderlist *)psync_malloc(offsetof(sync_folderlist, name) +
+    e = (sync_folderlist *)malloc(offsetof(sync_folderlist, name) +
                                         namelen);
     e->localid = psync_get_number(row[0]);
     e->remoteid = psync_get_number_or_null(row[1]);
@@ -419,7 +419,7 @@ static sync_folderlist *copy_folderlist_element(const sync_folderlist *e,
   sync_folderlist *ret;
   size_t l;
   l = offsetof(sync_folderlist, name) + strlen(e->name) + 1;
-  ret = (sync_folderlist *)psync_malloc(l);
+  ret = (sync_folderlist *)malloc(l);
   memcpy(ret, e, l);
   ret->localparentfolderid = localfolderid;
   ret->parentfolderid = folderid;
@@ -1262,7 +1262,7 @@ void psync_restat_sync_folders_add(psync_syncid_t syncid,
   sync_restat_list *l;
   struct stat st;
   size_t lplen = strlen(localpath);
-  l = (sync_restat_list *)psync_malloc(offsetof(sync_restat_list, localpath) +
+  l = (sync_restat_list *)malloc(offsetof(sync_restat_list, localpath) +
                                        lplen + 1);
   l->syncid = syncid;
   memcpy(l->localpath, localpath, lplen + 1);
