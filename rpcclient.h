@@ -13,8 +13,6 @@ typedef enum _pCloud_FileState {
 class RpcClient {
 
 private:
-  const char *sockpath;
-
   int connectSocket(const char *sockpath, char **out, size_t *out_size);
   int writeRequest(int fd, int msgtype, const char *value, char **out, size_t *out_size);
   int readResponse(int fd, char **out, size_t *out_size);

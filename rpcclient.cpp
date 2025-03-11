@@ -24,9 +24,7 @@
 #define POVERLAY_READ_INCOMPLETE -105
 #define POVERLAY_READ_INVALID_RESPONSE -106
 
-RpcClient::RpcClient() {
-  this->sockpath = "/tmp/pcloud_unix_soc.sock";
-}
+RpcClient::RpcClient() {}
 
 RpcClient::~RpcClient() {}
 
