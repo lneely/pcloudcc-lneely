@@ -84,9 +84,6 @@
 #include "pupload.h"
 #include "putil.h"
 
-
-#define BUGHUNT 0
-
 // Variable containing UNIX time of the last backup file deleted event
 time_t lastBupDelEventTime = 0;
 time_t bupNotifDelay = 300;
