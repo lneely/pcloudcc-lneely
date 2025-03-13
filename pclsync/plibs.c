@@ -44,17 +44,12 @@
 #include "pnetlibs.h"
 #include "prun.h"
 #include "psettings.h"
+#include "psynclib.h"
 #include "psys.h"
 #include "ptimer.h"
 #include "putil.h"
 
 extern PSYNC_THREAD const char *psync_thread_name; 
-
-#define return_error(err)                                                      \
-  do {                                                                         \
-    psync_error = err;                                                         \
-    return -1;                                                                 \
-  } while (0)
 
 #define SQL_NO_LOCK 0
 #define SQL_READ_LOCK 1
@@ -464,8 +459,10 @@ int psync_sql_connect(const char *db) {
         if (psync_sql_statement(psync_db_upgrade[i])) {
           pdbg_logf(D_ERROR, "error running statement %s on sqlite %s",
                 psync_db_upgrade[i], sqlite3_libversion());
-          if (IS_DEBUG)
-            return_error(PERROR_DATABASE_OPEN);
+          if (IS_DEBUG) {
+            psync_error = PERROR_DATABASE_OPEN;
+            return -1;            
+          }
         }
     }
 

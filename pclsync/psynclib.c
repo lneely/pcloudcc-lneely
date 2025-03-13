@@ -108,11 +108,6 @@ static inline int psync_status_is_offline() {
   return pstatus_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_OFFLINE;
 }
 
-#define return_error(err)                                                      \
-  do {                                                                         \
-    psync_error = err;                                                         \
-    return -1;                                                                 \
-  } while (0)
 #define return_isyncid(err)                                                    \
   do {                                                                         \
     psync_error = err;                                                         \
@@ -178,20 +173,24 @@ int psync_init() {
     if (pdbg_unlikely(!psync_database)) {
       if (IS_DEBUG)
         pthread_mutex_unlock(&psync_libstate_mutex);
-      return_error(PERROR_NO_HOMEDIR);
+
+      psync_error = PERROR_NO_HOMEDIR;
+      return -1;
     }
   }
   if (psync_sql_connect(psync_database)) {
     if (IS_DEBUG)
       pthread_mutex_unlock(&psync_libstate_mutex);
-    return_error(PERROR_DATABASE_OPEN);
+    psync_error = PERROR_DATABASE_OPEN;
+    return -1;
   }
   psync_sql_statement("UPDATE task SET inprogress=0 WHERE inprogress=1");
   ptimer_init();
   if (pdbg_unlikely(pssl_init())) {
     if (IS_DEBUG)
       pthread_mutex_unlock(&psync_libstate_mutex);
-    return_error(PERROR_SSL_INIT_FAILED);
+    psync_error = PERROR_SSL_INIT_FAILED;
+    return -1;
   }
 
   psync_libs_init();
@@ -755,16 +754,19 @@ int psync_add_sync_by_path_delayed(const char *localpath,
   int unsigned mbedtls_md;
   if (pdbg_unlikely(synctype < PSYNC_SYNCTYPE_MIN ||
                    synctype > PSYNC_SYNCTYPE_MAX))
-    return_error(PERROR_INVALID_SYNCTYPE);
+    psync_error = PERROR_INVALID_SYNCTYPE;
+  return -1;
   if (pdbg_unlikely(stat(localpath, &st)) ||
       pdbg_unlikely(!pfile_stat_isfolder(&st)))
-    return_error(PERROR_LOCAL_FOLDER_NOT_FOUND);
+    psync_error = PERROR_LOCAL_FOLDER_NOT_FOUND;
+  return -1;
   if (synctype & PSYNC_DOWNLOAD_ONLY)
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
   if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md)))
-    return_error(PERROR_LOCAL_FOLDER_ACC_DENIED);
+    psync_error = PERROR_LOCAL_FOLDER_ACC_DENIED;
+  return -1;
   res = psync_sql_prep_statement("INSERT INTO syncfolderdelayed (localpath, "
                                  "remotepath, synctype) VALUES (?, ?, ?)");
   psync_sql_bind_string(res, 1, localpath);
@@ -797,7 +799,8 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   if (pdbg_unlikely(!row)) {
     psync_sql_free_result(res);
     psync_sql_rollback_transaction();
-    return_error(PERROR_INVALID_SYNCID);
+    psync_error = PERROR_INVALID_SYNCID;
+    return -1;
   }
   folderid = psync_get_number(row[0]);
   oldsynctype = psync_get_number(row[2]);
