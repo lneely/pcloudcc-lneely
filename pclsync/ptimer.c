@@ -160,7 +160,7 @@ static void timer_thread() {
       timer_process_timers(&timers);
     if (unlikely(psync_current_time - lt >= 25))
       timer_sleep_detected(lt);
-    else if (unpdbg_likely(psync_current_time == lt)) {
+    else if (pdbg_unlikely(psync_current_time == lt)) {
       if (!psync_do_run)
         break;
       psys_sleep_milliseconds(1000);

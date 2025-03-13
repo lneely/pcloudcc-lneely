@@ -875,7 +875,7 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   psync_sql_rdlock();
   CHECK_LOGIN_RDLOCKED();
   folderid = psync_fsfolderid_by_path(path, &flags);
-  if (unpdbg_likely(folderid == PSYNC_INVALID_FSFOLDERID)) {
+  if (pdbg_unlikely(folderid == PSYNC_INVALID_FSFOLDERID)) {
     psync_sql_rdunlock();
     if (psync_fsfolder_crypto_error())
       return pdbg_return(
@@ -904,7 +904,7 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     while ((row = psync_sql_fetch_row(res))) {
       name = psync_get_lstring(row[5], &namelen);
 #if defined(FS_MAX_ACCEPTABLE_FILENAME_LEN)
-      if (unpdbg_likely(namelen > FS_MAX_ACCEPTABLE_FILENAME_LEN))
+      if (pdbg_unlikely(namelen > FS_MAX_ACCEPTABLE_FILENAME_LEN))
         continue;
 #endif
       if (!name || !name[0])
@@ -922,7 +922,7 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     while ((row = psync_sql_fetch_row(res))) {
       name = psync_get_lstring(row[0], &namelen);
 #if defined(FS_MAX_ACCEPTABLE_FILENAME_LEN)
-      if (unpdbg_likely(namelen > FS_MAX_ACCEPTABLE_FILENAME_LEN))
+      if (pdbg_unlikely(namelen > FS_MAX_ACCEPTABLE_FILENAME_LEN))
         continue;
 #endif
       if (!name || !name[0])
@@ -937,7 +937,7 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   if (folder) {
     ptree_for_each(trel, folder->mkdirs) {
 #if defined(FS_MAX_ACCEPTABLE_FILENAME_LEN)
-      if (unpdbg_likely(
+      if (pdbg_unlikely(
               strlen(
                   ptree_element(trel, psync_fstask_mkdir_t, tree)->name) >
               FS_MAX_ACCEPTABLE_FILENAME_LEN))
@@ -954,7 +954,7 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     }
     ptree_for_each(trel, folder->creats) {
 #if defined(FS_MAX_ACCEPTABLE_FILENAME_LEN)
-      if (unpdbg_likely(
+      if (pdbg_unlikely(
               strlen(
                   ptree_element(trel, psync_fstask_creat_t, tree)->name) >
               FS_MAX_ACCEPTABLE_FILENAME_LEN))
@@ -1080,7 +1080,7 @@ int64_t psync_fs_load_interval_tree(int fd, uint64_t size,
     rrd = pfile_pread(fd, records, rd * sizeof(psync_fs_index_record),
                            i * sizeof(psync_fs_index_record) +
                                sizeof(psync_fs_index_header));
-    if (unpdbg_likely(rrd != rd * sizeof(psync_fs_index_record)))
+    if (pdbg_unlikely(rrd != rd * sizeof(psync_fs_index_record)))
       return -1;
     for (j = 0; j < rd; j++)
       psync_interval_tree_add(tree, records[j].offset,
@@ -1108,7 +1108,7 @@ static int load_interval_tree(psync_openfile_t *of) {
   psync_fs_index_header hdr;
   int64_t ifs;
   ifs = pfile_size(of->indexfile);
-  if (unpdbg_likely(ifs == -1))
+  if (pdbg_unlikely(ifs == -1))
     return -1;
   if (ifs < sizeof(psync_fs_index_header)) {
     pdbg_assertw(ifs == 0);
@@ -1153,7 +1153,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
       return -EIO;
     }
     fs = pfile_size(of->datafile);
-    if (unpdbg_likely(fs == -1))
+    if (pdbg_unlikely(fs == -1))
       return -EIO;
     if (of->encrypted)
       of->currentsize = pfscrypto_plain_size(fs);
@@ -1300,7 +1300,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
               (unsigned long)hash);
       }
       psync_sql_free_result(res);
-      if (unpdbg_likely(!row)) {
+      if (pdbg_unlikely(!row)) {
         ret = -ENOENT;
         goto ex0;
       }
@@ -1318,7 +1318,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
         hash = row[4];
       }
       psync_sql_free_result(res);
-      if (unpdbg_likely(!row)) {
+      if (pdbg_unlikely(!row)) {
         ret = -ENOENT;
         goto ex0;
       }
@@ -1326,7 +1326,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
         fileid = cr->fileid;
         if (fpath->flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
           encoder = pcryptofolder_filencoder_get(fileid, hash, 1);
-          if (unpdbg_likely(psync_crypto_is_error(encoder))) {
+          if (pdbg_unlikely(psync_crypto_is_error(encoder))) {
             ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encoder));
             goto ex0;
           }
@@ -1344,7 +1344,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
         ret = open_write_files(of, fi->flags & O_TRUNC);
         pthread_mutex_unlock(&of->mutex);
         fi->fh = openfile_to_fh(of);
-        if (unpdbg_likely(ret)) {
+        if (pdbg_unlikely(ret)) {
           psync_fs_dec_of_refcnt(of);
           return ret;
         } else
@@ -1380,7 +1380,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
       }
       if (fpath->flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
         encoder = pcryptofolder_filencoder_get(fileid, hash, 1);
-        if (unpdbg_likely(psync_crypto_is_error(encoder))) {
+        if (pdbg_unlikely(psync_crypto_is_error(encoder))) {
           ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encoder));
           goto ex0;
         }
@@ -1397,7 +1397,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
       ret = open_write_files(of, fi->flags & O_TRUNC);
       pthread_mutex_unlock(&of->mutex);
       fi->fh = openfile_to_fh(of);
-      if (unpdbg_likely(ret)) {
+      if (pdbg_unlikely(ret)) {
         psync_fs_dec_of_refcnt(of);
         return ret;
       } else
@@ -1448,13 +1448,13 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
     if (fpath->flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
       if (row) {
         encoder = pcryptofolder_filencoder_get(fileid, hash, 0);
-        if (unpdbg_likely(psync_crypto_is_error(encoder))) {
+        if (pdbg_unlikely(psync_crypto_is_error(encoder))) {
           ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encoder));
           goto ex0;
         }
         encsymkey = pcryptofolder_filencoder_key_get(fileid, hash,
                                                             &encsymkeylen);
-        if (unpdbg_likely(psync_crypto_is_error(encsymkey))) {
+        if (pdbg_unlikely(psync_crypto_is_error(encsymkey))) {
           pcryptofolder_filencoder_release(fileid, hash, encoder);
           ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encsymkey));
           goto ex0;
@@ -1463,13 +1463,13 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
         psync_symmetric_key_t symkey;
         encsymkey = pcryptofolder_filencoder_key_newplain(
             0, &encsymkeylen, &symkey);
-        if (unpdbg_likely(psync_crypto_is_error(encsymkey))) {
+        if (pdbg_unlikely(psync_crypto_is_error(encsymkey))) {
           ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encsymkey));
           goto ex0;
         }
         encoder = pcrypto_sec_encdec_create(symkey);
         psymkey_free(symkey);
-        if (unpdbg_likely(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
+        if (pdbg_unlikely(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
           free(encsymkey);
           ret = -ENOMEM;
           goto ex0;
@@ -1483,7 +1483,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
     cr =
         psync_fstask_add_creat(folder, fpath->name, 0, encsymkey, encsymkeylen);
     free(encsymkey);
-    if (unpdbg_likely(!cr)) {
+    if (pdbg_unlikely(!cr)) {
       ret = -EIO;
       goto ex0;
     }
@@ -1496,7 +1496,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
     of->modified = 1;
     ret = open_write_files(of, 1);
     pthread_mutex_unlock(&of->mutex);
-    if (unpdbg_likely(ret)) {
+    if (pdbg_unlikely(ret)) {
       psync_fs_del_creat(fpath, of);
       return ret;
     }
@@ -1506,7 +1506,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
   } else if (row) {
     if (fpath->flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
       encoder = pcryptofolder_filencoder_get(fileid, hash, 1);
-      if (unpdbg_likely(psync_crypto_is_error(encoder))) {
+      if (pdbg_unlikely(psync_crypto_is_error(encoder))) {
         ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encoder));
         goto ex0;
       }
@@ -1632,7 +1632,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
     }
     encsymkey = pcryptofolder_filencoder_key_newplain(
         0, &encsymkeylen, &symkey);
-    if (unpdbg_likely(psync_crypto_is_error(encsymkey))) {
+    if (pdbg_unlikely(psync_crypto_is_error(encsymkey))) {
       psync_fstask_release_folder_tasks_locked(folder);
       psync_sql_unlock();
       free(fpath);
@@ -1640,7 +1640,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
     }
     encoder = pcrypto_sec_encdec_create(symkey);
     psymkey_free(symkey);
-    if (unpdbg_likely(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
+    if (pdbg_unlikely(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
       psync_fstask_release_folder_tasks_locked(folder);
       psync_sql_unlock();
       free(fpath);
@@ -1655,7 +1655,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
   cr = psync_fstask_add_creat(folder, fpath->name, 0, encsymkey, encsymkeylen);
   if (encsymkey)
     free(encsymkey);
-  if (unpdbg_likely(!cr)) {
+  if (pdbg_unlikely(!cr)) {
     psync_fstask_release_folder_tasks_locked(folder);
     psync_sql_unlock();
     free(fpath);
@@ -1670,7 +1670,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
   of->modified = 1;
   ret = open_write_files(of, 1);
   pthread_mutex_unlock(&of->mutex);
-  if (unpdbg_likely(ret)) {
+  if (pdbg_unlikely(ret)) {
     psync_fs_del_creat(fpath, of);
     return ret;
   }
@@ -1879,7 +1879,7 @@ static int psync_fs_flush(const char *path, struct fuse_file_info *fi) {
     writeid = of->writeid;
     if (of->encrypted) {
       ret = pfscrypto_flush(of);
-      if (unpdbg_likely(ret)) {
+      if (pdbg_unlikely(ret)) {
         pthread_mutex_unlock(&of->mutex);
         return ret;
       }
@@ -1941,18 +1941,18 @@ static int psync_fs_fsync(const char *path, int datasync,
   }
   if (of->encrypted) {
     ret = pfscrypto_flush(of);
-    if (unpdbg_likely(ret)) {
+    if (pdbg_unlikely(ret)) {
       pthread_mutex_unlock(&of->mutex);
       return ret;
     }
   }
-  if (unpdbg_likely(pfile_sync(of->datafile)) ||
-      unpdbg_likely(!of->newfile && pfile_sync(of->indexfile))) {
+  if (pdbg_unlikely(pfile_sync(of->datafile)) ||
+      pdbg_unlikely(!of->newfile && pfile_sync(of->indexfile))) {
     pthread_mutex_unlock(&of->mutex);
     return -EIO;
   }
   pthread_mutex_unlock(&of->mutex);
-  if (unpdbg_likely(psync_sql_sync()))
+  if (pdbg_unlikely(psync_sql_sync()))
     return -EIO;
   return 0;
 }
@@ -1961,7 +1961,7 @@ static int psync_fs_fsyncdir(const char *path, int datasync,
                              struct fuse_file_info *fi) {
   psync_fs_set_thread_name();
   pdbg_logf(D_NOTICE, "fsyncdir %s", path);
-  if (unpdbg_likely(psync_sql_sync()))
+  if (pdbg_unlikely(psync_sql_sync()))
     return -EIO;
   else
     return 0;
@@ -2083,7 +2083,7 @@ static int psync_fs_modfile_check_size_ok(psync_openfile_t *of, uint64_t size) {
       ioff = of->indexoff++;
       rec.offset = of->currentsize;
       rec.length = size - of->currentsize;
-      if (unpdbg_likely(pfile_pwrite(of->indexfile, &rec, sizeof(rec),
+      if (pdbg_unlikely(pfile_pwrite(of->indexfile, &rec, sizeof(rec),
                                          sizeof(rec) * ioff +
                                              sizeof(psync_fs_index_header)) !=
                        sizeof(rec)))
@@ -2140,7 +2140,7 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
     size = pfscrypto_crypto_size(of->initialsize);
     encsymkey = pcryptofolder_filencoder_key_get(of->fileid, of->hash,
                                                         &encsymkeylen);
-    if (unpdbg_likely(psync_crypto_is_error(encsymkey))) {
+    if (pdbg_unlikely(psync_crypto_is_error(encsymkey))) {
       psync_sql_unlock();
       return -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encsymkey));
     }
@@ -2158,7 +2158,7 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
           of->currentname);
     cr = psync_fstask_add_creat(of->currentfolder, of->currentname, of->fileid,
                                 encsymkey, encsymkeylen);
-    if (unpdbg_likely(!cr)) {
+    if (pdbg_unlikely(!cr)) {
       psync_sql_unlock();
       ppagecache_unlock_pages();
       free(encsymkey);
@@ -2170,7 +2170,7 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
     of->newfile = 1;
     of->modified = 1;
     ret = open_write_files(of, 0);
-    if (unpdbg_likely(ret)) {
+    if (pdbg_unlikely(ret)) {
       ppagecache_unlock_pages();
       free(encsymkey);
       return ret;
@@ -2181,7 +2181,7 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
       ret = ppagecache_copy_to_file_locked(
           of, of->hash, size);
       ppagecache_unlock_pages();
-      if (unpdbg_likely(ret)) {
+      if (pdbg_unlikely(ret)) {
         free(encsymkey);
         return -EIO;
       }
@@ -2193,14 +2193,14 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
                                       of->fileid, of->hash, encsymkey,
                                       encsymkeylen);
   free(encsymkey);
-  if (unpdbg_likely(!cr)) {
+  if (pdbg_unlikely(!cr)) {
     psync_sql_unlock();
     return -EIO;
   }
   psync_fs_update_openfile_fileid_locked(of, cr->fileid);
   psync_sql_unlock();
   ret = open_write_files(of, 0);
-  if (unpdbg_likely(ret) ||
+  if (pdbg_unlikely(ret) ||
       pfile_seek(of->datafile, size, SEEK_SET) == -1 ||
       pfile_truncate(of->datafile)) {
     if (!ret)
@@ -2238,7 +2238,7 @@ psync_fs_reopen_static_file_for_writing(psync_openfile_t *of) {
   pdbg_logf(D_NOTICE, "reopening static file %s for writing size %lu, taskid %lu",
         of->currentname, (unsigned long)of->currentsize, (unsigned long)taskid);
   cr = psync_fstask_add_creat(of->currentfolder, of->currentname, 0, NULL, 0);
-  if (unpdbg_likely(!cr)) {
+  if (pdbg_unlikely(!cr)) {
     psync_sql_unlock();
     return -EIO;
   }
@@ -2262,7 +2262,7 @@ psync_fs_reopen_static_file_for_writing(psync_openfile_t *of) {
   of->modified = 1;
   of->staticfile = 0;
   ret = open_write_files(of, 1);
-  if (unpdbg_likely(ret))
+  if (pdbg_unlikely(ret))
     return ret;
   if (pfile_pwrite(of->datafile, of->staticdata, of->currentsize, 0) !=
       of->currentsize)
@@ -2424,15 +2424,15 @@ static int psync_fs_write_modified(psync_openfile_t *of, const char *buf,
   psync_fs_index_record rec;
   uint64_t ioff;
   ssize_t bw;
-  if (unpdbg_likely(psync_fs_modfile_check_size_ok(of, offset)))
+  if (pdbg_unlikely(psync_fs_modfile_check_size_ok(of, offset)))
     return -EIO;
   ioff = of->indexoff++;
   bw = pfile_pwrite(of->datafile, buf, size, offset);
-  if (unpdbg_likely(bw == -1))
+  if (pdbg_unlikely(bw == -1))
     return -EIO;
   rec.offset = offset;
   rec.length = bw;
-  if (unpdbg_likely(pfile_pwrite(of->indexfile, &rec, sizeof(rec),
+  if (pdbg_unlikely(pfile_pwrite(of->indexfile, &rec, sizeof(rec),
                                      sizeof(rec) * ioff +
                                          sizeof(psync_fs_index_header)) !=
                    sizeof(rec)))
@@ -2462,7 +2462,7 @@ static int psync_fs_write(const char *path, const char *buf, size_t size,
   of = fh_to_openfile(fi->fh);
   psync_fs_lock_file(of);
   ret = psync_fs_check_write_space(of, size, offset);
-  if (unpdbg_likely(ret <= 0))
+  if (pdbg_unlikely(ret <= 0))
     return ret;
   psync_fs_inc_writeid_locked(of);
 retry:
@@ -2472,7 +2472,7 @@ retry:
     else
       ret = psync_fs_write_newfile(of, buf, size, offset);
     pthread_mutex_unlock(&of->mutex);
-    if (unpdbg_likely(ret == -1))
+    if (pdbg_unlikely(ret == -1))
       return -EIO;
     else
       return ret;
@@ -3540,7 +3540,7 @@ static void psync_usr1_handler(int sig) {
 static void psync_set_signal(int sig, void (*handler)(int)) {
   struct sigaction sa;
 
-  if (unpdbg_likely(sigaction(sig, NULL, &sa)))
+  if (pdbg_unlikely(sigaction(sig, NULL, &sa)))
     return;
 
   if (sa.sa_handler == SIG_DFL) {
@@ -3684,11 +3684,11 @@ static int psync_fs_do_start() {
   mp = psync_fuse_get_mountpoint();
 
   psync_fuse_channel = fuse_mount(mp, &args);
-  if (unpdbg_likely(!psync_fuse_channel))
+  if (pdbg_unlikely(!psync_fuse_channel))
     goto err0;
   psync_fuse = fuse_new(psync_fuse_channel, &args, &psync_oper,
                         sizeof(psync_oper), NULL);
-  if (unpdbg_likely(!psync_fuse))
+  if (pdbg_unlikely(!psync_fuse))
     goto err1;
   psync_current_mountpoint = mp;
   started = 1;

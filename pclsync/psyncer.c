@@ -302,7 +302,7 @@ static void psync_sync_newsyncedfolder(psync_syncid_t syncid) {
                         "WHERE id=? AND flags=0");
   psync_sql_bind_uint(res, 1, syncid);
   row = psync_sql_fetch_row(res);
-  if (unpdbg_likely(!row)) {
+  if (pdbg_unlikely(!row)) {
     psync_sql_free_result(res);
     psync_sql_rollback_transaction();
     return;
@@ -436,9 +436,9 @@ re:
       mbedtls_md = 7;
     else
       mbedtls_md = 5;
-    if (unpdbg_likely(stat(localpath, &st)) ||
-        unpdbg_likely(!pfile_stat_isfolder(&st)) ||
-        unpdbg_likely(!pfile_stat_mode_ok(&st, mbedtls_md))) {
+    if (pdbg_unlikely(stat(localpath, &st)) ||
+        pdbg_unlikely(!pfile_stat_isfolder(&st)) ||
+        pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md))) {
       pdbg_logf(D_WARNING,
             "ignoring delayed sync id %" PRIu64 " for local path %s", id,
             localpath);

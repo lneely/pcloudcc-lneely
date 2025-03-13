@@ -99,7 +99,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
 
   sock = papi_connect(binapi, psync_setting_get_bool(0));
 
-  if (unpdbg_likely(!sock)) {
+  if (pdbg_unlikely(!sock)) {
     if (err) {
       *err = psync_strdup("Could not connect to the server.");
     }
@@ -184,7 +184,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
   free(keyParams);
   free(paramsLocal);
 
-  if (unpdbg_likely(!res)) {
+  if (pdbg_unlikely(!res)) {
     psock_close(sock);
 
     if (err) {
@@ -295,7 +295,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
 
   sock = papi_connect(binapi, psync_setting_get_bool(0));
 
-  if (unpdbg_likely(!sock)) {
+  if (pdbg_unlikely(!sock)) {
     if (err) {
       *err = psync_strdup("Could not connect to the server.");
     }
@@ -308,7 +308,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
 
   free(localParams);
 
-  if (unpdbg_likely(!res)) {
+  if (pdbg_unlikely(!res)) {
     psock_close(sock);
 
     if (err) {

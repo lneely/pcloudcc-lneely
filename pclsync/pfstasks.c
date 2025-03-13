@@ -446,7 +446,7 @@ int psync_fstask_mkdir(psync_fsfolderid_t folderid, const char *name,
   } else
     depend = 0;
   depend += psync_fstask_depend_on_name(taskid, folderid, name, len);
-  if (unpdbg_likely(psync_sql_commit_transaction())) {
+  if (pdbg_unlikely(psync_sql_commit_transaction())) {
     psync_fstask_release_folder_tasks_locked(folder);
     return -EIO;
   }
@@ -650,7 +650,7 @@ int psync_fstask_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
   }
   psync_sql_free_result(res);
   psync_fstask_depend_on_name(taskid, folderid, name, len);
-  if (unpdbg_likely(psync_sql_commit_transaction())) {
+  if (pdbg_unlikely(psync_sql_commit_transaction())) {
     psync_fstask_release_folder_tasks_locked(folder);
     return -EIO;
   }
@@ -699,7 +699,7 @@ psync_fstask_creat_t *psync_fstask_add_creat(psync_fstask_folder_t *folder,
   if (folder->folderid < 0)
     psync_fstask_depend(taskid, -folder->folderid);
   psync_fstask_depend_on_name(taskid, folder->folderid, name, len);
-  if (unpdbg_likely(psync_sql_commit_transaction()))
+  if (pdbg_unlikely(psync_sql_commit_transaction()))
     return NULL;
   len++;
   un = (psync_fstask_unlink_t *)malloc(
@@ -774,7 +774,7 @@ psync_fstask_add_modified_file(psync_fstask_folder_t *folder, const char *name,
     free(task);
     folder->taskscnt--;
   }
-  if (unpdbg_likely(psync_sql_commit_transaction()))
+  if (pdbg_unlikely(psync_sql_commit_transaction()))
     return NULL;
   len++;
   un = (psync_fstask_unlink_t *)malloc(
@@ -820,7 +820,7 @@ int psync_fstask_set_mtime(psync_fileid_t fileid, uint64_t oldtm,
   psync_sql_bind_int(res, 3, oldtm);
   psync_sql_bind_int(res, 4, newtm);
   psync_sql_run_free(res);
-  if (unpdbg_likely(psync_sql_commit_transaction()))
+  if (pdbg_unlikely(psync_sql_commit_transaction()))
     return -EIO;
   psync_fsupload_wake();
   return 0;
@@ -1068,7 +1068,7 @@ int psync_fstask_unlink(psync_fsfolderid_t folderid, const char *name) {
   if (fileid < 0 && -fileid != depend)
     psync_fstask_depend(taskid, -fileid);
   psync_fstask_depend_on_name(taskid, folderid, name, len);
-  if (unpdbg_likely(psync_sql_commit_transaction())) {
+  if (pdbg_unlikely(psync_sql_commit_transaction())) {
     psync_fstask_release_folder_tasks_locked(folder);
     return -EIO;
   }
@@ -1163,7 +1163,7 @@ int psync_fstask_rename_file(psync_fsfileid_t fileid,
   psync_fstask_depend_on_name(ttaskid, to_folderid, new_name, nnlen);
   if (cr)
     psync_fstask_depend(ttaskid, cr->taskid);
-  if (unpdbg_likely(psync_sql_commit_transaction())) {
+  if (pdbg_unlikely(psync_sql_commit_transaction())) {
     psync_fstask_release_folder_tasks_locked(folder);
     return -EIO;
   }
@@ -1387,7 +1387,7 @@ int psync_fstask_rename_folder(psync_fsfolderid_t folderid,
   if (mk)
     psync_fstask_depend(ttaskid, mk->taskid);
 
-  if (unpdbg_likely(psync_sql_commit_transaction())) {
+  if (pdbg_unlikely(psync_sql_commit_transaction())) {
     psync_fstask_release_folder_tasks_locked(folder);
     return -EIO;
   }
@@ -1490,7 +1490,7 @@ void psync_fstask_folder_created(psync_folderid_t parentfolderid,
     res = psync_sql_query("SELECT sfolderid FROM fstask WHERE id=?");
     psync_sql_bind_uint(res, 1, taskid);
     row = psync_sql_fetch_rowint(res);
-    if (unpdbg_likely(!row))
+    if (pdbg_unlikely(!row))
       psync_sql_free_result(res);
     else {
       sfolderid = row[0];
@@ -1552,7 +1552,7 @@ static void psync_fstask_look_for_creat_in_db(psync_folderid_t parentfolderid,
   res = psync_sql_query("SELECT sfolderid FROM fstask WHERE id=?");
   psync_sql_bind_uint(res, 1, taskid);
   row = psync_sql_fetch_rowint(res);
-  if (unpdbg_likely(!row)) {
+  if (pdbg_unlikely(!row)) {
     psync_sql_free_result(res);
     return;
   }

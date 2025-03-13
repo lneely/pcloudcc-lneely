@@ -152,13 +152,13 @@ static void add_syncid(psync_syncid_t syncid) {
   }
   dir->syncid = syncid;
   dir->inotifyfd = inotify_init();
-  if (unpdbg_likely(dir->inotifyfd == -1))
+  if (pdbg_unlikely(dir->inotifyfd == -1))
     goto err;
   memset(dir->watches, 0, sizeof(dir->watches));
   add_dir_scan(dir, dir->path);
   e.events = EPOLLIN;
   e.data.ptr = dir;
-  if (unpdbg_likely(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, dir->inotifyfd, &e)))
+  if (pdbg_unlikely(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, dir->inotifyfd, &e)))
     goto err2;
   psync_list_add_tail(&dirs, &dir->list);
   return;
@@ -279,16 +279,16 @@ static void psync_localnotify_thread() {
 int psync_localnotify_init() {
   struct epoll_event e;
   int pfd[2];
-  if (unpdbg_likely(pipe(pfd)))
+  if (pdbg_unlikely(pipe(pfd)))
     goto err0;
   pipe_read = pfd[0];
   pipe_write = pfd[1];
   epoll_fd = epoll_create(1);
-  if (unpdbg_likely(epoll_fd == -1))
+  if (pdbg_unlikely(epoll_fd == -1))
     goto err1;
   e.events = EPOLLIN;
   e.data.ptr = NULL;
-  if (unpdbg_likely(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pipe_read, &e)))
+  if (pdbg_unlikely(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pipe_read, &e)))
     goto err2;
   prun_thread("localnotify", psync_localnotify_thread);
   return 0;

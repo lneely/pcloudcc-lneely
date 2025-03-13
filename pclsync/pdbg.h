@@ -60,9 +60,9 @@ extern "C" {
                            "assertion pdbg_likely(%s) failed", TO_STR(x)) *     \
                    0)
 
-#define unpdbg_likely(x)                                                        \
+#define pdbg_unlikely(x)                                                        \
   (unlikely(x) ? pdbg_printf(__FILE__, __FUNCTION__, __LINE__, D_WARNING,      \
-                             "assertion unpdbg_likely(%s) failed", TO_STR(x))   \
+                             "assertion pdbg_unlikely(%s) failed", TO_STR(x))   \
                : 0)
 #define pdbg_return(x)                                                        \
   ((x) * pdbg_printf(__FILE__, __FUNCTION__, __LINE__, D_NOTICE,               \

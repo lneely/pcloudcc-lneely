@@ -270,13 +270,13 @@ static int psync_send_task_creat_upload_small(psock_t *api,
 #endif
     data = papi_prepare_alloc("uploadfile", params, size, size, &len);
   }
-  if (unpdbg_likely(pfile_read(fd, data + len, size) != size) ||
-      unpdbg_likely(psync_fs_get_file_writeid(task->id) != task->int1)) {
+  if (pdbg_unlikely(pfile_read(fd, data + len, size) != size) ||
+      pdbg_unlikely(psync_fs_get_file_writeid(task->id) != task->int1)) {
     free(data);
     return -1;
   }
   size += len;
-  if (unpdbg_likely(psync_socket_writeall_upload(api, data, size) != size)) {
+  if (pdbg_unlikely(psync_socket_writeall_upload(api, data, size) != size)) {
     free(data);
     return -1;
   } else {
@@ -291,7 +291,7 @@ static int large_upload_creat_send_write(psock_t *api,
   binparam params[] = {PAPI_STR("auth", psync_my_auth),
                        PAPI_NUM("uploadoffset", offset),
                        PAPI_NUM("uploadid", uploadid)};
-  if (unpdbg_likely(!papi_send(api, "upload_write", strlen("upload_write"),
+  if (pdbg_unlikely(!papi_send(api, "upload_write", strlen("upload_write"),
                                     params, ARRAY_SIZE(params), length, 0)))
     return -1;
   else
@@ -333,7 +333,7 @@ static int large_upload_check_checksum(psock_t *api, uint64_t uploadid,
   binresult *res;
   uint64_t result;
   res = papi_send2(api, "upload_info", params);
-  if (unpdbg_likely(!res)) {
+  if (pdbg_unlikely(!res)) {
     psync_apipool_release_bad(api);
     return -1;
   }
@@ -567,7 +567,7 @@ static int large_upload_save(psock_t *api, uint64_t uploadid,
 #endif
     res = papi_send2(api, "upload_save", params);
   }
-  if (unpdbg_likely(!res)) {
+  if (pdbg_unlikely(!res)) {
     psync_apipool_release_bad(api);
     return -1;
   }
@@ -787,11 +787,11 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
     psync_sql_run_free(sql);
   }
   fd = pfile_open(filename, O_RDONLY, 0);
-  if (unpdbg_likely(fd == INVALID_HANDLE_VALUE))
+  if (pdbg_unlikely(fd == INVALID_HANDLE_VALUE))
     goto ret0;
   if (usize) {
     pdbg_logf(D_NOTICE, "resuming from offset %lu", (unsigned long)usize);
-    if (unpdbg_likely(pfile_seek(fd, usize, SEEK_SET) == -1))
+    if (pdbg_unlikely(pfile_seek(fd, usize, SEEK_SET) == -1))
       goto ret01;
   }
   if (large_upload_creat_send_write(api, uploadid, usize, fsize - usize))
@@ -812,10 +812,10 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
     else
       rd = fsize - usize;
     rrd = pfile_read(fd, buff, rd);
-    if (unpdbg_likely(rrd <= 0))
+    if (pdbg_unlikely(rrd <= 0))
       goto err2;
     usize += rrd;
-    if (unpdbg_likely(psync_socket_writeall_upload(api, buff, rrd) != rrd))
+    if (pdbg_unlikely(psync_socket_writeall_upload(api, buff, rrd) != rrd))
       goto err2;
     asize += rrd;
     pupload_bytes_add(rrd);
@@ -823,7 +823,7 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
   free(buff);
   pfile_close(fd);
   res = papi_result(api);
-  if (unpdbg_likely(!res))
+  if (pdbg_unlikely(!res))
     goto err0;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   free(res);
@@ -896,7 +896,7 @@ static int upload_modify_send_copy_from(psock_t *api,
   pdbg_logf(D_NOTICE, "copying %lu bytes from fileid %lu hash %lu at offset %lu",
         (unsigned long)length, (unsigned long)fileid, (unsigned long)hash,
         (unsigned long)offset);
-  if (unpdbg_likely(!papi_send_no_res(api, "upload_writefromfile", params)))
+  if (pdbg_unlikely(!papi_send_no_res(api, "upload_writefromfile", params)))
     return PSYNC_NET_TEMPFAIL;
   else {
     *upl += length;
@@ -918,8 +918,8 @@ static int upload_modify_send_local(psock_t *api,
   ssize_t rrd;
   pdbg_logf(D_NOTICE, "uploading %lu byte from local file at offset %lu",
         (unsigned long)length, (unsigned long)offset);
-  if (unpdbg_likely(pfile_seek(fd, offset, SEEK_SET) == -1) ||
-      unpdbg_likely(!papi_send(api, "upload_write", strlen("upload_write"),
+  if (pdbg_unlikely(pfile_seek(fd, offset, SEEK_SET) == -1) ||
+      pdbg_unlikely(!papi_send(api, "upload_write", strlen("upload_write"),
                                     params, ARRAY_SIZE(params), length, 0)))
     return PSYNC_NET_TEMPFAIL;
   bw = 0;
@@ -936,14 +936,14 @@ static int upload_modify_send_local(psock_t *api,
     else
       rd = length - bw;
     rrd = pfile_read(fd, buff, rd);
-    if (unpdbg_likely(rrd <= 0)) {
+    if (pdbg_unlikely(rrd <= 0)) {
       if (rrd == 0)
         goto errp;
       else
         goto err0;
     }
     bw += rrd;
-    if (unpdbg_likely(psync_socket_writeall_upload(api, buff, rrd) != rrd))
+    if (pdbg_unlikely(psync_socket_writeall_upload(api, buff, rrd) != rrd))
       goto err0;
     *upl += rrd;
     pupload_bytes_add(rrd);
@@ -1005,7 +1005,7 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
       return -1;
   }
   tree = NULL;
-  if (unpdbg_likely((fsize = pfile_size(fd)) == -1 ||
+  if (pdbg_unlikely((fsize = pfile_size(fd)) == -1 ||
                    psync_fs_load_interval_tree(fd, fsize, &tree) == -1)) {
     psync_interval_tree_free(tree);
     pfile_close(fd);
@@ -1013,12 +1013,12 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
   }
   pfile_close(fd);
   api = psync_apipool_get();
-  if (unpdbg_likely(!api))
+  if (pdbg_unlikely(!api))
     goto err1;
-  if (unpdbg_likely(clean_uploads_for_task(api, taskid)))
+  if (pdbg_unlikely(clean_uploads_for_task(api, taskid)))
     goto err2;
   res = papi_send2(api, "upload_create", aparams);
-  if (unpdbg_likely(!res))
+  if (pdbg_unlikely(!res))
     goto err2;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
@@ -1052,7 +1052,7 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
       return -1;
   }
   fsize = pfile_size(fd);
-  if (unpdbg_likely(fsize == -1))
+  if (pdbg_unlikely(fsize == -1))
     goto err3;
   pdbg_logf(D_NOTICE, "file size=%lu", (unsigned long)fsize);
   coff = 0;
@@ -1065,7 +1065,7 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
                                      ? PSYNC_SOCK_READ_TIMEOUT * 1000
                                      : 0) != SOCKET_ERROR)) {
       if ((ret = upload_modify_read_req(api))) {
-        if (unpdbg_likely(ret == PSYNC_NET_PERMFAIL))
+        if (pdbg_unlikely(ret == PSYNC_NET_PERMFAIL))
           perm_fail_upload_task(taskid);
         goto err3;
       } else
@@ -1098,7 +1098,7 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
       coff += len;
     }
     if (ret) {
-      if (unpdbg_likely(ret == PSYNC_NET_PERMFAIL))
+      if (pdbg_unlikely(ret == PSYNC_NET_PERMFAIL))
         perm_fail_upload_task(taskid);
       goto err3;
     }
@@ -1110,7 +1110,7 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
   pfile_close(fd);
   while (reqs--)
     if ((ret = upload_modify_read_req(api))) {
-      if (unpdbg_likely(ret == PSYNC_NET_PERMFAIL))
+      if (pdbg_unlikely(ret == PSYNC_NET_PERMFAIL))
         perm_fail_upload_task(taskid);
       goto err2;
     }
@@ -1306,8 +1306,8 @@ static int psync_send_task_creat(psock_t *api, fsupload_task_t *task) {
                             "/", fileidhex, NULL);
     fd = pfile_open(filename, O_RDONLY, 0);
     free(filename);
-    if (unpdbg_likely(fd == INVALID_HANDLE_VALUE) ||
-        unpdbg_likely(fstat(fd, &st))) {
+    if (pdbg_unlikely(fd == INVALID_HANDLE_VALUE) ||
+        pdbg_unlikely(fstat(fd, &st))) {
       if (fd != INVALID_HANDLE_VALUE)
         pfile_close(fd);
       perm_fail_upload_task(task->id);
@@ -1747,7 +1747,7 @@ static int psync_cancel_task_modify(fsupload_task_t *task) {
 static int psync_cancel_task_unlink(fsupload_task_t *task) {
   psync_sql_res *res;
   //  psync_uint_row row;
-  if (unpdbg_likely((psync_fsfileid_t)task->fileid > 0)) {
+  if (pdbg_unlikely((psync_fsfileid_t)task->fileid > 0)) {
     res = psync_sql_prep_statement("UPDATE fstask SET status=0 WHERE id=?");
     psync_sql_bind_uint(res, 1, task->id);
     upload_wakes++;
@@ -1974,7 +1974,7 @@ static void psync_fsupload_run_tasks(psync_list *tasks) {
       continue;
     }
     while (papi_result_async(api, &reader) == ASYNC_RES_READY) {
-      if (unpdbg_likely(!reader.result))
+      if (pdbg_unlikely(!reader.result))
         goto err0;
       while (rtask->needprocessing) {
         rtask = psync_list_element(rtask->list.next, fsupload_task_t, list);
@@ -1987,7 +1987,7 @@ static void psync_fsupload_run_tasks(psync_list *tasks) {
   while (rtask != task) {
     if (!rtask->needprocessing) {
       rtask->res = papi_result(api);
-      if (unpdbg_likely(!rtask->res))
+      if (pdbg_unlikely(!rtask->res))
         goto err0;
     }
     rtask = psync_list_element(rtask->list.next, fsupload_task_t, list);

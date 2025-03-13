@@ -277,7 +277,7 @@ static int check_user_relocated(uint64_t luserid, psock_t *sock) {
   binparam params[] = {PAPI_STR("timeformat", "timestamp"),
                        PAPI_STR("auth", psync_my_auth)};
   res = papi_send2(sock, "getolduserids", params);
-  if (unpdbg_likely(!res))
+  if (pdbg_unlikely(!res))
     return 0;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
@@ -395,7 +395,7 @@ static psock_t *get_connected_socket() {
 
     sock = papi_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
 
-    if (unpdbg_likely(!sock)) {
+    if (pdbg_unlikely(!sock)) {
       pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       continue;
@@ -451,7 +451,7 @@ static psock_t *get_connected_socket() {
 
     free(osversion);
 
-    if (unpdbg_likely(!res)) {
+    if (pdbg_unlikely(!res)) {
       psock_close(sock);
       pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
@@ -576,7 +576,7 @@ static psock_t *get_connected_socket() {
                   sizeof(psync_my_auth));
 
     if (luserid) {
-      if (unpdbg_likely(luserid != userid)) {
+      if (pdbg_unlikely(luserid != userid)) {
         if (check_user_relocated(luserid, sock)) {
           pdbg_logf(D_NOTICE, "setting PSTATUS_AUTH_RELOCATED");
           pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATED);
@@ -792,7 +792,7 @@ static psock_t *get_connected_socket() {
       binparam params[] = {PAPI_STR("timeformat", "timestamp"),
                            PAPI_STR("auth", psync_my_auth)};
       res = papi_send2(sock, "account_info", params);
-      if (unpdbg_likely(!res)) {
+      if (pdbg_unlikely(!res)) {
         psock_close(sock);
         continue;
       }
@@ -3008,7 +3008,7 @@ restart:
       sock->pending = 1;
       res = papi_result(sock);
       should_free_res = 1;
-      if (unpdbg_likely(!res)) {
+      if (pdbg_unlikely(!res)) {
         ptimer_notify_exception();
         handle_exception(&sock, &ids, 'r');
         socks[1] = sock->sock;

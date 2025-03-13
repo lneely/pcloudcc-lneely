@@ -136,7 +136,7 @@ void papi_conn_fail_reset() {
 }
 
 #define _NEED_DATA(cnt)                                                        \
-  if (unpdbg_likely(*datalen < (cnt)))                                          \
+  if (pdbg_unlikely(*datalen < (cnt)))                                          \
   return -1
 #define ALIGN_BYTES psync_alignof(uint64_t)
 
@@ -391,14 +391,14 @@ binresult *papi_result(psock_t *sock) {
   binresult *res;
   uint32_t ressize;
 
-  if (unpdbg_likely(psock_readall(sock, &ressize, sizeof(uint32_t)) !=
+  if (pdbg_unlikely(psock_readall(sock, &ressize, sizeof(uint32_t)) !=
                    sizeof(uint32_t))) {
     return NULL;
   }
 
   data = (unsigned char *)malloc(ressize);
 
-  if (unpdbg_likely(psock_readall(sock, data, ressize) != ressize)) {
+  if (pdbg_unlikely(psock_readall(sock, data, ressize) != ressize)) {
     free(data);
     return NULL;
   }
@@ -413,11 +413,11 @@ binresult *papi_result_thread(psock_t *sock) {
   unsigned char *data;
   binresult *res;
   uint32_t ressize;
-  if (unpdbg_likely(psock_readall_thread(
+  if (pdbg_unlikely(psock_readall_thread(
                        sock, &ressize, sizeof(uint32_t)) != sizeof(uint32_t)))
     return NULL;
   data = (unsigned char *)malloc(ressize);
-  if (unpdbg_likely(psock_readall_thread(sock, data, ressize) !=
+  if (pdbg_unlikely(psock_readall_thread(sock, data, ressize) !=
                    ressize)) {
     free(data);
     return NULL;
@@ -495,7 +495,7 @@ unsigned char *papi_prepare(const char *command, size_t cmdlen,
       plen += params[i].paramnamelen + 2;
     }
   }
-  if (unpdbg_likely(plen > 0xffff))
+  if (pdbg_unlikely(plen > 0xffff))
     return NULL;
   sdata = data = (unsigned char *)malloc(plen + 2 + additionalalloc);
   memcpy(data, &plen, 2);
@@ -543,12 +543,12 @@ binresult *papi_send(psock_t *sock, const char *command,
   }
 
   if (readres & 2) {
-    if (unpdbg_likely(psock_writeall_thread(sock, sdata, plen) != plen)) {
+    if (pdbg_unlikely(psock_writeall_thread(sock, sdata, plen) != plen)) {
       free(sdata);
       return NULL;
     }
   } else {
-    if (unpdbg_likely(psock_writeall(sock, sdata, plen) != plen)) {
+    if (pdbg_unlikely(psock_writeall(sock, sdata, plen) != plen)) {
       free(sdata);
       return NULL;
     }

@@ -172,7 +172,7 @@ static int setup_do_upload(const unsigned char *rsapriv,
     if (!api)
       return pdbg_return_const(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
     res = papi_send2(api, "crypto_setuserkeys", params);
-    if (unpdbg_likely(!res)) {
+    if (pdbg_unlikely(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
         return pdbg_return_const(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
@@ -227,7 +227,7 @@ static int download_keys(unsigned char **rsapriv, size_t *rsaprivlen, unsigned c
     if (!api)
       return pdbg_return_const(PSYNC_CRYPTO_START_CANT_CONNECT);
     res = papi_send2(api, "crypto_getuserkeys", params);
-    if (unpdbg_likely(!res)) {
+    if (pdbg_unlikely(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
         return pdbg_return_const(PSYNC_CRYPTO_START_CANT_CONNECT);
@@ -311,7 +311,7 @@ static binresult *psync_get_keys_bin_auth(const char *auth) {
   if (!api)
     return NULL;
   res = papi_send2(api, "crypto_getuserkeys", params);
-  if (unpdbg_likely(!res)) {
+  if (pdbg_unlikely(!res)) {
     psync_apipool_release_bad(api);
   } else {
     psync_apipool_release(api);
@@ -471,7 +471,7 @@ int pcryptofolder_get_hint(char **hint) {
     if (!api)
       return pdbg_return_const(PSYNC_CRYPTO_HINT_CANT_CONNECT);
     res = papi_send2(api, "crypto_getuserhint", params);
-    if (unpdbg_likely(!res)) {
+    if (pdbg_unlikely(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
         return pdbg_return_const(PSYNC_CRYPTO_HINT_CANT_CONNECT);
@@ -743,7 +743,7 @@ int pcryptofolder_reset() {
     if (!api)
       return pdbg_return_const(PSYNC_CRYPTO_RESET_CANT_CONNECT);
     res = papi_send2(api, "crypto_reset", params);
-    if (unpdbg_likely(!res)) {
+    if (pdbg_unlikely(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
         return pdbg_return_const(PSYNC_CRYPTO_RESET_CANT_CONNECT);
@@ -830,7 +830,7 @@ static psync_encrypted_symmetric_key_t download_fldr_enckey(psync_folderid_t fol
       return (psync_encrypted_symmetric_key_t)errptr(
           pdbg_return_const(PSYNC_CRYPTO_CANT_CONNECT));
     res = papi_send2(api, "crypto_getfolderkey", params);
-    if (unpdbg_likely(!res)) {
+    if (pdbg_unlikely(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
         return (psync_encrypted_symmetric_key_t)errptr(
@@ -883,7 +883,7 @@ static psync_encrypted_symmetric_key_t download_file_enckey(psync_fileid_t filei
       return (psync_encrypted_symmetric_key_t)errptr(
           pdbg_return_const(PSYNC_CRYPTO_CANT_CONNECT));
     res = papi_send2(api, "crypto_getfilekey", params);
-    if (unpdbg_likely(!res)) {
+    if (pdbg_unlikely(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
         return (psync_encrypted_symmetric_key_t)errptr(
@@ -999,7 +999,7 @@ static psync_symmetric_key_t get_file_symkey_safe(psync_fileid_t fileid, uint64_
     return symkey;
   }
   enckey = get_file_enckey(fileid, hash, nonetwork);
-  if (unpdbg_likely(is_err(enckey)))
+  if (pdbg_unlikely(is_err(enckey)))
     return (psync_symmetric_key_t)enckey;
   if (nonetwork &&
       enckey ==
@@ -1009,7 +1009,7 @@ static psync_symmetric_key_t get_file_symkey_safe(psync_fileid_t fileid, uint64_
   symkey = prsa_decrypt_symm_key_lock(&crypto_privkey, &enckey);
 
   free(enckey);
-  if (unpdbg_likely(symkey == PSYNC_INVALID_SYM_KEY))
+  if (pdbg_unlikely(symkey == PSYNC_INVALID_SYM_KEY))
     return (psync_symmetric_key_t)errptr(
         pdbg_return_const(PSYNC_CRYPTO_INVALID_KEY));
   return symkey;
@@ -1371,7 +1371,7 @@ static pcrypto_sector_encdec_t get_fileencoder(psync_fileid_t fileid, uint64_t h
   psync_symmetric_key_t symkey, realkey;
   sym_key_ver1 *skv1;
   symkey = get_file_symkey_safe(fileid, hash, nonetwork);
-  if (unpdbg_likely(is_err(symkey)))
+  if (pdbg_unlikely(is_err(symkey)))
     return (pcrypto_sector_encdec_t)symkey;
   if (nonetwork && (pcrypto_sector_encdec_t)symkey ==
                        PSYNC_CRYPTO_UNLOADED_SECTOR_ENCODER)
@@ -1420,7 +1420,7 @@ static pcrypto_sector_encdec_t get_fileencoder_tmp(psync_fsfileid_t fileid,
       "SELECT type, fileid, text2, int1 FROM fstask WHERE id=?");
   psync_sql_bind_uint(res, 1, -fileid);
   row = psync_sql_fetch_row(res);
-  if (unpdbg_likely(!row)) {
+  if (pdbg_unlikely(!row)) {
     psync_sql_free_result(res);
     return (pcrypto_sector_encdec_t)errptr(
         pdbg_return_const(PSYNC_CRYPTO_FILE_NOT_FOUND));
@@ -1648,7 +1648,7 @@ int psync_cloud_crypto_send_mkdir(psync_folderid_t folderid, const char *name,
     if (!api)
       return set_err(pdbg_return_const(PSYNC_CRYPTO_CANT_CONNECT), err);
     res = papi_send2(api, "createfolder", params);
-    if (unpdbg_likely(!res)) {
+    if (pdbg_unlikely(!res)) {
       psync_apipool_release_bad(api);
       if (++tries > 5)
         return set_err(pdbg_return_const(PSYNC_CRYPTO_CANT_CONNECT), err);

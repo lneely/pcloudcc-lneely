@@ -357,7 +357,7 @@ void pqevent_queue_sync_event_id(psync_eventtype_t eventid, psync_syncid_t synci
       remotepath = pfolder_path(remoteid, NULL);
     else
       remotepath = pfolder_file_path(remoteid, NULL);
-    if (unpdbg_likely(!remotepath))
+    if (pdbg_unlikely(!remotepath))
       return;
     pqevent_queue_sync_event_path(eventid, syncid, localpath, remoteid, remotepath);
     free(remotepath);

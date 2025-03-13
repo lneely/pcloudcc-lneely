@@ -381,7 +381,7 @@ int pfile_truncate(int fd) {
 
 int64_t pfile_size(int fd) {
   struct stat st;
-  if (unpdbg_likely(fstat(fd, &st)))
+  if (pdbg_unlikely(fstat(fd, &st)))
     return -1;
   else
     return st.st_size;
