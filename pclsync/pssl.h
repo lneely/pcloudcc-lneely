@@ -40,6 +40,12 @@
 
 #include "pcompiler.h"
 
+// No need to edit this directly, just pass -DPSYNC_SSL_DEBUG_LEVEL as a
+// compile option. Possible values are in the range [0, 5]
+#ifndef PSYNC_SSL_DEBUG_LEVEL
+#define PSYNC_SSL_DEBUG_LEVEL 0 
+#endif
+
 #define PSYNC_AES256_BLOCK_SIZE 16
 #define PSYNC_AES256_KEY_SIZE 32
 

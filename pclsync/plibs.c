@@ -29,24 +29,25 @@
    DAMAGE.
 */
 
-#include "plibs.h"
-#include "pcache.h"
-#include "pdatabase.h"
-#include "plocks.h"
-#include "pnetlibs.h"
-#include "ppath.h"
-#include "prun.h"
-#include "psettings.h"
-#include "ptimer.h"
-#include "psys.h"
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#include "pfile.h"
 
-// required by psync_debug
+#include "pcache.h"
+#include "pdatabase.h"
+#include "pdbg.h"
+#include "pfile.h"
+#include "plibs.h"
+#include "plocks.h"
+#include "pnetlibs.h"
+#include "prun.h"
+#include "psettings.h"
+#include "psys.h"
+#include "ptimer.h"
+#include "putil.h"
+
 extern PSYNC_THREAD const char *psync_thread_name; 
 
 #define return_error(err)                                                      \
@@ -613,7 +614,6 @@ static rd_lock_data *record_rdunlock() {
   return lock;
 }
 
-static void time_format(time_t tm, unsigned long ns, char *result);
 
 void psync_sql_dump_locks() {
   rd_lock_data *lock;
@@ -2527,111 +2527,6 @@ void psync_qpartition(void *base, size_t cnt, size_t sort_first, size_t size,
 void psync_try_free_memory() {
   sqlite3_db_release_memory(psync_db);
   pcache_clean();
-}
-
-static void time_format(time_t tm, unsigned long ns, char *result) {
-  static const char month_names[12][4] = {"Jan", "Feb", "Mar", "Apr",
-                                          "May", "Jun", "Jul", "Aug",
-                                          "Sep", "Oct", "Nov", "Dec"};
-  static const char day_names[7][4] = {"Sun", "Mon", "Tue", "Wed",
-                                       "Thu", "Fri", "Sat"};
-  struct tm dt;
-  unsigned long y;
-  ns /= 1000000;
-  gmtime_r(&tm, &dt);
-  memcpy(result, day_names[dt.tm_wday], 3);
-  result += 3;
-  *result++ = ',';
-  *result++ = ' ';
-  *result++ = dt.tm_mday / 10 + '0';
-  *result++ = dt.tm_mday % 10 + '0';
-  *result++ = ' ';
-  memcpy(result, month_names[dt.tm_mon], 3);
-  result += 3;
-  *result++ = ' ';
-  y = dt.tm_year + 1900;
-  *result++ = '0' + y / 1000;
-  y = y % 1000;
-  *result++ = '0' + y / 100;
-  y = y % 100;
-  *result++ = '0' + y / 10;
-  y = y % 10;
-  *result++ = '0' + y;
-  *result++ = ' ';
-  *result++ = dt.tm_hour / 10 + '0';
-  *result++ = dt.tm_hour % 10 + '0';
-  *result++ = ':';
-  *result++ = dt.tm_min / 10 + '0';
-  *result++ = dt.tm_min % 10 + '0';
-  *result++ = ':';
-  *result++ = dt.tm_sec / 10 + '0';
-  *result++ = dt.tm_sec % 10 + '0';
-  *result++ = '.';
-  *result++ = ns / 100 + '0';
-  *result++ = (ns / 10) % 10 + '0';
-  *result++ = ns % 10 + '0';
-  memcpy(result, " +0000", 7); // copies the null byte
-}
-
-char *psync_debug_path() {
-    char *home = ppath_home();
-    if (!home) {
-        return NULL;
-    }
-
-    const char *subdir = "/.pcloud/debug.log";
-    size_t len = strlen(home) + strlen(subdir) + 1;
-    char *sockpath = (char *)malloc(len);
-    if (!sockpath) {
-        return NULL;
-    }
-
-    snprintf(sockpath, len, "%s%s", home, subdir);
-    return sockpath;
-}
-
-int psync_debug(const char *file, const char *function, int unsigned line,
-                int unsigned level, const char *fmt, ...) {
-  if (!IS_DEBUG)
-    return 1;
-
-  static const struct {
-    unsigned long level;
-    const char *name;
-  } debug_levels[] = DEBUG_LEVELS;
-  static FILE *log = NULL;
-  struct timespec ts;
-  char dttime[36], format[512];
-  va_list ap;
-  const char *errname;
-  unsigned long i;
-  unsigned int u;
-  pthread_t threadid;
-  errname = "BAD_ERROR_CODE";
-  for (i = 0; i < ARRAY_SIZE(debug_levels); i++)
-    if (debug_levels[i].level == level) {
-      errname = debug_levels[i].name;
-      break;
-    }
-  if (unlikely(!log)) {
-    char *path = psync_debug_path();
-    log = fopen(path, "a+");
-    free(path);
-    if (!log)
-      return 1;
-  }
-  clock_gettime(CLOCK_REALTIME, &ts);
-  time_format(ts.tv_sec, ts.tv_nsec, dttime);
-  threadid = pthread_self();
-  memcpy(&u, &threadid, sizeof(u));
-  snprintf(format, sizeof(format), "%s %u %s %s: %s:%u (function %s): %s\n",
-           dttime, u, psync_thread_name, errname, file, line, function, fmt);
-  format[sizeof(format) - 1] = 0;
-  va_start(ap, fmt);
-  vfprintf(log, format, ap);
-  va_end(ap);
-  fflush(log);
-  return 1;
 }
 
 static const char *PSYNC_CONST get_type_name(uint32_t t) {

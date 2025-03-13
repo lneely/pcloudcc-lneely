@@ -10,6 +10,7 @@
 
 #include "rpcclient.h"
 #include "plibs.h"
+#include "pdbg.h"
 #include "prpc.h"
 #include "putil.h"
 

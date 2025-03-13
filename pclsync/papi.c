@@ -36,6 +36,7 @@
 #include "psettings.h"
 #include "psynclib.h"
 #include "ptimer.h"
+#include "pdbg.h"
 
 /*
   commented definitions are unused, but kept because they may be
