@@ -134,7 +134,7 @@ PSYNC_NOINLINE void do_check_userid(uint64_t userid, uint64_t folderid,
   if ((row = psync_sql_fetch_rowint(res)))
     *shareid = row[0];
   else
-    debug(D_WARNING,
+    pdbg_logf(D_WARNING,
           "came up to a folder %lu owned by userid %lu but can't find it in "
           "sharedfolder",
           (unsigned long)folderid, (unsigned long)userid);
@@ -447,7 +447,7 @@ retry:
   psync_sql_bind_int(res, 1, folderid);
   row = psync_sql_fetch_rowint(res);
   if (!row) {
-    debug(D_NOTICE, "Error reading flags by file id!");
+    pdbg_logf(D_NOTICE, "Error reading flags by file id!");
     psync_sql_free_result(res);
     psync_sql_unlock();
     return 0;

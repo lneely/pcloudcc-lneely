@@ -73,18 +73,18 @@ static int wait_readable(int sock, long sec, long usec) {
     msec = (end.tv_sec - start.tv_sec) * 1000 + end.tv_nsec / 1000000 -
            start.tv_nsec / 1000000;
     if (msec >= 30000)
-      debug(D_WARNING, "got response from socket after %lu milliseconds", msec);
+      pdbg_logf(D_WARNING, "got response from socket after %lu milliseconds", msec);
     else if (msec >= 5000)
-      debug(D_NOTICE, "got response from socket after %lu milliseconds", msec);
+      pdbg_logf(D_NOTICE, "got response from socket after %lu milliseconds", msec);
 #endif
     return 0;
   }
   if (res == 0) {
     if (sec)
-      debug(D_WARNING, "socket read timeouted on %ld seconds", sec);
+      pdbg_logf(D_WARNING, "socket read timeouted on %ld seconds", sec);
     errno = (ETIMEDOUT);
   } else
-    debug(D_WARNING, "select returned %d", res);
+    pdbg_logf(D_WARNING, "select returned %d", res);
 
   return SOCKET_ERROR;
 }
@@ -120,7 +120,7 @@ static int wait_ssl_ready(int sock) {
     wfds = &fds;
     tv.tv_sec = PSYNC_SOCK_WRITE_TIMEOUT;
   } else {
-    debug(D_BUG, "this functions should only be called when SSL returns "
+    pdbg_logf(D_BUG, "this functions should only be called when SSL returns "
                  "WANT_READ/WANT_WRITE");
     errno = (EINVAL);
     return SOCKET_ERROR;
@@ -130,10 +130,10 @@ static int wait_ssl_ready(int sock) {
   if (res == 1)
     return 0;
   if (res == 0) {
-    debug(D_WARNING, "socket timeouted");
+    pdbg_logf(D_WARNING, "socket timeouted");
     errno = (ETIMEDOUT);
   }
-  return PRINT_RETURN_CONST(SOCKET_ERROR);
+  return pdbg_return_const(SOCKET_ERROR);
 }
 
 static int addr_valid(struct addrinfo *olda, struct addrinfo *newa) {
@@ -209,7 +209,7 @@ static void addr_save(const char *host, const char *port,
     if (psync_sql_tryupgradelock())
       return;
     else
-      debug(D_NOTICE, "upgraded read to write lock to save data to DB");
+      pdbg_logf(D_NOTICE, "upgraded read to write lock to save data to DB");
   }
   psync_sql_start_transaction();
   res = psync_sql_prep_statement(
@@ -252,7 +252,7 @@ static int connect_res(struct addrinfo *res) {
   while (res) {
     sock = socket(res->ai_family, res->ai_socktype | PSOCK_TYPE_OR,
                   res->ai_protocol);
-    if (likely_log(sock != INVALID_SOCKET)) {
+    if (pdbg_likely(sock != INVALID_SOCKET)) {
 #if defined(PSOCK_NEED_NOBLOCK)
       fcntl(sock, F_SETFD, FD_CLOEXEC);
       fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK);
@@ -301,7 +301,7 @@ static int connect_socket(const char *host, const char *port) {
   struct addrinfo hints;
   int sock;
   int rc;
-  debug(D_NOTICE, "connecting to %s:%s", host, port);
+  pdbg_logf(D_NOTICE, "connecting to %s:%s", host, port);
   dbres = addr_load(host, port);
   if (dbres) {
     resolve_host_port resolv;
@@ -318,15 +318,15 @@ static int connect_socket(const char *host, const char *port) {
     res = (struct addrinfo *)psync_task_papi_result(tasks, 1);
     if (unlikely(!res)) {
       psync_task_free(tasks);
-      debug(D_WARNING, "failed to resolve %s", host);
+      pdbg_logf(D_WARNING, "failed to resolve %s", host);
       return INVALID_SOCKET;
     }
     addr_save(host, port, res);
     if (addr_valid(dbres, res)) {
-      debug(D_NOTICE, "successfully reused cached IP for %s:%s", host, port);
+      pdbg_logf(D_NOTICE, "successfully reused cached IP for %s:%s", host, port);
       sock = (int)(uintptr_t)psync_task_papi_result(tasks, 0);
     } else {
-      debug(D_NOTICE, "cached IP not valid for %s:%s", host, port);
+      pdbg_logf(D_NOTICE, "cached IP not valid for %s:%s", host, port);
       sock = connect_res(res);
     }
     freeaddrinfo(res);
@@ -338,7 +338,7 @@ static int connect_socket(const char *host, const char *port) {
     res = NULL;
     rc = getaddrinfo(host, port, &hints, &res);
     if (unlikely(rc != 0)) {
-      debug(D_WARNING, "failed to resolve %s", host);
+      pdbg_logf(D_WARNING, "failed to resolve %s", host);
       return INVALID_SOCKET;
     }
     addr_save(host, port, res);
@@ -367,7 +367,7 @@ static int connect_socket(const char *host, const char *port) {
 #endif
 #endif
   } else {
-    debug(D_WARNING, "failed to connect to %s:%s", host, port);
+    pdbg_logf(D_WARNING, "failed to connect to %s:%s", host, port);
   }
   return sock;
 }
@@ -387,7 +387,7 @@ int psock_try_write_buffer(psock_t *sock) {
         cw = pssl_write(sock->ssl, b->buff + b->roffset,
                              b->woffset - b->roffset);
         if (cw == PSYNC_SSL_FAIL) {
-          if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
+          if (pdbg_likely(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
                          psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE))
             break;
           else {
@@ -399,7 +399,7 @@ int psock_try_write_buffer(psock_t *sock) {
       } else {
         cw = write(sock->sock, b->buff + b->roffset, b->woffset - b->roffset);
         if (cw == SOCKET_ERROR) {
-          if (likely_log(errno == EWOULDBLOCK || errno == EAGAIN ||
+          if (pdbg_likely(errno == EWOULDBLOCK || errno == EAGAIN ||
                          errno == EINTR))
             break;
           else {
@@ -415,7 +415,7 @@ int psock_try_write_buffer(psock_t *sock) {
         break;
     }
     if (wrt > 0)
-      debug(D_NOTICE, "wrote %d bytes to socket from buffers", wrt);
+      pdbg_logf(D_NOTICE, "wrote %d bytes to socket from buffers", wrt);
     return wrt;
   } else
     return 0;
@@ -461,7 +461,7 @@ psock_t *psock_connect(const char *host, int unsigned port, int ssl) {
   psync_slprintf(sport, sizeof(sport), "%d", port);
 
   sock = connect_socket(host, sport);
-  if (unlikely_log(sock == INVALID_SOCKET)) {
+  if (unpdbg_likely(sock == INVALID_SOCKET)) {
     return NULL;
   }
 
@@ -474,7 +474,7 @@ psock_t *psock_connect(const char *host, int unsigned port, int ssl) {
       }
       ssl = pssl_connect_finish(sslc, host);
     }
-    if (unlikely_log(ssl != PSYNC_SSL_SUCCESS)) {
+    if (unpdbg_likely(ssl != PSYNC_SSL_SUCCESS)) {
       close(sock);
       return NULL;
     }
@@ -613,11 +613,11 @@ static int psync_socket_read_ssl(psock_t *sock, void *buff, int num) {
     psock_try_write_buffer(sock);
     r = pssl_read(sock->ssl, buff, num);
     if (r == PSYNC_SSL_FAIL) {
-      if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
+      if (pdbg_likely(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
                      psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE)) {
         if (wait_ssl_ready(sock->sock)) {
           if (sock->buffer)
-            debug(D_WARNING, "timeouted on socket with pending buffers");
+            pdbg_logf(D_WARNING, "timeouted on socket with pending buffers");
           return -1;
         } else
           continue;
@@ -637,13 +637,13 @@ static int psync_socket_read_plain(psock_t *sock, void *buff, int num) {
     if (sock->pending)
       sock->pending = 0;
     else if (psock_wait_read_timeout(sock->sock)) {
-      debug(D_WARNING, "timeouted on socket with pending buffers");
+      pdbg_logf(D_WARNING, "timeouted on socket with pending buffers");
       return -1;
     } else
       psock_try_write_buffer(sock);
     r = read(sock->sock, buff, num);
     if (r == SOCKET_ERROR) {
-      if (likely_log(errno == EWOULDBLOCK || errno == EAGAIN))
+      if (pdbg_likely(errno == EWOULDBLOCK || errno == EAGAIN))
         continue;
       else
         return -1;
@@ -664,7 +664,7 @@ static int psync_socket_read_noblock_ssl(psock_t *sock, void *buff, int num) {
   r = pssl_read(sock->ssl, buff, num);
   if (r == PSYNC_SSL_FAIL) {
     sock->pending = 0;
-    if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
+    if (pdbg_likely(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
                    psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE))
       return PSYNC_SOCKET_WOULDBLOCK;
     else {
@@ -680,7 +680,7 @@ static int psync_socket_read_noblock_plain(psock_t *sock, void *buff, int num) {
   r = read(sock->sock, buff, num);
   if (r == SOCKET_ERROR) {
     sock->pending = 0;
-    if (likely_log(errno == EWOULDBLOCK || errno == EAGAIN))
+    if (pdbg_likely(errno == EWOULDBLOCK || errno == EAGAIN))
       return PSYNC_SOCKET_WOULDBLOCK;
     else
       return -1;
@@ -711,7 +711,7 @@ static int psync_socket_read_ssl_thread(psock_t *sock, void *buff, int num) {
     r = pssl_read(sock->ssl, buff, num);
     pthread_mutex_unlock(&mutex);
     if (r == PSYNC_SSL_FAIL) {
-      if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
+      if (pdbg_likely(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
                      psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE)) {
         if (wait_ssl_ready(sock->sock))
           return -1;
@@ -741,7 +741,7 @@ static int psync_socket_read_plain_thread(psock_t *sock, void *buff, int num) {
     r = read(sock->sock, buff, num);
     pthread_mutex_unlock(&mutex);
     if (r == SOCKET_ERROR) {
-      if (likely_log(errno == EWOULDBLOCK || errno == EAGAIN))
+      if (pdbg_likely(errno == EWOULDBLOCK || errno == EAGAIN))
         continue;
       else
         return -1;
@@ -759,7 +759,7 @@ int psock_read_thread(psock_t *sock, void *buff, int num) {
 
 static int psync_socket_write_to_buf(psock_t *sock, const void *buff, int num) {
   psock_buf_t *b;
-  assert(sock->buffer);
+  pdbg_assert(sock->buffer);
   b = sock->buffer;
   while (b->next)
     b = b->next;
@@ -802,7 +802,7 @@ int psock_write(psock_t *sock, const void *buff, int num) {
   if (sock->ssl) {
     r = pssl_write(sock->ssl, buff, num);
     if (r == PSYNC_SSL_FAIL) {
-      if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
+      if (pdbg_likely(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
                      psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE))
         return 0;
       else
@@ -811,7 +811,7 @@ int psock_write(psock_t *sock, const void *buff, int num) {
   } else {
     r = write(sock->sock, buff, num);
     if (r == SOCKET_ERROR) {
-      if (likely_log(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
+      if (pdbg_likely(errno == EWOULDBLOCK || errno == EAGAIN || errno == EINTR))
         return 0;
       else
         return -1;
@@ -839,7 +839,7 @@ static int psync_socket_readall_ssl(psock_t *sock, void *buff, int num) {
     r = pssl_read(sock->ssl, (char *)buff + br, num - br);
 
     if (r == PSYNC_SSL_FAIL) {
-      if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
+      if (pdbg_likely(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
                      psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE)) {
         if (wait_ssl_ready(sock->sock))
           return -1;
@@ -871,7 +871,7 @@ static int psync_socket_readall_plain(psock_t *sock, void *buff, int num) {
       psock_try_write_buffer(sock);
     r = read(sock->sock, (char *)buff + br, num - br);
     if (r == SOCKET_ERROR) {
-      if (likely_log(errno == EWOULDBLOCK || errno == EAGAIN))
+      if (pdbg_likely(errno == EWOULDBLOCK || errno == EAGAIN))
         continue;
       else
         return -1;
@@ -959,7 +959,7 @@ static int psync_socket_readall_ssl_thread(psock_t *sock, void *buff, int num) {
     r = pssl_read(sock->ssl, (char *)buff + br, num - br);
     pthread_mutex_unlock(&mutex);
     if (r == PSYNC_SSL_FAIL) {
-      if (likely_log(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
+      if (pdbg_likely(psync_ssl_errno == PSYNC_SSL_ERR_WANT_READ ||
                      psync_ssl_errno == PSYNC_SSL_ERR_WANT_WRITE)) {
         if (wait_ssl_ready(sock->sock))
           return -1;
@@ -994,7 +994,7 @@ static int psync_socket_readall_plain_thread(psock_t *sock, void *buff,
     r = read(sock->sock, (char *)buff + br, num - br);
     pthread_mutex_unlock(&mutex);
     if (r == SOCKET_ERROR) {
-      if (likely_log(errno == EWOULDBLOCK || errno == EAGAIN))
+      if (pdbg_likely(errno == EWOULDBLOCK || errno == EAGAIN))
         continue;
       else
         return -1;
@@ -1094,7 +1094,7 @@ psock_ifaces_t *psock_list_adapters() {
   struct ifaddrs *addrs, *addr;
   sa_family_t family;
   size_t sz;
-  if (unlikely_log(getifaddrs(&addrs)))
+  if (unpdbg_likely(getifaddrs(&addrs)))
     goto empty;
   cnt = 0;
   addr = addrs;

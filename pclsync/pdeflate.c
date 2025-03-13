@@ -68,7 +68,7 @@ psync_deflate_t *pdeflate_init(int level) {
     ret = deflateInit2(&def->stream, level, Z_DEFLATED, 15, 8,
                        Z_DEFAULT_STRATEGY);
   }
-  if (likely_log(ret == Z_OK))
+  if (pdbg_likely(ret == Z_OK))
     return def;
   else {
     free(def);
@@ -95,7 +95,7 @@ static int psync_deflate_set_out_buff(psync_deflate_t *def) {
     def->stream.avail_out = def->bufferstartoff - end;
   else
     def->stream.avail_out = BUFFER_SIZE - end;
-  assert(def->stream.avail_out != 0);
+  pdbg_assert(def->stream.avail_out != 0);
   def->lastout = def->stream.avail_out;
   return 0;
 }
@@ -109,7 +109,7 @@ static int psync_translate_flush(int flush) {
   case PSYNC_DEFLATE_FLUSH_END:
     return Z_FINISH;
   default:
-    debug(D_WARNING, "invalid flush value %d", flush);
+    pdbg_logf(D_WARNING, "invalid flush value %d", flush);
     return Z_NO_FLUSH;
   }
 }
@@ -117,7 +117,7 @@ static int psync_translate_flush(int flush) {
 static int psync_deflate_call_compressor(psync_deflate_t *def, int flush,
                                          int adjustbe) {
   int ret;
-  assert(def->stream.avail_out);
+  pdbg_assert(def->stream.avail_out);
   if (def->flags & FLAG_DEFLATE)
     ret = deflate(&def->stream, psync_translate_flush(flush));
   else
@@ -155,14 +155,14 @@ static int psync_deflate_finish_flush_add_buffer(psync_deflate_t *def,
       }
       def->flushbuff = buff;
       def->flushbufflen = used;
-      debug(D_NOTICE, "added additional buffer of size %u",
+      pdbg_logf(D_NOTICE, "added additional buffer of size %u",
             (unsigned)def->flushbufflen);
       return Z_OK;
     }
     if (def->stream.avail_out) {
       def->flushbuff = buff;
       def->flushbufflen = used + current - def->stream.avail_out;
-      debug(D_NOTICE, "added additional buffer of size %u",
+      pdbg_logf(D_NOTICE, "added additional buffer of size %u",
             (unsigned)def->flushbufflen);
       return Z_OK;
     }
@@ -177,11 +177,11 @@ int pdeflate_write(psync_deflate_t *def, const void *data, int len,
                         int flush) {
   int ret;
   if (!len && flush == PSYNC_DEFLATE_NOFLUSH) {
-    debug(D_WARNING, "called with no len and no flush");
+    pdbg_logf(D_WARNING, "called with no len and no flush");
     return PSYNC_DEFLATE_ERROR;
   }
   if (def->flushbuff || psync_deflate_set_out_buff(def))
-    return PRINT_RETURN_CONST(PSYNC_DEFLATE_FULL);
+    return pdbg_return_const(PSYNC_DEFLATE_FULL);
   def->stream.next_in = (unsigned char *)data;
   def->stream.avail_in = len;
   ret = psync_deflate_call_compressor(def, flush, 1);
@@ -204,7 +204,7 @@ int pdeflate_write(psync_deflate_t *def, const void *data, int len,
 
 int pdeflate_read(psync_deflate_t *def, void *data, int len) {
   int ret;
-  assert(def->bufferstartoff <= def->bufferendoff);
+  pdbg_assert(def->bufferstartoff <= def->bufferendoff);
   if (def->bufferendoff == def->bufferstartoff) {
     if (def->flushbuff) {
       if (len > def->flushbufflen - def->flushbuffoff)
@@ -228,7 +228,7 @@ int pdeflate_read(psync_deflate_t *def, void *data, int len) {
         return PSYNC_DEFLATE_NODATA;
       case Z_STREAM_ERROR:
       case Z_DATA_ERROR:
-        return PRINT_RETURN_CONST(PSYNC_DEFLATE_ERROR);
+        return pdbg_return_const(PSYNC_DEFLATE_ERROR);
       case Z_STREAM_END:
         def->flags |= FLAG_STREAM_END;
       default:
@@ -244,12 +244,12 @@ int pdeflate_read(psync_deflate_t *def, void *data, int len) {
   }
   if (len > def->bufferendoff - def->bufferstartoff)
     len = def->bufferendoff - def->bufferstartoff;
-  assert(len <= BUFFER_SIZE);
-  assert(def->bufferstartoff <= BUFFER_SIZE);
+  pdbg_assert(len <= BUFFER_SIZE);
+  pdbg_assert(def->bufferstartoff <= BUFFER_SIZE);
   if (def->bufferstartoff + len <= BUFFER_SIZE)
     memcpy(data, def->buffer + def->bufferstartoff, len);
   else {
-    assert(len - (BUFFER_SIZE - def->bufferstartoff) ==
+    pdbg_assert(len - (BUFFER_SIZE - def->bufferstartoff) ==
            def->bufferendoff % BUFFER_SIZE);
     memcpy(data, def->buffer + def->bufferstartoff,
            BUFFER_SIZE - def->bufferstartoff);
@@ -261,7 +261,7 @@ int pdeflate_read(psync_deflate_t *def, void *data, int len) {
     def->bufferstartoff = def->bufferendoff = 0;
   else if (def->bufferstartoff >= BUFFER_SIZE) {
     def->bufferstartoff -= BUFFER_SIZE;
-    assert(def->bufferendoff >= BUFFER_SIZE);
+    pdbg_assert(def->bufferendoff >= BUFFER_SIZE);
     def->bufferendoff -= BUFFER_SIZE;
   }
   return len;

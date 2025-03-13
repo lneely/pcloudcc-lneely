@@ -75,7 +75,7 @@ static int find_in_dict(const unsigned char *pwd, size_t len) {
         else
           l = hi;
       }
-      //        debug(D_NOTICE, "pwd=%s l=%lu", pwd, (unsigned long)l);
+      //        pdbg_logf(D_NOTICE, "pwd=%s l=%lu", pwd, (unsigned long)l);
       return l;
       /*      }
             else
@@ -94,7 +94,7 @@ static int is_punct(int c) {
     oscore = score;                                                            \
     score *= num;                                                              \
     if (unlikely(oscore > score)) {                                            \
-      debug(D_NOTICE, "got overflow");                                         \
+      pdbg_logf(D_NOTICE, "got overflow");                                         \
       return ~((uint64_t)0);                                                   \
     }                                                                          \
   } while (0)

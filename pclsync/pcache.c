@@ -112,7 +112,7 @@ void *pcache_get(const char *key) {
   psync_list *lst;
   uint32_t h;
   if (IS_DEBUG && !strcmp(psync_thread_name, "timer"))
-    debug(D_ERROR,
+    pdbg_logf(D_ERROR,
           "trying get key %s from the timer thread, this may (and eventually "
           "will) lead to a deadlock, "
           "please start a worker thread to do the job or don't use cache (if "
@@ -121,7 +121,7 @@ void *pcache_get(const char *key) {
           key);
 
   h = compute_hash(key, NULL);
-  //  debug(D_NOTICE, "get %s %lu", key, h);
+  //  pdbg_logf(D_NOTICE, "get %s %lu", key, h);
   lst = &cache_hash[hash_to_bucket(h)];
   pthread_mutex_lock(&cachelocks[hash_to_lock(h)]);
   psync_list_for_each_element(
@@ -180,7 +180,7 @@ void pcache_add(const char *key, void *ptr, time_t freeafter,
       pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
       free(he);
       freefunc(ptr);
-      //        debug(D_NOTICE, "not adding key %s to cache as there already %u
+      //        pdbg_logf(D_NOTICE, "not adding key %s to cache as there already %u
       //        elements present", key, (unsigned int)maxkeys);
       return;
     }
@@ -199,7 +199,7 @@ void pcache_del(const char *key) {
   psync_list *lst;
   uint32_t h;
   if (IS_DEBUG && !strcmp(psync_thread_name, "timer"))
-    debug(D_ERROR,
+    pdbg_logf(D_ERROR,
           "trying get key %s from the timer thread, this may (and eventually "
           "will) lead to a deadlock, "
           "please start a worker thread to do the job or don't use cache (if "

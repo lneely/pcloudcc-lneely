@@ -70,7 +70,7 @@ void ptimer_wait_next_sec();
 
 #define ptimer_notify_exception()                                         \
   do {                                                                         \
-    debug(D_NOTICE, "sending exception");                                      \
+    pdbg_logf(D_NOTICE, "sending exception");                                      \
     ptimer_do_notify_exception();                                         \
   } while (0)
 

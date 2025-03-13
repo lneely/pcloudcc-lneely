@@ -28,7 +28,7 @@ char *psync_debug_path() {
     return sockpath;
 }
 
-int psync_debug(const char *file, const char *function, int unsigned line, int unsigned level, const char *fmt, ...) {
+int pdbg_printf(const char *file, const char *function, int unsigned line, int unsigned level, const char *fmt, ...) {
   if (!IS_DEBUG)
     return 1;
 

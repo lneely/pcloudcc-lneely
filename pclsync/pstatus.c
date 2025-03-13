@@ -73,7 +73,7 @@ static uint32_t calc_status() {
     else if (statuses[PSTATUS_TYPE_AUTH] == PSTATUS_AUTH_RELOCATED)
       return PSTATUS_RELOCATED;
     else {
-      debug(D_BUG, "invalid PSTATUS_TYPE_AUTH %d", statuses[PSTATUS_TYPE_AUTH]);
+      pdbg_logf(D_BUG, "invalid PSTATUS_TYPE_AUTH %d", statuses[PSTATUS_TYPE_AUTH]);
       return -1;
     }
   }
@@ -83,7 +83,7 @@ static uint32_t calc_status() {
     else if (statuses[PSTATUS_TYPE_RUN] == PSTATUS_RUN_STOP)
       return PSTATUS_STOPPED;
     else {
-      debug(D_BUG, "invalid PSTATUS_TYPE_RUN %d", statuses[PSTATUS_TYPE_RUN]);
+      pdbg_logf(D_BUG, "invalid PSTATUS_TYPE_RUN %d", statuses[PSTATUS_TYPE_RUN]);
       return -1;
     }
   }
@@ -95,7 +95,7 @@ static uint32_t calc_status() {
     else if (statuses[PSTATUS_TYPE_ONLINE] == PSTATUS_ONLINE_OFFLINE)
       return PSTATUS_OFFLINE;
     else {
-      debug(D_BUG, "invalid PSTATUS_TYPE_ONLINE %d",
+      pdbg_logf(D_BUG, "invalid PSTATUS_TYPE_ONLINE %d",
             statuses[PSTATUS_TYPE_ONLINE]);
       return -1;
     }
@@ -104,7 +104,7 @@ static uint32_t calc_status() {
     if (statuses[PSTATUS_TYPE_LOCALSCAN] == PSTATUS_LOCALSCAN_SCANNING)
       return PSTATUS_SCANNING;
     else {
-      debug(D_BUG, "invalid PSTATUS_TYPE_LOCALSCAN %d",
+      pdbg_logf(D_BUG, "invalid PSTATUS_TYPE_LOCALSCAN %d",
             statuses[PSTATUS_TYPE_LOCALSCAN]);
       return -1;
     }
@@ -113,7 +113,7 @@ static uint32_t calc_status() {
     if (statuses[PSTATUS_TYPE_ACCFULL] == PSTATUS_ACCFULL_OVERQUOTA)
       return PSTATUS_ACCOUNT_FULL;
     else {
-      debug(D_BUG, "invalid PSTATUS_TYPE_ACCFULL %d",
+      pdbg_logf(D_BUG, "invalid PSTATUS_TYPE_ACCFULL %d",
             statuses[PSTATUS_TYPE_ACCFULL]);
       return -1;
     }
@@ -122,7 +122,7 @@ static uint32_t calc_status() {
     if (statuses[PSTATUS_TYPE_DISKFULL] == PSTATUS_DISKFULL_FULL)
       return PSTATUS_DISK_FULL;
     else {
-      debug(D_BUG, "invalid PSTATUS_TYPE_DISKFULL %d",
+      pdbg_logf(D_BUG, "invalid PSTATUS_TYPE_DISKFULL %d",
             statuses[PSTATUS_TYPE_DISKFULL]);
       return -1;
     }
@@ -272,7 +272,7 @@ void pstatus_wait(uint32_t statusid, uint32_t status) {
   }
   pthread_mutex_unlock(&status_internal_mutex);
   if (unlikely(!psync_do_run)) {
-    debug(D_NOTICE, "exiting");
+    pdbg_logf(D_NOTICE, "exiting");
     pthread_exit(NULL);
   }
 }

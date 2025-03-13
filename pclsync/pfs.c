@@ -189,7 +189,7 @@ int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
           }
           size = pfscrypto_plain_size(size);
         }
-        debug(D_NOTICE, "updating fileid %ld to %lu, hash %lu size %lu",
+        pdbg_logf(D_NOTICE, "updating fileid %ld to %lu, hash %lu size %lu",
               (long)fileid, (unsigned long)newfileid, (unsigned long)hash,
               (unsigned long)size);
         fl->fileid = newfileid;
@@ -226,7 +226,7 @@ int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
             else
               break;
           } else {
-            debug(D_BUG, "found already open file %lu, should not happen",
+            pdbg_logf(D_BUG, "found already open file %lu, should not happen",
                   (unsigned long)newfileid);
             break;
           }
@@ -237,7 +237,7 @@ int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
           ptree_add_after(&openfiles, tr, &fl->tree);
         ret = 0;
       } else {
-        debug(D_NOTICE, "writeid of fileid %ld (%s) differs %lu!=%lu",
+        pdbg_logf(D_NOTICE, "writeid of fileid %ld (%s) differs %lu!=%lu",
               (long)fileid, fl->currentname, (unsigned long)fl->writeid,
               (unsigned long)writeid);
         if (fl->newfile) {
@@ -260,7 +260,7 @@ int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
     ret = 0;
   else {
     if (row)
-      debug(D_NOTICE, "writeid of fileid %ld differs %lu!=%lu", (long)fileid,
+      pdbg_logf(D_NOTICE, "writeid of fileid %ld differs %lu!=%lu", (long)fileid,
             (unsigned long)row[0], (unsigned long)writeid);
     ret = -1;
   }
@@ -341,7 +341,7 @@ void psync_fs_mark_openfile_deleted(uint64_t taskid) {
       tr = tr->right;
     else {
       fl = ptree_element(tr, psync_openfile_t, tree);
-      debug(D_NOTICE, "file being deleted %s is still open, marking as deleted",
+      pdbg_logf(D_NOTICE, "file being deleted %s is still open, marking as deleted",
             fl->currentname);
       psync_fs_lock_file(fl);
       fl->deleted = 1;
@@ -395,7 +395,7 @@ void psync_fs_update_openfile_fileid_locked(psync_openfile_t *of,
                                             psync_fsfileid_t fileid) {
   psync_tree *tr;
   int64_t d;
-  assertw(of->fileid != fileid);
+  pdbg_assertw(of->fileid != fileid);
   ptree_del(&openfiles, &of->tree);
   of->fileid = fileid;
   tr = openfiles;
@@ -410,7 +410,7 @@ void psync_fs_update_openfile_fileid_locked(psync_openfile_t *of,
           break;
         }
       } else {
-        assertw(d > 0);
+        pdbg_assertw(d > 0);
         if (tr->right)
           tr = tr->right;
         else {
@@ -518,7 +518,7 @@ static int psync_creat_db_to_file_stat(psync_fileid_t fileid,
   if ((row = psync_sql_fetch_row(res)))
     psync_row_to_file_stat(row, stbuf, flags);
   else
-    debug(D_NOTICE, "fileid %lu not found in database", (unsigned long)fileid);
+    pdbg_logf(D_NOTICE, "fileid %lu not found in database", (unsigned long)fileid);
   psync_sql_free_result(res);
   return row ? 0 : -1;
 }
@@ -561,7 +561,7 @@ static int fill_stat_from_open_file(psync_fsfileid_t fileid,
       fl = ptree_element(tr, psync_openfile_t, tree);
       psync_fs_lock_file(fl);
       stbuf->st_size = fl->currentsize;
-      debug(D_NOTICE, "found open file with size %lu",
+      pdbg_logf(D_NOTICE, "found open file with size %lu",
             (unsigned long)fl->currentsize);
       if (!fstat(fl->logfile, &st))
         stbuf->st_mtime = pfile_stat_mtime(&st);
@@ -612,9 +612,9 @@ static int psync_creat_local_to_file_stat(psync_fstask_creat_t *cr,
     stret = fstat(fl->datafile, &st);
     pthread_mutex_unlock(&fl->mutex);
     if (stret)
-      debug(D_NOTICE, "could not stat open file %ld", (long)cr->fileid);
+      pdbg_logf(D_NOTICE, "could not stat open file %ld", (long)cr->fileid);
     else
-      debug(D_NOTICE, "got stat from open file %ld", (long)cr->fileid);
+      pdbg_logf(D_NOTICE, "got stat from open file %ld", (long)cr->fileid);
   } else {
     if (fl)
       pthread_mutex_unlock(&fl->mutex);
@@ -626,7 +626,7 @@ static int psync_creat_local_to_file_stat(psync_fstask_creat_t *cr,
         psync_strcat(cachepath, "/", fileidhex, NULL);
     stret = stat(filename, &st);
     if (stret)
-      debug(D_NOTICE, "could not stat file %s", filename);
+      pdbg_logf(D_NOTICE, "could not stat file %s", filename);
     free(filename);
   }
   if (stret)
@@ -697,7 +697,7 @@ static int psync_creat_static_to_file_stat(psync_fstask_creat_t *cr,
 static int psync_creat_to_file_stat(psync_fstask_creat_t *cr,
                                     struct FUSE_STAT *stbuf,
                                     uint32_t folderflags) {
-  debug(D_NOTICE, "getting stat from creat for file %s fileid %ld taskid %lu",
+  pdbg_logf(D_NOTICE, "getting stat from creat for file %s fileid %ld taskid %lu",
         cr->name, (long)cr->fileid, (unsigned long)cr->taskid);
   if (cr->fileid > 0)
     return psync_creat_db_to_file_stat(cr->fileid, stbuf, folderflags);
@@ -746,7 +746,7 @@ static int psync_fs_getrootattr(struct FUSE_STAT *stbuf) {
   do {                                                                         \
     if (unlikely(waitingforlogin)) {                                           \
       psync_sql_unlock();                                                      \
-      debug(D_NOTICE, "returning EACCES for not logged in");                   \
+      pdbg_logf(D_NOTICE, "returning EACCES for not logged in");                   \
       return -EACCES;                                                          \
     }                                                                          \
   } while (0)
@@ -755,7 +755,7 @@ static int psync_fs_getrootattr(struct FUSE_STAT *stbuf) {
   do {                                                                         \
     if (unlikely(waitingforlogin)) {                                           \
       psync_sql_rdunlock();                                                    \
-      debug(D_NOTICE, "returning EACCES for not logged in");                   \
+      pdbg_logf(D_NOTICE, "returning EACCES for not logged in");                   \
       return -EACCES;                                                          \
     }                                                                          \
   } while (0)
@@ -768,7 +768,7 @@ static int psync_fs_getattr(const char *path, struct FUSE_STAT *stbuf) {
   psync_fstask_creat_t *cr;
   int crr;
   psync_fs_set_thread_name();
-  //  debug(D_NOTICE, "getattr %s", path);
+  //  pdbg_logf(D_NOTICE, "getattr %s", path);
   if (path[1] == 0 && path[0] == '/')
     return psync_fs_getrootattr(stbuf);
   psync_sql_rdlock();
@@ -779,10 +779,10 @@ static int psync_fs_getattr(const char *path, struct FUSE_STAT *stbuf) {
     crr = psync_fsfolder_crypto_error();
     if (crr) {
       crr = -psync_fs_crypto_err_to_errno(crr);
-      debug(D_NOTICE, "got crypto error for %s, returning %d", path, crr);
+      pdbg_logf(D_NOTICE, "got crypto error for %s, returning %d", path, crr);
       return crr;
     } else {
-      debug(D_NOTICE, "could not find path component of %s, returning ENOENT",
+      pdbg_logf(D_NOTICE, "could not find path component of %s, returning ENOENT",
             path);
       return -ENOENT;
     }
@@ -838,7 +838,7 @@ static int psync_fs_getattr(const char *path, struct FUSE_STAT *stbuf) {
   free(fpath);
   if (row || !crr)
     return 0;
-  debug(D_NOTICE, "returning ENOENT for %s", path);
+  pdbg_logf(D_NOTICE, "returning ENOENT for %s", path);
   return -ENOENT;
 }
 
@@ -871,23 +871,23 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   size_t namelen;
   struct FUSE_STAT st;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "readdir %s", path);
+  pdbg_logf(D_NOTICE, "readdir %s", path);
   psync_sql_rdlock();
   CHECK_LOGIN_RDLOCKED();
   folderid = psync_fsfolderid_by_path(path, &flags);
-  if (unlikely_log(folderid == PSYNC_INVALID_FSFOLDERID)) {
+  if (unpdbg_likely(folderid == PSYNC_INVALID_FSFOLDERID)) {
     psync_sql_rdunlock();
     if (psync_fsfolder_crypto_error())
-      return PRINT_RETURN(
+      return pdbg_return(
           -psync_fs_crypto_err_to_errno(psync_fsfolder_crypto_error()));
     else
-      return -PRINT_RETURN_CONST(ENOENT);
+      return -pdbg_return_const(ENOENT);
   }
   if (flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
     dec = pcryptofolder_flddecoder_get(folderid);
     if (psync_crypto_is_error(dec)) {
       psync_sql_rdunlock();
-      return PRINT_RETURN(
+      return pdbg_return(
           -psync_fs_crypto_err_to_errno(psync_crypto_to_error(dec)));
     }
   } else
@@ -904,7 +904,7 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     while ((row = psync_sql_fetch_row(res))) {
       name = psync_get_lstring(row[5], &namelen);
 #if defined(FS_MAX_ACCEPTABLE_FILENAME_LEN)
-      if (unlikely_log(namelen > FS_MAX_ACCEPTABLE_FILENAME_LEN))
+      if (unpdbg_likely(namelen > FS_MAX_ACCEPTABLE_FILENAME_LEN))
         continue;
 #endif
       if (!name || !name[0])
@@ -922,7 +922,7 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     while ((row = psync_sql_fetch_row(res))) {
       name = psync_get_lstring(row[0], &namelen);
 #if defined(FS_MAX_ACCEPTABLE_FILENAME_LEN)
-      if (unlikely_log(namelen > FS_MAX_ACCEPTABLE_FILENAME_LEN))
+      if (unpdbg_likely(namelen > FS_MAX_ACCEPTABLE_FILENAME_LEN))
         continue;
 #endif
       if (!name || !name[0])
@@ -937,7 +937,7 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   if (folder) {
     ptree_for_each(trel, folder->mkdirs) {
 #if defined(FS_MAX_ACCEPTABLE_FILENAME_LEN)
-      if (unlikely_log(
+      if (unpdbg_likely(
               strlen(
                   ptree_element(trel, psync_fstask_mkdir_t, tree)->name) >
               FS_MAX_ACCEPTABLE_FILENAME_LEN))
@@ -954,7 +954,7 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     }
     ptree_for_each(trel, folder->creats) {
 #if defined(FS_MAX_ACCEPTABLE_FILENAME_LEN)
-      if (unlikely_log(
+      if (unpdbg_likely(
               strlen(
                   ptree_element(trel, psync_fstask_creat_t, tree)->name) >
               FS_MAX_ACCEPTABLE_FILENAME_LEN))
@@ -970,7 +970,7 @@ static int psync_fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   psync_sql_rdunlock();
   if (dec)
     pcryptofolder_flddecoder_release(folderid, dec);
-  return PRINT_RETURN(0);
+  return pdbg_return(0);
 }
 
 static psync_openfile_t *
@@ -1003,14 +1003,14 @@ psync_fs_create_file(psync_fsfileid_t fileid, psync_fsfileid_t remotefileid,
         psync_fs_inc_of_refcnt_locked(fl);
       } else
         psync_fs_inc_of_refcnt(fl);
-      assertw(fl->currentfolder == folder);
-      assertw(!strcmp(fl->currentname, name));
+      pdbg_assertw(fl->currentfolder == folder);
+      pdbg_assertw(!strcmp(fl->currentname, name));
       psync_fstask_release_folder_tasks_locked(folder);
       psync_sql_unlock();
       if (encoder != PSYNC_CRYPTO_INVALID_ENCODER &&
           encoder != PSYNC_CRYPTO_UNLOADED_SECTOR_ENCODER)
         pcryptofolder_filencoder_release(fileid, hash, encoder);
-      debug(D_NOTICE, "found open file %ld, refcnt %u, currentsize=%lu",
+      pdbg_logf(D_NOTICE, "found open file %ld, refcnt %u, currentsize=%lu",
             (long int)fileid, (unsigned)fl->refcnt,
             (unsigned long)fl->currentsize);
       return fl;
@@ -1072,15 +1072,15 @@ int64_t psync_fs_load_interval_tree(int fd, uint64_t size,
   if (unlikely(size < sizeof(psync_fs_index_header)))
     return 0;
   size -= sizeof(psync_fs_index_header);
-  assertw(size % sizeof(psync_fs_index_record) == 0);
+  pdbg_assertw(size % sizeof(psync_fs_index_record) == 0);
   cnt = size / sizeof(psync_fs_index_record);
-  debug(D_NOTICE, "loading %lu intervals", (unsigned long)cnt);
+  pdbg_logf(D_NOTICE, "loading %lu intervals", (unsigned long)cnt);
   for (i = 0; i < cnt; i += ARRAY_SIZE(records)) {
     rd = ARRAY_SIZE(records) > cnt - i ? cnt - i : ARRAY_SIZE(records);
     rrd = pfile_pread(fd, records, rd * sizeof(psync_fs_index_record),
                            i * sizeof(psync_fs_index_record) +
                                sizeof(psync_fs_index_header));
-    if (unlikely_log(rrd != rd * sizeof(psync_fs_index_record)))
+    if (unpdbg_likely(rrd != rd * sizeof(psync_fs_index_record)))
       return -1;
     for (j = 0; j < rd; j++)
       psync_interval_tree_add(tree, records[j].offset,
@@ -1089,16 +1089,16 @@ int64_t psync_fs_load_interval_tree(int fd, uint64_t size,
   if (IS_DEBUG && *tree) {
     psync_interval_tree_t *tr;
     tr = *tree;
-    debug(D_NOTICE, "loaded approx %lu intervals",
+    pdbg_logf(D_NOTICE, "loaded approx %lu intervals",
           (unsigned long)1 << (tr->tree.height - 1));
     tr = psync_interval_tree_get_first(*tree);
-    debug(D_NOTICE, "first interval from %lu to %lu", (unsigned long)tr->from,
+    pdbg_logf(D_NOTICE, "first interval from %lu to %lu", (unsigned long)tr->from,
           (unsigned long)tr->to);
     //    while ((tr=psync_interval_tree_get_next(tr)))
-    //      debug(D_NOTICE, "next interval from %lu to %lu", (unsigned
+    //      pdbg_logf(D_NOTICE, "next interval from %lu to %lu", (unsigned
     //      long)tr->from, (unsigned long)tr->to);
     tr = psync_interval_tree_get_last(*tree);
-    debug(D_NOTICE, "last interval from %lu to %lu", (unsigned long)tr->from,
+    pdbg_logf(D_NOTICE, "last interval from %lu to %lu", (unsigned long)tr->from,
           (unsigned long)tr->to);
   }
   return cnt;
@@ -1108,10 +1108,10 @@ static int load_interval_tree(psync_openfile_t *of) {
   psync_fs_index_header hdr;
   int64_t ifs;
   ifs = pfile_size(of->indexfile);
-  if (unlikely_log(ifs == -1))
+  if (unpdbg_likely(ifs == -1))
     return -1;
   if (ifs < sizeof(psync_fs_index_header)) {
-    assertw(ifs == 0);
+    pdbg_assertw(ifs == 0);
     if (pfile_pwrite(of->indexfile, &hdr, sizeof(psync_fs_index_header),
                           0) != sizeof(psync_fs_index_header))
       return -1;
@@ -1134,7 +1134,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
   char fileidhex[sizeof(psync_fsfileid_t) * 2 + 2];
   int64_t fs;
   int ret;
-  debug(D_NOTICE, "opening write files of %s, trunc=%d", of->currentname,
+  pdbg_logf(D_NOTICE, "opening write files of %s, trunc=%d", of->currentname,
         trunc != 0);
   fileid = -of->fileid;
   psync_binhex(fileidhex, &fileid, sizeof(psync_fsfileid_t));
@@ -1148,19 +1148,19 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
                                    O_CREAT | (trunc ? O_TRUNC : 0));
     free(filename);
     if (of->datafile == INVALID_HANDLE_VALUE) {
-      debug(D_ERROR, "could not open cache file for fileid %ld",
+      pdbg_logf(D_ERROR, "could not open cache file for fileid %ld",
             (long)of->fileid);
       return -EIO;
     }
     fs = pfile_size(of->datafile);
-    if (unlikely_log(fs == -1))
+    if (unpdbg_likely(fs == -1))
       return -EIO;
     if (of->encrypted)
       of->currentsize = pfscrypto_plain_size(fs);
     else
       of->currentsize = fs;
   } else {
-    debug(D_NOTICE, "data file already open");
+    pdbg_logf(D_NOTICE, "data file already open");
     if (trunc)
       return psync_fs_ftruncate_of_locked(of, 0);
     else
@@ -1174,12 +1174,12 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
                                     O_CREAT | (trunc ? O_TRUNC : 0));
     free(filename);
     if (of->indexfile == INVALID_HANDLE_VALUE) {
-      debug(D_ERROR, "could not open cache index file for fileid %ld",
+      pdbg_logf(D_ERROR, "could not open cache index file for fileid %ld",
             (long)of->fileid);
       return -EIO;
     }
     if (load_interval_tree(of)) {
-      debug(D_ERROR,
+      pdbg_logf(D_ERROR,
             "could not load cache file for fileid %ld to interval tree",
             (long)of->fileid);
       return -EIO;
@@ -1193,13 +1193,13 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
       of->logfile = pfile_open(filename, O_RDWR, O_CREAT | O_TRUNC);
       free(filename);
       if (of->logfile == INVALID_HANDLE_VALUE) {
-        debug(D_ERROR, "could not open log file for fileid %ld",
+        pdbg_logf(D_ERROR, "could not open log file for fileid %ld",
               (long)of->fileid);
         return -EIO;
       }
       ret = pfscrypto_init_log(of);
       if (ret) {
-        debug(D_ERROR, "could not init log file for fileid %ld",
+        pdbg_logf(D_ERROR, "could not init log file for fileid %ld",
               (long)of->fileid);
         return ret;
       }
@@ -1253,7 +1253,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
   time_t ctime;
   int ret, status, type;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "open %s", path);
+  pdbg_logf(D_NOTICE, "open %s", path);
   fileid = writeid = hash = size = ctime = 0;
   psync_sql_lock();
   CHECK_LOGIN_LOCKED();
@@ -1263,9 +1263,9 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
     ret = psync_fsfolder_crypto_error();
     if (ret) {
       ret = -psync_fs_crypto_err_to_errno(ret);
-      return PRINT_RETURN(ret);
+      return pdbg_return(ret);
     } else {
-      debug(D_NOTICE, "returning ENOENT for %s, folder not found", path);
+      pdbg_logf(D_NOTICE, "returning ENOENT for %s, folder not found", path);
       return -ENOENT;
     }
   }
@@ -1295,12 +1295,12 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
         size = row[1];
         hash = row[2];
         ctime = row[3];
-        debug(D_NOTICE, "opening moved regular file %lu %s size %lu hash %lu",
+        pdbg_logf(D_NOTICE, "opening moved regular file %lu %s size %lu hash %lu",
               (unsigned long)fileid, fpath->name, (unsigned long)size,
               (unsigned long)hash);
       }
       psync_sql_free_result(res);
-      if (unlikely_log(!row)) {
+      if (unpdbg_likely(!row)) {
         ret = -ENOENT;
         goto ex0;
       }
@@ -1318,7 +1318,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
         hash = row[4];
       }
       psync_sql_free_result(res);
-      if (unlikely_log(!row)) {
+      if (unpdbg_likely(!row)) {
         ret = -ENOENT;
         goto ex0;
       }
@@ -1326,7 +1326,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
         fileid = cr->fileid;
         if (fpath->flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
           encoder = pcryptofolder_filencoder_get(fileid, hash, 1);
-          if (unlikely_log(psync_crypto_is_error(encoder))) {
+          if (unpdbg_likely(psync_crypto_is_error(encoder))) {
             ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encoder));
             goto ex0;
           }
@@ -1337,20 +1337,20 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
                                   fpath->name, encoder);
         psync_fstask_release_folder_tasks_locked(folder);
         psync_sql_unlock();
-        debug(D_NOTICE, "opening new file %ld %s", (long)fileid, fpath->name);
+        pdbg_logf(D_NOTICE, "opening new file %ld %s", (long)fileid, fpath->name);
         free(fpath);
         of->newfile = 1;
         of->releasedforupload = status != 1;
         ret = open_write_files(of, fi->flags & O_TRUNC);
         pthread_mutex_unlock(&of->mutex);
         fi->fh = openfile_to_fh(of);
-        if (unlikely_log(ret)) {
+        if (unpdbg_likely(ret)) {
           psync_fs_dec_of_refcnt(of);
           return ret;
         } else
           return ret;
       } else if (type == PSYNC_FS_TASK_MODIFY) {
-        debug(D_NOTICE, "opening sparse file %ld %s", (long)cr->fileid,
+        pdbg_logf(D_NOTICE, "opening sparse file %ld %s", (long)cr->fileid,
               fpath->name);
         if (fi->flags & O_TRUNC)
           size = 0;
@@ -1364,7 +1364,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
             size = row[0];
           psync_sql_free_result(res);
           if (unlikely(!row)) {
-            debug(
+            pdbg_logf(
                 D_WARNING,
                 "could not find fileid %lu with hash %lu (%ld) in filerevision",
                 (unsigned long)fileid, (unsigned long)hash, (long)hash);
@@ -1373,14 +1373,14 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
           }
         }
       } else {
-        debug(D_BUG, "trying to open file %s with id %ld but task type is %d",
+        pdbg_logf(D_BUG, "trying to open file %s with id %ld but task type is %d",
               fpath->name, (long)cr->fileid, type);
         ret = -EIO;
         goto ex0;
       }
       if (fpath->flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
         encoder = pcryptofolder_filencoder_get(fileid, hash, 1);
-        if (unlikely_log(psync_crypto_is_error(encoder))) {
+        if (unpdbg_likely(psync_crypto_is_error(encoder))) {
           ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encoder));
           goto ex0;
         }
@@ -1397,7 +1397,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
       ret = open_write_files(of, fi->flags & O_TRUNC);
       pthread_mutex_unlock(&of->mutex);
       fi->fh = openfile_to_fh(of);
-      if (unlikely_log(ret)) {
+      if (unpdbg_likely(ret)) {
         psync_fs_dec_of_refcnt(of);
         return ret;
       } else
@@ -1434,7 +1434,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
       size = row[1];
       hash = row[2];
       ctime = row[3];
-      debug(D_NOTICE, "opening regular file %lu %s size %lu hash %lu",
+      pdbg_logf(D_NOTICE, "opening regular file %lu %s size %lu hash %lu",
             (unsigned long)fileid, fpath->name, (unsigned long)size,
             (unsigned long)hash);
     }
@@ -1442,19 +1442,19 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
   }
   if (fi->flags & O_TRUNC || (fi->flags & O_CREAT && !row)) {
     if (fi->flags & O_TRUNC)
-      debug(D_NOTICE, "truncating file %s", path);
+      pdbg_logf(D_NOTICE, "truncating file %s", path);
     else
-      debug(D_NOTICE, "creating file %s", path);
+      pdbg_logf(D_NOTICE, "creating file %s", path);
     if (fpath->flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
       if (row) {
         encoder = pcryptofolder_filencoder_get(fileid, hash, 0);
-        if (unlikely_log(psync_crypto_is_error(encoder))) {
+        if (unpdbg_likely(psync_crypto_is_error(encoder))) {
           ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encoder));
           goto ex0;
         }
         encsymkey = pcryptofolder_filencoder_key_get(fileid, hash,
                                                             &encsymkeylen);
-        if (unlikely_log(psync_crypto_is_error(encsymkey))) {
+        if (unpdbg_likely(psync_crypto_is_error(encsymkey))) {
           pcryptofolder_filencoder_release(fileid, hash, encoder);
           ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encsymkey));
           goto ex0;
@@ -1463,13 +1463,13 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
         psync_symmetric_key_t symkey;
         encsymkey = pcryptofolder_filencoder_key_newplain(
             0, &encsymkeylen, &symkey);
-        if (unlikely_log(psync_crypto_is_error(encsymkey))) {
+        if (unpdbg_likely(psync_crypto_is_error(encsymkey))) {
           ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encsymkey));
           goto ex0;
         }
         encoder = pcrypto_sec_encdec_create(symkey);
         psymkey_free(symkey);
-        if (unlikely_log(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
+        if (unpdbg_likely(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
           free(encsymkey);
           ret = -ENOMEM;
           goto ex0;
@@ -1483,7 +1483,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
     cr =
         psync_fstask_add_creat(folder, fpath->name, 0, encsymkey, encsymkeylen);
     free(encsymkey);
-    if (unlikely_log(!cr)) {
+    if (unpdbg_likely(!cr)) {
       ret = -EIO;
       goto ex0;
     }
@@ -1496,7 +1496,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
     of->modified = 1;
     ret = open_write_files(of, 1);
     pthread_mutex_unlock(&of->mutex);
-    if (unlikely_log(ret)) {
+    if (unpdbg_likely(ret)) {
       psync_fs_del_creat(fpath, of);
       return ret;
     }
@@ -1506,7 +1506,7 @@ static int psync_fs_open(const char *path, struct fuse_file_info *fi) {
   } else if (row) {
     if (fpath->flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
       encoder = pcryptofolder_filencoder_get(fileid, hash, 1);
-      if (unlikely_log(psync_crypto_is_error(encoder))) {
+      if (unpdbg_likely(psync_crypto_is_error(encoder))) {
         ret = -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encoder));
         goto ex0;
       }
@@ -1589,7 +1589,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
   psync_openfile_t *of;
   int ret;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "creat %s", path);
+  pdbg_logf(D_NOTICE, "creat %s", path);
   psync_sql_lock();
   CHECK_LOGIN_LOCKED();
   fpath = psync_fsfolder_resolve_path(path);
@@ -1598,9 +1598,9 @@ static int psync_fs_creat(const char *path, mode_t mode,
     ret = psync_fsfolder_crypto_error();
     if (ret) {
       ret = psync_fs_crypto_err_to_errno(ret);
-      return PRINT_RETURN(-ret);
+      return pdbg_return(-ret);
     } else {
-      debug(D_NOTICE, "returning ENOENT for %s, folder not found", path);
+      pdbg_logf(D_NOTICE, "returning ENOENT for %s, folder not found", path);
       return -ENOENT;
     }
   }
@@ -1617,7 +1617,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
   folder = psync_fstask_get_or_create_folder_tasks_locked(fpath->folderid);
   if (psync_fs_file_exists_in_folder(folder, fpath->name)) {
     psync_fstask_release_folder_tasks_locked(folder);
-    debug(D_NOTICE, "file %s already exists, processing as open", path);
+    pdbg_logf(D_NOTICE, "file %s already exists, processing as open", path);
     ret = psync_fs_open(path, fi);
     psync_sql_unlock();
     free(fpath);
@@ -1628,11 +1628,11 @@ static int psync_fs_creat(const char *path, mode_t mode,
       psync_fstask_release_folder_tasks_locked(folder);
       psync_sql_unlock();
       free(fpath);
-      return -PRINT_RETURN_CONST(PSYNC_FS_ERR_CRYPTO_EXPIRED);
+      return -pdbg_return_const(PSYNC_FS_ERR_CRYPTO_EXPIRED);
     }
     encsymkey = pcryptofolder_filencoder_key_newplain(
         0, &encsymkeylen, &symkey);
-    if (unlikely_log(psync_crypto_is_error(encsymkey))) {
+    if (unpdbg_likely(psync_crypto_is_error(encsymkey))) {
       psync_fstask_release_folder_tasks_locked(folder);
       psync_sql_unlock();
       free(fpath);
@@ -1640,7 +1640,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
     }
     encoder = pcrypto_sec_encdec_create(symkey);
     psymkey_free(symkey);
-    if (unlikely_log(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
+    if (unpdbg_likely(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
       psync_fstask_release_folder_tasks_locked(folder);
       psync_sql_unlock();
       free(fpath);
@@ -1655,7 +1655,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
   cr = psync_fstask_add_creat(folder, fpath->name, 0, encsymkey, encsymkeylen);
   if (encsymkey)
     free(encsymkey);
-  if (unlikely_log(!cr)) {
+  if (unpdbg_likely(!cr)) {
     psync_fstask_release_folder_tasks_locked(folder);
     psync_sql_unlock();
     free(fpath);
@@ -1670,7 +1670,7 @@ static int psync_fs_creat(const char *path, mode_t mode,
   of->modified = 1;
   ret = open_write_files(of, 1);
   pthread_mutex_unlock(&of->mutex);
-  if (unlikely_log(ret)) {
+  if (unpdbg_likely(ret)) {
     psync_fs_del_creat(fpath, of);
     return ret;
   }
@@ -1693,15 +1693,15 @@ static void close_if_valid(int fd) {
 }
 
 static void psync_fs_free_openfile(psync_openfile_t *of) {
-  debug(D_NOTICE, "releasing file %s", of->currentname);
+  pdbg_logf(D_NOTICE, "releasing file %s", of->currentname);
   if (unlikely(of->writetimer != PSYNC_INVALID_TIMER))
-    debug(D_BUG,
+    pdbg_logf(D_BUG,
           "file %s with active timer is set to free, this is not supposed to "
           "happen",
           of->currentname);
   if (of->deleted && of->fileid < 0) {
     psync_sql_res *res;
-    debug(D_NOTICE, "file %s marked for deletion, releasing cancel tasks",
+    pdbg_logf(D_NOTICE, "file %s marked for deletion, releasing cancel tasks",
           of->currentname);
     res = psync_sql_prep_statement(
         "UPDATE fstask SET status=11 WHERE id=? AND status=12");
@@ -1712,7 +1712,7 @@ static void psync_fs_free_openfile(psync_openfile_t *of) {
   if (of->encrypted) {
     if (of->encoder != PSYNC_CRYPTO_UNLOADED_SECTOR_ENCODER &&
         of->encoder != PSYNC_CRYPTO_FAILED_SECTOR_ENCODER) {
-      assert(of->encoder != PSYNC_CRYPTO_LOADING_SECTOR_ENCODER);
+      pdbg_assert(of->encoder != PSYNC_CRYPTO_LOADING_SECTOR_ENCODER);
       pcrypto_sec_encdec_free(of->encoder);
     }
     close_if_valid(of->logfile);
@@ -1800,7 +1800,7 @@ static void psync_fs_upload_release_timer(void *ptr) {
   psync_openfile_writeid_t *ofw;
   uint32_t aff;
   ofw = (psync_openfile_writeid_t *)ptr;
-  debug(D_NOTICE, "releasing file %s for upload, size=%lu, writeid=%u",
+  pdbg_logf(D_NOTICE, "releasing file %s for upload, size=%lu, writeid=%u",
         ofw->of->currentname, (unsigned long)ofw->of->currentsize,
         (unsigned)ofw->writeid);
   res = psync_sql_prep_statement(
@@ -1831,17 +1831,17 @@ static void psync_fs_write_timer(psync_timer_t timer, void *ptr) {
   psync_fs_lock_file(of);
   ptimer_stop(timer);
   of->writetimer = PSYNC_INVALID_TIMER;
-  debug(D_NOTICE, "got write timer for file %s", of->currentname);
+  pdbg_logf(D_NOTICE, "got write timer for file %s", of->currentname);
   if (of->releasedforupload)
-    debug(D_NOTICE, "file seems to be already released for upload");
+    pdbg_logf(D_NOTICE, "file seems to be already released for upload");
   else if (of->modified) {
     psync_openfile_writeid_t *ofw;
     if (unlikely(of->staticfile)) {
-      debug(D_ERROR, "file is static file, which should not generally happen");
+      pdbg_logf(D_ERROR, "file is static file, which should not generally happen");
       goto unlock_ex;
     }
     if (unlikely(of->encrypted && pfscrypto_flush(of))) {
-      debug(D_WARNING,
+      pdbg_logf(D_WARNING,
             "we are in timer and we failed to flush crypto file, life sux");
       goto unlock_ex;
     }
@@ -1850,12 +1850,12 @@ static void psync_fs_write_timer(psync_timer_t timer, void *ptr) {
     ofw->of = of;
     ofw->writeid = of->writeid;
     pthread_mutex_unlock(&of->mutex);
-    debug(D_NOTICE, "running separate thread to release file for upload");
+    pdbg_logf(D_NOTICE, "running separate thread to release file for upload");
     prun_thread1("upload release timer", psync_fs_upload_release_timer,
                       ofw);
     return;
   } else
-    debug(D_NOTICE, "file seems to be already uploaded");
+    pdbg_logf(D_NOTICE, "file seems to be already uploaded");
 unlock_ex:
   pthread_mutex_unlock(&of->mutex);
   psync_fs_dec_of_refcnt(of);
@@ -1864,7 +1864,7 @@ unlock_ex:
 static int psync_fs_flush(const char *path, struct fuse_file_info *fi) {
   psync_openfile_t *of;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "flush %s", path);
+  pdbg_logf(D_NOTICE, "flush %s", path);
   of = fh_to_openfile(fi->fh);
   psync_fs_lock_file(of);
   if (of->modified) {
@@ -1879,7 +1879,7 @@ static int psync_fs_flush(const char *path, struct fuse_file_info *fi) {
     writeid = of->writeid;
     if (of->encrypted) {
       ret = pfscrypto_flush(of);
-      if (unlikely_log(ret)) {
+      if (unpdbg_likely(ret)) {
         pthread_mutex_unlock(&of->mutex);
         return ret;
       }
@@ -1887,13 +1887,13 @@ static int psync_fs_flush(const char *path, struct fuse_file_info *fi) {
     of->releasedforupload = 1;
     if (of->writetimer && !ptimer_stop(of->writetimer)) {
       if (--of->refcnt == 0) {
-        debug(D_BUG, "zero refcnt in flush after canceling timer");
-        assert(of->refcnt);
+        pdbg_logf(D_BUG, "zero refcnt in flush after canceling timer");
+        pdbg_assert(of->refcnt);
       }
       of->writetimer = PSYNC_INVALID_TIMER;
     }
     pthread_mutex_unlock(&of->mutex);
-    debug(D_NOTICE, "releasing file %s for upload, size=%lu, writeid=%u", path,
+    pdbg_logf(D_NOTICE, "releasing file %s for upload, size=%lu, writeid=%u", path,
           (unsigned long)of->currentsize, (unsigned)writeid);
     res = psync_sql_prep_statement(
         "UPDATE fstask SET status=0, int1=? WHERE id=? AND status=1");
@@ -1921,7 +1921,7 @@ static int psync_fs_flush(const char *path, struct fuse_file_info *fi) {
 
 static int psync_fs_release(const char *path, struct fuse_file_info *fi) {
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "release %s", path);
+  pdbg_logf(D_NOTICE, "release %s", path);
   psync_fs_flush(path, fi);
   psync_fs_dec_of_refcnt(fh_to_openfile(fi->fh));
   return 0;
@@ -1932,7 +1932,7 @@ static int psync_fs_fsync(const char *path, int datasync,
   psync_openfile_t *of;
   int ret;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "fsync %s", path);
+  pdbg_logf(D_NOTICE, "fsync %s", path);
   of = fh_to_openfile(fi->fh);
   psync_fs_lock_file(of);
   if (!of->modified || of->staticfile) {
@@ -1941,18 +1941,18 @@ static int psync_fs_fsync(const char *path, int datasync,
   }
   if (of->encrypted) {
     ret = pfscrypto_flush(of);
-    if (unlikely_log(ret)) {
+    if (unpdbg_likely(ret)) {
       pthread_mutex_unlock(&of->mutex);
       return ret;
     }
   }
-  if (unlikely_log(pfile_sync(of->datafile)) ||
-      unlikely_log(!of->newfile && pfile_sync(of->indexfile))) {
+  if (unpdbg_likely(pfile_sync(of->datafile)) ||
+      unpdbg_likely(!of->newfile && pfile_sync(of->indexfile))) {
     pthread_mutex_unlock(&of->mutex);
     return -EIO;
   }
   pthread_mutex_unlock(&of->mutex);
-  if (unlikely_log(psync_sql_sync()))
+  if (unpdbg_likely(psync_sql_sync()))
     return -EIO;
   return 0;
 }
@@ -1960,8 +1960,8 @@ static int psync_fs_fsync(const char *path, int datasync,
 static int psync_fs_fsyncdir(const char *path, int datasync,
                              struct fuse_file_info *fi) {
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "fsyncdir %s", path);
-  if (unlikely_log(psync_sql_sync()))
+  pdbg_logf(D_NOTICE, "fsyncdir %s", path);
+  if (unpdbg_likely(psync_sql_sync()))
     return -EIO;
   else
     return 0;
@@ -1972,7 +1972,7 @@ static int psync_read_newfile(psync_openfile_t *of, char *buf, uint64_t size,
   ssize_t br = pfile_pread(of->datafile, buf, size, offset);
   pthread_mutex_unlock(&of->mutex);
   if (br == -1) {
-    debug(D_NOTICE,
+    pdbg_logf(D_NOTICE,
           "error reading from new file offset %lu, size %lu, error %d",
           (unsigned long)offset, (unsigned long)size, (int)errno);
     br = -EIO;
@@ -2050,9 +2050,9 @@ static void psync_fs_inc_writeid_locked(psync_openfile_t *of) {
     }
     if (of->releasedforupload) {
       of->releasedforupload = 0;
-      debug(D_NOTICE, "stopping upload of file %s as new write arrived",
+      pdbg_logf(D_NOTICE, "stopping upload of file %s as new write arrived",
             of->currentname);
-      assertw(of->fileid < 0);
+      pdbg_assertw(of->fileid < 0);
       psync_fsupload_stop_upload_locked(-of->fileid);
     }
     psync_sql_unlock();
@@ -2069,7 +2069,7 @@ static void psync_fs_inc_writeid_locked(psync_openfile_t *of) {
 
 static int psync_fs_modfile_check_size_ok(psync_openfile_t *of, uint64_t size) {
   if (unlikely(of->currentsize < size)) {
-    debug(D_NOTICE, "extending file %s from %lu to %lu bytes", of->currentname,
+    pdbg_logf(D_NOTICE, "extending file %s from %lu to %lu bytes", of->currentname,
           (unsigned long)of->currentsize, (unsigned long)size);
     if (pfile_seek(of->datafile, size, SEEK_SET) == -1 ||
         pfile_truncate(of->datafile))
@@ -2079,11 +2079,11 @@ static int psync_fs_modfile_check_size_ok(psync_openfile_t *of, uint64_t size) {
     else {
       psync_fs_index_record rec;
       uint64_t ioff;
-      assertw(of->modified);
+      pdbg_assertw(of->modified);
       ioff = of->indexoff++;
       rec.offset = of->currentsize;
       rec.length = size - of->currentsize;
-      if (unlikely_log(pfile_pwrite(of->indexfile, &rec, sizeof(rec),
+      if (unpdbg_likely(pfile_pwrite(of->indexfile, &rec, sizeof(rec),
                                          sizeof(rec) * ioff +
                                              sizeof(psync_fs_index_header)) !=
                        sizeof(rec)))
@@ -2102,7 +2102,7 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
   char *encsymkey;
   size_t encsymkeylen;
   int ret;
-  debug(D_NOTICE, "reopening file %s for writing size %lu", of->currentname,
+  pdbg_logf(D_NOTICE, "reopening file %s for writing size %lu", of->currentname,
         (unsigned long)of->currentsize);
   if (unlikely(of->encrypted &&
                of->encoder == PSYNC_CRYPTO_UNLOADED_SECTOR_ENCODER)) {
@@ -2135,12 +2135,12 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
   if (of->encrypted) {
     if (unlikely(psync_crypto_isexpired())) {
       psync_sql_unlock();
-      return -PRINT_RETURN_CONST(PSYNC_FS_ERR_CRYPTO_EXPIRED);
+      return -pdbg_return_const(PSYNC_FS_ERR_CRYPTO_EXPIRED);
     }
     size = pfscrypto_crypto_size(of->initialsize);
     encsymkey = pcryptofolder_filencoder_key_get(of->fileid, of->hash,
                                                         &encsymkeylen);
-    if (unlikely_log(psync_crypto_is_error(encsymkey))) {
+    if (unpdbg_likely(psync_crypto_is_error(encsymkey))) {
       psync_sql_unlock();
       return -psync_fs_crypto_err_to_errno(psync_crypto_to_error(encsymkey));
     }
@@ -2152,13 +2152,13 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
   if (size == 0 || (size <= PSYNC_FS_MAX_SIZE_CONVERT_NEWFILE &&
                     ppagecache_have_all_pages(of->hash, size) &&
                     !ppagecache_lock_pages())) {
-    debug(D_NOTICE,
+    pdbg_logf(D_NOTICE,
           "we have all pages of file %s, convert it to new file as they are "
           "cheaper to work with",
           of->currentname);
     cr = psync_fstask_add_creat(of->currentfolder, of->currentname, of->fileid,
                                 encsymkey, encsymkeylen);
-    if (unlikely_log(!cr)) {
+    if (unpdbg_likely(!cr)) {
       psync_sql_unlock();
       ppagecache_unlock_pages();
       free(encsymkey);
@@ -2170,7 +2170,7 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
     of->newfile = 1;
     of->modified = 1;
     ret = open_write_files(of, 0);
-    if (unlikely_log(ret)) {
+    if (unpdbg_likely(ret)) {
       ppagecache_unlock_pages();
       free(encsymkey);
       return ret;
@@ -2181,7 +2181,7 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
       ret = ppagecache_copy_to_file_locked(
           of, of->hash, size);
       ppagecache_unlock_pages();
-      if (unlikely_log(ret)) {
+      if (unpdbg_likely(ret)) {
         free(encsymkey);
         return -EIO;
       }
@@ -2193,14 +2193,14 @@ psync_fs_reopen_file_for_writing(psync_openfile_t *of) {
                                       of->fileid, of->hash, encsymkey,
                                       encsymkeylen);
   free(encsymkey);
-  if (unlikely_log(!cr)) {
+  if (unpdbg_likely(!cr)) {
     psync_sql_unlock();
     return -EIO;
   }
   psync_fs_update_openfile_fileid_locked(of, cr->fileid);
   psync_sql_unlock();
   ret = open_write_files(of, 0);
-  if (unlikely_log(ret) ||
+  if (unpdbg_likely(ret) ||
       pfile_seek(of->datafile, size, SEEK_SET) == -1 ||
       pfile_truncate(of->datafile)) {
     if (!ret)
@@ -2221,8 +2221,8 @@ psync_fs_reopen_static_file_for_writing(psync_openfile_t *of) {
   psync_fstask_unlink_t *un;
   uint64_t taskid;
   int ret;
-  assert(!of->encrypted);
-  assert(of->staticfile);
+  pdbg_assert(!of->encrypted);
+  pdbg_assert(of->staticfile);
   if (unlikely(psync_sql_trylock())) {
     // we have to take sql_lock and retake of->mutex AFTER, then check if the
     // case is still !of->newfile && !of->modified
@@ -2235,23 +2235,23 @@ psync_fs_reopen_static_file_for_writing(psync_openfile_t *of) {
     }
   }
   taskid = UINT64_MAX - (INT64_MAX - of->fileid);
-  debug(D_NOTICE, "reopening static file %s for writing size %lu, taskid %lu",
+  pdbg_logf(D_NOTICE, "reopening static file %s for writing size %lu, taskid %lu",
         of->currentname, (unsigned long)of->currentsize, (unsigned long)taskid);
   cr = psync_fstask_add_creat(of->currentfolder, of->currentname, 0, NULL, 0);
-  if (unlikely_log(!cr)) {
+  if (unpdbg_likely(!cr)) {
     psync_sql_unlock();
     return -EIO;
   }
   psync_fs_update_openfile_fileid_locked(of, cr->fileid);
   psync_fs_static_to_task(taskid, cr->taskid);
   cr = psync_fstask_find_creat(of->currentfolder, of->currentname, taskid);
-  if (likely_log(cr)) {
+  if (pdbg_likely(cr)) {
     ptree_del(&of->currentfolder->creats, &cr->tree);
     of->currentfolder->taskscnt--;
     free(cr);
   }
   un = psync_fstask_find_unlink(of->currentfolder, of->currentname, taskid);
-  if (likely_log(un)) {
+  if (pdbg_likely(un)) {
     ptree_del(&of->currentfolder->unlinks, &un->tree);
     of->currentfolder->taskscnt--;
     free(un);
@@ -2262,11 +2262,11 @@ psync_fs_reopen_static_file_for_writing(psync_openfile_t *of) {
   of->modified = 1;
   of->staticfile = 0;
   ret = open_write_files(of, 1);
-  if (unlikely_log(ret))
+  if (unpdbg_likely(ret))
     return ret;
   if (pfile_pwrite(of->datafile, of->staticdata, of->currentsize, 0) !=
       of->currentsize)
-    ret = -PRINT_RETURN_CONST(EIO);
+    ret = -pdbg_return_const(EIO);
   else
     ret = 1;
   return ret;
@@ -2303,7 +2303,7 @@ static void psync_fs_throttle(size_t size, uint64_t speed) {
   static time_t thissec = 0;
   time_t currsec;
   int cnt;
-  assert(speed > 0);
+  pdbg_assert(speed > 0);
   cnt = 0;
   while (++cnt <= PSYNC_FS_MAX_SHAPER_SLEEP_SEC) {
     currsec = ptimer_time();
@@ -2319,7 +2319,7 @@ static void psync_fs_throttle(size_t size, uint64_t speed) {
       } else {
         writtenthissec += size;
         pthread_mutex_unlock(&throttle_mutex);
-        assert(size <= speed);
+        pdbg_assert(size <= speed);
         psys_sleep_milliseconds(size * 1000 / speed);
         return;
       }
@@ -2339,10 +2339,10 @@ PSYNC_NOINLINE static int psync_fs_do_check_write_space(psync_openfile_t *of,
   minlocal = psync_setting_get_uint(_PS(minlocalfreespace));
   freespc = ppath_free_space(cachepath);
   if (unlikely(freespc == -1)) {
-    debug(D_WARNING, "could not get free space of path %s", cachepath);
+    pdbg_logf(D_WARNING, "could not get free space of path %s", cachepath);
     return 1;
   }
-  //  debug(D_NOTICE, "free space of %s is %lld minlocal %llu", cachepath,
+  //  pdbg_logf(D_NOTICE, "free space of %s is %lld minlocal %llu", cachepath,
   //  freespc, minlocal);
   if (freespc >= minlocal + size) {
     psync_set_local_full(0);
@@ -2351,13 +2351,13 @@ PSYNC_NOINLINE static int psync_fs_do_check_write_space(psync_openfile_t *of,
   }
   of->throttle = 1;
   pthread_mutex_unlock(&of->mutex);
-  debug(D_NOTICE, "free space is %lu, less than minimum %lu+%lu",
+  pdbg_logf(D_NOTICE, "free space is %lu, less than minimum %lu+%lu",
         (unsigned long)freespc, (unsigned long)minlocal, (unsigned long)size);
   psync_set_local_full(1);
   if ((freespc <= minlocal / 2 || minlocal <= PSYNC_FS_PAGE_SIZE ||
        freespc <= size)) {
     if (ppagecache_free_read(size * 2) < size * 2) {
-      debug(D_WARNING,
+      pdbg_logf(D_WARNING,
             "free space is %lu, less than half of minimum %lu+%lu, returning "
             "error",
             (unsigned long)freespc, (unsigned long)minlocal,
@@ -2365,7 +2365,7 @@ PSYNC_NOINLINE static int psync_fs_do_check_write_space(psync_openfile_t *of,
       psys_sleep_milliseconds(5000);
       return -EINTR;
     } else {
-      debug(D_NOTICE,
+      pdbg_logf(D_NOTICE,
             "free space is %lu, less than half of minimum %lu+%lu, but we "
             "managed to free from read cache",
             (unsigned long)freespc, (unsigned long)minlocal,
@@ -2374,7 +2374,7 @@ PSYNC_NOINLINE static int psync_fs_do_check_write_space(psync_openfile_t *of,
       freed = 1;
     }
   } else if (freespc <= minlocal / 4 * 3) {
-    debug(D_NOTICE,
+    pdbg_logf(D_NOTICE,
           "free space is %lu, less than 3/4 of minimum %lu+%lu, will try to "
           "free read cache pages",
           (unsigned long)freespc, (unsigned long)minlocal, (unsigned long)size);
@@ -2383,7 +2383,7 @@ PSYNC_NOINLINE static int psync_fs_do_check_write_space(psync_openfile_t *of,
     freed = 0;
   if (psync_status.uploadspeed == 0) {
     if (freed || ppagecache_free_read(size) >= size) {
-      debug(D_NOTICE, "there is no active upload and we managed to free from "
+      pdbg_logf(D_NOTICE, "there is no active upload and we managed to free from "
                       "cache, not throttling write");
       psync_fs_lock_file(of);
       return 1;
@@ -2391,16 +2391,16 @@ PSYNC_NOINLINE static int psync_fs_do_check_write_space(psync_openfile_t *of,
   }
   minlocal /= 2;
   mult = (freespc - minlocal) * 1023 / minlocal + 1;
-  assert(mult >= 1 && mult <= 1024);
+  pdbg_assert(mult >= 1 && mult <= 1024);
   speed = psync_status.uploadspeed * 3 / 2;
   if (speed < PSYNC_FS_MIN_INITIAL_WRITE_SHAPER)
     speed = PSYNC_FS_MIN_INITIAL_WRITE_SHAPER;
   speed = speed * mult / 1024;
-  debug(D_NOTICE,
+  pdbg_logf(D_NOTICE,
         "limiting write speed to %luKb (%lub)/sec, speed multiplier %lu",
         (unsigned long)speed / 1024, (unsigned long)speed, (unsigned long)mult);
   psync_fs_throttle(size, speed);
-  debug(D_NOTICE, "continuing write");
+  pdbg_logf(D_NOTICE, "continuing write");
   psync_fs_lock_file(of);
   return 1;
 }
@@ -2424,15 +2424,15 @@ static int psync_fs_write_modified(psync_openfile_t *of, const char *buf,
   psync_fs_index_record rec;
   uint64_t ioff;
   ssize_t bw;
-  if (unlikely_log(psync_fs_modfile_check_size_ok(of, offset)))
+  if (unpdbg_likely(psync_fs_modfile_check_size_ok(of, offset)))
     return -EIO;
   ioff = of->indexoff++;
   bw = pfile_pwrite(of->datafile, buf, size, offset);
-  if (unlikely_log(bw == -1))
+  if (unpdbg_likely(bw == -1))
     return -EIO;
   rec.offset = offset;
   rec.length = bw;
-  if (unlikely_log(pfile_pwrite(of->indexfile, &rec, sizeof(rec),
+  if (unpdbg_likely(pfile_pwrite(of->indexfile, &rec, sizeof(rec),
                                      sizeof(rec) * ioff +
                                          sizeof(psync_fs_index_header)) !=
                    sizeof(rec)))
@@ -2457,12 +2457,12 @@ static int psync_fs_write(const char *path, const char *buf, size_t size,
   psync_openfile_t *of;
   int ret;
   psync_fs_set_thread_name();
-  //  debug(D_NOTICE, "write to %s of %lu at %lu", path, (unsigned long)size,
+  //  pdbg_logf(D_NOTICE, "write to %s of %lu at %lu", path, (unsigned long)size,
   //  (unsigned long)offset);
   of = fh_to_openfile(fi->fh);
   psync_fs_lock_file(of);
   ret = psync_fs_check_write_space(of, size, offset);
-  if (unlikely_log(ret <= 0))
+  if (unpdbg_likely(ret <= 0))
     return ret;
   psync_fs_inc_writeid_locked(of);
 retry:
@@ -2472,7 +2472,7 @@ retry:
     else
       ret = psync_fs_write_newfile(of, buf, size, offset);
     pthread_mutex_unlock(&of->mutex);
-    if (unlikely_log(ret == -1))
+    if (unpdbg_likely(ret == -1))
       return -EIO;
     else
       return ret;
@@ -2489,7 +2489,7 @@ retry:
     if (of->encrypted)
       return pfscrypto_write_mod(of, buf, size, offset);
     else {
-      debug(D_NOTICE, "write of %lu bytes at offset %lu", (unsigned long)size,
+      pdbg_logf(D_NOTICE, "write of %lu bytes at offset %lu", (unsigned long)size,
             (unsigned long)offset);
       if (unlikely(of->staticfile)) {
         ret = psync_fs_reopen_static_file_for_writing(of);
@@ -2511,7 +2511,7 @@ static int psync_fs_mkdir(const char *path, mode_t mode) {
   psync_fspath_t *fpath;
   int ret;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "mkdir %s", path);
+  pdbg_logf(D_NOTICE, "mkdir %s", path);
   psync_sql_lock();
   CHECK_LOGIN_LOCKED();
   fpath = psync_fsfolder_resolve_path(path);
@@ -2529,7 +2529,7 @@ static int psync_fs_mkdir(const char *path, mode_t mode) {
     ret = psync_fstask_mkdir(fpath->folderid, fpath->name, fpath->flags);
   psync_sql_unlock();
   free(fpath);
-  debug(D_NOTICE, "mkdir %s=%d", path, ret);
+  pdbg_logf(D_NOTICE, "mkdir %s=%d", path, ret);
   return ret;
 }
 
@@ -2538,7 +2538,7 @@ static int psync_fs_can_rmdir(const char *path) {
   psync_fspath_t *fpath;
   int ret;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "can_rmdir %s", path);
+  pdbg_logf(D_NOTICE, "can_rmdir %s", path);
   psync_sql_lock();
   fpath = psync_fsfolder_resolve_path(path);
   if (!fpath)
@@ -2549,7 +2549,7 @@ static int psync_fs_can_rmdir(const char *path) {
     ret = psync_fstask_can_rmdir(fpath->folderid, fpath->flags, fpath->name);
   psync_sql_unlock();
   free(fpath);
-  debug(D_NOTICE, "can_rmdir %s=%d", path, ret);
+  pdbg_logf(D_NOTICE, "can_rmdir %s=%d", path, ret);
   return ret;
 }
 #endif
@@ -2558,7 +2558,7 @@ static int psync_fs_rmdir(const char *path) {
   psync_fspath_t *fpath;
   int ret;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "rmdir %s", path);
+  pdbg_logf(D_NOTICE, "rmdir %s", path);
   psync_sql_lock();
   CHECK_LOGIN_LOCKED();
   fpath = psync_fsfolder_resolve_path(path);
@@ -2570,7 +2570,7 @@ static int psync_fs_rmdir(const char *path) {
     ret = psync_fstask_rmdir(fpath->folderid, fpath->flags, fpath->name);
   psync_sql_unlock();
   free(fpath);
-  debug(D_NOTICE, "rmdir %s=%d", path, ret);
+  pdbg_logf(D_NOTICE, "rmdir %s=%d", path, ret);
   return ret;
 }
 
@@ -2579,7 +2579,7 @@ static int psync_fs_can_unlink(const char *path) {
   psync_fspath_t *fpath;
   int ret;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "can_unlink %s", path);
+  pdbg_logf(D_NOTICE, "can_unlink %s", path);
   psync_sql_lock();
   fpath = psync_fsfolder_resolve_path(path);
   if (!fpath)
@@ -2590,7 +2590,7 @@ static int psync_fs_can_unlink(const char *path) {
     ret = psync_fstask_can_unlink(fpath->folderid, fpath->name);
   psync_sql_unlock();
   free(fpath);
-  debug(D_NOTICE, "can_unlink %s=%d", path, ret);
+  pdbg_logf(D_NOTICE, "can_unlink %s=%d", path, ret);
   return ret;
 }
 #endif
@@ -2599,7 +2599,7 @@ static int psync_fs_unlink(const char *path) {
   psync_fspath_t *fpath;
   int ret;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "unlink %s", path);
+  pdbg_logf(D_NOTICE, "unlink %s", path);
   psync_sql_lock();
   CHECK_LOGIN_LOCKED();
   fpath = psync_fsfolder_resolve_path(path);
@@ -2614,14 +2614,14 @@ static int psync_fs_unlink(const char *path) {
   if ((fpath->flags & PSYNC_FOLDER_FLAG_BACKUP) && ret == 0) {
     // Send async event to UI to notify the user that he is deleting a backedup
     // file.
-    debug(D_NOTICE, "Backedup file deleted in P drive. Send event. Flags: [%d]",
+    pdbg_logf(D_NOTICE, "Backedup file deleted in P drive. Send event. Flags: [%d]",
           fpath->flags);
     prun_thread1("psync_async_sync_delete", psync_async_ui_callback,
                       (void *)PEVENT_BKUP_F_DEL_DRIVE);
   }
 
   free(fpath);
-  debug(D_NOTICE, "unlink %s=%d", path, ret);
+  pdbg_logf(D_NOTICE, "unlink %s=%d", path, ret);
   return ret;
 }
 
@@ -2636,7 +2636,7 @@ static int psync_fs_rename_static_file(psync_fstask_folder_t *srcfolder,
   dstfolder = psync_fstask_get_or_create_folder_tasks_locked(to_folderid);
   cr = psync_fstask_find_creat(dstfolder, new_name, 0);
   if (unlikely(cr)) {
-    debug(D_NOTICE, "renaming over creat of file %s in folderid %ld", new_name,
+    pdbg_logf(D_NOTICE, "renaming over creat of file %s in folderid %ld", new_name,
           (long)to_folderid);
     un = psync_fstask_find_unlink(dstfolder, new_name, cr->taskid);
     if (un) {
@@ -2667,7 +2667,7 @@ static int psync_fs_rename_static_file(psync_fstask_folder_t *srcfolder,
   psync_fstask_inject_creat(dstfolder, cr);
   psync_fstask_release_folder_tasks_locked(dstfolder);
   un = psync_fstask_find_unlink(srcfolder, srccr->name, srccr->taskid);
-  if (likely_log(un)) {
+  if (pdbg_likely(un)) {
     ptree_del(&srcfolder->unlinks, &un->tree);
     free(un);
     srcfolder->taskscnt--;
@@ -2871,7 +2871,7 @@ static int psync_fs_rename(const char *old_path, const char *new_path) {
   int ret;
 
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "rename %s to %s", old_path, new_path);
+  pdbg_logf(D_NOTICE, "rename %s to %s", old_path, new_path);
   folder = NULL;
   psync_sql_lock();
   CHECK_LOGIN_LOCKED();
@@ -2992,7 +2992,7 @@ finish:
   psync_sql_unlock();
   free(fold_path);
   free(fnew_path);
-  return PRINT_RETURN_FORMAT(ret, " for rename from %s to %s", old_path,
+  return pdbg_returnf(ret, " for rename from %s to %s", old_path,
                              new_path);
 err_enoent:
   if (folder)
@@ -3000,14 +3000,14 @@ err_enoent:
   psync_sql_unlock();
   free(fold_path);
   free(fnew_path);
-  debug(D_NOTICE, "returning ENOENT, folder not found");
+  pdbg_logf(D_NOTICE, "returning ENOENT, folder not found");
   return -ENOENT;
 }
 
 static int psync_fs_statfs(const char *path, struct statvfs *stbuf) {
   uint64_t q, uq;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "statfs %s", path);
+  pdbg_logf(D_NOTICE, "statfs %s", path);
   if (waitingforlogin)
     return -EACCES;
   /* TODO:
@@ -3030,13 +3030,13 @@ static int psync_fs_statfs(const char *path, struct statvfs *stbuf) {
 
 static int psync_fs_chmod(const char *path, mode_t mode) {
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "chmod %s %u", path, (unsigned)mode);
+  pdbg_logf(D_NOTICE, "chmod %s %u", path, (unsigned)mode);
   return 0;
 }
 
 int psync_fs_chown(const char *path, uid_t uid, gid_t gid) {
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "chown %s %u %u", path, (unsigned)uid, (unsigned)gid);
+  pdbg_logf(D_NOTICE, "chown %s %u %u", path, (unsigned)uid, (unsigned)gid);
   return 0;
 }
 
@@ -3073,7 +3073,7 @@ static int psync_fs_set_filetime_locked(psync_fsfileid_t fileid,
     filename =
         psync_strcat(cachepath, "/", fileidhex, NULL);
     if (fl && fl->datafile != INVALID_HANDLE_VALUE) {
-      debug(D_NOTICE, "found open file for file id %ld", (long)fl->fileid);
+      pdbg_logf(D_NOTICE, "found open file for file id %ld", (long)fl->fileid);
       if (crtime)
         ret =
             pfile_set_crtime_mtime_by_fd(fl->datafile, filename, tv->tv_sec, 0);
@@ -3086,7 +3086,7 @@ static int psync_fs_set_filetime_locked(psync_fsfileid_t fileid,
       else
         ret = pfile_set_crtime_mtime(filename, 0, tv->tv_sec);
     }
-    debug(D_NOTICE, "setting %s time of %s to %lu=%d",
+    pdbg_logf(D_NOTICE, "setting %s time of %s to %lu=%d",
           crtime ? "creation" : "modification", filename,
           (unsigned long)tv->tv_sec, ret);
     free(filename);
@@ -3097,7 +3097,7 @@ static int psync_fs_set_filetime_locked(psync_fsfileid_t fileid,
 static int psync_fs_set_foldertime_locked(psync_fsfolderid_t folderid,
                                           const struct timespec *tv, int crtime,
                                           uint64_t current) {
-  debug(D_NOTICE, "request to set time of folderid %ld ignored",
+  pdbg_logf(D_NOTICE, "request to set time of folderid %ld ignored",
         (long)folderid);
   return 0;
 }
@@ -3125,7 +3125,7 @@ static int psync_fs_set_time_locked(psync_fsfolderid_t folderid,
           return psync_fs_set_filetime_locked(creat->fileid, tv, crtime, ctm);
         } else {
           psync_sql_free_result(res);
-          debug(D_WARNING,
+          pdbg_logf(D_WARNING,
                 "found creat in folderid %lu for %s with fileid %lu not "
                 "present in the database",
                 (unsigned long)folderid, name, (unsigned long)creat->fileid);
@@ -3195,21 +3195,21 @@ static int psync_fs_set_time(const char *path, const struct timespec *tv,
 #if defined(FUSE_HAS_SETCRTIME)
 static int psync_fs_setcrtime(const char *path, const struct timespec *tv) {
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "setcrtime %s %lu", path, tv->tv_sec);
+  pdbg_logf(D_NOTICE, "setcrtime %s %lu", path, tv->tv_sec);
   return psync_fs_set_time(path, tv, 1);
 }
 #endif
 
 static int psync_fs_utimens(const char *path, const struct timespec tv[2]) {
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "utimens %s %lu", path, tv[1].tv_sec);
+  pdbg_logf(D_NOTICE, "utimens %s %lu", path, tv[1].tv_sec);
   return psync_fs_set_time(path, &tv[1], 0);
 }
 
 static int psync_fs_ftruncate_of_locked(psync_openfile_t *of, fuse_off_t size) {
   int ret;
   if (of->currentsize == size) {
-    debug(D_NOTICE, "not truncating as size is already %lu",
+    pdbg_logf(D_NOTICE, "not truncating as size is already %lu",
           (long unsigned)size);
     return 0;
   }
@@ -3226,11 +3226,11 @@ retry:
     return pfscrypto_truncate(of, size);
   else {
     if (psync_fs_modfile_check_size_ok(of, size))
-      ret = -PRINT_RETURN_CONST(EIO);
+      ret = -pdbg_return_const(EIO);
     else if (of->currentsize != size &&
              (pfile_seek(of->datafile, size, SEEK_SET) == -1 ||
               pfile_truncate(of->datafile)))
-      ret = -PRINT_RETURN_CONST(EIO);
+      ret = -pdbg_return_const(EIO);
     else {
       ret = 0;
       of->currentsize = size;
@@ -3244,12 +3244,12 @@ static int psync_fs_ftruncate(const char *path, fuse_off_t size,
   psync_openfile_t *of;
   int ret;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "ftruncate %s %lu", path, (unsigned long)size);
+  pdbg_logf(D_NOTICE, "ftruncate %s %lu", path, (unsigned long)size);
   of = fh_to_openfile(fi->fh);
   psync_fs_lock_file(of);
   ret = psync_fs_ftruncate_of_locked(of, size);
   pthread_mutex_unlock(&of->mutex);
-  return PRINT_RETURN_FORMAT(ret, " for ftruncate of %s to %lu", path,
+  return pdbg_returnf(ret, " for ftruncate of %s to %lu", path,
                              (unsigned long)size);
 }
 
@@ -3257,7 +3257,7 @@ static int psync_fs_truncate(const char *path, fuse_off_t size) {
   struct fuse_file_info fi;
   int ret;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "truncate %s %lu", path, (unsigned long)size);
+  pdbg_logf(D_NOTICE, "truncate %s %lu", path, (unsigned long)size);
   memset(&fi, 0, sizeof(fi));
   ret = psync_fs_open(path, &fi);
   if (ret)
@@ -3341,10 +3341,10 @@ void psync_fs_refresh() {
   }
   pthread_mutex_unlock(&fsrefreshmutex);
   if (todo == 0) {
-    debug(D_NOTICE, "running cache invalidate direct");
+    pdbg_logf(D_NOTICE, "running cache invalidate direct");
     prun_thread("os cache invalidate", psync_invalidate_os_cache_noret);
   } else if (todo == 1) {
-    debug(D_NOTICE, "setting timer to invalidate cache");
+    pdbg_logf(D_NOTICE, "setting timer to invalidate cache");
     ptimer_register(psync_fs_refresh_timer, REFRESH_SEC, NULL);
   }
 }
@@ -3386,7 +3386,7 @@ void psync_fs_refresh_folder(psync_folderid_t folderid) {
   if (pfile_invalidate_os_cache_needed())
     pfile_invalidate_os_cache(fpath);
   else {
-    debug(D_NOTICE, "creating fake file %s", fpath);
+    pdbg_logf(D_NOTICE, "creating fake file %s", fpath);
     fd = pfile_open(fpath, O_WRONLY, O_CREAT);
     if (fd != INVALID_HANDLE_VALUE) {
       pfile_close(fd);
@@ -3448,10 +3448,10 @@ char *psync_fs_get_path_by_folderid(psync_folderid_t folderid) {
 
 static void psync_fs_dump_internals() {
   psync_openfile_t *of;
-  debug(D_NOTICE, "dumping internal state");
+  pdbg_logf(D_NOTICE, "dumping internal state");
   psync_sql_rdlock();
   ptree_for_each_element(of, openfiles, psync_openfile_t, tree)
-      debug(D_NOTICE, "open file %s fileid %ld folderid %ld", of->currentname,
+      pdbg_logf(D_NOTICE, "open file %s fileid %ld folderid %ld", of->currentname,
             (long)of->fileid, (long)of->currentfolder->folderid);
   psync_fstask_dump_state();
   psync_sql_rdunlock();
@@ -3465,7 +3465,7 @@ static void psync_fs_do_stop(void) {
     return;
   }
 
-  debug(D_NOTICE, "stopping");
+  pdbg_logf(D_NOTICE, "stopping");
   pthread_mutex_lock(&start_mutex);
   if (started == 1) {
 
@@ -3482,37 +3482,37 @@ static void psync_fs_do_stop(void) {
         // Check if the mountpoint is still accessible
         if (stat(mp, &st_after) == 0) {
           if (st_before.st_dev == st_after.st_dev) {
-            debug(D_WARNING, "FUSE filesystem may not have unmounted properly");
+            pdbg_logf(D_WARNING, "FUSE filesystem may not have unmounted properly");
           }
         } else if (errno != ENOENT) {
-          debug(D_WARNING, "Unexpected error after unmount: %s",
+          pdbg_logf(D_WARNING, "Unexpected error after unmount: %s",
                 strerror(errno));
         }
       } else {
-        debug(D_WARNING, "Mountpoint not accessible before unmount: %s",
+        pdbg_logf(D_WARNING, "Mountpoint not accessible before unmount: %s",
               strerror(errno));
       }
     } else {
-      debug(D_ERROR, "Failed to get mountpoint");
+      pdbg_logf(D_ERROR, "Failed to get mountpoint");
     }
 
-    debug(D_NOTICE, "running fuse_exit");
+    pdbg_logf(D_NOTICE, "running fuse_exit");
     fuse_exit(psync_fuse);
     started = 2;
-    debug(D_NOTICE, "fuse_exit exited, flushing cache");
+    pdbg_logf(D_NOTICE, "fuse_exit exited, flushing cache");
     ppagecache_flush();
-    debug(D_NOTICE, "cache flushed, waiting for fuse to exit");
+    pdbg_logf(D_NOTICE, "cache flushed, waiting for fuse to exit");
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += 2;
 
     int wait_result = pthread_cond_timedwait(&start_cond, &start_mutex, &ts);
     if (wait_result == ETIMEDOUT) {
-      debug(D_WARNING, "timed out waiting for fuse to exit");
+      pdbg_logf(D_WARNING, "timed out waiting for fuse to exit");
     } else if (wait_result != 0) {
-      debug(D_ERROR, "error waiting for fuse to exit: %s",
+      pdbg_logf(D_ERROR, "error waiting for fuse to exit: %s",
             strerror(wait_result));
     } else {
-      debug(D_NOTICE, "waited for fuse to exit");
+      pdbg_logf(D_NOTICE, "waited for fuse to exit");
     }
 
 #if IS_DEBUG
@@ -3526,13 +3526,13 @@ static void psync_fs_do_stop(void) {
 void psync_fs_stop() { psync_fs_do_stop(); }
 
 static void psync_signal_handler(int sig) {
-  debug(D_NOTICE, "got signal %d", sig);
+  pdbg_logf(D_NOTICE, "got signal %d", sig);
   exit(1); // invoke psync_do_stop via atexit()
 }
 
 #if IS_DEBUG
 static void psync_usr1_handler(int sig) {
-  //  debug(D_NOTICE, "got signal %d", sig);
+  //  pdbg_logf(D_NOTICE, "got signal %d", sig);
   prun_thread("dump signal", psync_fs_dump_internals);
 }
 #endif
@@ -3540,7 +3540,7 @@ static void psync_usr1_handler(int sig) {
 static void psync_set_signal(int sig, void (*handler)(int)) {
   struct sigaction sa;
 
-  if (unlikely_log(sigaction(sig, NULL, &sa)))
+  if (unpdbg_likely(sigaction(sig, NULL, &sa)))
     return;
 
   if (sa.sa_handler == SIG_DFL) {
@@ -3587,12 +3587,12 @@ static void psync_fuse_thread() {
     initonce = 1;
   }
   pthread_mutex_unlock(&start_mutex);
-  debug(D_NOTICE, "running fuse_loop_mt");
+  pdbg_logf(D_NOTICE, "running fuse_loop_mt");
   fr = fuse_loop_mt(psync_fuse);
-  debug(D_NOTICE, "fuse_loop_mt exited with code %d, running fuse_destroy", fr);
+  pdbg_logf(D_NOTICE, "fuse_loop_mt exited with code %d, running fuse_destroy", fr);
   pthread_mutex_lock(&start_mutex);
   fuse_destroy(psync_fuse);
-  debug(D_NOTICE, "fuse_destroy exited");
+  pdbg_logf(D_NOTICE, "fuse_destroy exited");
   free(psync_current_mountpoint);
   started = 0;
   pthread_cond_broadcast(&start_cond);
@@ -3684,11 +3684,11 @@ static int psync_fs_do_start() {
   mp = psync_fuse_get_mountpoint();
 
   psync_fuse_channel = fuse_mount(mp, &args);
-  if (unlikely_log(!psync_fuse_channel))
+  if (unpdbg_likely(!psync_fuse_channel))
     goto err0;
   psync_fuse = fuse_new(psync_fuse_channel, &args, &psync_oper,
                         sizeof(psync_oper), NULL);
-  if (unlikely_log(!psync_fuse))
+  if (unpdbg_likely(!psync_fuse))
     goto err1;
   psync_current_mountpoint = mp;
   started = 1;
@@ -3707,18 +3707,18 @@ err00:
 }
 
 static void psync_fs_wait_start() {
-  debug(D_NOTICE, "waiting for online status");
+  pdbg_logf(D_NOTICE, "waiting for online status");
   pstatus_wait(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
   if (psync_do_run) {
-    debug(D_NOTICE, "starting fs");
+    pdbg_logf(D_NOTICE, "starting fs");
     psync_fs_do_start();
   }
 }
 
 static void psync_fs_wait_login() {
-  debug(D_NOTICE, "waiting for online status");
+  pdbg_logf(D_NOTICE, "waiting for online status");
   pstatus_wait(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
-  debug(D_NOTICE, "waited for online status");
+  pdbg_logf(D_NOTICE, "waited for online status");
   psync_sql_lock();
   waitingforlogin = 0;
   psync_sql_unlock();
@@ -3728,7 +3728,7 @@ void psync_fs_pause_until_login() {
   psync_sql_lock();
   if (waitingforlogin == 0) {
     waitingforlogin = 1;
-    debug(D_NOTICE, "stopping fs until login");
+    pdbg_logf(D_NOTICE, "stopping fs until login");
     prun_thread("fs wait login", psync_fs_wait_login);
   }
   psync_sql_unlock();
@@ -3748,7 +3748,7 @@ int psync_fs_start() {
   if (ret)
     return ret;
   status = pstatus_get(PSTATUS_TYPE_AUTH);
-  debug(D_NOTICE, "auth status=%u", status);
+  pdbg_logf(D_NOTICE, "auth status=%u", status);
   if (status == PSTATUS_AUTH_PROVIDED)
     return psync_fs_do_start();
   else {

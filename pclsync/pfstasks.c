@@ -186,12 +186,12 @@ void psync_fstask_release_folder_tasks_locked(psync_fstask_folder_t *folder) {
 #if IS_DEBUG
   if ((!!folder->taskscnt) !=
       (folder->creats || folder->mkdirs || folder->rmdirs || folder->unlinks))
-    debug(D_ERROR, "taskcnt=%u, c=%p, m=%p, r=%p, u=%p",
+    pdbg_logf(D_ERROR, "taskcnt=%u, c=%p, m=%p, r=%p, u=%p",
           (unsigned)folder->taskscnt, folder->creats, folder->mkdirs,
           folder->rmdirs, folder->unlinks);
 #endif
   if (--folder->refcnt == 0 && !folder->taskscnt) {
-    debug(D_NOTICE, "releasing folder id %ld", (long int)folder->folderid);
+    pdbg_logf(D_NOTICE, "releasing folder id %ld", (long int)folder->folderid);
     ptree_del(&folders, &folder->tree);
     free(folder);
   }
@@ -271,7 +271,7 @@ static void psync_fstask_insert_into_tree(psync_tree **tree, size_t nameoff,
       }
     } else {
       if (c == 0)
-        debug(D_WARNING, "duplicate entry %s, should not happen", name);
+        pdbg_logf(D_WARNING, "duplicate entry %s, should not happen", name);
 
       if (node->right)
         node = node->right;
@@ -405,16 +405,16 @@ int psync_fstask_mkdir(psync_fsfolderid_t folderid, const char *name,
     psync_sql_free_result(res);
     if (row && !psync_fstask_find_rmdir(folder, name, 0)) {
       psync_fstask_release_folder_tasks_locked(folder);
-      return -PRINT_RETURN_CONST(EEXIST);
+      return -pdbg_return_const(EEXIST);
     }
   }
   if ((task = psync_fstask_find_mkdir(folder, name, 0))) {
     depend = task->flags;
     psync_fstask_release_folder_tasks_locked(folder);
     if (depend & PSYNC_FOLDER_FLAG_INVISIBLE)
-      return -PRINT_RETURN_CONST(EACCES);
+      return -pdbg_return_const(EACCES);
     else
-      return -PRINT_RETURN_CONST(EEXIST);
+      return -pdbg_return_const(EEXIST);
   }
   ctime = ptimer_time();
   if (folderflags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
@@ -446,7 +446,7 @@ int psync_fstask_mkdir(psync_fsfolderid_t folderid, const char *name,
   } else
     depend = 0;
   depend += psync_fstask_depend_on_name(taskid, folderid, name, len);
-  if (unlikely_log(psync_sql_commit_transaction())) {
+  if (unpdbg_likely(psync_sql_commit_transaction())) {
     psync_fstask_release_folder_tasks_locked(folder);
     return -EIO;
   }
@@ -500,7 +500,7 @@ int psync_fstask_can_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
       psync_sql_free_result(res);
       if (folder)
         psync_fstask_release_folder_tasks_locked(folder);
-      debug(D_WARNING,
+      pdbg_logf(D_WARNING,
             "attempt to delete encrypted folder %s in folderid %lu rejected",
             name, (unsigned long)folderid);
       return -EACCES;
@@ -512,7 +512,7 @@ int psync_fstask_can_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
     psync_fstask_release_folder_tasks_locked(cfolder);
     if (folder)
       psync_fstask_release_folder_tasks_locked(folder);
-    debug(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
+    pdbg_logf(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
     return -ENOTEMPTY;
   }
   if (cfolderid >= 0) {
@@ -525,7 +525,7 @@ int psync_fstask_can_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
           psync_fstask_release_folder_tasks_locked(cfolder);
         if (folder)
           psync_fstask_release_folder_tasks_locked(folder);
-        debug(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
+        pdbg_logf(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
         return -ENOTEMPTY;
       }
     psync_sql_free_result(res);
@@ -538,7 +538,7 @@ int psync_fstask_can_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
           psync_fstask_release_folder_tasks_locked(cfolder);
         if (folder)
           psync_fstask_release_folder_tasks_locked(folder);
-        debug(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
+        pdbg_logf(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
         return -ENOTEMPTY;
       }
     psync_sql_free_result(res);
@@ -580,7 +580,7 @@ int psync_fstask_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
         !(parentflags & PSYNC_FOLDER_FLAG_ENCRYPTED)) {
       psync_sql_free_result(res);
       psync_fstask_release_folder_tasks_locked(folder);
-      debug(D_WARNING,
+      pdbg_logf(D_WARNING,
             "attempt to delete encrypted folder %s in folderid %lu rejected",
             name, (unsigned long)folderid);
       return -EACCES;
@@ -596,7 +596,7 @@ int psync_fstask_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
   if (cfolder && (cfolder->creats || cfolder->mkdirs)) {
     psync_fstask_release_folder_tasks_locked(cfolder);
     psync_fstask_release_folder_tasks_locked(folder);
-    debug(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
+    pdbg_logf(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
     return -ENOTEMPTY;
   }
   if (cfolderid >= 0) {
@@ -608,7 +608,7 @@ int psync_fstask_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
         if (cfolder)
           psync_fstask_release_folder_tasks_locked(cfolder);
         psync_fstask_release_folder_tasks_locked(folder);
-        debug(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
+        pdbg_logf(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
         return -ENOTEMPTY;
       }
     psync_sql_free_result(res);
@@ -620,7 +620,7 @@ int psync_fstask_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
         if (cfolder)
           psync_fstask_release_folder_tasks_locked(cfolder);
         psync_fstask_release_folder_tasks_locked(folder);
-        debug(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
+        pdbg_logf(D_NOTICE, "returning ENOTEMPTY for folder name %s", name);
         return -ENOTEMPTY;
       }
     psync_sql_free_result(res);
@@ -650,7 +650,7 @@ int psync_fstask_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
   }
   psync_sql_free_result(res);
   psync_fstask_depend_on_name(taskid, folderid, name, len);
-  if (unlikely_log(psync_sql_commit_transaction())) {
+  if (unpdbg_likely(psync_sql_commit_transaction())) {
     psync_fstask_release_folder_tasks_locked(folder);
     return -EIO;
   }
@@ -679,7 +679,7 @@ psync_fstask_creat_t *psync_fstask_add_creat(psync_fstask_folder_t *folder,
   psync_fstask_unlink_t *un;
   uint64_t taskid;
   size_t len;
-  assert(fileid >= 0);
+  pdbg_assert(fileid >= 0);
   len = strlen(name);
   psync_sql_start_transaction();
   res = psync_sql_prep_statement(
@@ -699,7 +699,7 @@ psync_fstask_creat_t *psync_fstask_add_creat(psync_fstask_folder_t *folder,
   if (folder->folderid < 0)
     psync_fstask_depend(taskid, -folder->folderid);
   psync_fstask_depend_on_name(taskid, folder->folderid, name, len);
-  if (unlikely_log(psync_sql_commit_transaction()))
+  if (unpdbg_likely(psync_sql_commit_transaction()))
     return NULL;
   len++;
   un = (psync_fstask_unlink_t *)malloc(
@@ -747,7 +747,7 @@ psync_fstask_add_modified_file(psync_fstask_folder_t *folder, const char *name,
   uint64_t taskid;
   size_t len;
   len = strlen(name);
-  assert(fileid > 0);
+  pdbg_assert(fileid > 0);
   psync_sql_start_transaction();
   res = psync_sql_prep_statement(
       "INSERT INTO fstask (type, status, folderid, fileid, sfolderid, text1, "
@@ -774,7 +774,7 @@ psync_fstask_add_modified_file(psync_fstask_folder_t *folder, const char *name,
     free(task);
     folder->taskscnt--;
   }
-  if (unlikely_log(psync_sql_commit_transaction()))
+  if (unpdbg_likely(psync_sql_commit_transaction()))
     return NULL;
   len++;
   un = (psync_fstask_unlink_t *)malloc(
@@ -820,7 +820,7 @@ int psync_fstask_set_mtime(psync_fileid_t fileid, uint64_t oldtm,
   psync_sql_bind_int(res, 3, oldtm);
   psync_sql_bind_int(res, 4, newtm);
   psync_sql_run_free(res);
-  if (unlikely_log(psync_sql_commit_transaction()))
+  if (unpdbg_likely(psync_sql_commit_transaction()))
     return -EIO;
   psync_fsupload_wake();
   return 0;
@@ -843,7 +843,7 @@ int psync_fstask_add_local_creat_static(psync_fsfolderid_t folderid,
   folder = psync_fstask_get_or_create_folder_tasks_locked(folderid);
   cr = psync_fstask_find_creat(folder, name, 0);
   if (cr) {
-    debug(D_NOTICE,
+    pdbg_logf(D_NOTICE,
           "not adding file %s to folderid %ld as creat already exists", name,
           (long)folderid);
     goto ex;
@@ -856,14 +856,14 @@ int psync_fstask_add_local_creat_static(psync_fsfolderid_t folderid,
     row = psync_sql_fetch_rowint(res);
     psync_sql_free_result(res);
     if (row) {
-      debug(D_NOTICE,
+      pdbg_logf(D_NOTICE,
             "not adding file %s to folderid %ld as it already exists in the "
             "database",
             name, (long)folderid);
       goto ex;
     }
   }
-  debug(D_NOTICE, "adding file %s to folderid %ld, datalen %lu", name,
+  pdbg_logf(D_NOTICE, "adding file %s to folderid %ld, datalen %lu", name,
         (long)folderid, (unsigned long)datalen);
   len++;
   un = (psync_fstask_unlink_t *)malloc(
@@ -939,9 +939,9 @@ static psync_fsfileid_t get_file_at_old_location(psync_fsfileid_t fileid) {
 
 void psync_fstask_stop_and_delete_file(psync_fsfileid_t fileid) {
   psync_sql_res *res;
-  debug(D_NOTICE, "trying to stop upload of task %lu", (unsigned long)-fileid);
+  pdbg_logf(D_NOTICE, "trying to stop upload of task %lu", (unsigned long)-fileid);
   if (psync_fsupload_in_current_small_uploads_batch_locked(-fileid)) {
-    debug(D_NOTICE, "file is in current small uploads batch");
+    pdbg_logf(D_NOTICE, "file is in current small uploads batch");
     return;
   }
   psync_fsupload_stop_upload_locked(-fileid);
@@ -1015,7 +1015,7 @@ int psync_fstask_unlink(psync_fsfolderid_t folderid, const char *name) {
     rfileid = cr->rfileid;
     if (unlikely(cr->fileid == 0)) {
       task = psync_fstask_find_unlink(folder, cr->name, cr->taskid);
-      if (likely_log(task)) {
+      if (pdbg_likely(task)) {
         ptree_del(&folder->unlinks, &task->tree);
         folder->taskscnt--;
         free(task);
@@ -1068,7 +1068,7 @@ int psync_fstask_unlink(psync_fsfolderid_t folderid, const char *name) {
   if (fileid < 0 && -fileid != depend)
     psync_fstask_depend(taskid, -fileid);
   psync_fstask_depend_on_name(taskid, folderid, name, len);
-  if (unlikely_log(psync_sql_commit_transaction())) {
+  if (unpdbg_likely(psync_sql_commit_transaction())) {
     psync_fstask_release_folder_tasks_locked(folder);
     return -EIO;
   }
@@ -1127,7 +1127,7 @@ int psync_fstask_rename_file(psync_fsfileid_t fileid,
     rfileid = cr->rfileid;
   else
     rfileid = 0;
-  debug(D_NOTICE, "renaming file %ld from %ld/%s to %ld/%s", (long)fileid,
+  pdbg_logf(D_NOTICE, "renaming file %ld from %ld/%s to %ld/%s", (long)fileid,
         (long)parentfolderid, name, (long)to_folderid, new_name);
   psync_sql_start_transaction();
   res = psync_sql_prep_statement(
@@ -1163,7 +1163,7 @@ int psync_fstask_rename_file(psync_fsfileid_t fileid,
   psync_fstask_depend_on_name(ttaskid, to_folderid, new_name, nnlen);
   if (cr)
     psync_fstask_depend(ttaskid, cr->taskid);
-  if (unlikely_log(psync_sql_commit_transaction())) {
+  if (unpdbg_likely(psync_sql_commit_transaction())) {
     psync_fstask_release_folder_tasks_locked(folder);
     return -EIO;
   }
@@ -1190,7 +1190,7 @@ int psync_fstask_rename_file(psync_fsfileid_t fileid,
   nnlen++;
   cr = psync_fstask_find_creat(folder, new_name, 0);
   if (cr) {
-    debug(D_NOTICE, "renaming over creat of file %s(%ld) in folder %lu",
+    pdbg_logf(D_NOTICE, "renaming over creat of file %s(%ld) in folder %lu",
           new_name, (long)cr->fileid, (unsigned long)to_folderid);
     if (cr->fileid < 0)
       psync_fstask_stop_and_delete_file(cr->fileid);
@@ -1295,7 +1295,7 @@ static uint64_t psync_fstask_delete_folder_if_ex(psync_fsfolderid_t folderid,
     psync_sql_free_result(res);
 
     if (cfolderid == 0) {
-      debug(D_NOTICE, "Skip creation of a delete task.");
+      pdbg_logf(D_NOTICE, "Skip creation of a delete task.");
       return 0;
     }
   }
@@ -1387,7 +1387,7 @@ int psync_fstask_rename_folder(psync_fsfolderid_t folderid,
   if (mk)
     psync_fstask_depend(ttaskid, mk->taskid);
 
-  if (unlikely_log(psync_sql_commit_transaction())) {
+  if (unpdbg_likely(psync_sql_commit_transaction())) {
     psync_fstask_release_folder_tasks_locked(folder);
     return -EIO;
   }
@@ -1414,7 +1414,7 @@ int psync_fstask_rename_folder(psync_fsfolderid_t folderid,
   mk = psync_fstask_find_mkdir(folder, name, 0);
 
   if (mk) {
-    debug(D_NOTICE, "renaming over mkdir %s", name);
+    pdbg_logf(D_NOTICE, "renaming over mkdir %s", name);
     ptree_del(&folder->mkdirs, &mk->tree);
     free(mk);
     folder->taskscnt--;
@@ -1483,14 +1483,14 @@ void psync_fstask_folder_created(psync_folderid_t parentfolderid,
     psync_sql_res *res;
     psync_uint_row row;
     psync_fsfolderid_t sfolderid;
-    debug(
+    pdbg_logf(
         D_NOTICE,
         "could not find mkdir (taskid %lu) for created folder %s in folder %lu",
         (unsigned long)taskid, name, (unsigned long)parentfolderid);
     res = psync_sql_query("SELECT sfolderid FROM fstask WHERE id=?");
     psync_sql_bind_uint(res, 1, taskid);
     row = psync_sql_fetch_rowint(res);
-    if (unlikely_log(!row))
+    if (unpdbg_likely(!row))
       psync_sql_free_result(res);
     else {
       sfolderid = row[0];
@@ -1500,7 +1500,7 @@ void psync_fstask_folder_created(psync_folderid_t parentfolderid,
         mk = psync_fstask_find_mkdir_by_folderid(folder,
                                                  -(psync_fsfolderid_t)taskid);
         if (mk) {
-          debug(D_NOTICE, "found taskid %lu in folderid %ld as %s",
+          pdbg_logf(D_NOTICE, "found taskid %lu in folderid %ld as %s",
                 (unsigned long)taskid, (long)sfolderid, mk->name);
           mk->folderid = folderid;
         }
@@ -1510,7 +1510,7 @@ void psync_fstask_folder_created(psync_folderid_t parentfolderid,
   }
   folder = psync_fstask_get_folder_tasks_locked(-(psync_fsfolderid_t)taskid);
   if (folder) {
-    debug(D_NOTICE, "re-inserting into tree folder diffs of folder %ld as %lu",
+    pdbg_logf(D_NOTICE, "re-inserting into tree folder diffs of folder %ld as %lu",
           (long)folder->folderid, (unsigned long)folderid);
     ptree_del(&folders, &folder->tree);
     folder->folderid = folderid;
@@ -1546,13 +1546,13 @@ static void psync_fstask_look_for_creat_in_db(psync_folderid_t parentfolderid,
   psync_sql_res *res;
   psync_uint_row row;
   psync_fsfolderid_t sfolderid;
-  debug(D_NOTICE,
+  pdbg_logf(D_NOTICE,
         "could not find creat (taskid %lu) for uploaded file %s in folder %lu",
         (unsigned long)taskid, name, (unsigned long)parentfolderid);
   res = psync_sql_query("SELECT sfolderid FROM fstask WHERE id=?");
   psync_sql_bind_uint(res, 1, taskid);
   row = psync_sql_fetch_rowint(res);
-  if (unlikely_log(!row)) {
+  if (unpdbg_likely(!row)) {
     psync_sql_free_result(res);
     return;
   }
@@ -1562,11 +1562,11 @@ static void psync_fstask_look_for_creat_in_db(psync_folderid_t parentfolderid,
   if (folder) {
     cr = psync_fstask_find_creat_by_fileid(folder, -(psync_fsfileid_t)taskid);
     if (cr) {
-      debug(D_NOTICE, "found taskid %lu in folderid %ld as %s",
+      pdbg_logf(D_NOTICE, "found taskid %lu in folderid %ld as %s",
             (unsigned long)taskid, (long)sfolderid, cr->name);
       cr->fileid = fileid;
     } else
-      debug(D_NOTICE,
+      pdbg_logf(D_NOTICE,
             "could not find creat (taskid %lu) for uploaded file %s in folder "
             "%lu even after looking in db",
             (unsigned long)taskid, name, (unsigned long)parentfolderid);
@@ -1593,13 +1593,13 @@ void psync_fstask_file_created(psync_folderid_t parentfolderid, uint64_t taskid,
       free(un);
       folder->taskscnt--;
     } else
-      debug(D_NOTICE, "could not find unlink for file %s in folderid %lu", name,
+      pdbg_logf(D_NOTICE, "could not find unlink for file %s in folderid %lu", name,
             (unsigned long)parentfolderid);
     psync_fstask_release_folder_tasks_locked(folder);
     if (cr)
       ppathstatus_drive_fldr_changed(parentfolderid);
   } else
-    debug(D_NOTICE, "could not find unlink for file %s in folderid %lu", name,
+    pdbg_logf(D_NOTICE, "could not find unlink for file %s in folderid %lu", name,
           (unsigned long)parentfolderid);
   if (!folder || !cr)
     psync_fstask_look_for_creat_in_db(parentfolderid, taskid, name, fileid);
@@ -1676,7 +1676,7 @@ void psync_fstask_file_renamed(psync_folderid_t folderid, uint64_t taskid,
   }
   res = psync_sql_query("SELECT id, folderid, text1 FROM fstask WHERE id=?");
   psync_sql_bind_uint(res, 1, frtaskid);
-  if (likely_log(row = psync_sql_fetch_row(res))) {
+  if (pdbg_likely(row = psync_sql_fetch_row(res))) {
     folder = psync_fstask_get_folder_tasks_locked(psync_get_snumber(row[1]));
     if (folder) {
       un = psync_fstask_find_unlink(folder, psync_get_string(row[2]),
@@ -1729,7 +1729,7 @@ void psync_fstask_folder_renamed(psync_folderid_t parentfolderid,
   }
   res = psync_sql_query("SELECT id, folderid, text1 FROM fstask WHERE id=?");
   psync_sql_bind_uint(res, 1, frtaskid);
-  if (likely_log(row = psync_sql_fetch_row(res))) {
+  if (pdbg_likely(row = psync_sql_fetch_row(res))) {
     folder = psync_fstask_get_folder_tasks_locked(psync_get_snumber(row[1]));
     if (folder) {
       rm = psync_fstask_find_rmdir(folder, psync_get_string(row[2]),
@@ -2162,7 +2162,7 @@ void psync_fstask_init() {
   while ((row = psync_sql_fetch_row(res))) {
     tp = psync_get_number(row[1]);
     if (!tp || tp >= ARRAY_SIZE(psync_init_task_func)) {
-      debug(D_BUG, "invalid fstask type %lu", (long unsigned)tp);
+      pdbg_logf(D_BUG, "invalid fstask type %lu", (long unsigned)tp);
       continue;
     }
     psync_init_task_func[tp](row);
@@ -2181,36 +2181,36 @@ void psync_fstask_dump_state() {
   psync_fstask_unlink_t *un;
   uint32_t cnt;
   ptree_for_each_element(folder, folders, psync_fstask_folder_t, tree) {
-    debug(D_NOTICE, "open folderid %ld taskcnt %u refcnt %u",
+    pdbg_logf(D_NOTICE, "open folderid %ld taskcnt %u refcnt %u",
           (long)folder->folderid, (unsigned)folder->taskscnt,
           (unsigned)folder->refcnt);
     cnt = 0;
     ptree_for_each_element(mk, folder->mkdirs, psync_fstask_mkdir_t,
                                 tree) {
-      debug(D_NOTICE, "  mkdir %s folderid %ld taskid %lu", mk->name,
+      pdbg_logf(D_NOTICE, "  mkdir %s folderid %ld taskid %lu", mk->name,
             (long)mk->folderid, (unsigned long)mk->taskid);
       cnt++;
     }
     ptree_for_each_element(rm, folder->rmdirs, psync_fstask_rmdir_t,
                                 tree) {
-      debug(D_NOTICE, "  mkdir %s folderid %ld taskid %lu", rm->name,
+      pdbg_logf(D_NOTICE, "  mkdir %s folderid %ld taskid %lu", rm->name,
             (long)rm->folderid, (unsigned long)rm->taskid);
       cnt++;
     }
     ptree_for_each_element(cr, folder->creats, psync_fstask_creat_t,
                                 tree) {
-      debug(D_NOTICE, "  creat %s fileid %ld taskid %lu", cr->name,
+      pdbg_logf(D_NOTICE, "  creat %s fileid %ld taskid %lu", cr->name,
             (long)cr->fileid, (unsigned long)cr->taskid);
       cnt++;
     }
     ptree_for_each_element(un, folder->unlinks, psync_fstask_unlink_t,
                                 tree) {
-      debug(D_NOTICE, "  unlink %s fileid %ld taskid %lu", un->name,
+      pdbg_logf(D_NOTICE, "  unlink %s fileid %ld taskid %lu", un->name,
             (long)un->fileid, (unsigned long)un->taskid);
       cnt++;
     }
     if (cnt != folder->taskscnt)
-      debug(D_ERROR, "inconsistency found, counted taskcnt %u != taskcnt %u",
+      pdbg_logf(D_ERROR, "inconsistency found, counted taskcnt %u != taskcnt %u",
             (unsigned)cnt, (unsigned)folder->taskscnt);
   }
 }

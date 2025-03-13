@@ -32,7 +32,6 @@
 #ifndef _PSYNC_LIBS_H
 #define _PSYNC_LIBS_H
 
-#include "putil.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -42,7 +41,6 @@ extern "C" {
 #include "pcompiler.h"
 #include "pstatus.h"
 #include "pdbg.h"
-#include "psynclib.h" // need for macros...
 
 #include <sqlite3.h>
 #include <stdint.h>
@@ -117,7 +115,7 @@ extern "C" {
   do {                                                                         \
     int __mutex_result = pthread_mutex_lock(mutex);                            \
     if (unlikely(__mutex_result)) {                                            \
-      debug(D_CRITICAL, "pthread_mutex_lock returned %d", __mutex_result);     \
+      pdbg_logf(D_CRITICAL, "pthread_mutex_lock returned %d", __mutex_result);     \
       abort();                                                                 \
     }                                                                          \
   } while (0)
@@ -125,7 +123,7 @@ extern "C" {
   do {                                                                         \
     int __mutex_result = pthread_mutex_unlock(mutex);                          \
     if (unlikely(__mutex_result)) {                                            \
-      debug(D_CRITICAL, "pthread_mutex_unlock returned %d", __mutex_result);   \
+      pdbg_logf(D_CRITICAL, "pthread_mutex_unlock returned %d", __mutex_result);   \
       abort();                                                                 \
     }                                                                          \
   } while (0)
@@ -400,10 +398,10 @@ static inline void psync_get_string_id2(char *dst, const char *prefix,
 static inline size_t psync_strlcpy(char *dst, const char *src, size_t size) {
   size_t len;
   len = strlen(src);
-  if (likely_log(len < size)) {
+  if (pdbg_likely(len < size)) {
     memcpy(dst, src, len + 1);
     return len;
-  } else if (likely_log(size)) {
+  } else if (pdbg_likely(size)) {
     memcpy(dst, src, size - 1);
     dst[size - 1] = 0;
     return size - 1;

@@ -226,7 +226,7 @@ static binresult *get_userinfo_user_pass(psock_t *sock, const char *username,
 
   dig = papi_find_result2(res, "digest", PARAM_STR);
 
-  debug(D_NOTICE, "got digest %s", dig->str);
+  pdbg_logf(D_NOTICE, "got digest %s", dig->str);
 
   ul = strlen(username);
   uc = psync_new_cnt(unsigned char, ul);
@@ -277,11 +277,11 @@ static int check_user_relocated(uint64_t luserid, psock_t *sock) {
   binparam params[] = {PAPI_STR("timeformat", "timestamp"),
                        PAPI_STR("auth", psync_my_auth)};
   res = papi_send2(sock, "getolduserids", params);
-  if (unlikely_log(!res))
+  if (unpdbg_likely(!res))
     return 0;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
-    debug(D_NOTICE, "getolduserids returned error %lu %s",
+    pdbg_logf(D_NOTICE, "getolduserids returned error %lu %s",
           (unsigned long)result,
           papi_find_result2(res, "error", PARAM_STR)->str);
     free(res);
@@ -341,7 +341,7 @@ static psock_t *get_connected_socket() {
     deviceid = psync_strdup(deviceidhex);
   }
 
-  debug(D_NOTICE, "using deviceid %s", deviceid);
+  pdbg_logf(D_NOTICE, "using deviceid %s", deviceid);
   appversion = pdevice_get_software();
   devicestring = pdevice_name();
 
@@ -382,7 +382,7 @@ static psock_t *get_connected_socket() {
       if (tfa) {
         tfa = 0;
         psys_sleep_milliseconds(1000);
-        debug(D_WARNING, "tfa sleep");
+        pdbg_logf(D_WARNING, "tfa sleep");
         continue;
       }
       pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
@@ -395,7 +395,7 @@ static psock_t *get_connected_socket() {
 
     sock = papi_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
 
-    if (unlikely_log(!sock)) {
+    if (unpdbg_likely(!sock)) {
       pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
       continue;
@@ -451,7 +451,7 @@ static psock_t *get_connected_socket() {
 
     free(osversion);
 
-    if (unlikely_log(!res)) {
+    if (unpdbg_likely(!res)) {
       psock_close(sock);
       pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_OFFLINE);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
@@ -463,7 +463,7 @@ static psock_t *get_connected_socket() {
     result = papi_find_result2(res, "result", PARAM_NUM)->num;
 
     if (unlikely(result)) {
-      debug(D_NOTICE, "userinfo returned error %lu %s", (unsigned long)result,
+      pdbg_logf(D_NOTICE, "userinfo returned error %lu %s", (unsigned long)result,
             papi_find_result2(res, "error", PARAM_STR)->str);
       // here we only handle statuses that need to access the result
       if (result == 2297) {
@@ -530,7 +530,7 @@ static psock_t *get_connected_socket() {
         else if (user && pass) {
           // Ugly fix, sorry :(
           if (!strcmp(user, "pass") && !strcmp(pass, "dummy")) {
-            debug(D_NOTICE,
+            pdbg_logf(D_NOTICE,
                   "got %lu, for user=%s, not rising PSTATUS_AUTH_BADLOGIN",
                   (unsigned long)result, user);
             psys_sleep_milliseconds(1000);
@@ -576,12 +576,12 @@ static psock_t *get_connected_socket() {
                   sizeof(psync_my_auth));
 
     if (luserid) {
-      if (unlikely_log(luserid != userid)) {
+      if (unpdbg_likely(luserid != userid)) {
         if (check_user_relocated(luserid, sock)) {
-          debug(D_NOTICE, "setting PSTATUS_AUTH_RELOCATED");
+          pdbg_logf(D_NOTICE, "setting PSTATUS_AUTH_RELOCATED");
           pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATED);
         } else {
-          debug(D_NOTICE, "user mistmatch, db userid=%lu, connected userid=%lu",
+          pdbg_logf(D_NOTICE, "user mistmatch, db userid=%lu, connected userid=%lu",
                 (unsigned long)luserid, (unsigned long)userid);
           pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_MISMATCH);
         }
@@ -681,7 +681,7 @@ static psock_t *get_connected_socket() {
       pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       continue;
     }
-    debug(D_NOTICE, "userid %lu", (unsigned long)userid);
+    pdbg_logf(D_NOTICE, "userid %lu", (unsigned long)userid);
     cres = papi_check_result2(res, "account", PARAM_HASH);
     q = psync_sql_prep_statement(
         "REPLACE INTO setting (id, value) VALUES (?, ?)");
@@ -767,7 +767,7 @@ static psock_t *get_connected_socket() {
     // If the flag is up, send a first login event to track the number of
     // sucessful installs.
     if (isFirstLogin) {
-      debug(D_NOTICE,
+      pdbg_logf(D_NOTICE,
             "This is a first login. Send the FIRST_LOGIN event. Token:[%s], "
             "User id: [%lu]",
             psync_my_auth, (unsigned long)userid);
@@ -783,7 +783,7 @@ static psock_t *get_connected_socket() {
                            INST_EVENT_CATEG, psync_my_auth, P_OS_ID, rawtime,
                            &params, (char **)res);
     } else {
-      debug(D_NOTICE, "Not a first login. Run sync event.");
+      pdbg_logf(D_NOTICE, "Not a first login. Run sync event.");
 
       ptools_send_psyncs_event(apiserver, psync_my_auth);
     }
@@ -792,7 +792,7 @@ static psock_t *get_connected_socket() {
       binparam params[] = {PAPI_STR("timeformat", "timestamp"),
                            PAPI_STR("auth", psync_my_auth)};
       res = papi_send2(sock, "account_info", params);
-      if (unlikely_log(!res)) {
+      if (unpdbg_likely(!res)) {
         psock_close(sock);
         continue;
       }
@@ -810,7 +810,7 @@ static psock_t *get_connected_socket() {
             "owner_cryptosetup",
             papi_find_result2(cres, "cryptosetup", PARAM_BOOL)->num);
       } else
-        debug(D_WARNING,
+        pdbg_logf(D_WARNING,
               "account_info returned %lu, continuing without business info",
               (unsigned long)result);
       free(res);
@@ -938,7 +938,7 @@ static void process_createfolder(const binresult *entry) {
         "synctype) VALUES (?, ?, ?, ?)");
     while ((row = psync_sql_fetch_rowint(res))) {
       syncid = row[0];
-      debug(D_NOTICE,
+      pdbg_logf(D_NOTICE,
             "creating local folder %lu/%s for folderid %lu, parentfolderid %lu",
             (unsigned long)row[1], name->str, (unsigned long)folderid,
             (unsigned long)parentfolderid);
@@ -974,7 +974,7 @@ static void group_results_by_col(psync_full_result_int *restrict r1,
   uint32_t i, j, l;
   l = 0;
   rowsize = sizeof(r1->data[0]) * r1->cols;
-  assert(r1->cols == r2->cols);
+  pdbg_assert(r1->cols == r2->cols);
   for (i = 0; i < r1->rows; i++)
     for (j = 0; j < r2->rows; j++)
       if (psync_get_result_cell(r1, i, col) ==
@@ -1058,7 +1058,7 @@ static void process_modifyfolder(const binresult *entry) {
     oldname = psync_dup_string(vrow[1]);
     oldflags = psync_get_number(vrow[2]);
   } else {
-    debug(D_ERROR,
+    pdbg_logf(D_ERROR,
           "got modify for non-existing folder %lu (%s), processing as create",
           (unsigned long)folderid, name->str);
     psync_sql_free_result(res);
@@ -1069,7 +1069,7 @@ static void process_modifyfolder(const binresult *entry) {
 
   if ((oldflags & PSYNC_FOLDER_FLAG_BACKUP_ROOT) != 0 &&
       (flags & PSYNC_FOLDER_FLAG_BACKUP_ROOT) == 0) {
-    debug(D_NOTICE, "Stop backup root");
+    pdbg_logf(D_NOTICE, "Stop backup root");
     psync_delete_sync_by_folderid(folderid);
     // prun_thread1("psync_async_backup_delete",
     // psync_delete_sync_by_folderid, folderid);
@@ -1077,7 +1077,7 @@ static void process_modifyfolder(const binresult *entry) {
 
   if ((oldflags & PSYNC_FOLDER_FLAG_BACKUP_DEVICE) != 0 &&
       (flags & PSYNC_FOLDER_FLAG_BACKUP_DEVICE) == 0) {
-    debug(D_NOTICE, "Stop backup device");
+    pdbg_logf(D_NOTICE, "Stop backup device");
     psync_delete_backup_device(folderid);
   }
 
@@ -1150,7 +1150,7 @@ static void process_modifyfolder(const binresult *entry) {
       psync_sql_bind_uint(res, 2, psync_get_result_cell(fres1, i, 0));
       row = psync_sql_fetch_rowint(res);
       if (unlikely(!row)) {
-        debug(D_ERROR, "could not find local folder of folderid %lu",
+        pdbg_logf(D_ERROR, "could not find local folder of folderid %lu",
               (unsigned long)folderid);
         psync_sql_free_result(res);
         continue;
@@ -1181,7 +1181,7 @@ static void process_modifyfolder(const binresult *entry) {
       psync_sql_bind_uint(res, 2, syncid);
       row = psync_sql_fetch_rowint(res);
       if (unlikely(!row)) {
-        debug(D_ERROR, "could not find local folder of folderid %lu",
+        pdbg_logf(D_ERROR, "could not find local folder of folderid %lu",
               (unsigned long)folderid);
         psync_sql_free_result(res);
         continue;
@@ -1194,7 +1194,7 @@ static void process_modifyfolder(const binresult *entry) {
     }
     for (/*i is already=cnt*/; i < fres2->rows; i++) {
       syncid = psync_get_result_cell(fres2, i, 0);
-      debug(D_NOTICE,
+      pdbg_logf(D_NOTICE,
             "creating local folder %lu/%s for folderid %lu, parentfolderid %lu",
             (unsigned long)psync_get_result_cell(fres2, i, 1), name->str,
             (unsigned long)folderid, (unsigned long)parentfolderid);
@@ -1415,12 +1415,12 @@ static void process_createfile(const binresult *entry) {
 
       psync_sql_free_result(res2);
       if (!hasit) {
-        debug(D_NOTICE, "downloading file %s with hash %ld to local folder %lu",
+        pdbg_logf(D_NOTICE, "downloading file %s with hash %ld to local folder %lu",
               name->str, (long)hash, (unsigned long)row[1]);
         ptask_download_q(row[0], fileid, row[1], name->str);
         needdownload = 1;
       } else
-        debug(D_NOTICE,
+        pdbg_logf(D_NOTICE,
               "file %s with hash %ld already exists in local folder %lu",
               name->str, (long)hash, (unsigned long)row[1]);
     }
@@ -1464,7 +1464,7 @@ static void process_modifyfile(const binresult *entry) {
   psync_sql_bind_uint(sq, 1, fileid);
   row = psync_sql_fetch_row(sq);
   if (!row) {
-    debug(D_ERROR,
+    pdbg_logf(D_ERROR,
           "got modify for non-existing file %lu (%s), processing as create",
           (unsigned long)fileid, name->str);
     process_createfile(entry);
@@ -1545,7 +1545,7 @@ static void process_modifyfile(const binresult *entry) {
     fres2 = psync_sql_fetchall_int(res);
     group_results_by_col(fres1, fres2, 0);
     cnt = fres2->rows > fres1->rows ? fres1->rows : fres2->rows;
-    //    debug(D_NOTICE, "cnt=%u fres1->rows=%u, fres2->rows=%u,
+    //    pdbg_logf(D_NOTICE, "cnt=%u fres1->rows=%u, fres2->rows=%u,
     //    oldparentfolderid=%lu, parentfolderid=%lu", cnt, fres1->rows,
     //    fres2->rows, oldparentfolderid, parentfolderid);
     for (i = 0; i < cnt; i++) {
@@ -1568,7 +1568,7 @@ static void process_modifyfile(const binresult *entry) {
         row = psync_sql_fetch_row(res);
         psync_sql_free_result(res);
         if (row)
-          debug(D_NOTICE,
+          pdbg_logf(D_NOTICE,
                 "ignoring update for file %s, has correct hash in the database",
                 name->str);
         else {
@@ -1795,7 +1795,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     if (!(br = papi_check_result2(share, "touserid", PARAM_NUM)) &&
         !(br = papi_check_result2(share, "fromuserid", PARAM_NUM)) &&
         !(br = papi_check_result2(share, "toteamid", PARAM_NUM))) {
-      debug(D_WARNING,
+      pdbg_logf(D_WARNING,
             "Neigher frommail or tomail nor buissines share found for "
             "eventtype %u",
             (unsigned)eventid);
@@ -1848,7 +1848,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     else if ((br = papi_check_result2(share, "sharerequestid", PARAM_NUM)))
       res = psync_sql_query("SELECT name, ctime FROM sharerequest WHERE id=? ");
     else {
-      debug(
+      pdbg_logf(
           D_WARNING,
           "Neither sharename, shareid or sharerequestid found for eventtype %u",
           (unsigned)eventid);
@@ -1866,7 +1866,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
       sharename = NULL;
     psync_sql_free_result(res);
     if (!sharename) {
-      debug(D_WARNING,
+      pdbg_logf(D_WARNING,
             "Could not find sharedfolder or sharerequest in the database.");
       return;
     }
@@ -2064,7 +2064,7 @@ static void process_acceptedsharein(const binresult *entry) {
       "REPLACE INTO sharedfolder (id, isincoming, folderid, ctime, "
       "permissions, userid, mail, name) "
       "VALUES (?, 1, ?, ?, ?, ?, ?, ?)");
-  debug(D_WARNING, "INSERT NORMAL SHARE IN id: %lld",
+  pdbg_logf(D_WARNING, "INSERT NORMAL SHARE IN id: %lld",
         (long long)papi_find_result2(share, "shareid", PARAM_NUM)->num);
   psync_sql_bind_uint(q, 1,
                       papi_find_result2(share, "shareid", PARAM_NUM)->num);
@@ -2535,7 +2535,7 @@ static void check_overquota() {
 }
 
 static void diff_exception_handler() {
-  debug(D_NOTICE, "got exception");
+  pdbg_logf(D_NOTICE, "got exception");
   if (likely(exceptionsockwrite != INVALID_SOCKET)) {
     ssize_t ret = write(exceptionsockwrite, "e", 1);
     if (ret == -1) {
@@ -2642,14 +2642,14 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
     if (last_event >= ptimer_time() - 1)
       return;
     if (psock_select_in(&(*sock)->sock, 1, 1000) != 0) {
-      debug(D_NOTICE, "got a pdiff_wake() but no diff events in one "
+      pdbg_logf(D_NOTICE, "got a pdiff_wake() but no diff events in one "
                       "second, closing socket");
       psock_close(*sock);
       if (pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
         ids->notificationid = 0;
-      debug(D_NOTICE, "waiting for new socket");
+      pdbg_logf(D_NOTICE, "waiting for new socket");
       *sock = get_connected_socket();
-      debug(D_NOTICE, "got new socket");
+      pdbg_logf(D_NOTICE, "got new socket");
       pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
       psyncer_check_delayed();
       ids->diffid =
@@ -2658,16 +2658,16 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
     }
     return;
   }
-  debug(D_NOTICE, "exception handler %c", ex);
+  pdbg_logf(D_NOTICE, "exception handler %c", ex);
   if (ex == 'r' || pstatus_get(PSTATUS_TYPE_RUN) == PSTATUS_RUN_STOP ||
       pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED ||
       psync_setting_get_bool(_PS(usessl)) != psock_is_ssl(*sock)) {
     psock_close(*sock);
     if (pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED)
       ids->notificationid = 0;
-    debug(D_NOTICE, "waiting for new socket");
+    pdbg_logf(D_NOTICE, "waiting for new socket");
     *sock = get_connected_socket();
-    debug(D_NOTICE, "got new socket");
+    pdbg_logf(D_NOTICE, "got new socket");
     pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE);
     psyncer_check_delayed();
     ids->diffid =
@@ -2679,7 +2679,7 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
         psock_select_in(&(*sock)->sock, 1,
                         PSYNC_SOCK_TIMEOUT_ON_EXCEPTION * 1000) != 0) {
       const char *prefixes[] = {"API:", "HTTP"};
-      debug(D_NOTICE, "reconnecting diff");
+      pdbg_logf(D_NOTICE, "reconnecting diff");
       psock_close_bad(*sock);
       pcache_clean_oneof(prefixes, ARRAY_SIZE(prefixes));
       *sock = get_connected_socket();
@@ -2687,7 +2687,7 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
       psyncer_check_delayed();
       send_diff_command(*sock, *ids);
     } else {
-      debug(D_NOTICE, "diff socket seems to be alive");
+      pdbg_logf(D_NOTICE, "diff socket seems to be alive");
       (*sock)->pending = 1;
     }
   }
@@ -2779,7 +2779,7 @@ static void psync_run_analyze_if_needed() {
     char **tablenames;
     char *sql;
     size_t tablecnt, i;
-    debug(D_NOTICE, "running ANALYZE on tables");
+    pdbg_logf(D_NOTICE, "running ANALYZE on tables");
     res = psync_sql_query_rdlock(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table'");
     if ((row = psync_sql_fetch_rowint(res)))
@@ -2803,12 +2803,12 @@ static void psync_run_analyze_if_needed() {
 
     while (tablecnt) {
       --tablecnt;
-      debug(D_NOTICE, "running ANALYZE on %s", tablenames[tablecnt]);
+      pdbg_logf(D_NOTICE, "running ANALYZE on %s", tablenames[tablecnt]);
       sql = psync_strcat("ANALYZE ", tablenames[tablecnt], ";", NULL);
       free(tablenames[tablecnt]);
       psync_sql_statement(sql);
       free(sql);
-      debug(D_NOTICE, "table done");
+      pdbg_logf(D_NOTICE, "table done");
       psys_sleep_milliseconds(5);
     }
     free(tablenames);
@@ -2817,7 +2817,7 @@ static void psync_run_analyze_if_needed() {
     psync_sql_bind_string(res, 1, "lastanalyze");
     psync_sql_bind_uint(res, 2, ptimer_time());
     psync_sql_run_free(res);
-    debug(D_NOTICE, "done running ANALYZE on tables");
+    pdbg_logf(D_NOTICE, "done running ANALYZE on tables");
   }
 }
 
@@ -2833,15 +2833,15 @@ static int psync_diff_check_quota(psock_t *sock) {
     return -1;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result))
-    debug(D_WARNING, "userinfo returned error %u: %s", (unsigned)result,
+    pdbg_logf(D_WARNING, "userinfo returned error %u: %s", (unsigned)result,
           papi_find_result2(res, "error", PARAM_STR)->str);
   else {
     uq = papi_check_result2(res, "usedquota", PARAM_NUM);
-    if (likely_log(uq))
+    if (pdbg_likely(uq))
       used_quota = uq->num;
   }
   if (used_quota != oused_quota) {
-    debug(D_WARNING, "corrected locally calculated quota from %lu to %lu",
+    pdbg_logf(D_WARNING, "corrected locally calculated quota from %lu to %lu",
           (unsigned long)oused_quota, (unsigned long)used_quota);
     psync_set_uint_value("usedquota", used_quota);
     pqevent_queue_eventid(PEVENT_USEDQUOTA_CHANGED);
@@ -2870,13 +2870,13 @@ static void psync_diff_adapter_timer(psync_timer_t timer, void *ptr) {
   psync_diff_adapter_hash(hash);
   if (memcmp(adapter_hash, hash, PSYNC_FAST_HASH256_LEN)) {
     memcpy(adapter_hash, hash, PSYNC_FAST_HASH256_LEN);
-    debug(D_NOTICE, "network adapter list changed, sending exception");
+    pdbg_logf(D_NOTICE, "network adapter list changed, sending exception");
     
     ssize_t ret = write(exceptionsockwrite, "e", 1);
     if (ret == -1) {
-      debug(D_ERROR, "Failed to write exception: %s", strerror(errno));
+      pdbg_logf(D_ERROR, "Failed to write exception: %s", strerror(errno));
     } else if (ret != 1) {
-      debug(D_WARNING, "Partial write occurred when sending exception");
+      pdbg_logf(D_WARNING, "Partial write occurred when sending exception");
     }
   }
 }
@@ -2900,7 +2900,7 @@ static void psync_diff_thread() {
 restart:
   pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   sock = get_connected_socket();
-  debug(D_NOTICE, "connected");
+  pdbg_logf(D_NOTICE, "connected");
   pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_SCANNING);
   ids.diffid =
       psync_sql_cellint("SELECT value FROM setting WHERE id='diffid'", 0);
@@ -2923,7 +2923,7 @@ restart:
     }
     result = papi_find_result2(res, "result", PARAM_NUM)->num;
     if (unlikely(result)) {
-      debug(D_ERROR, "diff returned error %u: %s", (unsigned int)result,
+      pdbg_logf(D_ERROR, "diff returned error %u: %s", (unsigned int)result,
             papi_find_result2(res, "error", PARAM_STR)->str);
       psock_close(sock);
       psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
@@ -2932,10 +2932,10 @@ restart:
     entries = papi_find_result2(res, "entries", PARAM_ARRAY);
     if (entries->length) {
       newdiffid = papi_find_result2(res, "diffid", PARAM_NUM)->num;
-      debug(D_NOTICE, "processing diff with %u entries",
+      pdbg_logf(D_NOTICE, "processing diff with %u entries",
             (unsigned)entries->length);
       ids.diffid = process_entries(entries, newdiffid);
-      debug(D_NOTICE, "got diff with %u entries, new diffid %lu",
+      pdbg_logf(D_NOTICE, "got diff with %u entries, new diffid %lu",
             (unsigned)entries->length, (unsigned long)ids.diffid);
     }
     result = entries->length;
@@ -2947,7 +2947,7 @@ restart:
   } while (result);
 
   psync_fs_refresh_folder(0);
-  debug(D_NOTICE, "initial sync finished");
+  pdbg_logf(D_NOTICE, "initial sync finished");
   if (psync_diff_check_quota(sock)) {
     psock_close(sock);
     psys_sleep_milliseconds(PSYNC_SLEEP_BEFORE_RECONNECT);
@@ -2960,7 +2960,7 @@ restart:
   psyncer_check_delayed();
   exceptionsock = setup_exeptions();
   if (unlikely(exceptionsock == INVALID_SOCKET)) {
-    debug(D_ERROR, "could not create pipe");
+    pdbg_logf(D_ERROR, "could not create pipe");
     psock_close(sock);
     goto cleanup;
   }
@@ -3008,7 +3008,7 @@ restart:
       sock->pending = 1;
       res = papi_result(sock);
       should_free_res = 1;
-      if (unlikely_log(!res)) {
+      if (unpdbg_likely(!res)) {
         ptimer_notify_exception();
         handle_exception(&sock, &ids, 'r');
         socks[1] = sock->sock;
@@ -3019,12 +3019,12 @@ restart:
       result = papi_find_result2(res, "result", PARAM_NUM)->num;
       if (unlikely(result)) {
         if (result == 6003 || result == 6002) { // timeout or cancel
-          debug(D_NOTICE, "got \"%s\" from the socket",
+          pdbg_logf(D_NOTICE, "got \"%s\" from the socket",
                 papi_find_result2(res, "error", PARAM_STR)->str);
           send_diff_command(sock, ids);
           continue;
         }
-        debug(D_ERROR, "diff returned error %u: %s", (unsigned int)result,
+        pdbg_logf(D_ERROR, "diff returned error %u: %s", (unsigned int)result,
               papi_find_result2(res, "error", PARAM_STR)->str);
         handle_exception(&sock, &ids, 'r');
         socks[1] = sock->sock;
@@ -3043,7 +3043,7 @@ restart:
             if (initialdownload)
               initialdownload = 0;
           } else
-            debug(D_NOTICE, "diff with 0 entries, did we send a nop recently?");
+            pdbg_logf(D_NOTICE, "diff with 0 entries, did we send a nop recently?");
         } else if (entries->length == 13 &&
                    !strcmp(entries->str, "notifications")) {
           ids.notificationid =
@@ -3054,7 +3054,7 @@ restart:
           ids.publinkid = papi_find_result2(res, "publinkid", PARAM_NUM)->num;
           ret = cache_links(err, 256);
           if (ret < 0)
-            debug(D_ERROR, "Cacheing links failed with err %s", err);
+            pdbg_logf(D_ERROR, "Cacheing links failed with err %s", err);
           else
             psync_notify_cache_change(PACCOUNT_CHANGE_LINKS);
         } else if (entries->length == 11 &&
@@ -3063,7 +3063,7 @@ restart:
               papi_find_result2(res, "uploadlinkid", PARAM_NUM)->num;
           ret = cache_upload_links(&err);
           if (ret < 0)
-            debug(D_ERROR, "Cacheing upload links failed with err %s", err);
+            pdbg_logf(D_ERROR, "Cacheing upload links failed with err %s", err);
           else
             psync_notify_cache_change(PACCOUNT_CHANGE_LINKS);
         } else if (entries->length == 5 && !strcmp(entries->str, "teams")) {
@@ -3077,11 +3077,11 @@ restart:
           cache_contacts();
           psync_notify_cache_change(PACCOUNT_CHANGE_CONTACTS);
         } else {
-          debug(D_NOTICE, "got no from, did we send a nop recently?");
+          pdbg_logf(D_NOTICE, "got no from, did we send a nop recently?");
         }
         send_diff_command(sock, ids);
       } else {
-        debug(D_NOTICE, "got no from, did we send a nop recently?");
+        pdbg_logf(D_NOTICE, "got no from, did we send a nop recently?");
       }
     }
 
@@ -3116,9 +3116,9 @@ void pdiff_wake() {
 
   ssize_t ret = write(exceptionsockwrite, "c", 1);
   if (ret == -1) {
-    debug(D_ERROR, "Failed to write wake signal: %s", strerror(errno));
+    pdbg_logf(D_ERROR, "Failed to write wake signal: %s", strerror(errno));
   } else if (ret != 1) {
-    debug(D_WARNING, "Partial write occurred when sending wake signal");
+    pdbg_logf(D_WARNING, "Partial write occurred when sending wake signal");
   }
 }
 

@@ -91,10 +91,10 @@ static void on_request(void *lpvParam) {
     }
   }
   if (rc == -1) {
-    debug(D_ERROR, "Unix socket read error");
+    pdbg_logf(D_ERROR, "Unix socket read error");
     goto cleanup;
   } else if (rc == 0 && readbytes == 0) {
-    debug(D_NOTICE, "Connection closed by client before sending data");
+    pdbg_logf(D_NOTICE, "Connection closed by client before sending data");
     goto cleanup;
   }
 
@@ -107,16 +107,16 @@ static void on_request(void *lpvParam) {
     ssize_t bytes_written = write(*sockfd, response, total_size);
 
     if (bytes_written == -1) {
-        debug(D_ERROR, "Failed to write to socket: %s", strerror(errno));
+        pdbg_logf(D_ERROR, "Failed to write to socket: %s", strerror(errno));
         return;
     } else if (bytes_written < total_size) {
-        debug(D_ERROR, "Incomplete write to socket: wrote %zd of %zd bytes", bytes_written, total_size);
+        pdbg_logf(D_ERROR, "Incomplete write to socket: wrote %zd of %zd bytes", bytes_written, total_size);
         return;
     }
 
-    debug(D_NOTICE, "Successfully wrote %zd bytes to socket", bytes_written);
+    pdbg_logf(D_NOTICE, "Successfully wrote %zd bytes to socket", bytes_written);
   } else {
-    debug(D_ERROR, "No valid request received");
+    pdbg_logf(D_ERROR, "No valid request received");
   }
 
 cleanup:
@@ -127,7 +127,7 @@ cleanup:
     free(response);
   }
 
-  debug(D_NOTICE, "InstanceThread exiting.");
+  pdbg_logf(D_NOTICE, "InstanceThread exiting.");
 }
 
 static void respond_status(rpc_message_t *request, rpc_message_t *response, size_t available_space) {
@@ -167,7 +167,7 @@ static void respond_api(rpc_message_t *request, rpc_message_t *response, size_t 
                                                (uint32_t)handlers_size))) {
     response->type = 13;
     snprintf(response->value, available_space, "Invalid type.");
-    debug(D_NOTICE, "Invalid request type: %u", request->type);
+    pdbg_logf(D_NOTICE, "Invalid request type: %u", request->type);
     return;
   }
 
@@ -175,7 +175,7 @@ static void respond_api(rpc_message_t *request, rpc_message_t *response, size_t 
     response->type = 13;
     snprintf(response->value, available_space,
              "No callback with this id registered.");
-    debug(D_NOTICE, "No callback registered for type: %u", request->type);
+    pdbg_logf(D_NOTICE, "No callback registered for type: %u", request->type);
     return;
   }
 
@@ -186,7 +186,7 @@ static void respond_api(rpc_message_t *request, rpc_message_t *response, size_t 
     response->type = cbret;
     snprintf(response->value, available_space,
              "Callback returned error code.");
-    debug(D_NOTICE, "Callback failed with return code: %d", cbret);
+    pdbg_logf(D_NOTICE, "Callback failed with return code: %d", cbret);
   }
 }
 
@@ -201,7 +201,7 @@ static void respond(rpc_message_t *request, rpc_message_t *response) {
 
   // never print the crypto password to the logs in plain text
   dbgmsg = (request->type == 20) ? "REDACTED" : request->value;
-  debug(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]", request->type, request->length, dbgmsg);
+  pdbg_logf(D_NOTICE, "Client Request type [%u] len [%lu] string: [%s]", request->type, request->length, dbgmsg);
   if (request->type < 20) {
     respond_status(request, response, value_avail);
   } else {
@@ -213,7 +213,7 @@ static void respond(rpc_message_t *request, rpc_message_t *response) {
   if (response->type != 13 && response->value[0] == '\0') {
     snprintf(response->value, value_avail, "Ok.");
   } else {
-    debug(D_WARNING, "not updating value to Ok: response->msg->type=%d, " "response->msg->value=%s", response->type, response->value);
+    pdbg_logf(D_WARNING, "not updating value to Ok: response->msg->type=%d, " "response->msg->value=%s", response->type, response->value);
   }
 
   // truncate messages that exceed the buffer boundaries
@@ -222,7 +222,7 @@ static void respond(rpc_message_t *request, rpc_message_t *response) {
   if (response->length > POVERLAY_BUFSIZE) {
     response->length = POVERLAY_BUFSIZE;
     response->value[value_avail - 1] = '\0';
-    debug(D_WARNING, "Response message truncated to fit buffer");
+    pdbg_logf(D_WARNING, "Response message truncated to fit buffer");
   }
 }
 
@@ -232,12 +232,12 @@ void prpc_main_loop() {
 
   char *sockpath = prpc_sockpath();
   if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-    debug(D_ERROR, "Unix socket error failed to open %s", sockpath);
+    pdbg_logf(D_ERROR, "Unix socket error failed to open %s", sockpath);
     return;
   }
 
   if (fchmod(fd, 0600) == -1) {
-    debug(D_ERROR, "Failed to set socket permissions");
+    pdbg_logf(D_ERROR, "Failed to set socket permissions");
     return;
   }
 
@@ -248,20 +248,20 @@ void prpc_main_loop() {
   unlink(sockpath);
 
   if (bind(fd, (struct sockaddr *)&addr, strlen(sockpath) + sizeof(addr.sun_family)) == -1) {
-    debug(D_ERROR, "Unix socket bind error");
+    pdbg_logf(D_ERROR, "Unix socket bind error");
     return;
   }
   
   free(sockpath);
 
   if (listen(fd, 5) == -1) {
-    debug(D_ERROR, "Unix socket listen error");
+    pdbg_logf(D_ERROR, "Unix socket listen error");
     return;
   }
 
   while (1) {
     if ((cl = accept(fd, NULL, NULL)) == -1) {
-      debug(D_ERROR, "Unix socket accept error");
+      pdbg_logf(D_ERROR, "Unix socket accept error");
       continue;
     }
 

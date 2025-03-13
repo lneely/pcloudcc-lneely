@@ -25,12 +25,12 @@ void putil_wipe(void *mem, size_t sz) {
     ssize_t result = getrandom((void*)p, sz, 0);
     if (result != (ssize_t)sz) {
         if (result == -1) {
-            debug(D_WARNING, "getrandom() failed: %s.", strerror(errno));
+            pdbg_logf(D_WARNING, "getrandom() failed: %s.", strerror(errno));
         } else {
-            debug(D_WARNING, "getrandom() returned partial data.");
+            pdbg_logf(D_WARNING, "getrandom() returned partial data.");
         }
 
-        debug(D_WARNING, "falling back to less secure third pass. This may occur due to insufficient entropy, early boot state, or kernel incompatibility.");
+        pdbg_logf(D_WARNING, "falling back to less secure third pass. This may occur due to insufficient entropy, early boot state, or kernel incompatibility.");
         srand((unsigned int)(time(NULL) ^ (uintptr_t)&srand));
 		for (size_t i = 0; i < sz; i++) {
 		    p[i] = (unsigned char)rand();

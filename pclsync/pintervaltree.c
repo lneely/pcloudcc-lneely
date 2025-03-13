@@ -69,15 +69,15 @@ psync_interval_tree_consume_intervals(psync_interval_tree_t *tree,
 static psync_interval_tree_t *
 psync_interval_tree_get_add(psync_interval_tree_t *tree, uint64_t from,
                             uint64_t to) {
-  //  debug(D_NOTICE, "adding interval %lu %lu", from, to);
-  assert(to > from);
+  //  pdbg_logf(D_NOTICE, "adding interval %lu %lu", from, to);
+  pdbg_assert(to > from);
   if (unlikely(!tree))
     return psync_interval_tree_new(from, to);
   else {
     psync_interval_tree_t *e, *e2;
     e = tree;
     while (1) {
-      assert(from <= to);
+      pdbg_assert(from <= to);
       if (e->from <= from && e->to >= from) {
         if (e->to >= to)
           return tree;
@@ -97,7 +97,7 @@ psync_interval_tree_get_add(psync_interval_tree_t *tree, uint64_t from,
               e2);
         }
       } else {
-        assert(e->to < from);
+        pdbg_assert(e->to < from);
         if (e->tree.right)
           e = psync_interval_tree_element(e->tree.right);
         else {

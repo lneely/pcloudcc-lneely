@@ -14,7 +14,7 @@ static int psync_gids_cnt;
 static void abort_on_sqllock(uint64_t millisec) {
 #if IS_DEBUG
   if (psync_sql_islocked()) {
-    debug(D_CRITICAL, "trying to sleep while holding sql lock, aborting");
+    pdbg_logf(D_CRITICAL, "trying to sleep while holding sql lock, aborting");
     psync_sql_dump_locks();
     abort();
   }
@@ -33,14 +33,14 @@ void psys_init() {
   struct rlimit limit;
   limit.rlim_cur = limit.rlim_max = 2048;
   if (setrlimit(RLIMIT_NOFILE, &limit))
-    debug(D_ERROR, "setrlimit failed errno=%d", errno);
+    pdbg_logf(D_ERROR, "setrlimit failed errno=%d", errno);
 #if IS_DEBUG
   if (getrlimit(RLIMIT_CORE, &limit))
-    debug(D_ERROR, "getrlimit failed errno=%d", errno);
+    pdbg_logf(D_ERROR, "getrlimit failed errno=%d", errno);
   else {
     limit.rlim_cur = limit.rlim_max;
     if (setrlimit(RLIMIT_CORE, &limit))
-      debug(D_ERROR, "setrlimit failed errno=%d", errno);
+      pdbg_logf(D_ERROR, "setrlimit failed errno=%d", errno);
   }
 #endif
   signal(SIGPIPE, SIG_IGN);
@@ -48,14 +48,14 @@ void psys_init() {
   psync_gid = getgid();
   psync_gids_cnt = getgroups(0, NULL);
   psync_gids = psync_new_cnt(gid_t, psync_gids_cnt);
-  if (unlikely_log(getgroups(psync_gids_cnt, psync_gids) != psync_gids_cnt))
+  if (unpdbg_likely(getgroups(psync_gids_cnt, psync_gids) != psync_gids_cnt))
     psync_gids_cnt = 0;
-  debug(D_NOTICE, "detected page size %ld", sysconf(_SC_PAGESIZE));
+  pdbg_logf(D_NOTICE, "detected page size %ld", sysconf(_SC_PAGESIZE));
 }
 
 time_t psys_time_seconds() {
   struct timespec ts;
-  if (likely_log(clock_gettime(CLOCK_REALTIME, &ts) == 0)) {
+  if (pdbg_likely(clock_gettime(CLOCK_REALTIME, &ts) == 0)) {
     return ts.tv_sec;
   } else {
     return time(NULL);

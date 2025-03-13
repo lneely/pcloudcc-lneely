@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 #include "pcompiler.h"
-#include "pstatus.h"
+#include "putil.h" // need for macros...
 #include "psynclib.h" // need for macros...
 
 
@@ -29,69 +29,69 @@ extern "C" {
 #undef assert
 #endif
 
-#define debug(level, ...)                                                      \
+#define pdbg_logf(level, ...)                                                      \
   do {                                                                         \
     if (level <= DEBUG_LEVEL)                                                  \
-      psync_debug(__FILE__, __FUNCTION__, __LINE__, level, __VA_ARGS__);       \
+      pdbg_printf(__FILE__, __FUNCTION__, __LINE__, level, __VA_ARGS__);       \
   } while (0)
-#define assert(cond)                                                           \
+#define pdbg_assert(cond)                                                           \
   do {                                                                         \
     if (D_WARNING <= DEBUG_LEVEL && unlikely(!(cond))) {                       \
-      debug(D_WARNING, "assertion %s failed, aborting", TO_STR(cond));         \
+      pdbg_logf(D_WARNING, "assertion %s failed, aborting", TO_STR(cond));         \
       abort();                                                                 \
     }                                                                          \
   } while (0)
-#define assertw(cond)                                                          \
+#define pdbg_assertw(cond)                                                          \
   do {                                                                         \
     if (D_WARNING <= DEBUG_LEVEL && unlikely(!(cond))) {                       \
-      debug(D_WARNING, "assertion %s failed", TO_STR(cond));                   \
+      pdbg_logf(D_WARNING, "assertion %s failed", TO_STR(cond));                   \
     }                                                                          \
   } while (0)
-#define debug_execute(level, expr)                                             \
+#define pdbg_run(level, expr)                                             \
   do {                                                                         \
     if (level <= DEBUG_LEVEL)                                                  \
       (expr);                                                                  \
   } while (0)
 
 #if IS_DEBUG
-#define likely_log(x)                                                          \
+#define pdbg_likely(x)                                                          \
   (likely(x) ? 1                                                               \
-             : psync_debug(__FILE__, __FUNCTION__, __LINE__, D_WARNING,        \
-                           "assertion likely_log(%s) failed", TO_STR(x)) *     \
+             : pdbg_printf(__FILE__, __FUNCTION__, __LINE__, D_WARNING,        \
+                           "assertion pdbg_likely(%s) failed", TO_STR(x)) *     \
                    0)
 
-#define unlikely_log(x)                                                        \
-  (unlikely(x) ? psync_debug(__FILE__, __FUNCTION__, __LINE__, D_WARNING,      \
-                             "assertion unlikely_log(%s) failed", TO_STR(x))   \
+#define unpdbg_likely(x)                                                        \
+  (unlikely(x) ? pdbg_printf(__FILE__, __FUNCTION__, __LINE__, D_WARNING,      \
+                             "assertion unpdbg_likely(%s) failed", TO_STR(x))   \
                : 0)
-#define PRINT_RETURN(x)                                                        \
-  ((x) * psync_debug(__FILE__, __FUNCTION__, __LINE__, D_NOTICE,               \
+#define pdbg_return(x)                                                        \
+  ((x) * pdbg_printf(__FILE__, __FUNCTION__, __LINE__, D_NOTICE,               \
                      "returning %d", (int)(x)))
-#define PRINT_RETURN_CONST(x)                                                  \
+#define pdbg_return_const(x)                                                  \
   ((x) *                                                                       \
-   psync_debug(__FILE__, __FUNCTION__, __LINE__, D_NOTICE, "returning " #x))
-#define PRINT_RETURN_FORMAT(x, format, ...)                                    \
-  ((x) * psync_debug(__FILE__, __FUNCTION__, __LINE__, D_NOTICE,               \
+   pdbg_printf(__FILE__, __FUNCTION__, __LINE__, D_NOTICE, "returning " #x))
+#define pdbg_returnf(x, format, ...)                                    \
+  ((x) * pdbg_printf(__FILE__, __FUNCTION__, __LINE__, D_NOTICE,               \
                      "returning %d" format, (int)(x), __VA_ARGS__))
-#define PRINT_NEG_RETURN(x)                                                    \
-  ((x < 0) ? (x) * psync_debug(__FILE__, __FUNCTION__, __LINE__, D_WARNING,    \
+#define pdbg_return_neg(x)                                                    \
+  ((x < 0) ? (x) * pdbg_printf(__FILE__, __FUNCTION__, __LINE__, D_WARNING,    \
                                "returning %d", (int)(x))                       \
            : (x))
-#define PRINT_NEG_RETURN_FORMAT(x, format, ...)                                \
-  ((x < 0) ? (x) * psync_debug(__FILE__, __FUNCTION__, __LINE__, D_WARNING,    \
+#define pdbg_returnf_neg(x, format, ...)                                \
+  ((x < 0) ? (x) * pdbg_printf(__FILE__, __FUNCTION__, __LINE__, D_WARNING,    \
                                "returning %d " format, (int)(x), __VA_ARGS__)  \
            : (x))
 #else
 #define likely_log likely
 #define unlikely_log unlikely
-#define PRINT_RETURN(x) (x)
-#define PRINT_RETURN_CONST(x) (x)
-#define PRINT_RETURN_FORMAT(x, format, ...) (x)
-#define PRINT_NEG_RETURN(x) (x)
-#define PRINT_NEG_RETURN_FORMAT(x, format, ...) (x)
+#define pdbg_return(x) (x)
+#define pdbg_return_const(x) (x)
+#define pdbg_returnf(x, format, ...) (x)
+#define pdbg_return_neg(x) (x)
+#define pdbg_returnf_neg(x, format, ...) (x)
 #endif
 
-int psync_debug(const char *file, const char *function, int unsigned line, int unsigned level, const char *fmt, ...) PSYNC_COLD PSYNC_FORMAT(printf, 5, 6) PSYNC_NONNULL(5);
+int pdbg_printf(const char *file, const char *function, int unsigned line, int unsigned level, const char *fmt, ...) PSYNC_COLD PSYNC_FORMAT(printf, 5, 6) PSYNC_NONNULL(5);
 
 #ifdef __cplusplus
 }

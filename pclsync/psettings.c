@@ -230,7 +230,7 @@ void psync_settings_init() {
           if (settings[i].fix_callback)
             settings[i].fix_callback(&settings[i].boolean);
         } else
-          debug(D_BUG,
+          pdbg_logf(D_BUG,
                 "bad setting type for settingid %d (%s) expected %lu", i,
                 name, settings[i].type);
       }
@@ -243,18 +243,18 @@ psync_settingid_t psync_setting_getid(const char *name) {
   for (i = 0; i < ARRAY_SIZE(settings); i++)
     if (!strcmp(name, settings[i].name))
       return i;
-  debug(D_BUG, "setting witn name %s not found", name);
+  pdbg_logf(D_BUG, "setting witn name %s not found", name);
   return PSYNC_INVALID_SETTINGID;
 }
 
 #define CHECK_SETTINGID_AND_TYPE(ret, stype)                                   \
   do {                                                                         \
     if (unlikely(settingid < 0 || settingid >= ARRAY_SIZE(settings))) {        \
-      debug(D_BUG, "invalid settingid %d", settingid);                         \
+      pdbg_logf(D_BUG, "invalid settingid %d", settingid);                         \
       return ret;                                                              \
     }                                                                          \
     if (unlikely(settings[settingid].type != stype)) {                         \
-      debug(D_BUG, "invalid setting type requested for settingid %d (%s)",     \
+      pdbg_logf(D_BUG, "invalid setting type requested for settingid %d (%s)",     \
             settingid, settings[settingid].name);                              \
       return ret;                                                              \
     }                                                                          \

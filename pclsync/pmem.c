@@ -13,13 +13,13 @@ void *pmem_mmap(size_t size) {
 
 PSYNC_NOINLINE static void *psync_mmap_anon_emergency(size_t size) {
   void *ret;
-  debug(D_WARNING, "could not allocate %lu bytes", size);
+  pdbg_logf(D_WARNING, "could not allocate %lu bytes", size);
   psync_try_free_memory();
   ret = pmem_mmap(size);
   if (likely(ret))
     return ret;
   else {
-    debug(
+    pdbg_logf(
         D_CRITICAL,
         "could not allocate %lu bytes even after freeing some memory, aborting",
         size);

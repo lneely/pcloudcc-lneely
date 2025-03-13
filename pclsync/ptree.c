@@ -30,6 +30,7 @@
 */
 
 #include "ptree.h"
+#include "pdbg.h"
 #include <assert.h>
 #include <string.h>
 
@@ -98,7 +99,7 @@ up:
       e = e->parent;
       goto up;
     } else {
-      assert(tree == e);
+      pdbg_assert(tree == e);
       return tree;
     }
   } else if (dheight == 2) {
@@ -111,13 +112,13 @@ up:
       if (e2->left == e)
         e2->left = ptree_rotate_right(e);
       else {
-        assert(e2->right == e);
+        pdbg_assert(e2->right == e);
         e2->right = ptree_rotate_right(e);
       }
       return tree;
     }
   } else {
-    assert(dheight == -2);
+    pdbg_assert(dheight == -2);
     if (ptree_height(e->right->left) > ptree_height(e->right->right))
       e->right = ptree_rotate_right(e->right);
     if (e == tree)
@@ -127,7 +128,7 @@ up:
       if (e2->left == e)
         e2->left = ptree_rotate_left(e);
       else {
-        assert(e2->right == e);
+        pdbg_assert(e2->right == e);
         e2->right = ptree_rotate_left(e);
       }
       return tree;
@@ -194,7 +195,7 @@ up:
       e = e->parent;
       goto up;
     } else {
-      assert(tree == e);
+      pdbg_assert(tree == e);
       return tree;
     }
   } else if (dheight == 1 || dheight == -1)
@@ -209,14 +210,14 @@ up:
       if (e2->left == e)
         e2->left = ptree_rotate_right(e);
       else {
-        assert(e2->right == e);
+        pdbg_assert(e2->right == e);
         e2->right = ptree_rotate_right(e);
       }
       e = e2;
       goto up;
     }
   } else {
-    assert(dheight == -2);
+    pdbg_assert(dheight == -2);
     if (ptree_height(e->right->left) > ptree_height(e->right->right))
       e->right = ptree_rotate_right(e->right);
     if (e == tree)
@@ -226,7 +227,7 @@ up:
       if (e2->left == e)
         e2->left = ptree_rotate_left(e);
       else {
-        assert(e2->right == e);
+        pdbg_assert(e2->right == e);
         e2->right = ptree_rotate_left(e);
       }
       e = e2;
@@ -241,12 +242,12 @@ static psync_tree *ptree_replace_me_with(psync_tree *tree,
   psync_tree *parent;
   parent = node->parent;
   if (!parent) {
-    assert(tree == node);
+    pdbg_assert(tree == node);
     tree = repl;
   } else if (node == parent->left)
     parent->left = repl;
   else {
-    assert(node == parent->right);
+    pdbg_assert(node == parent->right);
     parent->right = repl;
   }
   if (repl)
@@ -302,11 +303,11 @@ psync_tree *ptree_get_del(psync_tree *tree, psync_tree *node) {
       if (node->parent->left == node)
         node->parent->left = el;
       else {
-        assert(node->parent->right == node);
+        pdbg_assert(node->parent->right == node);
         node->parent->right = el;
       }
     } else {
-      assert(node == tree);
+      pdbg_assert(node == tree);
       tree = el;
     }
     return ptree_go_up_rebalance_del(tree, parent);

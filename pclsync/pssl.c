@@ -62,10 +62,10 @@
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static void ssl_debug(int loglevel, int errnum, const char *msg) {
+static void ssl_pdbg_logf(int loglevel, int errnum, const char *msg) {
     char ebuf[100];
     mbedtls_strerror(errnum, ebuf, sizeof(ebuf));
-    debug(loglevel, "%s: %s (-0x%04x)", msg, ebuf, (unsigned int)-errnum);
+    pdbg_logf(loglevel, "%s: %s (-0x%04x)", msg, ebuf, (unsigned int)-errnum);
 }
 
 static void free_encrypted(psync_encrypted_data_t e) {
@@ -105,13 +105,13 @@ psync_symmetric_key_t prsa_decrypt_symm_key_lock(
     const psync_encrypted_symmetric_key_t *enckey) {
   psync_symmetric_key_t sym_key;
 
-  debug(D_NOTICE, "Get RSA decrypt key lock.");
+  pdbg_logf(D_NOTICE, "Get RSA decrypt key lock.");
   pthread_mutex_lock(&mutex);
 
   sym_key = psymkey_decrypt(*rsa, *enckey);
 
   pthread_mutex_unlock(&mutex);
-  debug(D_NOTICE, "RSA decrypt key Lock released.");
+  pdbg_logf(D_NOTICE, "RSA decrypt key Lock released.");
 
   return sym_key;
 }
@@ -179,7 +179,7 @@ int pssl_init() {
   int result;
 
   if (pthread_mutex_init(&rng.mutex, NULL))
-    return PRINT_RETURN(-1);
+    return pdbg_return(-1);
 
   mbedtls_entropy_init(&entropy);
   prand_seed(seed, seed, sizeof(seed), 0);
@@ -188,8 +188,8 @@ int pssl_init() {
   mbedtls_ctr_drbg_init(&rng.rnd);
   if ((result = mbedtls_ctr_drbg_seed(&rng.rnd, mbedtls_entropy_func,
                                       &entropy, NULL, 0))) {
-    debug(D_ERROR, "mbedtls_ctr_drbg_seed failed with return code %d", result);
-    return PRINT_RETURN(-1);
+    pdbg_logf(D_ERROR, "mbedtls_ctr_drbg_seed failed with return code %d", result);
+    return pdbg_return(-1);
   }
   
 
@@ -199,7 +199,7 @@ int pssl_init() {
                                     (unsigned char *)psync_ssl_trusted_certs[i],
                                     1 + strlen(psync_ssl_trusted_certs[i]));
     if (result) {
-      debug(D_ERROR, "failed to load certificate %lu, got result %d",
+      pdbg_logf(D_ERROR, "failed to load certificate %lu, got result %d",
             (unsigned long)i, result);
     }
   }
@@ -228,11 +228,11 @@ static void set_error(ssl_connection_t *conn, int err) {
     psync_ssl_errno = PSYNC_SSL_ERR_UNKNOWN;
     conn->isbroken = 1;
     if (err == MBEDTLS_ERR_NET_RECV_FAILED)
-      debug(D_NOTICE, "got MBEDTLS_ERR_NET_RECV_FAILED");
+      pdbg_logf(D_NOTICE, "got MBEDTLS_ERR_NET_RECV_FAILED");
     else if (err == MBEDTLS_ERR_NET_SEND_FAILED)
-      debug(D_NOTICE, "got MBEDTLS_ERR_NET_SEND_FAILED");
+      pdbg_logf(D_NOTICE, "got MBEDTLS_ERR_NET_SEND_FAILED");
     else
-      debug(D_NOTICE, "got error %d", err);
+      pdbg_logf(D_NOTICE, "got error %d", err);
   }
 }
 
@@ -295,17 +295,17 @@ static int check_peer_pubkey(ssl_connection_t *conn) {
   // TODO: returning null, why?
   cert = mbedtls_ssl_get_peer_cert(&conn->ssl);
   if (!cert) {
-    debug(D_WARNING, "ssl_get_peer_cert returned NULL");
+    pdbg_logf(D_WARNING, "ssl_get_peer_cert returned NULL");
     return -1;
   }
   if (mbedtls_pk_get_type(&cert->pk) != MBEDTLS_PK_RSA) {
-    debug(D_WARNING, "public key is not RSA");
+    pdbg_logf(D_WARNING, "public key is not RSA");
     return -1;
   }
   i = mbedtls_pk_write_pubkey_der((mbedtls_pk_context *)&cert->pk, buff,
                                   sizeof(buff));
   if (i <= 0) {
-    debug(D_WARNING, "pk_write_pubkey_der returned error %d", i);
+    pdbg_logf(D_WARNING, "pk_write_pubkey_der returned error %d", i);
     return -1;
   }
   mbedtls_sha256(buff + sizeof(buff) - i, i, sigbin, 0);
@@ -314,7 +314,7 @@ static int check_peer_pubkey(ssl_connection_t *conn) {
   for (i = 0; i < ARRAY_SIZE(psync_ssl_trusted_pk_sha256); i++)
     if (!strcmp(sighex, psync_ssl_trusted_pk_sha256[i]))
       return 0;
-  debug(D_ERROR,
+  pdbg_logf(D_ERROR,
         "got sha256hex of public key %s that does not match any approved "
         "fingerprint",
         sighex);
@@ -336,7 +336,7 @@ int pssl_connect(int sock, void **sslconn,
   if ((ret = mbedtls_ssl_config_defaults(&conn->cfg, MBEDTLS_SSL_IS_CLIENT,
                                          MBEDTLS_SSL_TRANSPORT_STREAM,
                                          MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
-    debug(D_ERROR,
+    pdbg_logf(D_ERROR,
           "failed to set ssl cfg defaults: ! mbedtls_ssl_config_defaults "
           "returned %d\n\n",
           ret);
@@ -359,9 +359,9 @@ int pssl_connect(int sock, void **sslconn,
   mbedtls_ssl_setup(&conn->ssl, &conn->cfg); // attach config to ssl
 
   if ((sess = (mbedtls_ssl_session *)pcache_get(conn->cachekey))) {
-    debug(D_NOTICE, "reusing cached session for %s", hostname);
+    pdbg_logf(D_NOTICE, "reusing cached session for %s", hostname);
     if (mbedtls_ssl_set_session(&conn->ssl, sess)) {
-      debug(D_WARNING, "ssl_set_session failed");
+      pdbg_logf(D_WARNING, "ssl_set_session failed");
     }
     mbedtls_ssl_session_free(sess);
     free(sess);
@@ -379,7 +379,7 @@ int pssl_connect(int sock, void **sslconn,
   }
 
   set_error(conn, ret);
-  if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE)) {
+  if (pdbg_likely(ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE)) {
     *sslconn = conn;
     return PSYNC_SSL_NEED_FINISH;
   }
@@ -387,7 +387,7 @@ err1:
   mbedtls_ssl_free(&conn->ssl);
 err0:
   free(conn);
-  return PRINT_RETURN_CONST(PSYNC_SSL_FAIL);
+  return pdbg_return_const(PSYNC_SSL_FAIL);
 }
 
 int pssl_connect_finish(void *sslconn, const char *hostname) {
@@ -403,16 +403,16 @@ int pssl_connect_finish(void *sslconn, const char *hostname) {
     save_session(conn);
     return PSYNC_SSL_SUCCESS;
   } else {
-    debug(D_ERROR, "handshake failed, return code was %d", ret);
+    pdbg_logf(D_ERROR, "handshake failed, return code was %d", ret);
   }
   set_error(conn, ret);
-  if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
+  if (pdbg_likely(ret == MBEDTLS_ERR_SSL_WANT_READ ||
                  ret == MBEDTLS_ERR_SSL_WANT_WRITE))
     return PSYNC_SSL_NEED_FINISH;
 fail:
   mbedtls_ssl_free(&conn->ssl);
   free(conn);
-  return PRINT_RETURN_CONST(PSYNC_SSL_FAIL);
+  return pdbg_return_const(PSYNC_SSL_FAIL);
 }
 
 int pssl_shutdown(void *sslconn) {
@@ -425,7 +425,7 @@ int pssl_shutdown(void *sslconn) {
   if (ret == 0)
     goto noshutdown;
   set_error(conn, ret);
-  if (likely_log(ret == MBEDTLS_ERR_SSL_WANT_READ ||
+  if (pdbg_likely(ret == MBEDTLS_ERR_SSL_WANT_READ ||
                  ret == MBEDTLS_ERR_SSL_WANT_WRITE))
     return PSYNC_SSL_NEED_FINISH;
 noshutdown:
@@ -470,7 +470,7 @@ int pssl_write(void *sslconn, const void *buf, int num) {
 void pssl_rand_strong(unsigned char *buf, int num) {
   // FIXME: causing segfault
   if (unlikely(rng_get(&rng, buf, num))) {
-    debug(D_CRITICAL, "could not generate %d random bytes, exiting", num);
+    pdbg_logf(D_CRITICAL, "could not generate %d random bytes, exiting", num);
     abort();
   }
 }
@@ -581,7 +581,7 @@ psync_rsa_publickey_t prsa_load_public(const unsigned char *keydata,
   mbedtls_pk_init(&ctx);
 
   if (unlikely(ret = mbedtls_pk_parse_public_key(&ctx, keydata, keylen))) {
-    debug(D_WARNING, "pk_parse_public_key failed with code %d (-0x%04x); resorting to " "mbedtls 1.x RSA fallback", ret, -ret);
+    pdbg_logf(D_WARNING, "pk_parse_public_key failed with code %d (-0x%04x); resorting to " "mbedtls 1.x RSA fallback", ret, -ret);
     return PSYNC_INVALID_RSA;
   }
   rsa = psync_new(mbedtls_rsa_context);
@@ -590,7 +590,7 @@ psync_rsa_publickey_t prsa_load_public(const unsigned char *keydata,
   ret = mbedtls_rsa_copy(rsa, mbedtls_pk_rsa(ctx));
   mbedtls_pk_free(&ctx);
   if (unlikely(ret)) {
-    debug(D_WARNING, "rsa_copy failed with code %d", ret);
+    pdbg_logf(D_WARNING, "rsa_copy failed with code %d", ret);
     mbedtls_rsa_free(rsa);
     free(rsa);
     return PSYNC_INVALID_RSA;
@@ -636,7 +636,7 @@ psync_rsa_privatekey_t prsa_load_private(const unsigned char *keydata, size_t ke
   mbedtls_pk_init(&ctx);
   ret = mbedtls_pk_parse_key(&ctx, keydata, keylen, NULL, 0, rng_get, &rng);
   if(unlikely(ret)) {
-    ssl_debug(D_WARNING, ret, "pk_parse_key failed");
+    ssl_pdbg_logf(D_WARNING, ret, "pk_parse_key failed");
     return PSYNC_INVALID_RSA;
   }
   rsa = psync_new(mbedtls_rsa_context);
@@ -645,7 +645,7 @@ psync_rsa_privatekey_t prsa_load_private(const unsigned char *keydata, size_t ke
   ret = mbedtls_rsa_copy(rsa, mbedtls_pk_rsa(ctx));
   mbedtls_pk_free(&ctx);
   if (unlikely(ret)) {
-    debug(D_WARNING, "rsa_copy failed with code %d", ret);
+    pdbg_logf(D_WARNING, "rsa_copy failed with code %d", ret);
     mbedtls_rsa_free(rsa);
     free(rsa);
     return PSYNC_INVALID_RSA;
@@ -723,14 +723,14 @@ prsa_encrypt_data(psync_rsa_publickey_t rsa, const unsigned char *data,
            rsa, rng_get, &rng,
            NULL, 0, datalen, data, ret->data))) {
     free(ret);
-    debug(
+    pdbg_logf(
         D_WARNING,
         "rsa_rsaes_oaep_encrypt failed with error=%d, datalen=%lu, rsasize=%d",
         code, (unsigned long)datalen, (int)rsalen);
     return PSYNC_INVALID_ENC_SYM_KEY;
   }
   ret->datalen = rsalen;
-  debug(D_NOTICE, "datalen=%lu", (unsigned long)ret->datalen);
+  pdbg_logf(D_NOTICE, "datalen=%lu", (unsigned long)ret->datalen);
   return ret;
 }
 
@@ -766,7 +766,7 @@ psync_symmetric_key_t psymkey_decrypt(
 psync_aes256_encoder
 paes_create_encoder(psync_symmetric_key_t key) {
   mbedtls_aes_context *aes;
-  assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
+  pdbg_assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
   aes = psync_new(mbedtls_aes_context);
   mbedtls_aes_setkey_enc(aes, key->key, 256);
   return aes;
@@ -780,7 +780,7 @@ void paes_free_encoder(psync_aes256_encoder aes) {
 psync_aes256_encoder
 paes_create_decoder(psync_symmetric_key_t key) {
   mbedtls_aes_context *aes;
-  assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
+  pdbg_assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
   aes = psync_new(mbedtls_aes_context);
   mbedtls_aes_setkey_dec(aes, key->key, 256);
   return aes;

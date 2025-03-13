@@ -64,7 +64,7 @@ static void ratelimit_timer(psync_timer_t timer, void *ptr) {
   }
   pthread_mutex_unlock(&task_mutex);
   if (run) {
-    debug(D_NOTICE, "running %s in a thread", name);
+    pdbg_logf(D_NOTICE, "running %s in a thread", name);
     prun_thread(name, call);
   } else {
     ptimer_stop(timer);
@@ -106,9 +106,9 @@ void prun_throttled(const char *name, prun_throttle_cb call,
     addto = &tasks;
   if (found) {
     if (node->scheduled)
-      debug(D_NOTICE, "skipping run of %s as it is already scheduled", name);
+      pdbg_logf(D_NOTICE, "skipping run of %s as it is already scheduled", name);
     else {
-      debug(D_NOTICE, "scheduling run of %s on existing timer", name);
+      pdbg_logf(D_NOTICE, "scheduling run of %s on existing timer", name);
       node->scheduled = 1;
     }
   } else {
@@ -122,10 +122,10 @@ void prun_throttled(const char *name, prun_throttle_cb call,
   pthread_mutex_unlock(&task_mutex);
   if (!found) {
     if (runinthread) {
-      debug(D_NOTICE, "running %s in a thread", name);
+      pdbg_logf(D_NOTICE, "running %s in a thread", name);
       prun_thread(name, call);
     } else {
-      debug(D_NOTICE, "running %s on this thread", name);
+      pdbg_logf(D_NOTICE, "running %s on this thread", name);
       call();
     }
     ptimer_register(ratelimit_timer, minintervalsec, node);
