@@ -113,7 +113,7 @@ static char *fill_formatted_bytes(char *str, uint64_t bytes) {
   str = cat_uint32(str, (uint32_t)bytes);
   if (sz && bytes < 100) {
     rem = rem * 1000 / 1024;
-    assert(rem <= 999);
+    pdbg_assert(rem <= 999);
     *str++ = '.';
     if (bytes < 10) {
       rem /= 10;
@@ -244,8 +244,8 @@ static void status_fill_formatted_str(pstatus_t *status, char *downloadstr,
   } else
     up = cat_const(up, "Everything Uploaded");
 
-  assert(dw < downloadstr + MAX_STATUS_STR_LEN);
-  assert(up < uploadstr + MAX_STATUS_STR_LEN);
+  pdbg_assert(dw < downloadstr + MAX_STATUS_STR_LEN);
+  pdbg_assert(up < uploadstr + MAX_STATUS_STR_LEN);
   *dw = 0;
   *up = 0;
   status->downloadstr = downloadstr;
@@ -284,7 +284,7 @@ static void status_change_thread(void *ptr) {
     if (!psync_do_run)
       break;
     status_fill_formatted_str(&psync_status, downloadstr, uploadstr);
-    debug(D_NOTICE, "sending status update, dwlstr: %s, uplstr: %s",
+    pdbg_logf(D_NOTICE, "sending status update, dwlstr: %s, uplstr: %s",
           psync_status.downloadstr, psync_status.uploadstr);
     callback(&psync_status);
   }
@@ -357,7 +357,7 @@ void pqevent_queue_sync_event_id(psync_eventtype_t eventid, psync_syncid_t synci
       remotepath = pfolder_path(remoteid, NULL);
     else
       remotepath = pfolder_file_path(remoteid, NULL);
-    if (unlikely_log(!remotepath))
+    if (unpdbg_likely(!remotepath))
       return;
     pqevent_queue_sync_event_path(eventid, syncid, localpath, remoteid, remotepath);
     free(remotepath);

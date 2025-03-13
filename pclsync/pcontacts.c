@@ -62,7 +62,7 @@ int do_call_contactlist(result_visitor vis, void *param) {
     psync_apipool_release(sock);
   else {
     psync_apipool_release_bad(sock);
-    debug(D_WARNING, "Send command returned invalid result.\n");
+    pdbg_logf(D_WARNING, "Send command returned invalid result.\n");
     return -1;
   }
 
@@ -70,7 +70,7 @@ int do_call_contactlist(result_visitor vis, void *param) {
 
   if (!contacts->length) {
     free(bres);
-    debug(D_WARNING, "Account_users returned empty result!\n");
+    pdbg_logf(D_WARNING, "Account_users returned empty result!\n");
     return -2;
   } else {
     psync_sql_start_transaction();
@@ -172,7 +172,7 @@ static void process_shares_out(const binresult *shares_out, int shcnt) {
         "REPLACE INTO sharedfolder (id, folderid, ctime, permissions, userid, "
         "mail, name, isincoming) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    // debug(D_NOTICE, "INSERT NORMAL SHARE OUT id: %lld", (long long)
+    // pdbg_logf(D_NOTICE, "INSERT NORMAL SHARE OUT id: %lld", (long long)
     // papi_find_result2(share, "shareid", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 1,
                         papi_find_result2(share, "shareid", PARAM_NUM)->num);
@@ -206,7 +206,7 @@ static void process_shares_in(const binresult *shares_in, int shcnt) {
         "REPLACE INTO sharedfolder (id, isincoming, folderid, ctime, "
         "permissions, userid, mail, name) "
         "VALUES (?, 1, ?, ?, ?, ?, ?, ?)");
-    // debug(D_WARNING, "INSERT NORMAL SHARE IN id: %lld", (long long)
+    // pdbg_logf(D_WARNING, "INSERT NORMAL SHARE IN id: %lld", (long long)
     // papi_find_result2(share, "shareid", PARAM_NUM)->num);
     psync_sql_bind_uint(q, 1,
                         papi_find_result2(share, "shareid", PARAM_NUM)->num);
@@ -332,7 +332,7 @@ void cache_shares() {
                          PAPI_STR("timeformat", "timestamp")};
     api = psync_apipool_get();
     if (unlikely(!api)) {
-      debug(D_WARNING, "Can't get api from the pool. No pool ?\n");
+      pdbg_logf(D_WARNING, "Can't get api from the pool. No pool ?\n");
       return;
     }
     bres = papi_send2(api, "listshares", params);
@@ -342,7 +342,7 @@ void cache_shares() {
                          PAPI_STR("timeformat", "timestamp")};
     api = psync_apipool_get();
     if (unlikely(!api)) {
-      debug(D_WARNING, "Can't get api from the pool. No pool ?\n");
+      pdbg_logf(D_WARNING, "Can't get api from the pool. No pool ?\n");
       return;
     }
     bres = papi_send2(api, "listshares", params);
@@ -352,13 +352,13 @@ void cache_shares() {
     psync_apipool_release(api);
   else {
     psync_apipool_release_bad(api);
-    debug(D_WARNING, "Send command returned in valid result.\n");
+    pdbg_logf(D_WARNING, "Send command returned in valid result.\n");
     return;
   }
   result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
     errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
-    debug(D_WARNING, "command listshares returned error code %u message %s",
+    pdbg_logf(D_WARNING, "command listshares returned error code %u message %s",
           (unsigned)result, errorret);
     psync_process_api_error(result);
     free(bres);

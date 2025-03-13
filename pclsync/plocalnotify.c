@@ -89,7 +89,7 @@ static void add_dir_scan(localnotify_dir *dir, const char *path) {
                                         IN_CLOSE_WRITE | IN_CREATE | IN_DELETE |
                                             IN_MOVED_FROM | IN_MOVED_TO |
                                             IN_DELETE_SELF)) == -1)) {
-    debug(D_ERROR, "inotify_add_watch failed");
+    pdbg_logf(D_ERROR, "inotify_add_watch failed");
     return;
   }
   namelen = pathconf(path, _PC_NAME_MAX);
@@ -105,7 +105,7 @@ static void add_dir_scan(localnotify_dir *dir, const char *path) {
   wch->pathlen = pl;
   wch->namelen = namelen;
   memcpy(wch->path, path, pl + 1);
-  if (likely_log(dh = opendir(path))) {
+  if (pdbg_likely(dh = opendir(path))) {
     entrylen = offsetof(struct dirent, d_name) + namelen + 1;
     cpath = (char *)malloc(pl + namelen + 2);
     entry = (struct dirent *)malloc(entrylen);
@@ -146,19 +146,19 @@ static void add_syncid(psync_syncid_t syncid) {
     psync_sql_free_result(res);
   } else {
     psync_sql_free_result(res);
-    debug(D_ERROR, "could not find syncfolder with id %u",
+    pdbg_logf(D_ERROR, "could not find syncfolder with id %u",
           (unsigned int)syncid);
     return;
   }
   dir->syncid = syncid;
   dir->inotifyfd = inotify_init();
-  if (unlikely_log(dir->inotifyfd == -1))
+  if (unpdbg_likely(dir->inotifyfd == -1))
     goto err;
   memset(dir->watches, 0, sizeof(dir->watches));
   add_dir_scan(dir, dir->path);
   e.events = EPOLLIN;
   e.data.ptr = dir;
-  if (unlikely_log(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, dir->inotifyfd, &e)))
+  if (unpdbg_likely(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, dir->inotifyfd, &e)))
     goto err2;
   psync_list_add_tail(&dirs, &dir->list);
   return;
@@ -194,7 +194,7 @@ static void del_syncid(psync_syncid_t syncid) {
 static void process_pipe() {
   localnotify_msg msg;
   if (read(pipe_read, &msg, sizeof(msg)) != sizeof(msg)) {
-    debug(D_ERROR, "read from pipe failed");
+    pdbg_logf(D_ERROR, "read from pipe failed");
     return;
   }
   if (msg.type == NOTIFY_MSG_ADD)
@@ -202,7 +202,7 @@ static void process_pipe() {
   else if (msg.type == NOTIFY_MSG_DEL)
     del_syncid(msg.syncid);
   else
-    debug(D_ERROR, "invalid message type %u", (unsigned int)msg.type);
+    pdbg_logf(D_ERROR, "invalid message type %u", (unsigned int)msg.type);
 }
 
 static uint32_t process_notification(localnotify_dir *dir) {
@@ -262,7 +262,7 @@ static void psync_localnotify_thread() {
     if ((cnt = epoll_wait(epoll_fd, &ev, 1, 1000)) != 1) {
       if (cnt == -1) {
         if (errno != EINTR)
-          debug(D_WARNING, "epoll_wait failed errno %d", errno);
+          pdbg_logf(D_WARNING, "epoll_wait failed errno %d", errno);
       } else if (cnt == 0 && ncnt) {
         ncnt = 0;
         psync_wake_localscan();
@@ -279,16 +279,16 @@ static void psync_localnotify_thread() {
 int psync_localnotify_init() {
   struct epoll_event e;
   int pfd[2];
-  if (unlikely_log(pipe(pfd)))
+  if (unpdbg_likely(pipe(pfd)))
     goto err0;
   pipe_read = pfd[0];
   pipe_write = pfd[1];
   epoll_fd = epoll_create(1);
-  if (unlikely_log(epoll_fd == -1))
+  if (unpdbg_likely(epoll_fd == -1))
     goto err1;
   e.events = EPOLLIN;
   e.data.ptr = NULL;
-  if (unlikely_log(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pipe_read, &e)))
+  if (unpdbg_likely(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pipe_read, &e)))
     goto err2;
   prun_thread("localnotify", psync_localnotify_thread);
   return 0;
@@ -307,7 +307,7 @@ void psync_localnotify_add_sync(psync_syncid_t syncid) {
   msg.type = NOTIFY_MSG_ADD;
   msg.syncid = syncid;
   if (write(pipe_write, &msg, sizeof(msg)) != sizeof(msg))
-    debug(D_ERROR, "write to pipe failed");
+    pdbg_logf(D_ERROR, "write to pipe failed");
 }
 
 void psync_localnotify_del_sync(psync_syncid_t syncid) {
@@ -315,5 +315,5 @@ void psync_localnotify_del_sync(psync_syncid_t syncid) {
   msg.type = NOTIFY_MSG_DEL;
   msg.syncid = syncid;
   if (write(pipe_write, &msg, sizeof(msg)) != sizeof(msg))
-    debug(D_ERROR, "write to pipe failed");
+    pdbg_logf(D_ERROR, "write to pipe failed");
 }

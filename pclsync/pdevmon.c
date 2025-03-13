@@ -75,7 +75,7 @@ static void monitor_usb() {
 
   udev = udev_new();
   if (!udev) {
-    debug(D_WARNING, "Can't create udev\n");
+    pdbg_logf(D_WARNING, "Can't create udev\n");
     return;
   }
   mon = udev_monitor_new_from_netlink(udev, "udev");
@@ -118,7 +118,7 @@ static void monitor_usb() {
 }
 
 static void proc_devmon() {
-  debug(D_NOTICE, "Waiting for USB devices connect/disconnect events");
+  pdbg_logf(D_NOTICE, "Waiting for USB devices connect/disconnect events");
   monitor_usb();
 }
 

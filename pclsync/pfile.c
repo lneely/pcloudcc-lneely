@@ -128,7 +128,7 @@ int pfile_open(const char *path, int access, int flags) {
   fd = open(path, access | flags, PSYNC_DEFAULT_POSIX_FILE_MODE);
   if (unlikely(fd == -1)) {
     while (errno == EINTR) {
-      debug(D_NOTICE, "got EINTR while opening file");
+      pdbg_logf(D_NOTICE, "got EINTR while opening file");
       fd = open(path, access | flags, PSYNC_DEFAULT_POSIX_FILE_MODE);
       if (fd != -1)
         return fd;
@@ -143,17 +143,17 @@ int pfile_sync(int fd) {
 #if defined(F_FULLFSYNC)
   if (unlikely(fcntl(fd, F_FULLFSYNC))) {
     while (errno == EINTR) {
-      debug(D_NOTICE, "got EINTR while fsyncing file");
+      pdbg_logf(D_NOTICE, "got EINTR while fsyncing file");
       if (!fcntl(fd, F_FULLFSYNC))
         return 0;
     }
-    debug(D_NOTICE,
+    pdbg_logf(D_NOTICE,
           "got error %d, when doing fcntl(F_FULLFSYNC), trying fsync()", errno);
     if (fsync(fd)) {
-      debug(D_NOTICE, "fsync also failed, error %d", errno);
+      pdbg_logf(D_NOTICE, "fsync also failed, error %d", errno);
       return -1;
     } else {
-      debug(D_NOTICE, "fsync succeded");
+      pdbg_logf(D_NOTICE, "fsync succeded");
       return 0;
     }
   } else
@@ -165,11 +165,11 @@ int pfile_sync(int fd) {
   if (unlikely(fsync(fd))) {
 #endif
     while (errno == EINTR) {
-      debug(D_NOTICE, "got EINTR while fsyncing file");
+      pdbg_logf(D_NOTICE, "got EINTR while fsyncing file");
       if (!fsync(fd))
         return 0;
     }
-    debug(D_NOTICE, "got error %d", errno);
+    pdbg_logf(D_NOTICE, "got error %d", errno);
     return -1;
   } else
     return 0;
@@ -184,17 +184,17 @@ int pfile_schedulesync(int fd) {
   void *fmap;
   int ret;
   if (unlikely(fstat(fd, &st))) {
-    debug(D_NOTICE, "fstat failed, errno=%d", errno);
+    pdbg_logf(D_NOTICE, "fstat failed, errno=%d", errno);
     return -1;
   }
   fmap = mmap(NULL, st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (unlikely(fmap == MAP_FAILED)) {
-    debug(D_NOTICE, "mmap failed, errno=%d", errno);
+    pdbg_logf(D_NOTICE, "mmap failed, errno=%d", errno);
     return -1;
   }
   ret = msync(fmap, st.st_size, MS_ASYNC);
   if (unlikely(ret))
-    debug(D_NOTICE, "msync failed, errno=%d", errno);
+    pdbg_logf(D_NOTICE, "msync failed, errno=%d", errno);
   munmap(fmap, st.st_size);
   return ret;
 #else
@@ -206,11 +206,11 @@ int pfile_folder_sync(const char *path) {
   int fd, ret;
   fd = open(path, O_RDONLY);
   if (fd == -1) {
-    debug(D_NOTICE, "could not open folder %s, error %d", path, errno);
+    pdbg_logf(D_NOTICE, "could not open folder %s, error %d", path, errno);
     return -1;
   }
   if (unlikely(pfile_sync(fd))) {
-    debug(D_NOTICE, "could not fsync folder %s, error %d", path, errno);
+    pdbg_logf(D_NOTICE, "could not fsync folder %s, error %d", path, errno);
     ret = -1;
   } else
     ret = 0;
@@ -230,7 +230,7 @@ int pfile_set_crtime_mtime(const char *path, time_t crtime, time_t mtime) {
     tm[1].tv_sec = mtime;
     tm[1].tv_usec = 0;
     if (unlikely(utimes(path, tm))) {
-      debug(D_NOTICE,
+      pdbg_logf(D_NOTICE,
             "got errno %d while setting modification time of %s to %lu: %s",
             errno, path, mtime, strerror(errno));
       return -1;
@@ -300,12 +300,12 @@ ssize_t pfile_read(int fd, void *buf, size_t count) {
   ret = read(fd, buf, count);
   if (unlikely(ret == -1)) {
     while (errno == EINTR) {
-      debug(D_NOTICE, "got EINTR while reading from file");
+      pdbg_logf(D_NOTICE, "got EINTR while reading from file");
       ret = read(fd, buf, count);
       if (ret != -1)
         return ret;
     }
-    debug(D_NOTICE, "got error %d", errno);
+    pdbg_logf(D_NOTICE, "got error %d", errno);
   }
   return ret;
 }
@@ -316,12 +316,12 @@ ssize_t pfile_pread(int fd, void *buf, size_t count,
   ret = pread(fd, buf, count, offset);
   if (unlikely(ret == -1)) {
     while (errno == EINTR) {
-      debug(D_NOTICE, "got EINTR while writing to file");
+      pdbg_logf(D_NOTICE, "got EINTR while writing to file");
       ret = pread(fd, buf, count, offset);
       if (ret != -1)
         return ret;
     }
-    debug(D_NOTICE, "got error %d", errno);
+    pdbg_logf(D_NOTICE, "got error %d", errno);
   }
   return ret;
 }
@@ -331,12 +331,12 @@ ssize_t pfile_write(int fd, const void *buf, size_t count) {
   ret = write(fd, buf, count);
   if (unlikely(ret == -1)) {
     while (errno == EINTR) {
-      debug(D_NOTICE, "got EINTR while writing to file");
+      pdbg_logf(D_NOTICE, "got EINTR while writing to file");
       ret = write(fd, buf, count);
       if (ret != -1)
         return ret;
     }
-    debug(D_NOTICE, "got error %d", errno);
+    pdbg_logf(D_NOTICE, "got error %d", errno);
   }
   return ret;
 }
@@ -347,12 +347,12 @@ ssize_t pfile_pwrite(int fd, const void *buf, size_t count,
   ret = pwrite(fd, buf, count, offset);
   if (unlikely(ret == -1)) {
     while (errno == EINTR) {
-      debug(D_NOTICE, "got EINTR while writing to file");
+      pdbg_logf(D_NOTICE, "got EINTR while writing to file");
       ret = pwrite(fd, buf, count, offset);
       if (ret != -1)
         return ret;
     }
-    debug(D_NOTICE, "got error %d", errno);
+    pdbg_logf(D_NOTICE, "got error %d", errno);
   }
   return ret;
 }
@@ -364,14 +364,14 @@ int64_t pfile_seek(int fd, uint64_t offset, int whence) {
 int pfile_truncate(int fd) {
   off_t off;
   off = lseek(fd, 0, SEEK_CUR);
-  if (likely_log(off != (off_t)-1)) {
+  if (pdbg_likely(off != (off_t)-1)) {
     if (unlikely(ftruncate(fd, off))) {
       while (errno == EINTR) {
-        debug(D_NOTICE, "got EINTR while truncating file");
+        pdbg_logf(D_NOTICE, "got EINTR while truncating file");
         if (!ftruncate(fd, off))
           return 0;
       }
-      debug(D_NOTICE, "got error %d", errno);
+      pdbg_logf(D_NOTICE, "got error %d", errno);
       return -1;
     } else
       return 0;
@@ -381,7 +381,7 @@ int pfile_truncate(int fd) {
 
 int64_t pfile_size(int fd) {
   struct stat st;
-  if (unlikely_log(fstat(fd, &st)))
+  if (unpdbg_likely(fstat(fd, &st)))
     return -1;
   else
     return st.st_size;
@@ -391,10 +391,10 @@ int64_t pfile_size(int fd) {
 
 int pfile_run_update(const char *path) {
   pid_t pid;
-  debug(D_NOTICE, "running %s with " PSYNC_RUN_CMD, path);
+  pdbg_logf(D_NOTICE, "running %s with " PSYNC_RUN_CMD, path);
   pid = fork();
   if (unlikely(pid == -1)) {
-    debug(D_ERROR, "fork failed");
+    pdbg_logf(D_ERROR, "fork failed");
     return -1;
   } else if (pid) {
     int status;
@@ -414,7 +414,7 @@ int pfile_run_update(const char *path) {
     setsid();
     ex = psync_strcat(PSYNC_RUN_CMD " \"", path, "\"", NULL);
     execl("/bin/sh", "/bin/sh", "-c", ex, NULL);
-    debug(D_ERROR, "exec of %s failed", ex);
+    pdbg_logf(D_ERROR, "exec of %s failed", ex);
     free(ex);
     exit(1);
   }

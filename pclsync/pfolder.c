@@ -90,7 +90,7 @@ psync_folderid_t pfolder_id(const char *path) {
     if (!res) {
       res = psync_sql_query_rdlock(
           "SELECT id FROM folder WHERE parentfolderid=? AND name=?");
-      if (unlikely_log(!res)) {
+      if (unpdbg_likely(!res)) {
         psync_error = PERROR_DATABASE_ERROR;
         return PSYNC_INVALID_FOLDERID;
       }
@@ -100,7 +100,7 @@ psync_folderid_t pfolder_id(const char *path) {
     psync_sql_bind_uint(res, 1, cfolderid);
     psync_sql_bind_lstring(res, 2, path, len);
     row = psync_sql_fetch_rowint(res);
-    if (unlikely_log(!row))
+    if (unpdbg_likely(!row))
       goto err;
     cfolderid = row[0];
     path += len;
@@ -159,7 +159,7 @@ psync_folderid_t pfolder_id_create(const char *path) {
     if (!res) {
       res = psync_sql_query_rdlock(
           "SELECT id FROM folder WHERE parentfolderid=? AND name=?");
-      if (unlikely_log(!res)) {
+      if (unpdbg_likely(!res)) {
         psync_error = PERROR_DATABASE_ERROR;
         return PSYNC_INVALID_FOLDERID;
       }
@@ -259,7 +259,7 @@ static int psync_add_path_to_list(psync_list *lst, psync_folderid_t folderid) {
     psync_sql_free_result(res);
   }
   psync_sql_free_result(res);
-  debug(D_ERROR, "folder %lu not found in database", (unsigned long)folderid);
+  pdbg_logf(D_ERROR, "folder %lu not found in database", (unsigned long)folderid);
   return -1;
 }
 
@@ -269,14 +269,14 @@ static string_list *str_list_decode(psync_folderid_t folderid, string_list *e) {
   dec = pcryptofolder_flddecoder_get(folderid);
   if (psync_crypto_is_error(dec)) {
     free(e);
-    debug(D_WARNING, "got error %d getting decoder for folderid %lu",
+    pdbg_logf(D_WARNING, "got error %d getting decoder for folderid %lu",
           psync_crypto_to_error(dec), (unsigned long)folderid);
     return NULL;
   }
   fn = pcryptofolder_flddecode_filename(dec, e->str);
   pcryptofolder_flddecoder_release(folderid, dec);
   free(e);
-  if (unlikely_log(!fn))
+  if (unpdbg_likely(!fn))
     return NULL;
   e = str_to_list_element(fn, strlen(fn));
   free(fn);
@@ -307,7 +307,7 @@ static int psync_add_path_to_list_decode(psync_list *lst,
         "SELECT parentfolderid, name, flags FROM folder WHERE id=?");
     psync_sql_bind_uint(res, 1, folderid);
     row = psync_sql_fetch_row(res);
-    if (unlikely_log(!row))
+    if (unpdbg_likely(!row))
       break;
     cfolderid = folderid;
     flags = psync_get_number(row[2]);
@@ -318,7 +318,7 @@ static int psync_add_path_to_list_decode(psync_list *lst,
     if (e) {
       if (flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
         e = str_list_decode(cfolderid, e);
-        if (unlikely_log(!e))
+        if (unpdbg_likely(!e))
           goto err;
       }
       psync_list_add_head(lst, &e->list);
@@ -327,7 +327,7 @@ static int psync_add_path_to_list_decode(psync_list *lst,
   }
   psync_sql_free_result(res);
 err:
-  debug(D_ERROR, "folder %lu not found in database", (unsigned long)folderid);
+  pdbg_logf(D_ERROR, "folder %lu not found in database", (unsigned long)folderid);
   return -1;
 }
 
@@ -365,7 +365,7 @@ char *pfolder_path(psync_folderid_t folderid, size_t *retlen) {
   psync_sql_rdlock();
   res = psync_add_path_to_list(&folderlist, folderid);
   psync_sql_rdunlock();
-  if (unlikely_log(res)) {
+  if (unpdbg_likely(res)) {
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
   }
@@ -387,7 +387,7 @@ char *pfolder_path_sep(psync_folderid_t folderid, const char *sep,
   int res;
   psync_list_init(&folderlist);
   res = psync_add_path_to_list_decode(&folderlist, folderid);
-  if (unlikely_log(res)) {
+  if (unpdbg_likely(res)) {
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
   }
@@ -417,7 +417,7 @@ char *pfolder_file_path(psync_fileid_t fileid, size_t *retlen) {
       "SELECT parentfolderid, name FROM file WHERE id=?");
   psync_sql_bind_uint(res, 1, fileid);
   row = psync_sql_fetch_row(res);
-  if (unlikely_log(!row)) {
+  if (unpdbg_likely(!row)) {
     psync_sql_free_result(res);
     psync_sql_rdunlock();
     return PSYNC_INVALID_PATH;
@@ -427,7 +427,7 @@ char *pfolder_file_path(psync_fileid_t fileid, size_t *retlen) {
   e = str_to_list_element(str, len);
   psync_list_add_head(&folderlist, &e->list);
   psync_sql_free_result(res);
-  if (unlikely_log(psync_add_path_to_list(&folderlist, folderid))) {
+  if (unpdbg_likely(psync_add_path_to_list(&folderlist, folderid))) {
     psync_sql_rdunlock();
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
@@ -449,7 +449,7 @@ static int psync_add_local_path_to_list_by_localfolderid(
   psync_sql_bind_uint(res, 1, syncid);
   row = psync_sql_fetch_row(res);
   if (unlikely(!row)) {
-    debug(D_ERROR, "could not find sync id %lu", (long unsigned)syncid);
+    pdbg_logf(D_ERROR, "could not find sync id %lu", (long unsigned)syncid);
     psync_sql_free_result(res);
     return -1;
   }
@@ -475,7 +475,7 @@ static int psync_add_local_path_to_list_by_localfolderid(
   }
   psync_sql_free_result(res);
   psync_list_add_head(lst, &le->list);
-  debug(D_ERROR, "local folder %lu not found in database",
+  pdbg_logf(D_ERROR, "local folder %lu not found in database",
         (unsigned long)localfolderid);
   return -1;
 }
@@ -490,7 +490,7 @@ char *pfolder_lpath_lfldr(psync_folderid_t localfolderid,
   res = psync_add_local_path_to_list_by_localfolderid(&folderlist,
                                                       localfolderid, syncid);
   psync_sql_rdunlock();
-  if (unlikely_log(res)) {
+  if (unpdbg_likely(res)) {
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
   }
@@ -516,7 +516,7 @@ char *pfolder_lpath_lfile(psync_fileid_t localfileid,
   res = psync_sql_query_nolock(
       "SELECT localparentfolderid, syncid, name FROM localfile WHERE id=?");
   psync_sql_bind_uint(res, 1, localfileid);
-  if (unlikely_log(!(row = psync_sql_fetch_row(res)))) {
+  if (unpdbg_likely(!(row = psync_sql_fetch_row(res)))) {
     psync_sql_free_result(res);
     psync_sql_rdunlock();
     psync_free_string_list(&folderlist);
@@ -531,7 +531,7 @@ char *pfolder_lpath_lfile(psync_fileid_t localfileid,
   rs = psync_add_local_path_to_list_by_localfolderid(&folderlist, localfolderid,
                                                      syncid);
   psync_sql_rdunlock();
-  if (unlikely_log(rs)) {
+  if (unpdbg_likely(rs)) {
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
   }
@@ -579,7 +579,7 @@ static pfolder_list_t *folder_list_finalize(folder_list *list) {
   pfolder_list_t *ret;
   char *name;
   uint32_t i;
-  debug(D_NOTICE, "allocating %u bytes for folder list, %u of which for names",
+  pdbg_logf(D_NOTICE, "allocating %u bytes for folder list, %u of which for names",
         (unsigned)(offsetof(pfolder_list_t, entries) +
                    sizeof(pentry_t) * list->entriescnt + list->nameoff),
         (unsigned)list->nameoff);
@@ -617,7 +617,7 @@ pfolder_list_t *pfolder_remote_folders(psync_folderid_t folderid,
       parentencrypted =
           (psync_get_number(row[0]) & PSYNC_FOLDER_FLAG_ENCRYPTED) ? 1 : 0;
     } else {
-      debug(D_ERROR, "Can't find folder with id %lu", folderid);
+      pdbg_logf(D_ERROR, "Can't find folder with id %lu", folderid);
       psync_sql_free_result(res);
       return NULL;
     }
@@ -649,7 +649,7 @@ pfolder_list_t *pfolder_remote_folders(psync_folderid_t folderid,
         tmp = (char *)psync_get_lstring(row[2], &namelen);
         entry.name = get_decname_for_folder(folderid, tmp, namelen);
         if (!entry.name) {
-          debug(
+          pdbg_logf(
               D_BUG,
               "Can't decrypt folder name for folderid: %lu, parent folfderid: "
               "%lu, cryptoerr: %d, encrypted name: %s. Skippping ...",

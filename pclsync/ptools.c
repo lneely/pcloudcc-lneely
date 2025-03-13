@@ -99,7 +99,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
 
   sock = papi_connect(binapi, psync_setting_get_bool(0));
 
-  if (unlikely_log(!sock)) {
+  if (unpdbg_likely(!sock)) {
     if (err) {
       *err = psync_strdup("Could not connect to the server.");
     }
@@ -166,13 +166,13 @@ int ptools_create_backend_event(const char *binapi, const char *category,
 
   for (i = 0; i < tpCnt; i++) {
     if (paramsLocal[i].paramtype == 0) {
-      debug(D_NOTICE, "%d: String Param: [%s] - [%s]", i,
+      pdbg_logf(D_NOTICE, "%d: String Param: [%s] - [%s]", i,
             paramsLocal[i].paramname, paramsLocal[i].str);
       continue;
     }
 
     if (paramsLocal[i].paramtype == 1) {
-      debug(D_NOTICE, "%d: Number Param: [%s] - [%lu]", i,
+      pdbg_logf(D_NOTICE, "%d: Number Param: [%s] - [%lu]", i,
             paramsLocal[i].paramname, paramsLocal[i].num);
       continue;
     }
@@ -184,7 +184,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
   free(keyParams);
   free(paramsLocal);
 
-  if (unlikely_log(!res)) {
+  if (unpdbg_likely(!res)) {
     psock_close(sock);
 
     if (err) {
@@ -203,7 +203,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
       *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     }
 
-    debug(D_CRITICAL, "Event command failed. Error:[%s]", *err);
+    pdbg_logf(D_CRITICAL, "Event command failed. Error:[%s]", *err);
   }
 
   return result;
@@ -295,7 +295,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
 
   sock = papi_connect(binapi, psync_setting_get_bool(0));
 
-  if (unlikely_log(!sock)) {
+  if (unpdbg_likely(!sock)) {
     if (err) {
       *err = psync_strdup("Could not connect to the server.");
     }
@@ -308,7 +308,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
 
   free(localParams);
 
-  if (unlikely_log(!res)) {
+  if (unpdbg_likely(!res)) {
     psock_close(sock);
 
     if (err) {
@@ -327,7 +327,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
       *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     }
 
-    debug(D_CRITICAL, "Backend command failed. Error:[%s]", *err);
+    pdbg_logf(D_CRITICAL, "Backend command failed. Error:[%s]", *err);
   } else {
     if (strlen(payloadName) > 0) {
       payload = (binresult *)papi_find_result2(res, payloadName, PARAM_HASH);
@@ -424,7 +424,7 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
         "SELECT COUNT(*) FROM syncfolder WHERE synctype != 7", 0);
 
     if (syncCnt < 1) {
-      debug(D_NOTICE, "No syncs, skip the event.");
+      pdbg_logf(D_NOTICE, "No syncs, skip the event.");
       free(errMsg);
       return;
     }
@@ -438,7 +438,7 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
                                   PSYNC_EVENT_LABEL,  // "SYNCS_COUNT"
                                   auth, P_OS_ID, rawtime, &params, &errMsg);
 
-    debug(D_NOTICE, "Syncs Count Event Result:[%d], Message: [%s] .", intRes,
+    pdbg_logf(D_NOTICE, "Syncs Count Event Result:[%d], Message: [%s] .", intRes,
           errMsg);
 
     sql = psync_sql_prep_statement(
@@ -455,7 +455,7 @@ int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
   char msgErr[1024];
   binresult *retData;
 
-  debug(D_NOTICE,
+  pdbg_logf(D_NOTICE,
         "Update file date in the backend. FileId: [%lu], ctime: [%lu], mtime: "
         "[%lu]",
         fileid, ctime, mtime);
@@ -472,7 +472,7 @@ int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
       ptools_backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams1,
                    &optionalParams, &retData, (char **)msgErr);
 
-  debug(D_NOTICE, "cTime res: [%d]", callRes);
+  pdbg_logf(D_NOTICE, "cTime res: [%d]", callRes);
 
   eventParams requiredParams = {5,
                                 {PAPI_STR("auth", psync_my_auth),
@@ -484,7 +484,7 @@ int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
       ptools_backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams,
                    &optionalParams, &retData, (char **)msgErr);
 
-  debug(D_NOTICE, "mTime res: [%d]", callRes);
+  pdbg_logf(D_NOTICE, "mTime res: [%d]", callRes);
 
   return callRes;
 }

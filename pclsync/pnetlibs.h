@@ -36,24 +36,24 @@
 #include "plist.h"
 #include "pfoldersync.h"
 
-#define senddebug(str, ...)                                                    \
+#define sendpdbg_logf(str, ...)                                                    \
   do {                                                                         \
-    psync_send_debug(0, __FILE__, __FUNCTION__, __LINE__, str, __VA_ARGS__);   \
+    psync_send_pdbg_logf(0, __FILE__, __FUNCTION__, __LINE__, str, __VA_ARGS__);   \
   } while (0)
-#define sendtdebug(str, ...)                                                   \
+#define sendtpdbg_logf(str, ...)                                                   \
   do {                                                                         \
-    psync_send_debug(1, __FILE__, __FUNCTION__, __LINE__, str, __VA_ARGS__);   \
+    psync_send_pdbg_logf(1, __FILE__, __FUNCTION__, __LINE__, str, __VA_ARGS__);   \
   } while (0)
-#define sendassert(cond)                                                       \
+#define sendpdbg_assert(cond)                                                       \
   do {                                                                         \
     if (unlikely(!(cond))) {                                                   \
-      senddebug("assertion %s failed", TO_STR(cond));                          \
+      sendpdbg_logf("assertion %s failed", TO_STR(cond));                          \
     }                                                                          \
   } while (0)
-#define sendtassert(cond)                                                      \
+#define sendtpdbg_assert(cond)                                                      \
   do {                                                                         \
     if (unlikely(!(cond))) {                                                   \
-      sendtdebug("assertion %s failed", TO_STR(cond));                         \
+      sendtpdbg_logf("assertion %s failed", TO_STR(cond));                         \
     }                                                                          \
   } while (0)
 
@@ -208,7 +208,7 @@ int psync_get_upload_checksum(psync_uploadid_t uploadid, unsigned char *uhash,
 
 void psync_process_api_error(uint64_t result);
 
-int psync_send_debug(int thread, const char *file, const char *function,
+int psync_send_pdbg_logf(int thread, const char *file, const char *function,
                      int unsigned line, const char *fmt, ...) PSYNC_COLD
     PSYNC_FORMAT(printf, 5, 6) PSYNC_NONNULL(5);
 

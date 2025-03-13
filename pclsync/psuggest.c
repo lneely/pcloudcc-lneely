@@ -133,7 +133,7 @@ static void dir_scan(void *ptr, ppath_fast_stat *st) {
 
 static void scan_folder_by_ptr(scan_folder *f) {
   psync_list *e;
-  //  debug(D_NOTICE, "scanning directory %s", f->path);
+  //  pdbg_logf(D_NOTICE, "scanning directory %s", f->path);
   ppath_ls_fast(f->path, dir_scan, f);
   psync_list_for_each(e, &f->subfolders)
       scan_folder_by_ptr(psync_list_element(e, scan_folder, nextfolder));
@@ -161,7 +161,7 @@ static void suggest_folders(scan_folder *f, psync_list *suggestions) {
     sum += f->filecnt[i];
   if (sum >= PSYNC_SCANNER_MIN_FILES &&
       sum >= (f->filecnt[0] + sum) * PSYNC_SCANNER_PERCENT / 100) {
-    //    debug(D_NOTICE, "suggesting %s sum %u", f->path, sum);
+    //    pdbg_logf(D_NOTICE, "suggesting %s sum %u", f->path, sum);
     s = psync_new(suggested_folder);
     s->folder = f;
     s->filecnt = sum;
@@ -260,7 +260,7 @@ psuggested_folders_t *psuggest_scan_folder(const char *path) {
     memcpy(str, descs[i], descslen[i]);
     str += descslen[i];
     free(descs[i]);
-    debug(D_NOTICE, "suggesting %s (%s, %s)", ret->entries[i].localpath,
+    pdbg_logf(D_NOTICE, "suggesting %s (%s, %s)", ret->entries[i].localpath,
           ret->entries[i].name, ret->entries[i].description);
   }
   psync_list_for_each_element_call(&suggestions, suggested_folder, list, free);

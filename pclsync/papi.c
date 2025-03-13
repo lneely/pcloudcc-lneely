@@ -36,6 +36,7 @@
 #include "psettings.h"
 #include "psynclib.h"
 #include "ptimer.h"
+#include "pdbg.h"
 
 /*
   commented definitions are unused, but kept because they may be
@@ -115,7 +116,7 @@ psock_t *papi_connect(const char *hostname, int usessl) {
     ret = psock_connect(
         userapi, usessl ? PSYNC_API_PORT_SSL : PSYNC_API_PORT, usessl);
     if (ret) {
-      debug(D_NOTICE, "failed to connect to %s, but was able to connect to %s",
+      pdbg_logf(D_NOTICE, "failed to connect to %s, but was able to connect to %s",
             hostname, userapi);
       notuntil = ptimer_time() + 1800;
     }
@@ -135,7 +136,7 @@ void papi_conn_fail_reset() {
 }
 
 #define _NEED_DATA(cnt)                                                        \
-  if (unlikely_log(*datalen < (cnt)))                                          \
+  if (unpdbg_likely(*datalen < (cnt)))                                          \
   return -1
 #define ALIGN_BYTES psync_alignof(uint64_t)
 
@@ -390,14 +391,14 @@ binresult *papi_result(psock_t *sock) {
   binresult *res;
   uint32_t ressize;
 
-  if (unlikely_log(psock_readall(sock, &ressize, sizeof(uint32_t)) !=
+  if (unpdbg_likely(psock_readall(sock, &ressize, sizeof(uint32_t)) !=
                    sizeof(uint32_t))) {
     return NULL;
   }
 
   data = (unsigned char *)malloc(ressize);
 
-  if (unlikely_log(psock_readall(sock, data, ressize) != ressize)) {
+  if (unpdbg_likely(psock_readall(sock, data, ressize) != ressize)) {
     free(data);
     return NULL;
   }
@@ -412,11 +413,11 @@ binresult *papi_result_thread(psock_t *sock) {
   unsigned char *data;
   binresult *res;
   uint32_t ressize;
-  if (unlikely_log(psock_readall_thread(
+  if (unpdbg_likely(psock_readall_thread(
                        sock, &ressize, sizeof(uint32_t)) != sizeof(uint32_t)))
     return NULL;
   data = (unsigned char *)malloc(ressize);
-  if (unlikely_log(psock_readall_thread(sock, data, ressize) !=
+  if (unpdbg_likely(psock_readall_thread(sock, data, ressize) !=
                    ressize)) {
     free(data);
     return NULL;
@@ -461,7 +462,7 @@ again:
       reader->data = (unsigned char *)malloc(reader->respsize);
       goto again;
     } else {
-      assert(reader->state == 1);
+      pdbg_assert(reader->state == 1);
       reader->result = parse_result(reader->data, reader->respsize);
       free(reader->data);
       papi_rdr_alloc(reader);
@@ -494,7 +495,7 @@ unsigned char *papi_prepare(const char *command, size_t cmdlen,
       plen += params[i].paramnamelen + 2;
     }
   }
-  if (unlikely_log(plen > 0xffff))
+  if (unpdbg_likely(plen > 0xffff))
     return NULL;
   sdata = data = (unsigned char *)malloc(plen + 2 + additionalalloc);
   memcpy(data, &plen, 2);
@@ -542,12 +543,12 @@ binresult *papi_send(psock_t *sock, const char *command,
   }
 
   if (readres & 2) {
-    if (unlikely_log(psock_writeall_thread(sock, sdata, plen) != plen)) {
+    if (unpdbg_likely(psock_writeall_thread(sock, sdata, plen) != plen)) {
       free(sdata);
       return NULL;
     }
   } else {
-    if (unlikely_log(psock_writeall(sock, sdata, plen) != plen)) {
+    if (unpdbg_likely(psock_writeall(sock, sdata, plen) != plen)) {
       free(sdata);
       return NULL;
     }
@@ -563,36 +564,36 @@ binresult *papi_send(psock_t *sock, const char *command,
 void papi_dump(const binresult *res, const char *file,
                              const char *function, int unsigned line) {
   uint32_t i;
-  psync_debug(file, function, line, D_NOTICE,
+  pdbg_printf(file, function, line, D_NOTICE,
               "dumping existing fields of the hash");
   for (i = 0; i < res->length; i++)
     switch (res->hash[i].value->type) {
     case PARAM_HASH:
-      psync_debug(file, function, line, D_NOTICE, "  %s=[hash]",
+      pdbg_printf(file, function, line, D_NOTICE, "  %s=[hash]",
                   res->hash[i].key);
       break;
     case PARAM_ARRAY:
-      psync_debug(file, function, line, D_NOTICE, "  %s=[array]",
+      pdbg_printf(file, function, line, D_NOTICE, "  %s=[array]",
                   res->hash[i].key);
       break;
     case PARAM_DATA:
-      psync_debug(file, function, line, D_NOTICE, "  %s=[data]",
+      pdbg_printf(file, function, line, D_NOTICE, "  %s=[data]",
                   res->hash[i].key);
       break;
     case PARAM_NUM:
-      psync_debug(file, function, line, D_NOTICE, "  %s=%llu", res->hash[i].key,
+      pdbg_printf(file, function, line, D_NOTICE, "  %s=%llu", res->hash[i].key,
                   (long long unsigned)res->hash[i].value->num);
       break;
     case PARAM_STR:
-      psync_debug(file, function, line, D_NOTICE, "  %s=\"%s\"",
+      pdbg_printf(file, function, line, D_NOTICE, "  %s=\"%s\"",
                   res->hash[i].key, res->hash[i].value->str);
       break;
     case PARAM_BOOL:
-      psync_debug(file, function, line, D_NOTICE, "  %s=%s", res->hash[i].key,
+      pdbg_printf(file, function, line, D_NOTICE, "  %s=%s", res->hash[i].key,
                   res->hash[i].value->num ? "true" : "false");
       break;
     default:
-      psync_debug(file, function, line, D_NOTICE, "  %s=!unknown type %u",
+      pdbg_printf(file, function, line, D_NOTICE, "  %s=!unknown type %u",
                   res->hash[i].key, (unsigned)res->hash[i].value->type);
       break;
     }
@@ -608,7 +609,7 @@ const binresult *papi_find_result(const binresult *res, const char *name,
       if (res) {
         nm = type_names[res->type];
       }
-      psync_debug(file, function, line, D_CRITICAL,
+      pdbg_printf(file, function, line, D_CRITICAL,
                   "expecting hash as first parameter, got %s", nm);
     }
     return empty_types[type];
@@ -619,14 +620,14 @@ const binresult *papi_find_result(const binresult *res, const char *name,
         return res->hash[i].value;
       else {
         if (D_CRITICAL <= DEBUG_LEVEL)
-          psync_debug(file, function, line, D_CRITICAL,
+          pdbg_printf(file, function, line, D_CRITICAL,
                       "type error for key %s, expected %s got %s", name,
                       type_names[type], type_names[res->hash[i].value->type]);
         return empty_types[type];
       }
     }
   if (D_CRITICAL <= DEBUG_LEVEL)
-    psync_debug(file, function, line, D_CRITICAL, "could not find key %s",
+    pdbg_printf(file, function, line, D_CRITICAL, "could not find key %s",
                 name);
 #if IS_DEBUG
   papi_dump(res, file, function, line);
@@ -644,7 +645,7 @@ const binresult *papi_check_result(const binresult *res, const char *name,
       const char *nm = "NULL";
       if (res)
         nm = type_names[res->type];
-      psync_debug(file, function, line, D_CRITICAL,
+      pdbg_printf(file, function, line, D_CRITICAL,
                   "expecting hash as first parameter, got %s", nm);
     }
     return NULL;
@@ -655,7 +656,7 @@ const binresult *papi_check_result(const binresult *res, const char *name,
         return res->hash[i].value;
       else {
         if (D_CRITICAL <= DEBUG_LEVEL)
-          psync_debug(file, function, line, D_CRITICAL,
+          pdbg_printf(file, function, line, D_CRITICAL,
                       "type error for key %s, expected %s got %s", name,
                       type_names[type], type_names[res->hash[i].value->type]);
         return NULL;
@@ -673,7 +674,7 @@ const binresult *papi_get_result(const binresult *res, const char *name,
       const char *nm = "NULL";
       if (res)
         nm = type_names[res->type];
-      psync_debug(file, function, line, D_CRITICAL,
+      pdbg_printf(file, function, line, D_CRITICAL,
                   "expecting hash as first parameter, got %s", nm);
     }
     return NULL;

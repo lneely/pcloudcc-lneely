@@ -95,7 +95,7 @@ static void psync_add_folder_to_downloadlist_locked(psync_folderid_t folderid) {
         break;
       }
     } else {
-      debug(D_NOTICE,
+      pdbg_logf(D_NOTICE,
             "not adding folderid %llu to downloadlist as it is already there",
             (unsigned long long)folderid);
       break;
@@ -156,7 +156,7 @@ void psyncer_folder_inc_tasks(psync_folderid_t lfolderid) {
       "UPDATE localfolder SET taskcnt=taskcnt+1 WHERE id=?");
   psync_sql_bind_uint(res, 1, lfolderid);
   psync_sql_run_free(res);
-  assertw(psync_sql_affected_rows() == 1);
+  pdbg_assertw(psync_sql_affected_rows() == 1);
 }
 
 void psyncer_folder_dec_tasks(psync_folderid_t lfolderid) {
@@ -165,7 +165,7 @@ void psyncer_folder_dec_tasks(psync_folderid_t lfolderid) {
       "UPDATE localfolder SET taskcnt=taskcnt+1 WHERE id=?");
   psync_sql_bind_uint(res, 1, lfolderid);
   psync_sql_run_free(res);
-  assertw(psync_sql_affected_rows() == 1);
+  pdbg_assertw(psync_sql_affected_rows() == 1);
 }
 
 psync_folderid_t psyncer_db_folder_create(
@@ -176,7 +176,7 @@ psync_folderid_t psyncer_db_folder_create(
   psync_folderid_t lfolderid, dbfolderid;
   const char *ptr;
   char *vname;
-  debug(D_NOTICE, "creating local folder in db as %lu/%s for folderid %lu",
+  pdbg_logf(D_NOTICE, "creating local folder in db as %lu/%s for folderid %lu",
         (unsigned long)localparentfolderid, name, (unsigned long)folderid);
   res = psync_sql_query(
       "SELECT id FROM localfolder WHERE syncid=? AND folderid=?");
@@ -227,11 +227,11 @@ psync_folderid_t psyncer_db_folder_create(
   } else {
     lfolderid = 0;
     dbfolderid = 0;
-    debug(D_ERROR, "local folder %s not found in the database", name);
+    pdbg_logf(D_ERROR, "local folder %s not found in the database", name);
   }
   psync_sql_free_result(res);
   if (lfolderid && dbfolderid != folderid) {
-    debug(D_NOTICE,
+    pdbg_logf(D_NOTICE,
           "local folder %lu does not have folderid associated, setting to %lu",
           (unsigned long)lfolderid, (unsigned long)folderid);
     res = psync_sql_prep_statement(
@@ -302,7 +302,7 @@ static void psync_sync_newsyncedfolder(psync_syncid_t syncid) {
                         "WHERE id=? AND flags=0");
   psync_sql_bind_uint(res, 1, syncid);
   row = psync_sql_fetch_row(res);
-  if (unlikely_log(!row)) {
+  if (unpdbg_likely(!row)) {
     psync_sql_free_result(res);
     psync_sql_rollback_transaction();
     return;
@@ -327,7 +327,7 @@ static void psync_sync_newsyncedfolder(psync_syncid_t syncid) {
       "UPDATE syncfolder SET flags=1 WHERE flags=0 AND id=?");
   psync_sql_bind_uint(res, 1, syncid);
   psync_sql_run_free(res);
-  if (likely_log(psync_sql_affected_rows())) {
+  if (pdbg_likely(psync_sql_affected_rows())) {
     if (!psync_sql_commit_transaction()) {
       if (synctype & PSYNC_UPLOAD_ONLY)
         psync_wake_localscan();
@@ -436,10 +436,10 @@ re:
       mbedtls_md = 7;
     else
       mbedtls_md = 5;
-    if (unlikely_log(stat(localpath, &st)) ||
-        unlikely_log(!pfile_stat_isfolder(&st)) ||
-        unlikely_log(!pfile_stat_mode_ok(&st, mbedtls_md))) {
-      debug(D_WARNING,
+    if (unpdbg_likely(stat(localpath, &st)) ||
+        unpdbg_likely(!pfile_stat_isfolder(&st)) ||
+        unpdbg_likely(!pfile_stat_mode_ok(&st, mbedtls_md))) {
+      pdbg_logf(D_WARNING,
             "ignoring delayed sync id %" PRIu64 " for local path %s", id,
             localpath);
       delete_delayed_sync(id);
@@ -449,13 +449,13 @@ re:
     res2 = psync_sql_query("SELECT localpath FROM syncfolder");
     while ((srow = psync_sql_fetch_rowstr(res2)))
       if (psyncer_str_has_prefix(srow[0], localpath)) {
-        debug(
+        pdbg_logf(
             D_WARNING,
             "skipping localfolder %s, remote %s, because of same parent to %s",
             localpath, remotepath, srow[0]);
         mbedtls_md = 1;
       } else if (!strcmp(srow[0], localpath)) {
-        debug(D_WARNING,
+        pdbg_logf(D_WARNING,
               "skipping localfolder %s, remote %s, because of same dir to %s",
               localpath, remotepath, srow[0]);
         mbedtls_md = 1;
@@ -472,7 +472,7 @@ re:
 
     folderid = pfolder_id_create(remotepath);
     if (unlikely(folderid == PSYNC_INVALID_FOLDERID)) {
-      debug(D_WARNING, "could not get folderid/create folder %s", remotepath);
+      pdbg_logf(D_WARNING, "could not get folderid/create folder %s", remotepath);
       free(localpath);
       free(remotepath);
       if (psync_error != PERROR_OFFLINE) {
@@ -502,7 +502,7 @@ re:
     psync_sql_bind_uint(stmt, 4, pfile_stat_inode(&st));
     psync_sql_bind_uint(stmt, 5, pfile_stat_device(&st));
     psync_sql_run(stmt);
-    if (likely_log(psync_sql_affected_rows()))
+    if (pdbg_likely(psync_sql_affected_rows()))
       syncid = psync_sql_insertid();
     else
       syncid = -1;

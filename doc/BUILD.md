@@ -32,4 +32,5 @@ make STATIC=0               # dynamically link libpcloudcc_lib.so. (default: 1)
 make SCAN=1                 # run code analysis; recommend CC=clang and CXX=clang++. (default: 0)
 make CC=clang CXX=clang++   # use clang instead of gcc (default: gcc,g++)
 make DESTDIR=/prefix        # installation prefix (default: /usr/local/bin)
+make SSLDBGLVL=0            # mbedtls debug level (range: 0-5, default: 0)
 ```

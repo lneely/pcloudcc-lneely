@@ -49,7 +49,7 @@ typedef union {
 } psync_rwlock_lockcnt_t;
 
 void plocks_init(psync_rwlock_t *rw) {
-  assert(sizeof(void *) == sizeof(psync_rwlock_lockcnt_t));
+  pdbg_assert(sizeof(void *) == sizeof(psync_rwlock_lockcnt_t));
   rw->rcount = 0;
   rw->rwait = 0;
   rw->wcount = 0;
@@ -87,7 +87,7 @@ static int psync_rwlock_check_rdrecursive_in(psync_rwlock_t *rw) {
     psync_rwlock_set_count(rw, cnt);
     return 1;
   } else if (cnt.cnt[1]) {
-    assert(cnt.cnt[1] != PSYNC_WR_RESERVED);
+    pdbg_assert(cnt.cnt[1] != PSYNC_WR_RESERVED);
     cnt.cnt[1]++;
     psync_rwlock_set_count(rw, cnt);
     return 1;
@@ -98,9 +98,9 @@ static int psync_rwlock_check_rdrecursive_in(psync_rwlock_t *rw) {
 static int psync_rwlock_check_wrrecursive_in(psync_rwlock_t *rw) {
   psync_rwlock_lockcnt_t cnt;
   cnt = psync_rwlock_get_count(rw);
-  assert(!cnt.cnt[0]);
+  pdbg_assert(!cnt.cnt[0]);
   if (cnt.cnt[1]) {
-    assert(cnt.cnt[1] != PSYNC_WR_RESERVED);
+    pdbg_assert(cnt.cnt[1] != PSYNC_WR_RESERVED);
     cnt.cnt[1]++;
     psync_rwlock_set_count(rw, cnt);
     return 1;
@@ -116,7 +116,7 @@ static int psync_rwlock_check_recursive_out(psync_rwlock_t *rw) {
     psync_rwlock_set_count(rw, cnt);
     return cnt.cnt[0] > 0;
   } else {
-    assert(cnt.cnt[1]);
+    pdbg_assert(cnt.cnt[1]);
     cnt.cnt[1]--;
     psync_rwlock_set_count(rw, cnt);
     return cnt.cnt[1] > 0;
@@ -258,7 +258,7 @@ int plocks_timedwrlock(psync_rwlock_t *rw,
 void plocks_rslock(psync_rwlock_t *rw) {
   psync_rwlock_lockcnt_t cnt;
   cnt = psync_rwlock_get_count(rw);
-  assert(cnt.cnt[0] == 0);
+  pdbg_assert(cnt.cnt[0] == 0);
   if (cnt.cnt[1]) {
     if (cnt.cnt[1] == PSYNC_WR_RESERVED)
       cnt.cnt[0]++;
@@ -288,14 +288,14 @@ int plocks_towrlock(psync_rwlock_t *rw) {
   cnt = psync_rwlock_get_count(rw);
   if (cnt.cnt[1] && cnt.cnt[1] != PSYNC_WR_RESERVED)
     return 0;
-  assert(cnt.cnt[0]);
+  pdbg_assert(cnt.cnt[0]);
   pthread_mutex_lock(&rw->mutex);
-  assert(rw->rcount);
-  assert(!rw->wcount);
+  pdbg_assert(rw->rcount);
+  pdbg_assert(!rw->wcount);
   if (rw->opts & PSYNC_RW_OPT_RESERVED) {
     if (cnt.cnt[1] != PSYNC_WR_RESERVED) {
       pthread_mutex_unlock(&rw->mutex);
-      //      debug(D_NOTICE, "could not upgrade to write lock, consider using
+      //      pdbg_logf(D_NOTICE, "could not upgrade to write lock, consider using
       //      reserved locks instead");
       return -1;
     }
@@ -307,7 +307,7 @@ int plocks_towrlock(psync_rwlock_t *rw) {
     pthread_cond_wait(&rw->wcond, &rw->mutex);
     rw->wwait--;
   }
-  assert(!rw->wcount);
+  pdbg_assert(!rw->wcount);
   rw->wcount++;
   rw->opts &= ~PSYNC_RW_OPT_RESERVED;
   pthread_mutex_unlock(&rw->mutex);
@@ -321,7 +321,7 @@ void plocks_unlock(psync_rwlock_t *rw) {
   if (psync_rwlock_check_recursive_out(rw))
     return;
   pthread_mutex_lock(&rw->mutex);
-  assert(!(rw->rcount && rw->wcount));
+  pdbg_assert(!(rw->rcount && rw->wcount));
   if (rw->rcount) {
     if ((rw->opts & PSYNC_RW_OPT_RESERVED) &&
         psync_rwlock_is_reserved_by_this_thread_clr(rw))
@@ -335,11 +335,11 @@ void plocks_unlock(psync_rwlock_t *rw) {
       }
     }
   } else {
-    //    debug(D_NOTICE, "Releasing write lock.");
-    assert(rw->wcount);
+    //    pdbg_logf(D_NOTICE, "Releasing write lock.");
+    pdbg_assert(rw->wcount);
     if (--rw->wcount == 0) {
       if (rw->opts & PSYNC_RW_OPT_RESERVED) {
-        assert(rw->wwait);
+        pdbg_assert(rw->wwait);
         // this could create some small thundering herd, but is probably better
         // than using one more condition variable
         pthread_cond_broadcast(&rw->wcond);

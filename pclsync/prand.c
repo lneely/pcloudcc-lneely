@@ -74,7 +74,7 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
   int64_t i64;
   pthread_t threadid;
   unsigned char lsc[64][PSYNC_LHASH_DIGEST_LEN];
-  debug(D_NOTICE, "in");
+  pdbg_logf(D_NOTICE, "in");
   struct utsname un;
   struct statvfs stfs;
   char **env;
@@ -82,7 +82,7 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
   clock_gettime(CLOCK_REALTIME, &tm);
   psync_lhash_init(&hctx);
   psync_lhash_update(&hctx, &tm, sizeof(tm));
-  if (likely_log(!uname(&un)))
+  if (pdbg_likely(!uname(&un)))
     psync_lhash_update(&hctx, &un, sizeof(un));
   pid = getpid();
   psync_lhash_update(&hctx, &pid, sizeof(pid));
@@ -92,13 +92,13 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
     psync_lhash_update(&hctx, *env, strlen(*env));
 #if defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0 &&                             \
     defined(_POSIX_MONOTONIC_CLOCK)
-  if (likely_log(!clock_gettime(CLOCK_MONOTONIC, &tm)))
+  if (pdbg_likely(!clock_gettime(CLOCK_MONOTONIC, &tm)))
     psync_lhash_update(&hctx, &tm, sizeof(tm));
 #endif
 
   add_file("/dev/urandom", &hctx, PSYNC_HASH_DIGEST_LEN);
 
-  if (likely_log(!sysinfo(&si))) {
+  if (pdbg_likely(!sysinfo(&si))) {
     psync_lhash_update(&hctx, &si, sizeof(si));
   }
   add_file("/proc/stat", &hctx, 0);
@@ -128,12 +128,12 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
     i64 = ppath_free_space(home);
     psync_lhash_update(&hctx, &i64, sizeof(i64));
     psync_lhash_update(&hctx, home, strlen(home));
-    if (likely_log(!stat(home, &st)))
+    if (pdbg_likely(!stat(home, &st)))
       psync_lhash_update(&hctx, &st, sizeof(st));
     free(home);
   }
   if (!fast) {
-    debug(D_NOTICE, "getting seed from database");
+    pdbg_logf(D_NOTICE, "getting seed from database");
     psync_sql_res *res;
     struct timespec tm;
     unsigned char rnd[PSYNC_LHASH_DIGEST_LEN];
@@ -153,11 +153,11 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
     psync_lhash_update(&hctx, &tm, sizeof(tm));
     sqlite3_randomness(sizeof(rnd), rnd);
     psync_lhash_update(&hctx, rnd, sizeof(rnd));
-    debug(D_NOTICE, "got seed from database");
+    pdbg_logf(D_NOTICE, "got seed from database");
   }
   if (aelen)
     psync_lhash_update(&hctx, addent, aelen);
-  debug(D_NOTICE, "adding bulk data");
+  pdbg_logf(D_NOTICE, "adding bulk data");
   for (i = 0; i < ARRAY_SIZE(lsc); i++) {
     memcpy(&lsc[i], lastseed, PSYNC_LHASH_DIGEST_LEN);
     for (j = 0; j < PSYNC_LHASH_DIGEST_LEN; j++)
@@ -175,7 +175,7 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
   psync_lhash_final(seed, &hctx);
   memcpy(lastseed, seed, PSYNC_LHASH_DIGEST_LEN);
 
-  debug(D_NOTICE, "storing in db");
+  pdbg_logf(D_NOTICE, "storing in db");
   psync_sql_res *res;
   unsigned char hashbin[PSYNC_LHASH_DIGEST_LEN];
   char hashhex[PSYNC_LHASH_DIGEST_HEXLEN], nm[16];
@@ -197,5 +197,5 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
   psync_sql_bind_lstring(res, 2, hashhex, PSYNC_LHASH_DIGEST_HEXLEN);
   psync_sql_run_free(res);
 
-  debug(D_NOTICE, "out");
+  pdbg_logf(D_NOTICE, "out");
 }

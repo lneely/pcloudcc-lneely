@@ -78,28 +78,28 @@ static void psync_notifications_download_thumb(const binresult *thumb,
   rd = -1;
   path = papi_find_result2(thumb, "path", PARAM_STR)->str;
   filename = strrchr(path, '/');
-  if (unlikely_log(!filename++))
+  if (unpdbg_likely(!filename++))
     return;
   filepath = psync_strcat(thumbpath, "/", filename, NULL);
   if (!stat(filepath, &st)) {
-    debug(D_NOTICE, "skipping download of %s as it already exists", filename);
+    pdbg_logf(D_NOTICE, "skipping download of %s as it already exists", filename);
     goto err0;
   }
   tmpfilepath = psync_strcat(filepath, ".part", NULL);
-  debug(D_NOTICE, "downloading thumbnail %s", filename);
-  if (unlikely_log((fd = pfile_open(tmpfilepath, O_WRONLY,
+  pdbg_logf(D_NOTICE, "downloading thumbnail %s", filename);
+  if (unpdbg_likely((fd = pfile_open(tmpfilepath, O_WRONLY,
                                          O_CREAT | O_TRUNC)) ==
                    INVALID_HANDLE_VALUE))
     goto err1;
   sock = psync_http_connect_multihost(
       papi_find_result2(thumb, "hosts", PARAM_ARRAY), &host);
-  if (unlikely_log(!sock))
+  if (unpdbg_likely(!sock))
     goto err2;
   psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
                  papi_find_result2(thumb, "dwltag", PARAM_STR)->str);
-  if (unlikely_log(psync_http_request(sock, host, path, 0, 0, cookie)))
+  if (unpdbg_likely(psync_http_request(sock, host, path, 0, 0, cookie)))
     goto err3;
-  if (unlikely_log(psync_http_next_request(sock)))
+  if (unpdbg_likely(psync_http_next_request(sock)))
     goto err3;
   buff = (char *)malloc(PSYNC_COPY_BUFFER_SIZE);
   while (1) {
@@ -116,9 +116,9 @@ err2:
   pfile_close(fd);
 err1:
   if (rd == 0 && !pfile_rename_overwrite(tmpfilepath, filepath))
-    debug(D_NOTICE, "downloaded thumbnail %s", filename);
+    pdbg_logf(D_NOTICE, "downloaded thumbnail %s", filename);
   else
-    debug(D_WARNING, "downloading of thumbnail %s failed", filename);
+    pdbg_logf(D_WARNING, "downloading of thumbnail %s failed", filename);
   free(tmpfilepath);
 err0:
   free(filepath);
@@ -132,7 +132,7 @@ static void psync_notifications_set_current_list(binresult *res,
   uint32_t cntnew, cnttotal, i;
   notifications = papi_find_result2(res, "notifications", PARAM_ARRAY);
   cnttotal = notifications->length;
-  debug(D_NOTICE, "got list with %u notifications", (unsigned)cnttotal);
+  pdbg_logf(D_NOTICE, "got list with %u notifications", (unsigned)cnttotal);
   cntnew = 0;
   for (i = 0; i < cnttotal; i++) {
     if (papi_find_result2(notifications->array[i], "isnew", PARAM_BOOL)->num)
@@ -153,7 +153,7 @@ static void psync_notifications_set_current_list(binresult *res,
   pthread_mutex_unlock(&ntf_mutex);
   free(ores);
   if (cb) {
-    debug(D_NOTICE, "calling notification callback, cnt=%u, newcnt=%u",
+    pdbg_logf(D_NOTICE, "calling notification callback, cnt=%u, newcnt=%u",
           (unsigned)cnttotal, (unsigned)cntnew);
     cb(cnttotal, cntnew);
   }
@@ -250,7 +250,7 @@ static void psync_notifications_thumb_dir_list(void *ptr,
           break;
         }
       } else {
-        debug(D_WARNING, "duplicate name in file list %s, should not happen",
+        pdbg_logf(D_WARNING, "duplicate name in file list %s, should not happen",
               st->name);
         return;
       }
@@ -307,7 +307,7 @@ psync_notification_list_t *pnotify_get() {
     ntf_res = ntf_processed_result;
   else if (ntf_result) {
     ntf_res = ntf_result;
-    debug(D_NOTICE, "using not processed result for now");
+    pdbg_logf(D_NOTICE, "using not processed result for now");
   } else
     ntf_res = NULL;
   if (ntf_res) {
@@ -333,7 +333,7 @@ psync_notification_list_t *pnotify_get() {
             psync_list_add_string_offset(builder,
                                          offsetof(psync_notification_t, thumb));
           } else
-            debug(D_WARNING,
+            pdbg_logf(D_WARNING,
                   "could not stat thumb %s which is supposed to be downloaded",
                   filename);
           free(filepath);
@@ -353,7 +353,7 @@ psync_notification_list_t *pnotify_get() {
   thumbs = ptree_get_first_safe(thumbs);
   while (thumbs) {
     nx = ptree_get_next_safe(thumbs);
-    debug(D_NOTICE, "deleting unused thumb %s",
+    pdbg_logf(D_NOTICE, "deleting unused thumb %s",
           ptree_element(thumbs, psync_thumb_list_t, tree)->name);
     filepath = psync_strcat(
         thumbpath, "/",
@@ -372,7 +372,7 @@ psync_notification_list_t *pnotify_get() {
 static void psync_notifications_del_thumb(void *ptr, ppath_stat *st) {
   if (pfile_stat_isfolder(&st->stat))
     return;
-  debug(D_NOTICE, "deleting thumb %s", st->path);
+  pdbg_logf(D_NOTICE, "deleting thumb %s", st->path);
   pfile_delete(st->path);
 }
 

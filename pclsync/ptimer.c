@@ -73,7 +73,7 @@ static int timer_running = 0;
 
 PSYNC_NOINLINE static void timer_sleep_detected(time_t lt) {
   struct exception_list *e;
-  debug(D_NOTICE, "sleep detected, current_time=%lu, last_current_time=%lu",
+  pdbg_logf(D_NOTICE, "sleep detected, current_time=%lu, last_current_time=%lu",
         (unsigned long)psync_current_time, (unsigned long)lt);
   pthread_mutex_lock(&timer_ex_mutex);
   e = sleeplist;
@@ -160,7 +160,7 @@ static void timer_thread() {
       timer_process_timers(&timers);
     if (unlikely(psync_current_time - lt >= 25))
       timer_sleep_detected(lt);
-    else if (unlikely_log(psync_current_time == lt)) {
+    else if (unpdbg_likely(psync_current_time == lt)) {
       if (!psync_do_run)
         break;
       psys_sleep_milliseconds(1000);
@@ -205,7 +205,7 @@ psync_timer_t ptimer_register(psync_timer_callback func, time_t numsec,
   }
   if (unlikely(i == TIMER_LEVELS)) {
     n /= TIMER_ARRAY_SIZE;
-    debug(D_ERROR, "requested timeout %lu is larger than the maximum of %lu",
+    pdbg_logf(D_ERROR, "requested timeout %lu is larger than the maximum of %lu",
           (unsigned long)numsec, (unsigned long)n);
     numsec = n;
     i--;

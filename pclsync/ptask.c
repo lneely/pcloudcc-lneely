@@ -69,7 +69,7 @@
 #define CHECK_LEN(l)                                                           \
   do {                                                                         \
     if (unlikely(len != l)) {                                                  \
-      debug(D_BUG,                                                             \
+      pdbg_logf(D_BUG,                                                             \
             "wrong size for packet of type %u, expected size %u but got %u",   \
             (unsigned)type, (unsigned)l, (unsigned)len);                       \
       return 2;                                                                \
@@ -180,7 +180,7 @@ static int data_send(async_params_t *prms, const void *data, int len) {
       len -= wr;
       data = (const char *)data + wr;
     } else if (wr != PSYNC_DEFLATE_FULL) {
-      debug(D_ERROR, "write to deflate compressor of %d bytes returned %d", len,
+      pdbg_logf(D_ERROR, "write to deflate compressor of %d bytes returned %d", len,
             wr);
       return -1;
     }
@@ -197,7 +197,7 @@ static int data_pending_flush(async_params_t *prms) {
   int ret;
   ret = pdeflate_write(prms->enc, "", 0, PSYNC_DEFLATE_FLUSH);
   if (ret != 0) {
-    debug(D_WARNING, "psync_deflate_write returned %d when flushing", ret);
+    pdbg_logf(D_WARNING, "psync_deflate_write returned %d when flushing", ret);
     return -1;
   }
   prms->pendingrequests = 0;
@@ -213,12 +213,12 @@ static int data_pending_send(async_params_t *prms) {
       return 0;
     if (ret > 0) {
       if (psock_writeall(prms->api, buff, ret) != ret) {
-        debug(D_WARNING, "write of %d bytes to socket failed", ret);
+        pdbg_logf(D_WARNING, "write of %d bytes to socket failed", ret);
         return -1;
       } else
-        debug(D_NOTICE, "sent %d bytes of compressed data to socket", ret);
+        pdbg_logf(D_NOTICE, "sent %d bytes of compressed data to socket", ret);
     } else {
-      debug(D_ERROR, "read from deflate compressor returned %d", ret);
+      pdbg_logf(D_ERROR, "read from deflate compressor returned %d", ret);
       return -1;
     }
   }
@@ -239,10 +239,10 @@ static int download_send_error(stream_t *s, async_params_t *prms,
                                     uint32_t errorflags) {
   psync_async_result_t r;
   if (error)
-    debug(D_NOTICE, "got error %u(%u) for file %s", (unsigned)error,
+    pdbg_logf(D_NOTICE, "got error %u(%u) for file %s", (unsigned)error,
           (unsigned)errorflags, fda->localpath);
   else
-    debug(D_NOTICE, "download of %s finished", fda->localpath);
+    pdbg_logf(D_NOTICE, "download of %s finished", fda->localpath);
   r.error = error;
   r.errorflags = errorflags;
   r.file.size = fda->size;
@@ -250,7 +250,7 @@ static int download_send_error(stream_t *s, async_params_t *prms,
   memcpy(r.file.sha1hex, fda->sha1hex, PSYNC_SHA1_DIGEST_HEXLEN);
   s->cb(s->cbext, &r);
 
-  debug(D_NOTICE, "closing stream %u", (unsigned)s->streamid);
+  pdbg_logf(D_NOTICE, "closing stream %u", (unsigned)s->streamid);
   ptree_del(&prms->streams, &s->tree);
   if (s->free)
     s->free(s, error);
@@ -263,7 +263,7 @@ static int download_checksum(download_context_t *fda) {
   psync_sha1_final(sha1b, &fda->sha1ctx);
   psync_binhex(sha1h, sha1b, PSYNC_SHA1_DIGEST_LEN);
   if (memcmp(sha1h, fda->sha1hex, PSYNC_SHA1_DIGEST_HEXLEN)) {
-    debug(D_WARNING,
+    pdbg_logf(D_WARNING,
           "checksum verification for file %s failed, expected %40s got %40s",
           fda->localpath, (char *)fda->sha1hex, (char *)sha1h);
     return -1;
@@ -278,7 +278,7 @@ static int download_process_data(stream_t *s, async_params_t *prms,
   int err;
   fda = (download_context_t *)(s + 1);
   if (datalen > fda->remsize) {
-    debug(D_ERROR,
+    pdbg_logf(D_ERROR,
           "got packed of size %u for stream %u file %s when the remaining data "
           "is %lu",
           (unsigned)datalen, (unsigned)s->streamid, fda->localpath,
@@ -294,7 +294,7 @@ static int download_process_data(stream_t *s, async_params_t *prms,
     wr = pfile_write(fda->fd, buff, datalen);
     if (wr == -1) {
       err = (int)errno;
-      debug(D_WARNING, "writing to file %s failed, errno %d", fda->localpath,
+      pdbg_logf(D_WARNING, "writing to file %s failed, errno %d", fda->localpath,
             err);
       return download_send_error(
           s, prms, fda,
@@ -321,7 +321,7 @@ static int download_process_headers(stream_t *s,
   download_context_t *fda;
   psync_sql_res *res;
   if (unlikely(datalen < sizeof(download_rsp_t))) {
-    debug(D_ERROR,
+    pdbg_logf(D_ERROR,
           "got packet of size %u while expecting at least %u, disconnecting",
           (unsigned)datalen, (unsigned)sizeof(download_rsp_t));
     return -1;
@@ -333,7 +333,7 @@ static int download_process_headers(stream_t *s,
   memcpy(fda->sha1hex, r.sha1hex, PSYNC_SHA1_DIGEST_HEXLEN);
   if (r.error)
     return download_send_error(s, prms, fda, r.error + 100, r.errorflags);
-  debug(D_NOTICE,
+  pdbg_logf(D_NOTICE,
         "got headers for file %s size %" PRIu64 " hash %" PRIu64
         " sha1 %.40s",
         fda->localpath, fda->size, fda->hash, fda->sha1hex);
@@ -371,7 +371,7 @@ static int download_process_headers(stream_t *s,
   psync_sql_commit_transaction();
   fda->fd = pfile_open(fda->localpath, O_WRONLY, O_CREAT | O_TRUNC);
   if (fda->fd == INVALID_HANDLE_VALUE) {
-    debug(D_WARNING, "could not open file %s, errno %d", fda->localpath,
+    pdbg_logf(D_WARNING, "could not open file %s, errno %d", fda->localpath,
           (int)errno);
     return download_send_error(s, prms, fda, PSYNC_ASYNC_ERROR_FILE, 0);
   }
@@ -394,17 +394,17 @@ static int handle_command(async_params_t *prms) {
   int ret;
   unsigned char r;
   if (sock_readall(prms->privsock, &hdr, sizeof(hdr))) {
-    debug(D_WARNING, "could not read header from socket pair");
+    pdbg_logf(D_WARNING, "could not read header from socket pair");
     return -1;
   }
   if (hdr.len > sizeof(buff)) {
-    debug(D_WARNING,
+    pdbg_logf(D_WARNING,
           "too large length of packet %u provided, maximum supported is %u",
           (unsigned)hdr.len, (unsigned)sizeof(buff));
     return -1;
   }
   if (sock_readall(prms->privsock, buff, hdr.len)) {
-    debug(D_WARNING, "could not read %u bytes of data from socket pair",
+    pdbg_logf(D_WARNING, "could not read %u bytes of data from socket pair",
           (unsigned)hdr.len);
     return -1;
   }
@@ -417,7 +417,7 @@ static int handle_command(async_params_t *prms) {
     ret = 0;
   }
   if (sock_writeall(prms->privsock, &r, sizeof(r))) {
-    debug(D_WARNING, "failed to write response to socket pair");
+    pdbg_logf(D_WARNING, "failed to write response to socket pair");
     return -1;
   }
   return ret;
@@ -442,12 +442,12 @@ static int handle_download(async_params_t *prms,
                        "act=dwl,strm=%" PRIu64 ",fileid=%" PRIu64 "\n",
                        (uint64_t)s->streamid, (uint64_t)dwl->fileid);
   if (data_send(prms, buff, len)) {
-    debug(D_WARNING, "failed to send request for fileid %lu",
+    pdbg_logf(D_WARNING, "failed to send request for fileid %lu",
           (unsigned long)dwl->fileid);
     return -1;
   }
   s->flags |= STREAM_FLAG_ACTIVE;
-  debug(D_NOTICE, "requested data of fileid %lu to be saved in %s",
+  pdbg_logf(D_NOTICE, "requested data of fileid %lu to be saved in %s",
         (unsigned long)dwl->fileid, dwl->localpath);
   return 0;
 }
@@ -474,12 +474,12 @@ static int handle_download_nm(async_params_t *prms,
       "act=dwlnm,strm=%" PRIu64 ",fileid=%" PRIu64 ",sha1=%.40s\n",
       (uint64_t)s->streamid, (uint64_t)dwl->fileid, dwl->sha1hex);
   if (data_send(prms, buff, len)) {
-    debug(D_WARNING, "failed to send request for fileid %lu",
+    pdbg_logf(D_WARNING, "failed to send request for fileid %lu",
           (unsigned long)dwl->fileid);
     return -1;
   }
   s->flags |= STREAM_FLAG_ACTIVE;
-  debug(D_NOTICE, "requested data of fileid %lu to be saved in %s",
+  pdbg_logf(D_NOTICE, "requested data of fileid %lu to be saved in %s",
         (unsigned long)dwl->fileid, dwl->localpath);
   return 0;
 }
@@ -488,7 +488,7 @@ static int handle_command_data(async_params_t *prms, char *data, uint32_t type, 
   switch (type) {
   case TASK_TYPE_EXIT:
     CHECK_LEN(0);
-    debug(D_NOTICE, "exiting");
+    pdbg_logf(D_NOTICE, "exiting");
     return -1;
   case TASK_TYPE_FILE_DWL:
     CHECK_LEN(sizeof(download_req_t));
@@ -498,7 +498,7 @@ static int handle_command_data(async_params_t *prms, char *data, uint32_t type, 
     return handle_download_nm(prms,
                                    (download_needed_req_t *)data);
   default:
-    debug(D_BUG, "got packet of unknown type %u", (unsigned)type);
+    pdbg_logf(D_BUG, "got packet of unknown type %u", (unsigned)type);
     return 1;
   }
 }
@@ -515,7 +515,7 @@ static int handle_decompressed_data(async_params_t *prms) {
     } else if (rd == PSYNC_DEFLATE_NODATA)
       return 0;
     else {
-      debug(D_ERROR, "psync_deflate_read returned %d", rd);
+      pdbg_logf(D_ERROR, "psync_deflate_read returned %d", rd);
       return -1;
     }
   }
@@ -530,7 +530,7 @@ static int handle_incoming_data(async_params_t *prms) {
     if (rdsock == PSYNC_SOCKET_WOULDBLOCK)
       return 0;
     else if (rdsock <= 0) {
-      debug(D_WARNING, "read from socket returned %d", rdsock);
+      pdbg_logf(D_WARNING, "read from socket returned %d", rdsock);
       return -1;
     }
     ptr = buff;
@@ -538,10 +538,10 @@ static int handle_incoming_data(async_params_t *prms) {
       wrdecomp =
           pdeflate_write(prms->dec, ptr, rdsock, PSYNC_DEFLATE_FLUSH);
       if (wrdecomp == PSYNC_DEFLATE_ERROR) {
-        debug(D_ERROR, "psync_deflate_write returned PSYNC_DEFLATE_ERROR");
+        pdbg_logf(D_ERROR, "psync_deflate_write returned PSYNC_DEFLATE_ERROR");
         return -1;
       } else if (wrdecomp != PSYNC_DEFLATE_FULL) {
-        assert(wrdecomp > 0);
+        pdbg_assert(wrdecomp > 0);
         rdsock -= wrdecomp;
         ptr += wrdecomp;
       }
@@ -581,7 +581,7 @@ static void proc_async_transfer(void *ptr) {
       if (handle_command(prms))
         break;
     } else {
-      debug(D_NOTICE, "psync_select_in returned %d, exiting, errno %d", ret,
+      pdbg_logf(D_NOTICE, "psync_select_in returned %d, exiting, errno %d", ret,
             (int)errno);
       break;
     }
@@ -618,7 +618,7 @@ static int proc_start_async_transfer() {
   while (1) {
     api = psync_apipool_get();
     if (!api) {
-      debug(D_NOTICE, "could not connect to API, failing");
+      pdbg_logf(D_NOTICE, "could not connect to API, failing");
       goto err0;
     }
     res = papi_send2(api, "asynctransfer", params);
@@ -626,13 +626,13 @@ static int proc_start_async_transfer() {
       break;
     psync_apipool_release_bad(api);
     if (++tries >= 5) {
-      debug(D_NOTICE, "failing after %d tries to send asynctransfer call",
+      pdbg_logf(D_NOTICE, "failing after %d tries to send asynctransfer call",
             tries);
       goto err0;
     }
   }
   if (papi_find_result2(res, "result", PARAM_NUM)->num) {
-    debug(D_WARNING, "asynctransfer returned error %d: %s",
+    pdbg_logf(D_WARNING, "asynctransfer returned error %d: %s",
           (int)papi_find_result2(res, "result", PARAM_NUM)->num,
           papi_find_result2(res, "error", PARAM_STR)->str);
     psync_process_api_error(papi_find_result2(res, "result", PARAM_NUM)->num);
@@ -642,17 +642,17 @@ static int proc_start_async_transfer() {
   }
   free(res);
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair)) {
-    debug(D_NOTICE, "socketpair() failed");
+    pdbg_logf(D_NOTICE, "socketpair() failed");
     goto err1;
   }
   enc = pdeflate_init(PSYNC_DEFLATE_COMP_FAST);
   if (!enc) {
-    debug(D_NOTICE, "pdeflate_init() failed");
+    pdbg_logf(D_NOTICE, "pdeflate_init() failed");
     goto err2;
   }
   dec = pdeflate_init(PSYNC_DEFLATE_DECOMPRESS);
   if (!dec) {
-    debug(D_NOTICE, "pdeflate_init() failed");
+    pdbg_logf(D_NOTICE, "pdeflate_init() failed");
     goto err3;
   }
   tparams = psync_new(async_params_t);
@@ -690,7 +690,7 @@ static int sock_readall(int sock, void *buff, size_t len) {
                 errno == EWOULDBLOCK))
       continue;
     else {
-      debug(D_WARNING, "read from socket of %lu bytes returned %ld, errno %d",
+      pdbg_logf(D_WARNING, "read from socket of %lu bytes returned %ld, errno %d",
             (unsigned long)len, (long)rd, (int)errno);
       return -1;
     }
@@ -712,7 +712,7 @@ static int sock_writeall(int sock, const void *buff, size_t len) {
                 errno == EWOULDBLOCK))
       continue;
     else {
-      debug(D_WARNING, "write to socket of %lu bytes returned %ld, errno %d",
+      pdbg_logf(D_WARNING, "write to socket of %lu bytes returned %ld, errno %d",
             (unsigned long)len, (long)wr, (int)errno);
       return -1;
     }
@@ -737,7 +737,7 @@ static stream_t *stream_create(async_params_t *prms, size_t addsize) {
 }
 
 static void stream_destroy(stream_t *s) {
-  debug(D_NOTICE, "freeing unfinished stream %u", (unsigned)s->streamid);
+  pdbg_logf(D_NOTICE, "freeing unfinished stream %u", (unsigned)s->streamid);
   if (s->flags & STREAM_FLAG_ACTIVE) {
     psync_async_result_t ar;
     memset(&ar, 0, sizeof(ar));
@@ -767,7 +767,7 @@ static int stream_process_data(async_params_t *prms) {
     }
   }
   if (!tr) {
-    debug(D_NOTICE, "throwing out %u bytes of data for unknown streamid %u",
+    pdbg_logf(D_NOTICE, "throwing out %u bytes of data for unknown streamid %u",
           (unsigned)prms->curreadbufflen, (unsigned)prms->currentstreamid);
     ret = 0;
   }
@@ -795,18 +795,18 @@ static void stream_setup_header(async_params_t *prms) {
 static int task_send_async_locked(const void *task, size_t len) {
   unsigned char ch;
   if (sock_writeall(sockd, task, len)) {
-    debug(D_WARNING, "failed to write %lu bytes of task to socket",
+    pdbg_logf(D_WARNING, "failed to write %lu bytes of task to socket",
           (unsigned long)len);
     return -1;
   }
   if (sock_readall(sockd, &ch, 1)) {
-    debug(D_WARNING, "failed to read response from socket");
+    pdbg_logf(D_WARNING, "failed to read response from socket");
     return -1;
   }
   if (ch == 0)
     return 0;
   else {
-    debug(D_WARNING, "got error %d from async thread", (int)ch);
+    pdbg_logf(D_WARNING, "got error %d from async thread", (int)ch);
     return -1;
   }
 }

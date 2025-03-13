@@ -10,6 +10,7 @@
 
 #include "rpcclient.h"
 #include "plibs.h"
+#include "pdbg.h"
 #include "prpc.h"
 #include "putil.h"
 
@@ -135,9 +136,9 @@ int RpcClient::GetState(pCloud_FileState *state, char *path) {
   int rep = 0;
 
   if ((rep = this->Call(4, path, &errm, &errm_size) == 0)) {
-    debug(D_NOTICE, "rpc_get_state responese rep[%d] path[%s]", rep, path);
+    pdbg_logf(D_NOTICE, "rpc_get_state responese rep[%d] path[%s]", rep, path);
     if (errm) {
-      debug(D_NOTICE, "The error is %s", errm);
+      pdbg_logf(D_NOTICE, "The error is %s", errm);
     }
     if (rep == 10) {
       *state = FileStateInSync;
@@ -149,7 +150,7 @@ int RpcClient::GetState(pCloud_FileState *state, char *path) {
       *state = FileStateInvalid;
     }
   } else {
-    debug(D_ERROR, "rpc_get_state ERROR rep[%d] path[%s]", rep, path);
+    pdbg_logf(D_ERROR, "rpc_get_state ERROR rep[%d] path[%s]", rep, path);
   }
   if(errm) {
     free(errm);    

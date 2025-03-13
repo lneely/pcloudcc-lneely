@@ -290,7 +290,7 @@ static folder_tasks_t *get_folder_tasks(psync_folderid_t folderid, int create) {
     ft->folderid = folderid;
     ft->child_task_cnt = 0;
     ft->own_tasks = 0;
-    debug(D_NOTICE, "marking folderid %lu as having (sub)tasks",
+    pdbg_logf(D_NOTICE, "marking folderid %lu as having (sub)tasks",
           (unsigned long)folderid);
     return ft;
   } else {
@@ -299,7 +299,7 @@ static folder_tasks_t *get_folder_tasks(psync_folderid_t folderid, int create) {
 }
 
 static void free_folder_tasks(folder_tasks_t *ft) {
-  debug(D_NOTICE, "marking folderid %lu as clean", (unsigned long)ft->folderid);
+  pdbg_logf(D_NOTICE, "marking folderid %lu as clean", (unsigned long)ft->folderid);
   ptree_del(&folder_tasks, &ft->tree);
   free(ft);
 }
@@ -322,7 +322,7 @@ static psync_folderid_t get_parent_folder(psync_folderid_t folderid) {
   psync_sql_bind_uint(res, 1, folderid);
   row = psync_sql_fetch_rowint(res);
   if (unlikely(!row)) {
-    debug(D_WARNING, "can not find parent folder for folderid %lu",
+    pdbg_logf(D_WARNING, "can not find parent folder for folderid %lu",
           (unsigned long)folderid);
     psync_sql_free_result(res);
     return PSYNC_INVALID_FOLDERID;
@@ -356,8 +356,8 @@ void ppathstatus_drive_fldr_changed(psync_folderid_t folderid) {
     return;
   }
   if (changed) {
-    assert(!ft->own_tasks);
-    assert(!ft->child_task_cnt);
+    pdbg_assert(!ft->own_tasks);
+    pdbg_assert(!ft->child_task_cnt);
     ft->own_tasks = 1;
     while ((folderid = get_parent_folder(folderid)) != PSYNC_INVALID_FOLDERID) {
       ft = get_folder_tasks(folderid, 1);
@@ -366,13 +366,13 @@ void ppathstatus_drive_fldr_changed(psync_folderid_t folderid) {
         break;
     }
   } else {
-    assert(ft);
-    assert(!ft->child_task_cnt);
-    assert(ft->own_tasks);
+    pdbg_assert(ft);
+    pdbg_assert(!ft->child_task_cnt);
+    pdbg_assert(ft->own_tasks);
     free_folder_tasks(ft);
     while ((folderid = get_parent_folder(folderid)) != PSYNC_INVALID_FOLDERID) {
       ft = get_folder_tasks(folderid, 0);
-      assert(ft); // if assert fails, the problem is not the assert, don't
+      pdbg_assert(ft); // if assert fails, the problem is not the assert, don't
                   // change it to "if (!ft) break;"
       ft->child_task_cnt--;
       if (ft->child_task_cnt || ft->own_tasks)
@@ -396,7 +396,7 @@ static void folder_moved(psync_folderid_t folderid,
     pft->child_task_cnt++;
   }
   pft = get_folder_tasks(old_parent_folderid, 0);
-  assert(pft);
+  pdbg_assert(pft);
   pft->child_task_cnt--;
   while (!pft->child_task_cnt && !pft->own_tasks) {
     free_folder_tasks(pft);
@@ -404,7 +404,7 @@ static void folder_moved(psync_folderid_t folderid,
     if (old_parent_folderid == PSYNC_INVALID_FOLDERID)
       break;
     pft = get_folder_tasks(old_parent_folderid, 0);
-    assert(pft);
+    pdbg_assert(pft);
     pft->child_task_cnt--;
   }
 }
@@ -438,7 +438,7 @@ void ppathstatus_fldr_deleted(psync_folderid_t folderid) {
     free_folder_tasks(ft);
     while ((folderid = get_parent_folder(folderid)) != PSYNC_INVALID_FOLDERID) {
       ft = get_folder_tasks(folderid, 0);
-      assert(ft); // if assert fails, the problem is not the assert, don't
+      pdbg_assert(ft); // if assert fails, the problem is not the assert, don't
                   // change it to "if (!ft) break;"
       ft->child_task_cnt--;
       if (ft->child_task_cnt || ft->own_tasks)
@@ -535,7 +535,7 @@ get_sync_folder_tasks(sync_data_t *sd, psync_folderid_t folderid, int create) {
     ft->folderid = folderid;
     ft->child_task_cnt = 0;
     ft->own_tasks = 0;
-    debug(D_NOTICE, "marking folderid %lu in syncid %u as having (sub)tasks",
+    pdbg_logf(D_NOTICE, "marking folderid %lu in syncid %u as having (sub)tasks",
           (unsigned long)folderid, (unsigned)sd->syncid);
     return ft;
   } else {
@@ -564,7 +564,7 @@ static psync_folderid_t get_sync_parent_folder(sync_data_t *sd,
   psync_sql_bind_uint(res, 1, folderid);
   row = psync_sql_fetch_rowint(res);
   if (unlikely(!row)) {
-    debug(D_WARNING, "can not find parent folder for localfolderid %lu",
+    pdbg_logf(D_WARNING, "can not find parent folder for localfolderid %lu",
           (unsigned long)folderid);
     psync_sql_free_result(res);
     return PSYNC_INVALID_FOLDERID;
@@ -584,7 +584,7 @@ void ppath_syncfldr_task_added_locked(
     psync_syncid_t syncid, psync_folderid_t localfolderid) {
   sync_data_t *sd;
   folder_tasks_t *ft;
-  //  debug(D_NOTICE, "syncid %u localfolderid %lu", (unsigned)syncid, (unsigned
+  //  pdbg_logf(D_NOTICE, "syncid %u localfolderid %lu", (unsigned)syncid, (unsigned
   //  long)localfolderid);
   sd = get_sync_data(syncid, 1);
   ft = get_sync_folder_tasks(sd, localfolderid, 1);
@@ -657,7 +657,7 @@ static int local_folder_has_tasks(psync_syncid_t syncid,
 }
 
 static void free_sync_folder_tasks(sync_data_t *sd, folder_tasks_t *ft) {
-  debug(D_NOTICE, "marking folderid %lu from syncid %u as clean",
+  pdbg_logf(D_NOTICE, "marking folderid %lu from syncid %u as clean",
         (unsigned long)ft->folderid, (unsigned)sd->syncid);
   ptree_del(&sd->folder_tasks, &ft->tree);
   free(ft);
@@ -667,7 +667,7 @@ void ppathstatus_syncfldr_task_completed(
     psync_syncid_t syncid, psync_folderid_t localfolderid) {
   sync_data_t *sd;
   folder_tasks_t *ft;
-  //  debug(D_NOTICE, "syncid %u localfolderid %lu lfht %d", (unsigned)syncid,
+  //  pdbg_logf(D_NOTICE, "syncid %u localfolderid %lu lfht %d", (unsigned)syncid,
   //  (unsigned long)localfolderid, local_folder_has_tasks(syncid,
   //  localfolderid));
   psync_sql_lock();
@@ -685,8 +685,8 @@ void ppathstatus_syncfldr_task_completed(
     if (localfolderid == PSYNC_INVALID_FOLDERID)
       break;
     ft = get_sync_folder_tasks(sd, localfolderid, 0);
-    assert(ft);
-    assert(ft->child_task_cnt);
+    pdbg_assert(ft);
+    pdbg_assert(ft->child_task_cnt);
     ft->child_task_cnt--;
   }
   psync_sql_unlock();
@@ -736,9 +736,9 @@ static void sync_folder_moved(psync_folderid_t folderid,
     pft->child_task_cnt++;
   }
   sd = get_sync_data(old_syncid, 0);
-  assert(sd);
+  pdbg_assert(sd);
   pft = get_sync_folder_tasks(sd, old_parent_folderid, 0);
-  assert(pft);
+  pdbg_assert(pft);
   pft->child_task_cnt--;
   while (!pft->child_task_cnt && !pft->own_tasks) {
     free_sync_folder_tasks(sd, pft);
@@ -746,7 +746,7 @@ static void sync_folder_moved(psync_folderid_t folderid,
     if (old_parent_folderid == PSYNC_INVALID_FOLDERID)
       break;
     pft = get_sync_folder_tasks(sd, old_parent_folderid, 0);
-    assert(pft);
+    pdbg_assert(pft);
     pft->child_task_cnt--;
   }
 }
@@ -792,7 +792,7 @@ void ppathstatus_syncfldr_deleted(psync_syncid_t syncid,
     while ((folderid = get_sync_parent_folder(sd, folderid)) !=
            PSYNC_INVALID_FOLDERID) {
       ft = get_sync_folder_tasks(sd, folderid, 0);
-      assert(ft); // if assert fails, the problem is not the assert, don't
+      pdbg_assert(ft); // if assert fails, the problem is not the assert, don't
                   // change it to "if (!ft) break;"
       ft->child_task_cnt--;
       if (ft->child_task_cnt || ft->own_tasks)

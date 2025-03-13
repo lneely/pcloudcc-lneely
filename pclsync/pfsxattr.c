@@ -140,7 +140,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
     return 0;
   fspath = psync_fsfolder_resolve_path(path);
   if (!fspath) {
-    debug(D_NOTICE, "path component of %s not found", path);
+    pdbg_logf(D_NOTICE, "path component of %s not found", path);
     return -1;
   }
   checkfile = 1;
@@ -150,7 +150,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
     mk = psync_fstask_find_mkdir(folder, fspath->name, 0);
     if (mk) {
       free(fspath);
-      assertw(mk->folderid != 0);
+      pdbg_assertw(mk->folderid != 0);
       if (mk->folderid > 0)
         return folderid_to_objid(mk->folderid);
       else
@@ -171,11 +171,11 @@ static int64_t xattr_get_object_id_locked(const char *path) {
           if (row[0] == PSYNC_FS_TASK_CREAT)
             ret = taskid_to_objid(-cr->fileid);
           else {
-            assertw(row[0] == PSYNC_FS_TASK_MODIFY);
+            pdbg_assertw(row[0] == PSYNC_FS_TASK_MODIFY);
             ret = fileid_to_objid(row[1]);
           }
         } else {
-          debug(D_WARNING,
+          pdbg_logf(D_WARNING,
                 "found temporary file for path %s but could not find task %lu",
                 path, (unsigned long)(-cr->fileid));
           ret = -1;
@@ -189,7 +189,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
   }
   if (fspath->folderid < 0) {
     free(fspath);
-    debug(D_NOTICE, "path %s not found in temporary folder", path);
+    pdbg_logf(D_NOTICE, "path %s not found in temporary folder", path);
     return -1;
   }
   if (checkfolder) {
@@ -223,7 +223,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
     }
   }
   free(fspath);
-  debug(D_NOTICE, "path %s not found", path);
+  pdbg_logf(D_NOTICE, "path %s not found", path);
   return -1;
 }
 
@@ -233,7 +233,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
     oid = xattr_get_object_id_locked(path);                                    \
     if (unlikely(oid == -1)) {                                                 \
       psync_sql_unlock();                                                      \
-      return -PRINT_RETURN_CONST(ENOENT);                                      \
+      return -pdbg_return_const(ENOENT);                                      \
     }                                                                          \
   } while (0)
 
@@ -243,7 +243,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
     oid = xattr_get_object_id_locked(path);                                    \
     if (unlikely(oid == -1)) {                                                 \
       psync_sql_rdunlock();                                                    \
-      return -PRINT_RETURN_CONST(ENOENT);                                      \
+      return -pdbg_return_const(ENOENT);                                      \
     }                                                                          \
   } while (0)
 
@@ -253,7 +253,7 @@ int psync_fs_setxattr(const char *path, const char *name, const char *value,
   int64_t oid;
   int ret;
   psync_fs_set_thread_name();
-  debug(D_NOTICE, "setting attribute %s of %s", name, path);
+  pdbg_logf(D_NOTICE, "setting attribute %s of %s", name, path);
   LOCK_AND_LOOKUP();
   if (flags & XATTR_CREATE) {
     res = psync_sql_prep_statement("INSERT OR IGNORE INTO fsxattr (objectid, "
@@ -265,7 +265,7 @@ int psync_fs_setxattr(const char *path, const char *name, const char *value,
     if (psync_sql_affected_rows())
       ret = 0;
     else
-      ret = -PRINT_RETURN_CONST(EEXIST);
+      ret = -pdbg_return_const(EEXIST);
   } else if (flags & XATTR_REPLACE) {
     res = psync_sql_prep_statement(
         "UPDATE fsxattr SET value=? WHERE objectid=? AND name=?");
@@ -276,7 +276,7 @@ int psync_fs_setxattr(const char *path, const char *name, const char *value,
     if (psync_sql_affected_rows())
       ret = 0;
     else
-      ret = -PRINT_RETURN_CONST(ENOATTR);
+      ret = -pdbg_return_const(ENOATTR);
   } else {
     res = psync_sql_prep_statement(
         "REPLACE INTO fsxattr (objectid, name, value) VALUES (?, ?, ?)");
@@ -308,16 +308,16 @@ int psync_fs_getxattr(const char *path, const char *name, char *value,
     if ((row = psync_sql_fetch_row(res))) {
       str = psync_get_lstring(row[0], &len);
       if (size >= len) {
-        debug(D_NOTICE, "returning attribute %s of %s", name, path);
+        pdbg_logf(D_NOTICE, "returning attribute %s of %s", name, path);
         memcpy(value, str, len);
         ret = len;
       } else {
-        debug(D_NOTICE, "buffer too small for attribute %s of %s", name, path);
+        pdbg_logf(D_NOTICE, "buffer too small for attribute %s of %s", name, path);
         ret = -ERANGE;
       }
     } else {
       ret = -ENOATTR;
-      //      debug(D_NOTICE, "attribute %s not found for %s", name, path);
+      //      pdbg_logf(D_NOTICE, "attribute %s not found for %s", name, path);
     }
     psync_sql_free_result(res);
   } else {
@@ -328,11 +328,11 @@ int psync_fs_getxattr(const char *path, const char *name, char *value,
     psync_sql_bind_string(res, 2, name);
     if ((row = psync_sql_fetch_rowint(res))) {
       ret = row[0];
-      debug(D_NOTICE, "returning length of attribute %s of %s = %d", name, path,
+      pdbg_logf(D_NOTICE, "returning length of attribute %s of %s = %d", name, path,
             ret);
     } else {
       ret = -ENOATTR;
-      //      debug(D_NOTICE, "attribute %s not found for %s", name, path);
+      //      pdbg_logf(D_NOTICE, "attribute %s not found for %s", name, path);
     }
     psync_sql_free_result(res);
   }
@@ -364,7 +364,7 @@ int psync_fs_listxattr(const char *path, char *list, size_t size) {
       ret += len;
     }
     psync_sql_free_result(res);
-    debug(D_NOTICE, "returning list of attributes of %s = %d", path, ret);
+    pdbg_logf(D_NOTICE, "returning list of attributes of %s = %d", path, ret);
   } else {
     psync_uint_row row;
     res = psync_sql_query_nolock(
@@ -375,7 +375,7 @@ int psync_fs_listxattr(const char *path, char *list, size_t size) {
     else
       ret = 0;
     psync_sql_free_result(res);
-    debug(D_NOTICE, "returning length of attributes of %s = %d", path, ret);
+    pdbg_logf(D_NOTICE, "returning length of attributes of %s = %d", path, ret);
   }
   psync_sql_rdunlock();
   return ret;
@@ -395,10 +395,10 @@ int psync_fs_removexattr(const char *path, const char *name) {
   aff = psync_sql_affected_rows();
   psync_sql_unlock();
   if (aff) {
-    debug(D_NOTICE, "attribute %s deleted for %s", name, path);
+    pdbg_logf(D_NOTICE, "attribute %s deleted for %s", name, path);
     return 0;
   } else {
-    debug(D_NOTICE, "attribute %s not found for %s", name, path);
+    pdbg_logf(D_NOTICE, "attribute %s not found for %s", name, path);
     return -ENOATTR;
   }
 }

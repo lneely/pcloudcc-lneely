@@ -127,7 +127,7 @@ static uint32_t hash_func(const char *key) {
 static psock_t *psync_get_api() {
   psock_t *sock;
   sem_wait(&api_pool_sem);
-  debug(D_NOTICE, "connecting to %s", apiserver);
+  pdbg_logf(D_NOTICE, "connecting to %s", apiserver);
   sock = papi_connect(apiserver, psync_setting_get_bool(_PS(usessl)));
   if (sock)
     sock->misc = hash_func(apiserver);
@@ -136,16 +136,16 @@ static psock_t *psync_get_api() {
 
 static void psync_ret_api(void *ptr) {
   sem_post(&api_pool_sem);
-  debug(D_NOTICE, "closing connection to api");
+  pdbg_logf(D_NOTICE, "closing connection to api");
   psock_close((psock_t *)ptr);
-  debug(D_NOTICE, "closed connection to api");
+  pdbg_logf(D_NOTICE, "closed connection to api");
 }
 
 static int api_sock_is_broken(psock_t *ret) {
-  if (unlikely_log(psock_is_broken(ret->sock) ||
+  if (unpdbg_likely(psock_is_broken(ret->sock) ||
                    psock_is_ssl(ret) !=
                        psync_setting_get_bool(_PS(usessl)))) {
-    debug(D_NOTICE, "got broken socket from cache");
+    pdbg_logf(D_NOTICE, "got broken socket from cache");
     psync_ret_api(ret);
     return 1;
   } else {
@@ -155,10 +155,10 @@ static int api_sock_is_broken(psock_t *ret) {
       rd = psock_read_noblock(ret, buff, sizeof(buff));
       if (rd <= 0) {
         psync_ret_api(ret);
-        debug(D_NOTICE, "got broken socket from cache");
+        pdbg_logf(D_NOTICE, "got broken socket from cache");
       } else {
         buff[sizeof(buff) - 1] = 0;
-        debug(D_ERROR,
+        pdbg_logf(D_ERROR,
               "got socket with pending data to read from cache, read %d bytes: "
               "%s",
               rd, buff);
@@ -168,7 +168,7 @@ static int api_sock_is_broken(psock_t *ret) {
       }
       return 1;
     } else {
-      debug(D_NOTICE, "got api connection from cache, key %s", apikey);
+      pdbg_logf(D_NOTICE, "got api connection from cache, key %s", apikey);
       return 0;
     }
   }
@@ -180,7 +180,7 @@ void psync_apipool_set_server(const char *binapi) {
   if (len <= sizeof(apiserver)) {
     memcpy(apiserver, binapi, len);
     memcpy(apikey + 4, binapi, len);
-    debug(D_NOTICE, "set %s as best api server", apiserver);
+    pdbg_logf(D_NOTICE, "set %s as best api server", apiserver);
   }
 }
 
@@ -194,7 +194,7 @@ psock_t *psync_apipool_get() {
       return ret;
   }
   ret = psync_get_api();
-  if (unlikely_log(!ret))
+  if (unpdbg_likely(!ret))
     ptimer_notify_exception();
   return ret;
 }
@@ -217,10 +217,10 @@ void psync_apipool_prepare() {
   else {
     psock_t *ret;
     ret = psync_get_api();
-    if (unlikely_log(!ret))
+    if (unpdbg_likely(!ret))
       ptimer_notify_exception();
     else {
-      debug(D_NOTICE, "prepared api connection");
+      pdbg_logf(D_NOTICE, "prepared api connection");
       psync_apipool_release(ret);
     }
   }
@@ -311,10 +311,10 @@ PSYNC_NOINLINE static void psync_apipool_dump_socket(psock_t *api) {
   res = papi_result(api);
   psync_apipool_release_bad(api);
   if (!res) {
-    debug(D_NOTICE, "could not read result from socket, it is probably broken");
+    pdbg_logf(D_NOTICE, "could not read result from socket, it is probably broken");
     return;
   }
-  debug(D_WARNING, "read result from released socket, dumping and aborting");
+  pdbg_logf(D_WARNING, "read result from released socket, dumping and aborting");
   print_tree(res, 0);
   free(res);
   abort();
@@ -325,7 +325,7 @@ PSYNC_NOINLINE static void psync_apipool_dump_socket(psock_t *api) {
 void psync_apipool_release(psock_t *api) {
 #if IS_DEBUG
   if (unlikely(psock_readable(api))) {
-    debug(D_WARNING, "released socket with pending data to read");
+    pdbg_logf(D_WARNING, "released socket with pending data to read");
     psync_apipool_dump_socket(api);
     return;
   }
@@ -402,7 +402,7 @@ int psync_handle_api_result(uint64_t result) {
              result == 2029 || result == 2067 || result == 5002)
     return PSYNC_NET_PERMFAIL;
   else if (result == 2007) {
-    debug(D_ERROR, "trying to delete root folder");
+    pdbg_logf(D_ERROR, "trying to delete root folder");
     return PSYNC_NET_PERMFAIL;
   } else
     return PSYNC_NET_TEMPFAIL;
@@ -422,7 +422,7 @@ int psync_get_remote_file_checksum(psync_fileid_t fileid, unsigned char *hexsum,
   psync_sql_bind_uint(sres, 1, fileid);
   row = psync_sql_fetch_row(sres);
   if (row) {
-    assertw(row[0].length == PSYNC_HASH_DIGEST_HEXLEN);
+    pdbg_assertw(row[0].length == PSYNC_HASH_DIGEST_HEXLEN);
     memcpy(hexsum, psync_get_string(row[0]), PSYNC_HASH_DIGEST_HEXLEN);
     if (fsize)
       *fsize = psync_get_number(row[1]);
@@ -437,7 +437,7 @@ int psync_get_remote_file_checksum(psync_fileid_t fileid, unsigned char *hexsum,
     return PSYNC_NET_TEMPFAIL;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
-    debug(D_WARNING, "checksumfile returned error %lu", (unsigned long)result);
+    pdbg_logf(D_WARNING, "checksumfile returned error %lu", (unsigned long)result);
     free(res);
     return psync_handle_api_result(result);
   }
@@ -482,7 +482,7 @@ int psync_get_local_file_checksum(const char *restrict filename,
     return PSYNC_NET_PERMFAIL;
   buff = malloc(PSYNC_COPY_BUFFER_SIZE);
 retry:
-  if (unlikely_log(fstat(fd, &st)))
+  if (unpdbg_likely(fstat(fd, &st)))
     goto err1;
   psync_hash_init(&hctx);
   rsz = pfile_stat_size(&st);
@@ -495,7 +495,7 @@ retry:
     rrs = pfile_read(fd, buff, rs);
     if (unlikely(rrs <= 0)) {
       if (rrs == 0 && !fstat(fd, &st2) && file_changed(&st, &st2)) {
-        debug(D_NOTICE,
+        pdbg_logf(D_NOTICE,
               "file %s changed while calculating checksum, restarting",
               filename);
         psync_hash_final(hashbin, &hctx);
@@ -510,10 +510,10 @@ retry:
     if (++cnt % 16 == 0)
       psys_sleep_milliseconds(5);
   }
-  if (unlikely_log(fstat(fd, &st2)))
+  if (unpdbg_likely(fstat(fd, &st2)))
     goto err1;
   if (unlikely(file_changed(&st, &st2))) {
-    debug(D_NOTICE, "file %s changed while calculating checksum, restarting",
+    pdbg_logf(D_NOTICE, "file %s changed while calculating checksum, restarting",
           filename);
     psync_hash_final(hashbin, &hctx);
     psys_sleep_milliseconds(PSYNC_SLEEP_FILE_CHANGE);
@@ -550,7 +550,7 @@ int psync_get_local_file_checksum_part(const char *restrict filename,
   fd = pfile_open(filename, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE)
     return PSYNC_NET_PERMFAIL;
-  if (unlikely_log(fstat(fd, &st)))
+  if (unpdbg_likely(fstat(fd, &st)))
     goto err1;
   buff = malloc(PSYNC_COPY_BUFFER_SIZE);
   psync_hash_init(&hctx);
@@ -628,12 +628,12 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
   unsigned char hashbin[PSYNC_HASH_DIGEST_LEN];
   char hashhex[PSYNC_HASH_DIGEST_HEXLEN];
   sfd = pfile_open(source, O_RDONLY, 0);
-  if (unlikely_log(sfd == INVALID_HANDLE_VALUE))
+  if (unpdbg_likely(sfd == INVALID_HANDLE_VALUE))
     goto err0;
-  if (unlikely_log(pfile_size(sfd) != fsize))
+  if (unpdbg_likely(pfile_size(sfd) != fsize))
     goto err1;
   dfd = pfile_open(destination, O_WRONLY, O_CREAT | O_TRUNC);
-  if (unlikely_log(dfd == INVALID_HANDLE_VALUE))
+  if (unpdbg_likely(dfd == INVALID_HANDLE_VALUE))
     goto err1;
   psync_hash_init(&hctx);
   buff = malloc(PSYNC_COPY_BUFFER_SIZE);
@@ -643,9 +643,9 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
     else
       rrd = fsize;
     rd = pfile_read(sfd, buff, rrd);
-    if (unlikely_log(rd <= 0))
+    if (unpdbg_likely(rd <= 0))
       goto err2;
-    if (unlikely_log(psync_file_writeall_checkoverquota(dfd, buff, rd)))
+    if (unpdbg_likely(psync_file_writeall_checkoverquota(dfd, buff, rd)))
       goto err2;
     sched_yield();
     psync_hash_update(&hctx, buff, rd);
@@ -653,11 +653,11 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
   }
   psync_hash_final(hashbin, &hctx);
   psync_binhex(hashhex, hashbin, PSYNC_HASH_DIGEST_LEN);
-  if (unlikely_log(memcmp(hexsum, hashhex, PSYNC_HASH_DIGEST_HEXLEN)) ||
-      unlikely_log(pfile_sync(dfd)))
+  if (unpdbg_likely(memcmp(hexsum, hashhex, PSYNC_HASH_DIGEST_HEXLEN)) ||
+      unpdbg_likely(pfile_sync(dfd)))
     goto err2;
   free(buff);
-  if (unlikely_log(pfile_close(dfd)))
+  if (unpdbg_likely(pfile_close(dfd)))
     goto err1;
   pfile_close(sfd);
   return PSYNC_NET_OK;
@@ -858,7 +858,7 @@ long psync_socket_writeall_upload(psock_t *sock, const void *buff,
         //        set_send_buf(sock);
         ptimer_wait_next_sec();
       }
-      debug(D_NOTICE, "dyn_upload_speed=%lu", dyn_upload_speed);
+      pdbg_logf(D_NOTICE, "dyn_upload_speed=%lu", dyn_upload_speed);
       if (num > dyn_upload_speed - thissec)
         wwr = dyn_upload_speed - thissec;
       else
@@ -925,7 +925,7 @@ psync_http_socket *psync_http_connect(const char *host, const char *path,
     if (!sock)
       goto err0;
   } else
-    debug(D_NOTICE, "got connection to %s from cache", host);
+    pdbg_logf(D_NOTICE, "got connection to %s from cache", host);
   readbuff = malloc(PSYNC_HTTP_RESP_BUFFER);
   if (!addhdr)
     addhdr = "";
@@ -981,7 +981,7 @@ cont:
         goto ex;
       }
       *ptr = 0;
-      /*      debug(D_NOTICE, "key=%s, value=%s", key, val);*/
+      /*      pdbg_logf(D_NOTICE, "key=%s, value=%s", key, val);*/
       if (!memcmp(key, "content-length", 14))
         clen = psync_ato64(val);
       else if (!memcmp(key, "keep-alive", 10) && !memcmp(val, "timeout=", 8))
@@ -1033,7 +1033,7 @@ err0:
 
 void psync_http_close(psync_http_socket *http) {
   if (http->keepalive > 5 && http->readbytes == http->contentlength) {
-    //    debug(D_NOTICE, "caching socket %s keepalive=%u, readbytes=%lu,
+    //    pdbg_logf(D_NOTICE, "caching socket %s keepalive=%u, readbytes=%lu,
     //    contentlength=%lu", http->cachekey, (unsigned)http->keepalive,
     //                    (unsigned long)http->readbytes, (unsigned
     //                    long)http->contentlength);
@@ -1041,7 +1041,7 @@ void psync_http_close(psync_http_socket *http) {
                     (pcache_free_cb)psync_socket_close_download,
                     PSYNC_MAX_IDLE_HTTP_CONNS);
   } else {
-    debug(D_NOTICE,
+    pdbg_logf(D_NOTICE,
           "closing socket %s keepalive=%u, readbytes=%lu, contentlength=%lu",
           http->cachekey, (unsigned)http->keepalive,
           (unsigned long)http->readbytes, (unsigned long)http->contentlength);
@@ -1114,7 +1114,7 @@ static void connect_cache_thread(void *ptr) {
   if (node->haswaiter) {
     *node->res = sock;
     node->ready = 1;
-    debug(D_NOTICE, "passing connection to %s to waiter", node->host);
+    pdbg_logf(D_NOTICE, "passing connection to %s to waiter", node->host);
     pthread_cond_signal(node->cond);
     pthread_mutex_unlock(&connect_cache_mutex);
   } else {
@@ -1129,7 +1129,7 @@ static void connect_cache_thread(void *ptr) {
     }
     pthread_mutex_unlock(&connect_cache_mutex);
     if (sock)
-      debug(D_NOTICE, "added connection to %s to cache", node->host);
+      pdbg_logf(D_NOTICE, "added connection to %s to cache", node->host);
     free(node);
   }
 }
@@ -1176,7 +1176,7 @@ void psync_http_connect_and_cache_host(const char *host) {
   connect_cache_tree_node_t *node;
   psync_tree *e;
   int c;
-  debug(D_NOTICE, "creating connection to host %s for cache", host);
+  pdbg_logf(D_NOTICE, "creating connection to host %s for cache", host);
   pthread_mutex_lock(&connect_cache_mutex);
   if (!connect_cache_tree) {
     node = connect_cache_create_node(host);
@@ -1219,7 +1219,7 @@ void psync_http_connect_and_cache_host(const char *host) {
   if (node)
     prun_thread1("connect http cache", connect_cache_thread, node);
   else
-    debug(D_NOTICE, "connection for %s is already in progress", host);
+    pdbg_logf(D_NOTICE, "connection for %s is already in progress", host);
 }
 
 psock_t *connect_cache_wait_for_http_connection(const char *host,
@@ -1259,7 +1259,7 @@ psock_t *connect_cache_wait_for_http_connection(const char *host,
           pthread_mutex_unlock(&connect_cache_mutex);
           free(node);
           if (sock)
-            debug(D_NOTICE, "waited successfully for connection to %s", host);
+            pdbg_logf(D_NOTICE, "waited successfully for connection to %s", host);
           return sock;
         }
         break;
@@ -1286,11 +1286,11 @@ psync_http_socket *psync_http_connect_multihost(const binresult *hosts,
     cachekey[sizeof(cachekey) - 1] = 0;
     sock = (psock_t *)pcache_get(cachekey);
     if (sock) {
-      if (unlikely_log(psock_is_broken(sock->sock))) {
+      if (unpdbg_likely(psock_is_broken(sock->sock))) {
         psock_close_bad(sock);
         sock = NULL;
       } else {
-        debug(D_NOTICE, "got socket to %s from cache", hosts->array[i]->str);
+        pdbg_logf(D_NOTICE, "got socket to %s from cache", hosts->array[i]->str);
         *host = hosts->array[i]->str;
         break;
       }
@@ -1357,11 +1357,11 @@ psync_http_connect_multihost_from_cache(const binresult *hosts,
     cachekey[sizeof(cachekey) - 1] = 0;
     sock = (psock_t *)pcache_get(cachekey);
     if (sock) {
-      if (unlikely_log(psock_is_broken(sock->sock))) {
+      if (unpdbg_likely(psock_is_broken(sock->sock))) {
         psock_close_bad(sock);
         sock = NULL;
       } else {
-        debug(D_NOTICE, "got socket to %s from cache", hosts->array[i]->str);
+        pdbg_logf(D_NOTICE, "got socket to %s from cache", hosts->array[i]->str);
         *host = hosts->array[i]->str;
         break;
       }
@@ -1435,7 +1435,7 @@ int psync_http_next_request(psync_http_socket *sock) {
   char ch, lch;
   if (unlikely((rb = psock_read(sock->sock, sock->readbuff,
                                        PSYNC_HTTP_RESP_BUFFER - 1)) <= 0)) {
-    debug(D_WARNING, "read from socket for %d bytes returned %d",
+    pdbg_logf(D_WARNING, "read from socket for %d bytes returned %d",
           (int)(PSYNC_HTTP_RESP_BUFFER - 1), rb);
     goto err0;
   }
@@ -1445,20 +1445,20 @@ int psync_http_next_request(psync_http_socket *sock) {
     ptr++;
   while (*ptr && isspace(*ptr))
     ptr++;
-  if (unlikely_log(!isdigit(*ptr))) {
-    debug(D_NOTICE, "got %s", sock->readbuff);
+  if (unpdbg_likely(!isdigit(*ptr))) {
+    pdbg_logf(D_NOTICE, "got %s", sock->readbuff);
     goto err0;
   }
   rl = atoi(ptr);
-  if (unlikely_log(rl / 10 != 20)) {
-    if (unlikely_log(rl == 0))
+  if (unpdbg_likely(rl / 10 != 20)) {
+    if (unpdbg_likely(rl == 0))
       return -1;
     else
       return rl;
   }
   while (*ptr && *ptr != '\012')
     ptr++;
-  if (unlikely_log(!*ptr))
+  if (unpdbg_likely(!*ptr))
     goto err0;
   ptr++;
   end = sock->readbuff + rb;
@@ -1479,7 +1479,7 @@ cont:
         goto ex;
       }
       *ptr = 0;
-      /*      debug(D_NOTICE, "key=%s, value=%s", key, val);*/
+      /*      pdbg_logf(D_NOTICE, "key=%s, value=%s", key, val);*/
       if (!memcmp(key, "content-length", 14))
         clen = psync_ato64(val);
       else if (!memcmp(key, "keep-alive", 10) && !memcmp(val, "timeout=", 8))
@@ -1497,11 +1497,11 @@ cont:
       *ptr = tolower(ch);
     lch = ch;
   }
-  if (unlikely_log(rb == PSYNC_HTTP_RESP_BUFFER))
+  if (unpdbg_likely(rb == PSYNC_HTTP_RESP_BUFFER))
     goto err0;
   rl = psock_read(sock->sock, sock->readbuff + rb,
                          PSYNC_HTTP_RESP_BUFFER - rb);
-  if (unlikely_log(rl <= 0))
+  if (unpdbg_likely(rl <= 0))
     goto err0;
   rb += rl;
   end = sock->readbuff + rb;
@@ -1611,13 +1611,13 @@ static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
     else
       psync_apipool_release_bad(api);
   }
-  if (unlikely_log(!res)) {
+  if (unpdbg_likely(!res)) {
     ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   }
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
-    debug(D_ERROR, "getchecksumlink returned error %lu", (unsigned long)result);
+    pdbg_logf(D_ERROR, "getchecksumlink returned error %lu", (unsigned long)result);
     free(res);
     return psync_handle_api_result(result);
   }
@@ -1631,14 +1631,14 @@ static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
                                    cookie)))
       break;
   free(res);
-  if (unlikely_log(!http))
+  if (unpdbg_likely(!http))
     return PSYNC_NET_TEMPFAIL;
-  if (unlikely_log(psync_http_readall(http, &hdr, sizeof(hdr)) != sizeof(hdr)))
+  if (unpdbg_likely(psync_http_readall(http, &hdr, sizeof(hdr)) != sizeof(hdr)))
     goto err0;
   i = (hdr.filesize + (uint64_t)hdr.blocksize - 1) / (uint64_t)hdr.blocksize;
   if ((sizeof(psync_block_checksum) + sizeof(uint32_t)) * i >=
       PSYNC_MAX_CHECKSUMS_SIZE) {
-    debug(
+    pdbg_logf(
         D_WARNING, "checksums too large %lu",
         (unsigned long)((sizeof(psync_block_checksum) + sizeof(uint32_t)) * i));
     psync_http_close(http);
@@ -1653,14 +1653,14 @@ static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
   cs->next =
       (uint32_t *)(((char *)cs) + offsetof(psync_file_checksums, blocks) +
                    sizeof(psync_block_checksum) * i);
-  if (unlikely_log(psync_http_readall(http, cs->blocks,
+  if (unpdbg_likely(psync_http_readall(http, cs->blocks,
                                       sizeof(psync_block_checksum) * i) !=
                    sizeof(psync_block_checksum) * i))
     goto err1;
   psync_http_close(http);
   memset(cs->next, 0, sizeof(uint32_t) * i);
   *checksums = cs;
-  debug(D_NOTICE, "checksums downloaded");
+  pdbg_logf(D_NOTICE, "checksums downloaded");
   return PSYNC_NET_OK;
 err1:
   free(cs);
@@ -1681,25 +1681,25 @@ static int psync_net_get_upload_checksums(psock_t *api,
   uint32_t i;
   *checksums = NULL;
   res = papi_send2(api, "upload_blockchecksums", params);
-  if (unlikely_log(!res)) {
+  if (unpdbg_likely(!res)) {
     ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
   }
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
-    debug(D_ERROR, "upload_blockchecksums returned error %lu",
+    pdbg_logf(D_ERROR, "upload_blockchecksums returned error %lu",
           (unsigned long)result);
     free(res);
     return psync_handle_api_result(result);
   }
   free(res);
-  if (unlikely_log(psync_socket_readall_download(api, &hdr, sizeof(hdr)) !=
+  if (unpdbg_likely(psync_socket_readall_download(api, &hdr, sizeof(hdr)) !=
                    sizeof(hdr)))
     goto err0;
   i = (hdr.filesize + hdr.blocksize - 1) / hdr.blocksize;
   if ((sizeof(psync_block_checksum) + sizeof(uint32_t)) * i >=
       PSYNC_MAX_CHECKSUMS_SIZE) {
-    debug(
+    pdbg_logf(
         D_WARNING, "checksums too large %lu",
         (unsigned long)((sizeof(psync_block_checksum) + sizeof(uint32_t)) * i));
     // should we delete the uploadid from db as well so we don't loop
@@ -1717,7 +1717,7 @@ static int psync_net_get_upload_checksums(psock_t *api,
   cs->next =
       (uint32_t *)(((char *)cs) + offsetof(psync_file_checksums, blocks) +
                    sizeof(psync_block_checksum) * i);
-  if (unlikely_log(psync_socket_readall_download(
+  if (unpdbg_likely(psync_socket_readall_download(
                        api, cs->blocks, sizeof(psync_block_checksum) * i) !=
                    sizeof(psync_block_checksum) * i))
     goto err1;
@@ -1800,7 +1800,7 @@ psync_net_create_hash(const psync_file_checksums *checksums) {
           break;
       } while (h->elements[o]);
       if (col > MAX_ADLER_COLL) {
-        debug(D_WARNING, "too many collisions, ignoring a checksum %u",
+        pdbg_logf(D_WARNING, "too many collisions, ignoring a checksum %u",
               (unsigned)checksums->blocks[i].adler);
         continue;
       }
@@ -1818,7 +1818,7 @@ static void psync_net_hash_remove(psync_file_checksum_hash *restrict hash,
   o = adler % hash->elementcnt;
   while (1) {
     idx = hash->elements[o];
-    if (unlikely_log(!idx))
+    if (unpdbg_likely(!idx))
       return;
     else if (checksums->blocks[idx - 1].adler == adler &&
              !memcmp(checksums->blocks[idx - 1].mbedtls_sha1, mbedtls_sha1,
@@ -1988,7 +1988,7 @@ static void psync_net_check_file_for_blocks(
   uint32_t adler, off;
   psync_sha1_ctx ctx;
   unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
-  debug(D_NOTICE, "scanning file %s for blocks", name);
+  pdbg_logf(D_NOTICE, "scanning file %s for blocks", name);
   fd = pfile_open(name, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE)
     return;
@@ -2083,11 +2083,11 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
   if (!filecnt)
     goto fulldownload;
   rt = psync_net_get_checksums(NULL, fileid, filehash, &checksums);
-  if (unlikely_log(rt == PSYNC_NET_PERMFAIL))
+  if (unpdbg_likely(rt == PSYNC_NET_PERMFAIL))
     goto fulldownload;
-  else if (unlikely_log(rt == PSYNC_NET_TEMPFAIL))
+  else if (unpdbg_likely(rt == PSYNC_NET_TEMPFAIL))
     return PSYNC_NET_TEMPFAIL;
-  if (unlikely_log(checksums->filesize != filesize)) {
+  if (unpdbg_likely(checksums->filesize != filesize)) {
     free(checksums);
     return PSYNC_NET_TEMPFAIL;
   }
@@ -2155,9 +2155,9 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
   int32_t skipbytes;
   psync_sha1_ctx ctx;
   unsigned char sha1bin[PSYNC_SHA1_DIGEST_LEN];
-  if (unlikely_log(pfile_seek(fd, off, SEEK_SET) == -1))
+  if (unpdbg_likely(pfile_seek(fd, off, SEEK_SET) == -1))
     return PSYNC_NET_TEMPFAIL;
-  debug(D_NOTICE, "scanning in range starting %lu, length %lu, blocksize %u",
+  pdbg_logf(D_NOTICE, "scanning in range starting %lu, length %lu, blocksize %u",
         (unsigned long)off, (unsigned long)len, (unsigned)checksums->blocksize);
   if (checksums->blocksize * 2 > PSYNC_COPY_BUFFER_SIZE ||
       len < PSYNC_COPY_BUFFER_SIZE)
@@ -2192,7 +2192,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
       blockidx =
           psync_net_hash_has_adler_and_sha1(hash, checksums, adler, sha1bin);
       if (blockidx) {
-        // debug(D_NOTICE, "got block, buffoff+outbyteoff=%lu, off=%lu,
+        // pdbg_logf(D_NOTICE, "got block, buffoff+outbyteoff=%lu, off=%lu,
         // blockidx=%u", buffoff+outbyteoff, off, (unsigned)(blockidx-1));
         if (buffoff + outbyteoff + checksums->blocksize <= len)
           blen = checksums->blocksize;
@@ -2235,7 +2235,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
           if (rd <= 0)
             break;
           else {
-            assert(checksums->blocksize != 0);
+            pdbg_assert(checksums->blocksize != 0);
             bufferlen = (rd + checksums->blocksize - 1) / checksums->blocksize *
                         checksums->blocksize;
             memset(buff + rd, 0, bufferlen - rd);
@@ -2283,20 +2283,20 @@ static void merge_list_to_element(psync_upload_range_list_t *le,
   psync_list_for_each_safe(l, lb, rlist) {
     ur = psync_list_element(l, psync_upload_range_list_t, list);
     psync_list_del(l);
-    assertw(ur->len <= le->len);
-    assertw(ur->uploadoffset >= le->uploadoffset);
-    assertw(ur->uploadoffset + ur->len <= le->uploadoffset + le->len);
+    pdbg_assertw(ur->len <= le->len);
+    pdbg_assertw(ur->uploadoffset >= le->uploadoffset);
+    pdbg_assertw(ur->uploadoffset + ur->len <= le->uploadoffset + le->len);
     if (IS_DEBUG &&
         (!(ur->len <= le->len) || !(ur->uploadoffset >= le->uploadoffset) ||
          !(ur->uploadoffset + ur->len <= le->uploadoffset + le->len)))
-      debug(D_ERROR,
+      pdbg_logf(D_ERROR,
             "ur->len=%lu, le->len=%lu, ur->uploadoffset=%lu, "
             "le->uploadoffset=%lu",
             (unsigned long)ur->len, (unsigned long)le->len,
             (unsigned long)ur->uploadoffset, (unsigned long)le->uploadoffset);
     if (ur->len == le->len) {
-      assertw(ur->uploadoffset == le->uploadoffset);
-      assertw(psync_list_isempty(rlist));
+      pdbg_assertw(ur->uploadoffset == le->uploadoffset);
+      pdbg_assertw(psync_list_isempty(rlist));
       psync_list_add_after(&le->list, &ur->list);
       psync_list_del(&le->list);
       free(le);
@@ -2311,7 +2311,7 @@ static void merge_list_to_element(psync_upload_range_list_t *le,
     } else {
       n = psync_new(psync_upload_range_list_t);
       n->uploadoffset = n->off = ur->uploadoffset + ur->len;
-      assertw(le->len > ur->uploadoffset - le->uploadoffset + ur->len);
+      pdbg_assertw(le->len > ur->uploadoffset - le->uploadoffset + ur->len);
       n->len = le->len - (ur->uploadoffset - le->uploadoffset) - ur->len;
       n->type = PSYNC_URANGE_UPLOAD;
       le->len = ur->uploadoffset - le->uploadoffset;
@@ -2331,12 +2331,12 @@ int psync_net_scan_file_for_blocks(psock_t *api, psync_list *rlist,
   psync_upload_range_list_t *ur, *le;
   psync_list nr;
   int rt;
-  debug(D_NOTICE, "scanning fileid %lu hash %lu for blocks",
+  pdbg_logf(D_NOTICE, "scanning fileid %lu hash %lu for blocks",
         (unsigned long)fileid, (unsigned long)filehash);
   rt = psync_net_get_checksums(api, fileid, filehash, &checksums);
-  if (unlikely_log(rt == PSYNC_NET_PERMFAIL))
+  if (unpdbg_likely(rt == PSYNC_NET_PERMFAIL))
     return PSYNC_NET_OK;
-  else if (unlikely_log(rt == PSYNC_NET_TEMPFAIL))
+  else if (unpdbg_likely(rt == PSYNC_NET_TEMPFAIL))
     return PSYNC_NET_TEMPFAIL;
   hash = psync_net_create_hash(checksums);
   psync_list_for_each_safe(l, lb, rlist) {
@@ -2373,11 +2373,11 @@ int psync_net_scan_upload_for_blocks(psock_t *api, psync_list *rlist,
   psync_upload_range_list_t *ur, *le;
   psync_list nr;
   int rt;
-  debug(D_NOTICE, "scanning uploadid %lu for blocks", (unsigned long)uploadid);
+  pdbg_logf(D_NOTICE, "scanning uploadid %lu for blocks", (unsigned long)uploadid);
   rt = psync_net_get_upload_checksums(api, uploadid, &checksums);
-  if (unlikely_log(rt == PSYNC_NET_PERMFAIL))
+  if (unpdbg_likely(rt == PSYNC_NET_PERMFAIL))
     return PSYNC_NET_OK;
-  else if (unlikely_log(rt == PSYNC_NET_TEMPFAIL))
+  else if (unpdbg_likely(rt == PSYNC_NET_TEMPFAIL))
     return PSYNC_NET_TEMPFAIL;
   hash = psync_net_create_hash(checksums);
   psync_list_for_each_safe(l, lb, rlist) {
@@ -2437,7 +2437,7 @@ static int download_file_revisions(psync_fileid_t fileid) {
   if (unlikely(!api))
     return PSYNC_NET_TEMPFAIL;
   res = papi_send2(api, "listrevisions", params);
-  if (unlikely_log(!res)) {
+  if (unpdbg_likely(!res)) {
     psync_apipool_release_bad(api);
     ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
@@ -2445,7 +2445,7 @@ static int download_file_revisions(psync_fileid_t fileid) {
   psync_apipool_release(api);
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
-    debug(D_ERROR, "listrevisions returned error %lu", (unsigned long)result);
+    pdbg_logf(D_ERROR, "listrevisions returned error %lu", (unsigned long)result);
     free(res);
     return psync_handle_api_result(result);
   }
@@ -2566,7 +2566,7 @@ int psync_get_upload_checksum(psync_uploadid_t uploadid, unsigned char *uhash,
   if (unlikely(!api))
     return PSYNC_NET_TEMPFAIL;
   res = papi_send2(api, "upload_info", params);
-  if (unlikely_log(!res)) {
+  if (unpdbg_likely(!res)) {
     psync_apipool_release_bad(api);
     ptimer_notify_exception();
     return PSYNC_NET_TEMPFAIL;
@@ -2607,7 +2607,7 @@ static void psync_send_debug_thread(void *ptr) {
     binparam params[] = {PAPI_STR("report", str),
                          PAPI_NUM("userid", psync_my_userid)};
     binresult *res;
-    debug(D_NOTICE, "sending debug %s", str);
+    pdbg_logf(D_NOTICE, "sending debug %s", str);
     res = psync_api_run_command("senddebug", params);
     if (res) {
       free(res);
@@ -2620,7 +2620,7 @@ static void psync_send_debug_thread(void *ptr) {
   pthread_mutex_unlock(&m);
 }
 
-int psync_send_debug(int thread, const char *file, const char *function,
+int psync_send_pdbg_logf(int thread, const char *file, const char *function,
                      int unsigned line, const char *fmt, ...) {
   char format[1024];
   va_list ap;
@@ -2679,7 +2679,7 @@ int psync_do_run_command_res(const char *cmd, size_t cmdlen,
   }
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
-    debug(D_WARNING, "command %s returned code %u", cmd, (unsigned)result);
+    pdbg_logf(D_WARNING, "command %s returned code %u", cmd, (unsigned)result);
     if (err)
       *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     psync_process_api_error(result);

@@ -17,7 +17,7 @@ static key_t get_key() {
     
     home = ppath_home();
     if(!home) {
-        debug(D_ERROR, "HOME environment variable is not set");
+        pdbg_logf(D_ERROR, "HOME environment variable is not set");
         return (key_t)-1;
     }
     snprintf(path, sizeof(path), "%s/.pcloud/data.db", home);
@@ -30,7 +30,7 @@ static int get_id() {
 
 	key = get_key();
 	if(key == -1) {
-		debug(D_ERROR, "failed to get ipc key");
+		pdbg_logf(D_ERROR, "failed to get ipc key");
 		return -1;
 	}
 
@@ -45,13 +45,13 @@ bool pshm_read(void **data, size_t *datasz) {
 
     shmid = get_id();
     if (shmid == -1) {
-        debug(D_ERROR, "Failed to get shared memory ID");
+        pdbg_logf(D_ERROR, "Failed to get shared memory ID");
         return false;
     }
 
     shm = (psync_shm*)shmat(shmid, NULL, 0);
     if (shm == (void*)-1) {
-        debug(D_ERROR, "Failed to attach to shared memory: %s", strerror(errno));
+        pdbg_logf(D_ERROR, "Failed to attach to shared memory: %s", strerror(errno));
         return false;
     }
 
@@ -67,7 +67,7 @@ bool pshm_read(void **data, size_t *datasz) {
 
     *data = malloc(shm->datasz);
     if(*data == NULL) {
-        debug(D_ERROR, "Failed to allocate memory for shared data");
+        pdbg_logf(D_ERROR, "Failed to allocate memory for shared data");
         shmdt(shm);
         return false;
     }
@@ -87,24 +87,24 @@ void pshm_write(const void *data, size_t datasz) {
     char *dataArea;
     
     if (datasz > PSYNC_SHM_SIZE - sizeof(psync_shm)) {
-        debug(D_ERROR, "Data size exceeds available shared memory size");
+        pdbg_logf(D_ERROR, "Data size exceeds available shared memory size");
         return;
     }
 
     shmid = get_id();
     if (shmid == -1) {
-        debug(D_ERROR, "Failed to get shared memory ID");
+        pdbg_logf(D_ERROR, "Failed to get shared memory ID");
         return;
     }
 
     shm = (psync_shm*)shmat(shmid, NULL, 0);
     if (shm == (void*)-1) {
-        debug(D_ERROR, "Failed to attach to shared memory: %s", strerror(errno));
+        pdbg_logf(D_ERROR, "Failed to attach to shared memory: %s", strerror(errno));
         return;
     }
 
     if (shm->flag == 0 && shm->datasz == 0) {
-        debug(D_NOTICE, "Initializing shared memory segment");
+        pdbg_logf(D_NOTICE, "Initializing shared memory segment");
         // Clear the structure first
         memset(shm, 0, sizeof(psync_shm));
         // Data area starts right after the structure
@@ -120,7 +120,7 @@ void pshm_write(const void *data, size_t datasz) {
     __atomic_store_n(&shm->flag, 1, __ATOMIC_SEQ_CST);
     
     if (shmdt(shm) == -1) {
-        debug(D_ERROR, "Failed to detach from shared memory: %s", strerror(errno));
+        pdbg_logf(D_ERROR, "Failed to detach from shared memory: %s", strerror(errno));
     }
 }
 
