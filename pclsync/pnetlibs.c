@@ -1742,7 +1742,7 @@ static psync_block_checksum
 **psync_net_get_sorted_checksums(psync_file_checksums *checksums){
   psync_block_checksum **ret;
   uint32_t i;
-  ret=psync_new_cnt(psync_block_checksum *, checksums->blockcnt);
+  ret=malloc(sizeof(psync_block_checksum *) * checksums->blockcnt);
   for (i=0; i<checksums->blockcnt; i++)
     ret[i]=&checksums->blocks[i];
   qsort(ret, checksums->blockcnt, sizeof(psync_block_checksum *),
@@ -2092,12 +2092,12 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
     return PSYNC_NET_TEMPFAIL;
   }
   hash = psync_net_create_hash(checksums);
-  blockactions = psync_new_cnt(psync_block_action, checksums->blockcnt);
+  blockactions = malloc(sizeof(psync_block_action) * checksums->blockcnt);
   memset(blockactions, 0, sizeof(psync_block_action) * checksums->blockcnt);
   for (i = 0; i < filecnt; i++)
     psync_net_check_file_for_blocks(files[i], checksums, hash, blockactions, i);
   free(hash);
-  range = psync_new(psync_range_list_t);
+  range = malloc(sizeof(psync_range_list_t));
   range->len = checksums->blocksize;
   range->type = blockactions[0].type;
   if (range->type == PSYNC_RANGE_COPY) {
@@ -2117,7 +2117,7 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
         (range->type == PSYNC_RANGE_COPY &&
          (range->filename != files[blockactions[i].idx] ||
           range->off + range->len != blockactions[i].off))) {
-      range = psync_new(psync_range_list_t);
+      range = malloc(sizeof(psync_range_list_t));
       range->len = bs;
       range->type = blockactions[i].type;
       if (range->type == PSYNC_RANGE_COPY) {
@@ -2133,7 +2133,7 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
   free(blockactions);
   return PSYNC_NET_OK;
 fulldownload:
-  range = psync_new(psync_range_list_t);
+  range = malloc(sizeof(psync_range_list_t));
   range->off = 0;
   range->len = filesize;
   range->type = PSYNC_RANGE_TRANSFER;
@@ -2204,7 +2204,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
             ur->uploadoffset + ur->len == off + buffoff + outbyteoff)
           ur->len += blen;
         else {
-          ur = psync_new(psync_upload_range_list_t);
+          ur = malloc(sizeof(psync_upload_range_list_t));
           ur->uploadoffset = off + buffoff + outbyteoff;
           ur->off = (uint64_t)(blockidx - 1) * checksums->blocksize;
           ur->len = blen;
@@ -2309,7 +2309,7 @@ static void merge_list_to_element(psync_upload_range_list_t *le,
       psync_list_add_after(&le->list, &ur->list);
       le->len -= ur->len;
     } else {
-      n = psync_new(psync_upload_range_list_t);
+      n = malloc(sizeof(psync_upload_range_list_t));
       n->uploadoffset = n->off = ur->uploadoffset + ur->len;
       pdbg_assertw(le->len > ur->uploadoffset - le->uploadoffset + ur->len);
       n->len = le->len - (ur->uploadoffset - le->uploadoffset) - ur->len;

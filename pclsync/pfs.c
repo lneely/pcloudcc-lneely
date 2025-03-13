@@ -1020,7 +1020,7 @@ psync_fs_create_file(psync_fsfileid_t fileid, psync_fsfileid_t remotefileid,
     fl = (psync_openfile_t *)malloc(offsetof(psync_openfile_t, encoder));
     memset(fl, 0, offsetof(psync_openfile_t, encoder));
   } else {
-    fl = psync_new(psync_openfile_t);
+    fl = malloc(sizeof(psync_openfile_t));
     memset(fl, 0, sizeof(psync_openfile_t));
     size = pfscrypto_plain_size(size);
   }
@@ -1846,7 +1846,7 @@ static void psync_fs_write_timer(psync_timer_t timer, void *ptr) {
       goto unlock_ex;
     }
     of->releasedforupload = 1;
-    ofw = psync_new(psync_openfile_writeid_t);
+    ofw = malloc(sizeof(psync_openfile_writeid_t));
     ofw->of = of;
     ofw->writeid = of->writeid;
     pthread_mutex_unlock(&of->mutex);

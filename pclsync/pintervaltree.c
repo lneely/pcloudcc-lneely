@@ -34,7 +34,7 @@
 
 static psync_interval_tree_t *psync_interval_tree_new(uint64_t from,
                                                       uint64_t to) {
-  psync_interval_tree_t *tree = psync_new(psync_interval_tree_t);
+  psync_interval_tree_t *tree = malloc(sizeof(psync_interval_tree_t));
   tree->from = from;
   tree->to = to;
   return psync_interval_tree_element(
@@ -42,7 +42,7 @@ static psync_interval_tree_t *psync_interval_tree_new(uint64_t from,
 }
 
 static psync_interval_tree_t *psync_interval_new(uint64_t from, uint64_t to) {
-  psync_interval_tree_t *tree = psync_new(psync_interval_tree_t);
+  psync_interval_tree_t *tree = malloc(sizeof(psync_interval_tree_t));
   tree->from = from;
   tree->to = to;
   return tree;

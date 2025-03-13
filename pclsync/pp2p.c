@@ -352,7 +352,7 @@ static void psync_p2p_tcphandler(void *ptr) {
     free(binpubrsa);
     goto err0;
   }
-  token = psync_new_cnt(char, packet.tokenlen);
+  token = malloc(sizeof(char) * packet.tokenlen);
   if (pdbg_unlikely(socket_read_all(sock, token, packet.tokenlen)) ||
       pdbg_unlikely(!check_token(token, packet.tokenlen, binpubrsa->data,
                                 packet.keylen, hashhex))) {
@@ -508,7 +508,7 @@ static void psync_p2p_thread() {
       else
         psys_sleep_milliseconds(1);
     } else if (sret == 1) {
-      inconn = psync_new(int);
+      inconn = malloc(sizeof(int));
       *inconn = accept(tcpsock, NULL, NULL);
       if (pdbg_unlikely(*inconn == INVALID_SOCKET))
         free(inconn);
@@ -761,7 +761,7 @@ int pp2p_check_download(psync_fileid_t fileid,
   psync_binhex(pct1.genhash, hashbin, PSYNC_HASH_DIGEST_LEN);
   memcpy(pct1.computername, computername, PSYNC_HASH_DIGEST_HEXLEN);
   il = psock_list_adapters();
-  sockets = psync_new_cnt(int, il->interfacecnt);
+  sockets = malloc(sizeof(int) * il->interfacecnt);
   FD_ZERO(&rfds);
   msock = 0;
   for (i = 0; i < il->interfacecnt; i++) {

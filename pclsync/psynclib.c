@@ -193,7 +193,6 @@ int psync_init() {
     return -1;
   }
 
-  psync_libs_init();
   psync_settings_init();
   pstatus_init();
   ptimer_sleep_handler(psync_stop_crypto_on_sleep);
@@ -1921,7 +1920,7 @@ psync_folderid_t *psync_crypto_folderids() {
   size_t alloc, l;
   alloc = 2;
   l = 0;
-  ret = psync_new_cnt(psync_folderid_t, alloc);
+  ret = malloc(sizeof(psync_folderid_t) * alloc);
   res = psync_sql_query_rdlock(
       "SELECT f1.id FROM folder f1, folder f2 WHERE f1.parentfolderid=f2.id "
       "AND "

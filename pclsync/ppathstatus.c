@@ -284,7 +284,7 @@ static folder_tasks_t *get_folder_tasks(psync_folderid_t folderid, int create) {
     }
   }
   if (create) {
-    ft = psync_new(folder_tasks_t);
+    ft = malloc(sizeof(folder_tasks_t));
     *atr = &ft->tree;
     ptree_added_at(&folder_tasks, tr, &ft->tree);
     ft->folderid = folderid;
@@ -424,7 +424,7 @@ void ppathstatus_fldr_moved(psync_folderid_t folderid,
   ppathstatus_del_from_parent_cache(folderid);
   if (!get_folder_tasks(folderid, 0))
     return;
-  mp = psync_new(folder_moved_params_t);
+  mp = malloc(sizeof(folder_moved_params_t));
   mp->folderid = folderid;
   mp->old_parent_folderid = old_parent_folderid;
   mp->new_parent_folderid = new_parent_folderid;
@@ -483,7 +483,7 @@ static sync_data_t *get_sync_data(psync_syncid_t syncid, int create) {
     return NULL;
   } else {
     size_t i;
-    sd = psync_new(sync_data_t);
+    sd = malloc(sizeof(sync_data_t));
     sd->syncid = syncid;
     *atr = &sd->tree;
     ptree_added_at(&sync_data, tr, &sd->tree);
@@ -529,7 +529,7 @@ get_sync_folder_tasks(sync_data_t *sd, psync_folderid_t folderid, int create) {
     }
   }
   if (create) {
-    ft = psync_new(folder_tasks_t);
+    ft = malloc(sizeof(folder_tasks_t));
     *atr = &ft->tree;
     ptree_added_at(&sd->folder_tasks, tr, &ft->tree);
     ft->folderid = folderid;
@@ -773,7 +773,7 @@ void ppathstatus_syncfldr_moved(psync_folderid_t folderid,
   sync_del_from_parent_cache(sd, folderid);
   if (!get_folder_tasks(folderid, 0))
     return;
-  mp = psync_new(sync_folder_moved_params_t);
+  mp = malloc(sizeof(sync_folder_moved_params_t));
   mp->folderid = folderid;
   mp->old_parent_folderid = old_parent_folderid;
   mp->new_parent_folderid = new_parent_folderid;

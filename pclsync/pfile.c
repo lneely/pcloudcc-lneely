@@ -275,7 +275,7 @@ int pfile_preread(int fd, uint64_t offset, size_t count) {
   cfd = pfile_dup(fd);
   if (cfd == INVALID_HANDLE_VALUE)
     return -1;
-  pr = psync_new(psync_file_preread_t);
+  pr = malloc(sizeof(psync_file_preread_t));
   pr->offset = offset;
   pr->count = count;
   pr->fd = cfd;

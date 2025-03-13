@@ -573,7 +573,7 @@ psync_fs_crypto_set_sector_log_offset(psync_openfile_t *of,
       return;
     }
   }
-  ntr = psync_new(psync_sector_inlog_t);
+  ntr = malloc(sizeof(psync_sector_inlog_t));
   *pe = &ntr->tree;
   ntr->sectorid = sectorid;
   ntr->logoffset = offset;
@@ -1605,8 +1605,8 @@ retry:
     if (!icnt)
       psync_interval_tree_free(needtodwl);
     else {
-      ranges = psync_new_cnt(psync_pagecache_read_range, icnt);
-      tmpbuf = psync_new_cnt(char, isize);
+      ranges = malloc(sizeof(psync_pagecache_read_range) * icnt);
+      tmpbuf = malloc(sizeof(char) * isize);
       icnt = 0;
       isize = 0;
       itr = psync_interval_tree_get_first(needtodwl);
@@ -1881,7 +1881,7 @@ static int psync_fs_crypto_run_extender(psync_openfile_t *of, uint64_t size) {
   pdbg_assert(!of->extender);
   pdbg_logf(D_NOTICE, "will run extender thread to extend from %lu to %lu",
         (unsigned long)of->currentsize, (unsigned long)size);
-  ext = psync_new(psync_enc_file_extender_t);
+  ext = malloc(sizeof(psync_enc_file_extender_t));
   pthread_cond_init(&ext->cond, NULL);
   ext->extendto = size;
   ext->extendedto = of->currentsize;

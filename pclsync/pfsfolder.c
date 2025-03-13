@@ -97,7 +97,7 @@ static psync_fspath_t *ret_folder_data(psync_fsfolderid_t folderid,
     ret->permissions = permissions;
     ret->flags = flags;
   } else {
-    ret = psync_new(psync_fspath_t);
+    ret = malloc(sizeof(psync_fspath_t));
     ret->folderid = folderid;
     ret->name = name;
     ret->shareid = shareid;

@@ -326,8 +326,8 @@ uint64_t ppassword_score(const char *cpassword) {
   }
   if (!plen)
     return score;
-  lpwd = psync_new_cnt(unsigned char, plen);
-  ldpwd = psync_new_cnt(unsigned char, plen);
+  lpwd = malloc(sizeof(unsigned char) * plen);
+  ldpwd = malloc(sizeof(unsigned char) * plen);
   for (nlen = 0; nlen < plen; nlen++) {
     lpwd[nlen] = tolower(password[nlen]);
     if (lpwd[nlen] == '0')

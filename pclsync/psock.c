@@ -481,7 +481,7 @@ psock_t *psock_connect(const char *host, int unsigned port, int ssl) {
   } else {
     sslc = NULL;
   }
-  ret = psync_new(psock_t);
+  ret = malloc(sizeof(psock_t));
   ret->ssl = sslc;
   ret->buffer = NULL;
   ret->sock = sock;

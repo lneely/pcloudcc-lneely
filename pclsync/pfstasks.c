@@ -127,7 +127,7 @@ psync_fstask_get_or_create_folder_tasks_locked(psync_fsfolderid_t folderid) {
     }
   }
 
-  folder = psync_new(psync_fstask_folder_t);
+  folder = malloc(sizeof(psync_fstask_folder_t));
   memset(folder, 0, sizeof(psync_fstask_folder_t));
 
   if (d < 0)

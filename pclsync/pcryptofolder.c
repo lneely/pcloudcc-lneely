@@ -795,7 +795,7 @@ static void save_folder_key(psync_folderid_t folderid,
   // we are likely holding (few) read locks on the database, so executing here
   // will deadlock
   insert_folder_key_task *t;
-  t = psync_new(insert_folder_key_task);
+  t = malloc(sizeof(insert_folder_key_task));
   t->key = psymkey_copy_encrypted(enckey);
   t->id = folderid;
   prun_thread1("save folder key to db task", ptask_cfldr_save_fldrkey, t);
@@ -804,7 +804,7 @@ static void save_folder_key(psync_folderid_t folderid,
 static void save_file_key_to_db(psync_fileid_t fileid, uint64_t hash,
                                 psync_encrypted_symmetric_key_t enckey) {
   insert_file_key_task *t;
-  t = psync_new(insert_file_key_task);
+  t = malloc(sizeof(insert_file_key_task));
   t->key = psymkey_copy_encrypted(enckey);
   t->id = fileid;
   t->hash = hash;

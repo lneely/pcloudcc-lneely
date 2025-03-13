@@ -275,7 +275,7 @@ static void free_session(void *ptr) {
 
 static void save_session(ssl_connection_t *conn) {
   mbedtls_ssl_session *sess;
-  sess = psync_new(mbedtls_ssl_session);
+  sess = malloc(sizeof(mbedtls_ssl_session));
   // mbedtls_ssl_get_session seems to copy all elements, instead of referencing
   // them, therefore it is thread safe to add session upon connect
   memset(sess, 0, sizeof(mbedtls_ssl_session));
@@ -477,7 +477,7 @@ void pssl_rand_strong(unsigned char *buf, int num) {
 
 psync_rsa_t pssl_gen_rsa(int bits) {
   mbedtls_rsa_context *ctx;
-  ctx = psync_new(mbedtls_rsa_context);
+  ctx = malloc(sizeof(mbedtls_rsa_context));
   mbedtls_rsa_init(ctx);
   mbedtls_rsa_set_padding(ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
 
@@ -512,7 +512,7 @@ void prsa_free_public(psync_rsa_publickey_t key) {
 
 psync_rsa_privatekey_t prsa_get_private(psync_rsa_t rsa) {
   mbedtls_rsa_context *ctx;
-  ctx = psync_new(mbedtls_rsa_context);
+  ctx = malloc(sizeof(mbedtls_rsa_context));
   mbedtls_rsa_init(ctx);
   mbedtls_rsa_set_padding(ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
 
@@ -584,7 +584,7 @@ psync_rsa_publickey_t prsa_load_public(const unsigned char *keydata,
     pdbg_logf(D_WARNING, "pk_parse_public_key failed with code %d (-0x%04x); resorting to " "mbedtls 1.x RSA fallback", ret, -ret);
     return PSYNC_INVALID_RSA;
   }
-  rsa = psync_new(mbedtls_rsa_context);
+  rsa = malloc(sizeof(mbedtls_rsa_context));
   mbedtls_rsa_init(rsa);
   mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
   ret = mbedtls_rsa_copy(rsa, mbedtls_pk_rsa(ctx));
@@ -639,7 +639,7 @@ psync_rsa_privatekey_t prsa_load_private(const unsigned char *keydata, size_t ke
     ssl_pdbg_logf(D_WARNING, ret, "pk_parse_key failed");
     return PSYNC_INVALID_RSA;
   }
-  rsa = psync_new(mbedtls_rsa_context);
+  rsa = malloc(sizeof(mbedtls_rsa_context));
   mbedtls_rsa_init(rsa);
   mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
   ret = mbedtls_rsa_copy(rsa, mbedtls_pk_rsa(ctx));
@@ -691,7 +691,7 @@ char *psymkey_derive(const char *username,
   mbedtls_md_context_t ctx;
   size_t userlen, i;
   userlen = strlen(username);
-  usercopy = psync_new_cnt(unsigned char, userlen);
+  usercopy = malloc(sizeof(unsigned char) * userlen);
   for (i = 0; i < userlen; i++)
     if ((unsigned char)username[i] <= 127)
       usercopy[i] = tolower((unsigned char)username[i]);
@@ -767,7 +767,7 @@ psync_aes256_encoder
 paes_create_encoder(psync_symmetric_key_t key) {
   mbedtls_aes_context *aes;
   pdbg_assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
-  aes = psync_new(mbedtls_aes_context);
+  aes = malloc(sizeof(mbedtls_aes_context));
   mbedtls_aes_setkey_enc(aes, key->key, 256);
   return aes;
 }
@@ -781,7 +781,7 @@ psync_aes256_encoder
 paes_create_decoder(psync_symmetric_key_t key) {
   mbedtls_aes_context *aes;
   pdbg_assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
-  aes = psync_new(mbedtls_aes_context);
+  aes = malloc(sizeof(mbedtls_aes_context));
   mbedtls_aes_setkey_dec(aes, key->key, 256);
   return aes;
 }

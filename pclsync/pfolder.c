@@ -729,7 +729,7 @@ pentry_t *pfolder_stat(const char *remotepath) {
   if (remotepath[0] != '/')
     return NULL;
   if (remotepath[1] == 0) {
-    ret = psync_new(pentry_t);
+    ret = malloc(sizeof(pentry_t));
     ret->name = "/";
     ret->namelen = 1;
     ret->isfolder = 1;
@@ -744,7 +744,7 @@ pentry_t *pfolder_stat(const char *remotepath) {
   if (len == 0)
     folderid = 0;
   else {
-    cremotepath = psync_new_cnt(char, len + 1);
+    cremotepath = malloc(sizeof(char) * (len + 1));
     memcpy(cremotepath, remotepath, len + 1);
     cremotepath[len] = 0;
     folderid = pfolder_id(cremotepath);

@@ -64,7 +64,7 @@ static psync_tree *synced_down_folders = PSYNC_TREE_EMPTY;
 static pthread_mutex_t sync_down_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static psync_tree *psync_new_sd_folder(psync_folderid_t folderid) {
-  synced_down_folder *f = psync_new(synced_down_folder);
+  synced_down_folder *f = malloc(sizeof(synced_down_folder));
   f->folderid = folderid;
   return &f->tree;
 }
@@ -350,7 +350,7 @@ static void psync_do_sync_thread(void *ptr) {
 }
 
 void psyncer_create(psync_syncid_t syncid) {
-  psync_syncid_t *psid = psync_new(psync_syncid_t);
+  psync_syncid_t *psid = malloc(sizeof(psync_syncid_t));
   *psid = syncid;
   prun_thread1("syncer", psync_do_sync_thread, psid);
 }

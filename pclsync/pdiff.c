@@ -170,7 +170,7 @@ static void do_send_eventdata(void *param);
 
 static void psync_notify_cache_change(psync_changetype_t event) {
   paccount_cache_callback_t callback;
-  psync_changetype_t *chtype = psync_new(psync_changetype_t);
+  psync_changetype_t *chtype = malloc(sizeof(psync_changetype_t));
   *chtype = event;
   callback = psync_cache_callback;
   if (callback)
@@ -229,7 +229,7 @@ static binresult *get_userinfo_user_pass(psock_t *sock, const char *username,
   pdbg_logf(D_NOTICE, "got digest %s", dig->str);
 
   ul = strlen(username);
-  uc = psync_new_cnt(unsigned char, ul);
+  uc = malloc(sizeof(unsigned char) * ul);
 
   for (i = 0; i < ul; i++)
     uc[i] = tolower(username[i]);
@@ -2758,7 +2758,7 @@ static void psync_diff_refresh_fs(const binresult *entries) {
     }
     if (!refresh_last)
       return;
-    ptr = psync_new(refresh_folders_ptr_t);
+    ptr = malloc(sizeof(refresh_folders_ptr_t));
     ptr->refresh_folders = refresh_folders;
     ptr->refresh_last = refresh_last;
     prun_thread1("fs folder refresh", psync_diff_refresh_thread, ptr);
@@ -2787,7 +2787,7 @@ static void psync_run_analyze_if_needed() {
     else
       tablecnt = 0;
     psync_sql_free_result(res);
-    tablenames = psync_new_cnt(char *, tablecnt);
+    tablenames = malloc(sizeof(char *) * tablecnt);
     res = psync_sql_query_rdlock(
         "SELECT name FROM sqlite_master WHERE type='table' LIMIT ?");
     psync_sql_bind_uint(res, 1, tablecnt);

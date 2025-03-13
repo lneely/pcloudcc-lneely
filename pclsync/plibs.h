@@ -129,9 +129,6 @@ extern "C" {
   } while (0)
 #endif
 
-#define psync_new(type) (type *)malloc(sizeof(type))
-#define psync_new_cnt(type, cnt) (type *)malloc(sizeof(type) * (cnt))
-
 #define psync_binhex(dst, src, cnt)                                            \
   do {                                                                         \
     size_t it__;                                                               \
@@ -201,27 +198,6 @@ extern uint64_t psync_my_userid;
 extern pthread_mutex_t psync_my_auth_mutex;
 extern PSYNC_THREAD uint32_t psync_error;
 extern uint16_t const *__hex_lookup;
-extern const char base64_table[];
-
-char *psync_strdup(const char *str) PSYNC_MALLOC PSYNC_NONNULL(1);
-char *psync_strnormalize_filename(const char *str) PSYNC_MALLOC
-    PSYNC_NONNULL(1);
-char *psync_strndup(const char *str, size_t len) PSYNC_MALLOC PSYNC_NONNULL(1);
-char *psync_strcat(const char *str, ...) PSYNC_MALLOC PSYNC_SENTINEL;
-int psync_slprintf(char *str, size_t size, const char *format, ...)
-    PSYNC_NONNULL(1, 3);
-
-unsigned char *psync_base32_encode(const unsigned char *str, size_t length,
-                                   size_t *ret_length);
-unsigned char *psync_base32_decode(const unsigned char *str, size_t length,
-                                   size_t *ret_length);
-
-unsigned char *psync_base64_encode(const unsigned char *str, size_t length,
-                                   size_t *ret_length);
-unsigned char *psync_base64_decode(const unsigned char *str, size_t length,
-                                   size_t *ret_length);
-
-int psync_is_valid_utf8(const char *str);
 
 int psync_sql_connect(const char *db) PSYNC_NONNULL(1);
 int psync_sql_close();
@@ -317,14 +293,10 @@ uint64_t psync_sql_insertid() PSYNC_PURE;
 
 int psync_rename_conflicted_file(const char *path);
 
-void psync_libs_init();
 void psync_run_after_sec(psync_run_after_t run, void *ptr, uint32_t seconds);
 void psync_free_after_sec(void *ptr, uint32_t seconds);
 
 int psync_match_pattern(const char *name, const char *pattern, size_t plen);
-
-uint64_t psync_ato64(const char *str);
-uint32_t psync_ato32(const char *str);
 
 psync_list_builder_t *psync_list_builder_create(size_t element_size,
                                                 size_t offset);
@@ -393,20 +365,6 @@ static inline void psync_get_string_id2(char *dst, const char *prefix,
     id2 /= 64;
   } while (id2);
   *dst = 0;
-}
-
-static inline size_t psync_strlcpy(char *dst, const char *src, size_t size) {
-  size_t len;
-  len = strlen(src);
-  if (pdbg_likely(len < size)) {
-    memcpy(dst, src, len + 1);
-    return len;
-  } else if (pdbg_likely(size)) {
-    memcpy(dst, src, size - 1);
-    dst[size - 1] = 0;
-    return size - 1;
-  } else
-    return 0;
 }
 
 #ifdef __cplusplus 

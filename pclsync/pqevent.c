@@ -416,7 +416,7 @@ void pqevent_queue_eventid(psync_eventtype_t eventid) {
   if (eventthreadrunning) {
     event_list_t *event;
 
-    event = psync_new(event_list_t);
+    event = malloc(sizeof(event_list_t));
     event->data.ptr = NULL;
     event->event = eventid;
     event->freedata = 0;
@@ -432,7 +432,7 @@ void pqevent_queue_event(psync_eventtype_t eventid, void *eventdata) {
   if (eventthreadrunning) {
     event_list_t *event;
 
-    event = psync_new(event_list_t);
+    event = malloc(sizeof(event_list_t));
     event->data.ptr = eventdata;
     event->event = eventid;
     event->freedata = 1;

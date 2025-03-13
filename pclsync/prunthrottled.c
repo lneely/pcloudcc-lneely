@@ -112,7 +112,7 @@ void prun_throttled(const char *name, prun_throttle_cb call,
       node->scheduled = 1;
     }
   } else {
-    node = psync_new(psync_rr_tree_node);
+    node = malloc(sizeof(psync_rr_tree_node));
     node->call = call;
     node->name = name;
     node->scheduled = 0;

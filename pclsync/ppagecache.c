@@ -482,7 +482,7 @@ static int wait_shared_api() {
   psock_t *capi;
   int ret;
   capi = sharedapi;
-  waiter = psync_new(shared_api_waiter_t);
+  waiter = malloc(sizeof(shared_api_waiter_t));
   pthread_cond_init(&waiter->cond, NULL);
   waiter->api = NULL;
   psync_list_add_tail(&sharedapiwaiters, &waiter->list);
@@ -696,7 +696,7 @@ static psync_urls_t *get_urls_for_request(psync_request_t *req) {
     pthread_mutex_unlock(&url_cache_mutex);
     return NULL;
   }
-  urls = psync_new(psync_urls_t);
+  urls = malloc(sizeof(psync_urls_t));
   urls->hash = req->hash;
   urls->refcnt = 0;
   urls->status = 0;
@@ -786,7 +786,7 @@ static unsigned char *has_pages_in_db(uint64_t hash, uint64_t pageid,
   uint32_t fcnt;
   if (unlikely(!pagecnt))
     return NULL;
-  ret = psync_new_cnt(unsigned char, pagecnt);
+  ret = malloc(sizeof(unsigned char) * pagecnt);
   memset(ret, 0, pagecnt);
   fromid = 0;
   fcnt = 0;
@@ -2284,7 +2284,7 @@ static void check_or_request_page(uint64_t fileid, uint64_t hash,
       break;
     }
     if (!found) {
-      pw = psync_new(psync_page_wait_t);
+      pw = malloc(sizeof(psync_page_wait_t));
       psync_list_add_tail(&wait_page_hash[h], &pw->list);
       psync_list_init(&pw->waiters);
       pw->hash = hash;
@@ -2297,7 +2297,7 @@ static void check_or_request_page(uint64_t fileid, uint64_t hash,
       if (range && range->offset + range->length == pageid * PSYNC_FS_PAGE_SIZE)
         range->length += PSYNC_FS_PAGE_SIZE;
       else {
-        range = psync_new(psync_request_range_t);
+        range = malloc(sizeof(psync_request_range_t));
         psync_list_add_tail(ranges, &range->list);
         range->offset = pageid * PSYNC_FS_PAGE_SIZE;
         range->length = PSYNC_FS_PAGE_SIZE;
@@ -2454,7 +2454,7 @@ static void psync_pagecache_read_unmodified_readahead(
     if (found)
       continue;
     //    pdbg_logf(D_NOTICE, "read-aheading page %lu", first_page_id+i);
-    pw = psync_new(psync_page_wait_t);
+    pw = malloc(sizeof(psync_page_wait_t));
     psync_list_add_tail(&wait_page_hash[h], &pw->list);
     psync_list_init(&pw->waiters);
     pw->hash = hash;
@@ -2468,7 +2468,7 @@ static void psync_pagecache_read_unmodified_readahead(
                      (first_page_id + i) * PSYNC_FS_PAGE_SIZE)
       range->length += PSYNC_FS_PAGE_SIZE;
     else {
-      range = psync_new(psync_request_range_t);
+      range = malloc(sizeof(psync_request_range_t));
       psync_list_add_tail(ranges, &range->list);
       range->offset = (first_page_id + i) * PSYNC_FS_PAGE_SIZE;
       range->length = PSYNC_FS_PAGE_SIZE;
@@ -2496,7 +2496,7 @@ add_page_waiter(psync_list *wait_list, psync_list *range_list, uint64_t hash,
   psync_page_wait_t *pw;
   psync_request_range_t *range;
   unsigned long h;
-  pwt = psync_new(psync_page_waiter_t);
+  pwt = malloc(sizeof(psync_page_waiter_t));
   pthread_cond_init(&pwt->cond, NULL);
   pwt->buff = buff;
   pwt->pageidx = pageidx;
@@ -2510,7 +2510,7 @@ add_page_waiter(psync_list *wait_list, psync_list *range_list, uint64_t hash,
                               list) if (pw->hash == hash &&
                                         pw->pageid == pageid) goto found;
   pdbg_logf(D_NOTICE, "page %lu not found", (unsigned long)pageid);
-  pw = psync_new(psync_page_wait_t);
+  pw = malloc(sizeof(psync_page_wait_t));
   psync_list_add_tail(&wait_page_hash[h], &pw->list);
   psync_list_init(&pw->waiters);
   pw->hash = hash;
@@ -2523,7 +2523,7 @@ add_page_waiter(psync_list *wait_list, psync_list *range_list, uint64_t hash,
   if (range && range->offset + range->length == pageid * PSYNC_FS_PAGE_SIZE)
     range->length += PSYNC_FS_PAGE_SIZE;
   else {
-    range = psync_new(psync_request_range_t);
+    range = malloc(sizeof(psync_request_range_t));
     psync_list_add_tail(range_list, &range->list);
     range->offset = pageid * PSYNC_FS_PAGE_SIZE;
     range->length = PSYNC_FS_PAGE_SIZE;
@@ -2575,7 +2575,7 @@ int ppagecache_read_unmod_locked(psync_openfile_t *of, char *buf,
   pagecnt = psize / PSYNC_FS_PAGE_SIZE;
   first_page_id = poffset / PSYNC_FS_PAGE_SIZE;
   psync_list_init(&waiting);
-  rq = psync_new(psync_request_t);
+  rq = malloc(sizeof(psync_request_t));
   psync_list_init(&rq->ranges);
   lock_wait(hash);
   if (pagecnt > 1 && pagecnt <= sizeof(dbread) * 8 && psize == size) {
@@ -2789,11 +2789,11 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
   psize = size_round_up_to_page(size + pageoff);
   pagecnt = psize / PSYNC_FS_PAGE_SIZE;
   first_page_id = poffset / PSYNC_FS_PAGE_SIZE;
-  rq = psync_new(psync_request_t);
+  rq = malloc(sizeof(psync_request_t));
   psync_list_init(&rq->ranges);
   psync_list_init(&waiting);
   psync_list_init(&auth_pages);
-  dp = psync_new_cnt(psync_crypto_data_page, pagecnt);
+  dp = malloc(sizeof(psync_crypto_data_page) * pagecnt);
   memset(dp, 0, sizeof(psync_crypto_data_page) * pagecnt);
   ap = NULL;
   lock_wait(hash);
@@ -2805,7 +2805,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
     }
     pfscrypto_get_auth_off(first_page_id + i, 0, &offsets,
                                         &aoffset, &asize, &aoff);
-    ap = psync_new(psync_crypto_auth_page);
+    ap = malloc(sizeof(psync_crypto_auth_page));
     ap->waiter = NULL;
     ap->parent = NULL;
     ap->firstpageid = (first_page_id + i) / PSYNC_CRYPTO_HASH_TREE_SECTORS *
@@ -2825,7 +2825,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
       for (l = 1; l <= offsets.treelevels; l++) {
         pfscrypto_get_auth_off(first_page_id + i, l, &offsets,
                                             &aoffset, &asize, &aoff);
-        cap = psync_new(psync_crypto_auth_page);
+        cap = malloc(sizeof(psync_crypto_auth_page));
         cap->waiter = NULL;
         cap->parent = NULL;
         cap->firstpageid = 0;
@@ -2858,7 +2858,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
     } else
       pbuff = buf + i * PSYNC_FS_PAGE_SIZE - pageoff;
     if (!pbuff) {
-      pbuff = psync_new_cnt(char, apsize);
+      pbuff = malloc(sizeof(char) * apsize);
       dp[i].freebuff = 1;
     }
     dp[i].buff = pbuff;
@@ -3048,7 +3048,7 @@ int ppagecache_readv_locked(psync_openfile_t *of,
   } else
     needkey = 0;
   pthread_mutex_unlock(&of->mutex);
-  rq = psync_new(psync_request_t);
+  rq = malloc(sizeof(psync_request_t));
   psync_list_init(&rq->ranges);
   psync_list_init(&waiting);
   for (i = 0; i < cnt; i++) {

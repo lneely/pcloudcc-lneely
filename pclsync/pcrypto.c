@@ -182,7 +182,7 @@ pcrypto_ctr_encdec_t pcrypto_ctr_encdec_create(psync_symmetric_key_t key) {
   if (pdbg_unlikely(enc == PSYNC_INVALID_ENCODER)) {
     return PSYNC_CRYPTO_INVALID_ENCODER;
   }
-  ret = psync_new(pcrypto_key_t);
+  ret = malloc(sizeof(pcrypto_key_t));
   ret->encoder = enc;
   memcpy(ret->iv, key->key + PSYNC_AES256_KEY_SIZE, PSYNC_AES256_BLOCK_SIZE);
   return ret;
@@ -286,7 +286,7 @@ void pcrypto_encode_text(pcrypto_textenc_t enc,
   aesdst = aessrc + PSYNC_AES256_BLOCK_SIZE;
   hmac = aessrc + PSYNC_AES256_BLOCK_SIZE * 2;
   ol = ALIGN_A256_BS(txtlen);
-  outptr = psync_new_cnt(unsigned char, ol);
+  outptr = malloc(sizeof(unsigned char) * ol);
   *out = outptr;
   *outlen = ol;
   if (txtlen <= PSYNC_AES256_BLOCK_SIZE) {
@@ -327,7 +327,7 @@ pcrypto_decode_text(pcrypto_textdec_t enc,
     return NULL;
   aessrc = ALIGN_PTR_A256_BS(buff);
   aesdst = aessrc + PSYNC_AES256_BLOCK_SIZE;
-  outptr = psync_new_cnt(unsigned char, datalen + 1);
+  outptr = malloc(sizeof(unsigned char) * (datalen + 1));
   ret = outptr;
   datalen /= PSYNC_AES256_BLOCK_SIZE;
   if (datalen == 1) {

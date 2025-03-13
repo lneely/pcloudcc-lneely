@@ -85,31 +85,7 @@ static const uint8_t __hex_lookupl[513] = {"000102030405060708090a0b0c0d0e0f"
                                            "e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
                                            "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff"};
 
-const char base64_table[] = {
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '_'};
-
-static const char base64_reverse_table[256] = {
-    -2, -2, -2, -2, -2, -2, -2, -2, -2, -1, -1, -2, -2, -1, -2, -2, -2, -2, -2,
-    -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -1, -2, -2, -2, -2, -2,
-    -2, -2, -2, -2, -2, 62, -2, 62, -2, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60,
-    61, -2, -2, -2, -1, -2, -2, -2, 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
-    11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -2, -2, -2, -2,
-    63, -2, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
-    43, 44, 45, 46, 47, 48, 49, 50, 51, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2,
-    -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2,
-    -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2,
-    -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2,
-    -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2,
-    -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2,
-    -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2,
-    -2, -2, -2, -2, -2, -2, -2, -2, -2};
-
 uint16_t const *__hex_lookup = (uint16_t *)__hex_lookupl;
-static char normalize_table[256];
 
 const static char *psync_typenames[] = {
     "[invalid type]", "[number]", "[string]", "[float]", "[null]", "[bool]"};
@@ -134,244 +110,6 @@ static pthread_mutex_t psync_db_checkpoint_mutex;
 static int in_transaction = 0;
 static int transaction_failed = 0;
 static psync_list tran_callbacks;
-
-char *psync_strdup(const char *str) {
-  size_t len;
-  len = strlen(str) + 1;
-  return (char *)memcpy(psync_new_cnt(char, len), str, len);
-}
-
-char *psync_strnormalize_filename(const char *str) {
-  size_t len, i;
-  char *ptr;
-  len = strlen(str) + 1;
-  ptr = psync_new_cnt(char, len);
-  for (i = 0; i < len; i++)
-    ptr[i] = normalize_table[(unsigned char)str[i]];
-  return ptr;
-}
-
-char *psync_strndup(const char *str, size_t len) {
-  char *ptr;
-  ptr = (char *)memcpy(psync_new_cnt(char, len + 1), str, len);
-  ptr[len] = 0;
-  return ptr;
-}
-
-char *psync_strcat(const char *str, ...) {
-  size_t i, size, len;
-  const char *strs[64];
-  size_t lengths[64];
-  const char *ptr;
-  char *ptr2, *ptr3;
-  va_list ap;
-  va_start(ap, str);
-  strs[0] = str;
-  len = strlen(str);
-  lengths[0] = len;
-  size = len + 1;
-  i = 1;
-  while ((ptr = va_arg(ap, const char *))) {
-    pdbg_assert(i < ARRAY_SIZE(strs));
-    len = strlen(ptr);
-    lengths[i] = len;
-    strs[i++] = ptr;
-    size += len;
-  }
-  va_end(ap);
-  ptr2 = ptr3 = (char *)malloc(size);
-  for (size = 0; size < i; size++) {
-    memcpy(ptr2, strs[size], lengths[size]);
-    ptr2 += lengths[size];
-  }
-  *ptr2 = 0;
-  return ptr3;
-}
-
-int psync_slprintf(char *str, size_t size, const char *format, ...) {
-  va_list ap;
-  int ret;
-  va_start(ap, format);
-  ret = vsnprintf(str, size, format, ap);
-  va_end(ap);
-  if (pdbg_unlikely(ret >= size))
-    str[size - 1] = 0;
-  return ret;
-}
-
-unsigned char *psync_base32_encode(const unsigned char *str, size_t length,
-                                   size_t *ret_length) {
-  static const unsigned char *table =
-      (const unsigned char *)"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  unsigned char *result;
-  unsigned char *p;
-  uint32_t bits, buff;
-
-  result = (unsigned char *)malloc(((length + 4) / 5) * 8 + 1);
-  p = result;
-
-  bits = 0;
-  buff = 0; // don't really have to initialize this one, but a compiler that
-            // will detect that this is safe is yet to be born
-
-  while (length) {
-    if (bits < 5) {
-      buff = (buff << 8) | (*str++);
-      length--;
-      bits += 8;
-    }
-    bits -= 5;
-    *p++ = table[0x1f & (buff >> bits)];
-  }
-
-  while (bits) {
-    if (bits < 5) {
-      buff <<= (5 - bits);
-      bits = 5;
-    }
-    bits -= 5;
-    *p++ = table[0x1f & (buff >> bits)];
-  }
-
-  *ret_length = p - result;
-  *p = 0;
-  return result;
-}
-
-unsigned char *psync_base32_decode(const unsigned char *str, size_t length,
-                                   size_t *ret_length) {
-  unsigned char *result, *p;
-  uint32_t bits, buff;
-  unsigned char ch;
-  result = (unsigned char *)malloc((length + 7) / 8 * 5 + 1);
-  p = result;
-  bits = 0;
-  buff = 0;
-  while (length) {
-    ch = *str++;
-    length--;
-    if (ch >= 'A' && ch <= 'Z')
-      ch = (ch & 0x1f) - 1;
-    else if (ch >= '2' && ch <= '7')
-      ch -= '2' - 26;
-    else {
-      free(result);
-      return NULL;
-    }
-    buff = (buff << 5) + ch;
-    bits += 5;
-    if (bits >= 8) {
-      bits -= 8;
-      *p++ = buff >> bits;
-    }
-  }
-  *p = 0;
-  *ret_length = p - result;
-  return result;
-}
-
-unsigned char *psync_base64_encode(const unsigned char *str, size_t length,
-                                   size_t *ret_length) {
-  const unsigned char *current = str;
-  unsigned char *p;
-  unsigned char *result;
-
-  result = (unsigned char *)malloc(((length + 2) / 3) * 4 + 1);
-  p = result;
-
-  while (length > 2) {
-    *p++ = base64_table[current[0] >> 2];
-    *p++ = base64_table[((current[0] & 0x03) << 4) + (current[1] >> 4)];
-    *p++ = base64_table[((current[1] & 0x0f) << 2) + (current[2] >> 6)];
-    *p++ = base64_table[current[2] & 0x3f];
-    current += 3;
-    length -= 3;
-  }
-
-  if (length != 0) {
-    *p++ = base64_table[current[0] >> 2];
-    if (length > 1) {
-      *p++ = base64_table[((current[0] & 0x03) << 4) + (current[1] >> 4)];
-      *p++ = base64_table[(current[1] & 0x0f) << 2];
-    } else
-      *p++ = base64_table[(current[0] & 0x03) << 4];
-  }
-
-  *ret_length = p - result;
-  *p = 0;
-  return result;
-}
-
-unsigned char *psync_base64_decode(const unsigned char *str, size_t length,
-                                   size_t *ret_length) {
-  const unsigned char *current = str;
-  unsigned char *result;
-  size_t i = 0, j = 0;
-  ssize_t ch;
-
-  result = (unsigned char *)malloc((length + 3) / 4 * 3 + 1);
-
-  while (length-- > 0) {
-    ch = base64_reverse_table[*current++];
-    if (ch == -1)
-      continue;
-    else if (ch == -2) {
-      free(result);
-      return NULL;
-    }
-    switch (i % 4) {
-    case 0:
-      result[j] = ch << 2;
-      break;
-    case 1:
-      result[j++] |= ch >> 4;
-      result[j] = (ch & 0x0f) << 4;
-      break;
-    case 2:
-      result[j++] |= ch >> 2;
-      result[j] = (ch & 0x03) << 6;
-      break;
-    case 3:
-      result[j++] |= ch;
-      break;
-    }
-    i++;
-  }
-  *ret_length = j;
-  result[j] = 0;
-  return result;
-}
-
-int psync_is_valid_utf8(const char *str) {
-  static const int8_t trailing[] = {
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-      0,  0,  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-      -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1,  1,  1,  1,  1,  1,
-      1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-      1,  1,  1,  1,  1,  1,  1,  1,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-      2,  2,  2,  2,  2,  2,  3,  3,  3,  3,  3,  3,  3,  3,  -1, -1, -1, -1,
-      -1, -1, -1, -1};
-  int8_t t;
-  while (*str) {
-    t = trailing[(unsigned char)*str++];
-    if (unlikely(t)) {
-      if (t < 0)
-        return 0;
-      while (t--)
-        if ((((unsigned char)*str++) & 0xc0) != 0x80)
-          return 0;
-    }
-  }
-  return 1;
-}
 
 void psync_sql_err_callback(void *ptr, int code, const char *msg) {
   pdbg_logf(D_WARNING, "database warning %d: %s", code, msg);
@@ -589,7 +327,7 @@ static void record_wrunlock() {
 static void record_rdlock(const char *file, unsigned line,
                           struct timespec *tm) {
   rd_lock_data *lock;
-  lock = psync_new(rd_lock_data);
+  lock = malloc(sizeof(rd_lock_data));
   lock->file = file;
   lock->thread = psync_thread_name;
   lock->line = line;
@@ -610,7 +348,6 @@ static rd_lock_data *record_rdunlock() {
   pthread_mutex_unlock(&rdmutex);
   return lock;
 }
-
 
 void psync_sql_dump_locks() {
   rd_lock_data *lock;
@@ -901,7 +638,7 @@ void psync_sql_transation_add_callbacks(
     psync_transaction_callback_t rollback_callback, void *ptr) {
   tran_callback_t *cb;
   pdbg_assert(in_transaction);
-  cb = psync_new(tran_callback_t);
+  cb = malloc(sizeof(tran_callback_t));
   cb->commit_callback = commit_callback;
   cb->rollback_callback = rollback_callback;
   cb->ptr = ptr;
@@ -939,7 +676,7 @@ static void psync_sql_do_check_query_plan(const char *sql) {
 
 static psync_tree *psync_sql_new_tree_node(const char *sql) {
   psync_sql_tree_t *node;
-  node = psync_new(psync_sql_tree_t);
+  node = malloc(sizeof(psync_sql_tree_t));
   node->sql = sql;
   return &node->tree;
 }
@@ -1467,7 +1204,7 @@ psync_sql_res *psync_sql_prep_statement_nocache(const char *sql) {
 #endif
     return NULL;
   }
-  res = psync_new(psync_sql_res);
+  res = malloc(sizeof(psync_sql_res));
   res->stmt = stmt;
   res->sql = sql;
 #if IS_DEBUG
@@ -1750,15 +1487,6 @@ int psync_rename_conflicted_file(const char *path) {
   }
 }
 
-void psync_libs_init() {
-  unsigned long i;
-  for (i = 0; i < 256; i++)
-    normalize_table[i] = i;
-  normalize_table[':'] = '_';
-  normalize_table['/'] = '_';
-  normalize_table['\\'] = '_';
-}
-
 static void run_after_sec(psync_timer_t timer, void *ptr) {
   struct run_after_ptr *fp = (struct run_after_ptr *)ptr;
   ptimer_stop(timer);
@@ -1768,19 +1496,19 @@ static void run_after_sec(psync_timer_t timer, void *ptr) {
 
 void psync_run_after_sec(psync_run_after_t run, void *ptr, uint32_t seconds) {
   struct run_after_ptr *fp;
-  fp = psync_new(struct run_after_ptr);
+  fp = malloc(sizeof(struct run_after_ptr));
   fp->run = run;
   fp->ptr = ptr;
   ptimer_register(run_after_sec, seconds, fp);
 }
 
-static void free_after_sec(psync_timer_t timer, void *ptr) {
+static void proc_free_after(psync_timer_t timer, void *ptr) {
   ptimer_stop(timer);
   free(ptr);
 }
 
 void psync_free_after_sec(void *ptr, uint32_t seconds) {
-  ptimer_register(free_after_sec, seconds, ptr);
+  ptimer_register(proc_free_after, seconds, ptr);
 }
 
 int psync_match_pattern(const char *name, const char *pattern, size_t plen) {
@@ -1814,20 +1542,6 @@ int psync_match_pattern(const char *name, const char *pattern, size_t plen) {
       return 0;
   }
   return name[i] == 0;
-}
-
-uint64_t psync_ato64(const char *str) {
-  uint64_t n = 0;
-  while (*str >= '0' && *str <= '9')
-    n = n * 10 + (*str++) - '0';
-  return n;
-}
-
-uint32_t psync_ato32(const char *str) {
-  uint32_t n = 0;
-  while (*str >= '0' && *str <= '9')
-    n = n * 10 + (*str++) - '0';
-  return n;
 }
 
 typedef struct {
@@ -1868,7 +1582,7 @@ struct psync_list_builder_t_ {
 psync_list_builder_t *psync_list_builder_create(size_t element_size,
                                                 size_t offset) {
   psync_list_builder_t *builder;
-  builder = psync_new(psync_list_builder_t);
+  builder = malloc(sizeof(psync_list_builder_t));
   builder->element_size = element_size;
   builder->elements_offset = offset;
   if (element_size <= 200)
@@ -1890,7 +1604,7 @@ static uint32_t *psync_list_bulder_push_num(psync_list_builder_t *builder) {
   if (!builder->last_numbers ||
       builder->last_numbers->used >=
           sizeof(builder->last_numbers->numbers) / sizeof(uint32_t)) {
-    psync_list_num_list *l = psync_new(psync_list_num_list);
+    psync_list_num_list *l = malloc(sizeof(psync_list_num_list));
     l->used = 0;
     builder->last_numbers = l;
     psync_list_add_tail(&builder->number_list, &l->list);
@@ -2008,7 +1722,7 @@ void *psync_list_builder_finalize(psync_list_builder_t *builder) {
        builder->stringalloc;
   pdbg_logf(D_NOTICE, "allocating %lu bytes, %lu of which for strings",
         (unsigned long)sz, (unsigned long)builder->stringalloc);
-  ret = psync_new_cnt(char, sz);
+  ret = malloc(sizeof(char) * sz);
   if (builder->elements_offset <= sizeof(builder->cnt))
     memcpy(ret, &builder->cnt, builder->elements_offset);
   else
@@ -2199,7 +1913,6 @@ int psync_task_complete(void *h, void *data) {
   return ret;
 }
 
-#define rot(x, k) (((x) << (k)) | ((x) >> (32 - (k))))
 static uint32_t pq_rnd() {
   static uint32_t a = 0x95ae3d25, b = 0xe225d755, c = 0xc63a2ae7,
                   d = 0xe4556265;

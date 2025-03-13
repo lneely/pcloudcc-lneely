@@ -55,7 +55,7 @@ struct _psync_deflate_t {
 psync_deflate_t *pdeflate_init(int level) {
   psync_deflate_t *def;
   int ret;
-  def = psync_new(psync_deflate_t);
+  def = malloc(sizeof(psync_deflate_t));
   memset(&def->stream, 0, sizeof(def->stream));
   def->flushbuff = NULL;
   def->bufferstartoff = 0;
@@ -137,7 +137,7 @@ static int psync_deflate_finish_flush_add_buffer(psync_deflate_t *def,
   uint32_t alloced, used, current;
   int ret;
   alloced = 4096;
-  buff = psync_new_cnt(unsigned char, alloced);
+  buff = malloc(sizeof(unsigned char) * alloced);
   current = alloced;
   used = 0;
   def->flags &= ~FLAG_MORE_DATA;

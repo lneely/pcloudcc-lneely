@@ -364,7 +364,7 @@ int handle_api_errors(sync_err_struct *err_struct) {
     pdbg_logf(D_NOTICE, "Got sync path: [%s] Sync folder: [%s]", syncFolder,
           folder);
 
-    event_data = psync_new(event_data_struct);
+    event_data = malloc(sizeof(event_data_struct));
     event_data->eventid = PEVENT_SYNC_RENAME_F;
     event_data->str1 = strdup(err_struct->newName);
     event_data->str2 = folder;
@@ -1019,7 +1019,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
   }
   psync_list_init(&rlist);
   if (likely(uploadoffset < fsize)) {
-    le = psync_new(psync_upload_range_list_t);
+    le = malloc(sizeof(psync_upload_range_list_t));
     le->uploadoffset = uploadoffset;
     le->off = uploadoffset;
     le->len = fsize - uploadoffset;
@@ -1119,14 +1119,14 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
       list) if ((le->type == PSYNC_URANGE_COPY_FILE ||
                  le->type == PSYNC_URANGE_COPY_UPLOAD) &&
                 le->len > PSYNC_MAX_COPY_FROM_REQ) {
-    le2 = psync_new(psync_upload_range_list_t);
+    le2 = malloc(sizeof(psync_upload_range_list_t));
     *le2 = *le;
     le->len = PSYNC_MAX_COPY_FROM_REQ;
     le2->off += PSYNC_MAX_COPY_FROM_REQ;
     le2->len -= PSYNC_MAX_COPY_FROM_REQ;
     psync_list_add_after(&le->list, &le2->list);
   }
-  le = psync_new(psync_upload_range_list_t);
+  le = malloc(sizeof(psync_upload_range_list_t));
   le->type = PSYNC_URANGE_LAST;
   psync_list_add_tail(&rlist, &le->list);
   psync_list_for_each_element(le, &rlist, psync_upload_range_list_t, list) {

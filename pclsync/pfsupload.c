@@ -1170,7 +1170,7 @@ static void large_upload() {
     else {
       cname = psync_get_lstring(row[4], &len);
       len++;
-      key = psync_new_cnt(char, len);
+      key = malloc(sizeof(char) * len);
       memcpy(key, cname, len);
     }
     cname = psync_get_lstring(row[3], &len);
@@ -1178,7 +1178,7 @@ static void large_upload() {
     fileid = psync_get_number(row[6]);
     hash = psync_get_number_or_null(row[7]);
     len++;
-    name = psync_new_cnt(char, len);
+    name = malloc(sizeof(char) * len);
     memcpy(name, cname, len);
     current_upload_taskid = taskid;
     stop_current_upload = 0;
@@ -1598,7 +1598,7 @@ static void change_folder_name(fsupload_task_t *task) {
     while (et > task->text1 + 2 && isdigit(et[0]))
       et--;
     if (et > task->text1 && et[0] == '(' && atol(et + 1) < 20) {
-      nn = psync_new_cnt(char, et - task->text1 + 7);
+      nn = malloc(sizeof(char) * (et - task->text1 + 7));
       memcpy(nn, task->text1, et - task->text1);
       psync_slprintf(nn + (et - task->text1), 7, " (%d)", atoi(et + 1) + 1);
     }

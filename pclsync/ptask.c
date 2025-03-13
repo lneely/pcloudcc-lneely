@@ -655,7 +655,7 @@ static int proc_start_async_transfer() {
     pdbg_logf(D_NOTICE, "pdeflate_init() failed");
     goto err3;
   }
-  tparams = psync_new(async_params_t);
+  tparams = malloc(sizeof(async_params_t));
   memset(tparams, 0, sizeof(async_params_t));
   tparams->enc = enc;
   tparams->dec = dec;
