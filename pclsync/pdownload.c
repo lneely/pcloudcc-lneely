@@ -451,8 +451,8 @@ static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
   struct stat st;
   psync_uint_row row;
   psync_fileid_t localfileid;
-  if (unpdbg_likely(stat(name, &st)) ||
-      unpdbg_likely(pfile_stat_size(&st) != serversize))
+  if (pdbg_unlikely(stat(name, &st)) ||
+      pdbg_unlikely(pfile_stat_size(&st) != serversize))
     return -1;
   localfileid = 0;
   psync_sql_start_transaction();
@@ -589,7 +589,7 @@ static int task_download_file(download_task_t *dt) {
 
   rt = psync_get_remote_file_checksum(dt->dwllist.fileid, serverhashhex,
                                       &serversize, &hash);
-  if (unpdbg_likely(rt != PSYNC_NET_OK)) {
+  if (pdbg_unlikely(rt != PSYNC_NET_OK)) {
     if (rt == PSYNC_NET_TEMPFAIL)
       return -1;
     else
@@ -653,7 +653,7 @@ static int task_download_file(download_task_t *dt) {
                          PSYNC_HASH_DIGEST_HEXLEN);
   while ((row = psync_sql_fetch_rowint(sql))) {
     tmpold = pfolder_lpath_lfile(row[0], NULL);
-    if (unpdbg_likely(!tmpold))
+    if (pdbg_unlikely(!tmpold))
       continue;
     psync_sql_free_result(sql);
     sql = NULL;
@@ -693,7 +693,7 @@ static int task_download_file(download_task_t *dt) {
       return -1;
   }
   res = psync_api_run_command("getfilelink", params);
-  if (unpdbg_likely(!res))
+  if (pdbg_unlikely(!res))
     return -1;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
@@ -728,7 +728,7 @@ static int task_download_file(download_task_t *dt) {
   }
 
   fd = pfile_open(dt->tmpname, O_WRONLY, O_CREAT | O_TRUNC);
-  if (unpdbg_likely(fd == INVALID_HANDLE_VALUE))
+  if (pdbg_unlikely(fd == INVALID_HANDLE_VALUE))
     goto err0;
 
   rt = psync_net_download_ranges(&ranges, dt->dwllist.fileid, hash, serversize,
@@ -758,15 +758,15 @@ static int task_download_file(download_task_t *dt) {
                      : (range->len + range->off - 1),
                  cookie)))
           break;
-      if (unpdbg_likely(!http))
+      if (pdbg_unlikely(!http))
         goto err2;
 
       while (!dt->dwllist.stop) {
         rd = psync_http_readall(http, buff, PSYNC_COPY_BUFFER_SIZE);
         if (rd == 0)
           break;
-        if (unpdbg_likely(rd < 0) ||
-            unpdbg_likely(psync_file_writeall_checkoverquota(fd, buff, rd)))
+        if (pdbg_unlikely(rd < 0) ||
+            pdbg_unlikely(psync_file_writeall_checkoverquota(fd, buff, rd)))
           goto err2;
         psync_hash_update(&hashctx, buff, rd);
         pthread_mutex_lock(&current_downloads_mutex);
@@ -789,9 +789,9 @@ static int task_download_file(download_task_t *dt) {
             (unsigned long)range->len, range->filename,
             (unsigned long)range->off);
       ifd = pfile_open(range->filename, O_RDONLY, 0);
-      if (unpdbg_likely(ifd == INVALID_HANDLE_VALUE))
+      if (pdbg_unlikely(ifd == INVALID_HANDLE_VALUE))
         goto err2;
-      if (unpdbg_likely(pfile_seek(ifd, range->off, SEEK_SET) == -1)) {
+      if (pdbg_unlikely(pfile_seek(ifd, range->off, SEEK_SET) == -1)) {
         pfile_close(ifd);
         goto err2;
       }
@@ -802,8 +802,8 @@ static int task_download_file(download_task_t *dt) {
         else
           rd = result;
         rd = pfile_read(ifd, buff, rd);
-        if (unpdbg_likely(rd <= 0) ||
-            unpdbg_likely(psync_file_writeall_checkoverquota(fd, buff, rd)) ||
+        if (pdbg_unlikely(rd <= 0) ||
+            pdbg_unlikely(psync_file_writeall_checkoverquota(fd, buff, rd)) ||
             unlikely(!pstatus_ok_status_arr(requiredstatuses,
                                               ARRAY_SIZE(requiredstatuses)))) {
           pfile_close(ifd);
@@ -833,14 +833,14 @@ static int task_download_file(download_task_t *dt) {
     }
     goto err2;
   }
-  if (unpdbg_likely(pfile_sync(fd)))
+  if (pdbg_unlikely(pfile_sync(fd)))
     goto err2;
   free(buff);
   psync_hash_final(localhashbin, &hashctx);
-  if (unpdbg_likely(pfile_close(fd)))
+  if (pdbg_unlikely(pfile_close(fd)))
     goto err0;
   psync_binhex(localhashhex, localhashbin, PSYNC_HASH_DIGEST_LEN);
-  if (unpdbg_likely(
+  if (pdbg_unlikely(
           memcmp(localhashhex, serverhashhex, PSYNC_HASH_DIGEST_HEXLEN))) {
     pdbg_logf(D_WARNING, "got wrong file checksum for file %s", dt->filename);
     if (dt->dwllist.stop == 2) {
@@ -959,16 +959,16 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
     }
   }
   psync_sql_free_result(res);
-  if (unpdbg_likely(!lfileid)) {
+  if (pdbg_unlikely(!lfileid)) {
     ptask_download(newsyncid, fileid, newlocalfolderid, newname);
     return 0;
   }
   newfolder =
       pfolder_lpath_lfldr(newlocalfolderid, newsyncid, NULL);
-  if (unpdbg_likely(!newfolder))
+  if (pdbg_unlikely(!newfolder))
     return 0;
   oldpath = pfolder_lpath_lfile(lfileid, NULL);
-  if (unpdbg_likely(!oldpath)) {
+  if (pdbg_unlikely(!oldpath)) {
     free(newfolder);
     return 0;
   }
@@ -1192,7 +1192,7 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
     hastargetchecksum = 0;
   psync_sql_free_result(res);
   localpath = pfolder_lpath_lfldr(localfolderid, syncid, NULL);
-  if (unpdbg_likely(!localpath))
+  if (pdbg_unlikely(!localpath))
     return 0;
   localname =
       psync_strcat(localpath, "/", filename, NULL);
@@ -1379,7 +1379,7 @@ static int task_del_folder_rec(psync_folderid_t localfolderid,
   task_wait_no_downloads();
   psync_stop_localscan();
   localpath = pfolder_lpath_lfldr(localfolderid, syncid, NULL);
-  if (unpdbg_likely(!localpath)) {
+  if (pdbg_unlikely(!localpath)) {
     psync_resume_localscan();
     return 0;
   }

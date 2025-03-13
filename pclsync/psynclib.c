@@ -175,7 +175,7 @@ int psync_init() {
 
   if (!psync_database) {
     psync_database = ppath_default_db();
-    if (unpdbg_likely(!psync_database)) {
+    if (pdbg_unlikely(!psync_database)) {
       if (IS_DEBUG)
         pthread_mutex_unlock(&psync_libstate_mutex);
       return_error(PERROR_NO_HOMEDIR);
@@ -188,7 +188,7 @@ int psync_init() {
   }
   psync_sql_statement("UPDATE task SET inprogress=0 WHERE inprogress=1");
   ptimer_init();
-  if (unpdbg_likely(pssl_init())) {
+  if (pdbg_unlikely(pssl_init())) {
     if (IS_DEBUG)
       pthread_mutex_unlock(&psync_libstate_mutex);
     return_error(PERROR_SSL_INIT_FAILED);
@@ -669,17 +669,17 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
 
   pdbg_logf(D_NOTICE, "Add sync by folder id localpath: [%s]", localpath);
 
-  if (unpdbg_likely(synctype < PSYNC_SYNCTYPE_MIN ||
+  if (pdbg_unlikely(synctype < PSYNC_SYNCTYPE_MIN ||
                    synctype > PSYNC_SYNCTYPE_MAX))
     return_isyncid(PERROR_INVALID_SYNCTYPE);
-  if (unpdbg_likely(stat(localpath, &st)) ||
-      unpdbg_likely(!pfile_stat_isfolder(&st)))
+  if (pdbg_unlikely(stat(localpath, &st)) ||
+      pdbg_unlikely(!pfile_stat_isfolder(&st)))
     return_isyncid(PERROR_LOCAL_FOLDER_NOT_FOUND);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
-  if (unpdbg_likely(!pfile_stat_mode_ok(&st, mbedtls_md)))
+  if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md)))
     return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
   syncmp = psync_fs_getmountpoint();
   if (syncmp) {
@@ -693,7 +693,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
     free(syncmp);
   }
   res = psync_sql_query("SELECT localpath FROM syncfolder");
-  if (unpdbg_likely(!res))
+  if (pdbg_unlikely(!res))
     return_isyncid(PERROR_DATABASE_ERROR);
   while ((srow = psync_sql_fetch_rowstr(res)))
     if (psyncer_str_has_prefix(srow[0], localpath)) {
@@ -706,11 +706,11 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   psync_sql_free_result(res);
   if (folderid) {
     res = psync_sql_query("SELECT permissions FROM folder WHERE id=?");
-    if (unpdbg_likely(!res))
+    if (pdbg_unlikely(!res))
       return_isyncid(PERROR_DATABASE_ERROR);
     psync_sql_bind_uint(res, 1, folderid);
     row = psync_sql_fetch_rowint(res);
-    if (unpdbg_likely(!row)) {
+    if (pdbg_unlikely(!row)) {
       psync_sql_free_result(res);
       return_isyncid(PERROR_REMOTE_FOLDER_NOT_FOUND);
     }
@@ -718,7 +718,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
     psync_sql_free_result(res);
   } else
     perms = PSYNC_PERM_ALL;
-  if (unpdbg_likely((synctype & PSYNC_DOWNLOAD_ONLY &&
+  if (pdbg_unlikely((synctype & PSYNC_DOWNLOAD_ONLY &&
                     (perms & PSYNC_PERM_READ) != PSYNC_PERM_READ) ||
                    (synctype & PSYNC_UPLOAD_ONLY &&
                     (perms & PSYNC_PERM_WRITE) != PSYNC_PERM_WRITE)))
@@ -726,7 +726,7 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
   res = psync_sql_prep_statement(
       "INSERT OR IGNORE INTO syncfolder (folderid, localpath, synctype, flags, "
       "inode, deviceid) VALUES (?, ?, ?, 0, ?, ?)");
-  if (unpdbg_likely(!res))
+  if (pdbg_unlikely(!res))
     return_isyncid(PERROR_DATABASE_ERROR);
   psync_sql_bind_uint(res, 1, folderid);
   psync_sql_bind_string(res, 2, localpath);
@@ -753,17 +753,17 @@ int psync_add_sync_by_path_delayed(const char *localpath,
   psync_sql_res *res;
   struct stat st;
   int unsigned mbedtls_md;
-  if (unpdbg_likely(synctype < PSYNC_SYNCTYPE_MIN ||
+  if (pdbg_unlikely(synctype < PSYNC_SYNCTYPE_MIN ||
                    synctype > PSYNC_SYNCTYPE_MAX))
     return_error(PERROR_INVALID_SYNCTYPE);
-  if (unpdbg_likely(stat(localpath, &st)) ||
-      unpdbg_likely(!pfile_stat_isfolder(&st)))
+  if (pdbg_unlikely(stat(localpath, &st)) ||
+      pdbg_unlikely(!pfile_stat_isfolder(&st)))
     return_error(PERROR_LOCAL_FOLDER_NOT_FOUND);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
-  if (unpdbg_likely(!pfile_stat_mode_ok(&st, mbedtls_md)))
+  if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md)))
     return_error(PERROR_LOCAL_FOLDER_ACC_DENIED);
   res = psync_sql_prep_statement("INSERT INTO syncfolderdelayed (localpath, "
                                  "remotepath, synctype) VALUES (?, ?, ?)");
@@ -786,7 +786,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   struct stat st;
   int unsigned mbedtls_md;
   psync_synctype_t oldsynctype;
-  if (unpdbg_likely(synctype < PSYNC_SYNCTYPE_MIN ||
+  if (pdbg_unlikely(synctype < PSYNC_SYNCTYPE_MIN ||
                    synctype > PSYNC_SYNCTYPE_MAX))
     return_isyncid(PERROR_INVALID_SYNCTYPE);
   psync_sql_start_transaction();
@@ -794,7 +794,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
       "SELECT folderid, localpath, synctype FROM syncfolder WHERE id=?");
   psync_sql_bind_uint(res, 1, syncid);
   row = psync_sql_fetch_row(res);
-  if (unpdbg_likely(!row)) {
+  if (pdbg_unlikely(!row)) {
     psync_sql_free_result(res);
     psync_sql_rollback_transaction();
     return_error(PERROR_INVALID_SYNCID);
@@ -806,8 +806,8 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
     psync_sql_rollback_transaction();
     return 0;
   }
-  if (unpdbg_likely(stat(psync_get_string(row[1]), &st)) ||
-      unpdbg_likely(!pfile_stat_isfolder(&st))) {
+  if (pdbg_unlikely(stat(psync_get_string(row[1]), &st)) ||
+      pdbg_unlikely(!pfile_stat_isfolder(&st))) {
     psync_sql_free_result(res);
     psync_sql_rollback_transaction();
     return_isyncid(PERROR_LOCAL_FOLDER_NOT_FOUND);
@@ -817,17 +817,17 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
-  if (unpdbg_likely(!pfile_stat_mode_ok(&st, mbedtls_md))) {
+  if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md))) {
     psync_sql_rollback_transaction();
     return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
   }
   if (folderid) {
     res = psync_sql_query("SELECT permissions FROM folder WHERE id=?");
-    if (unpdbg_likely(!res))
+    if (pdbg_unlikely(!res))
       return_isyncid(PERROR_DATABASE_ERROR);
     psync_sql_bind_uint(res, 1, folderid);
     urow = psync_sql_fetch_rowint(res);
-    if (unpdbg_likely(!urow)) {
+    if (pdbg_unlikely(!urow)) {
       psync_sql_free_result(res);
       psync_sql_rollback_transaction();
       return_isyncid(PERROR_REMOTE_FOLDER_NOT_FOUND);
@@ -836,7 +836,7 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
     psync_sql_free_result(res);
   } else
     perms = PSYNC_PERM_ALL;
-  if (unpdbg_likely((synctype & PSYNC_DOWNLOAD_ONLY &&
+  if (pdbg_unlikely((synctype & PSYNC_DOWNLOAD_ONLY &&
                     (perms & PSYNC_PERM_READ) != PSYNC_PERM_READ) ||
                    (synctype & PSYNC_UPLOAD_ONLY &&
                     (perms & PSYNC_PERM_WRITE) != PSYNC_PERM_WRITE))) {
@@ -1098,14 +1098,14 @@ int psync_register(const char *email, const char *password, int termsaccepted,
     return -1;
   }
   sock = papi_connect(binapi, psync_setting_get_bool(_PS(usessl)));
-  if (unpdbg_likely(!sock)) {
+  if (pdbg_unlikely(!sock)) {
     if (err)
       *err = psync_strdup("Could not connect to the server.");
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
     return -1;
   }
   res = papi_send2(sock, "register", params);
-  if (unpdbg_likely(!res)) {
+  if (pdbg_unlikely(!res)) {
     psock_close(sock);
     if (err)
       *err = psync_strdup("Could not connect to the server.");
@@ -1669,10 +1669,10 @@ static char *psync_filename_from_res(const binresult *res) {
   char *nmd, *path, *ret;
   const char *nmarr[2];
   nm = strrchr(papi_find_result2(res, "path", PARAM_STR)->str, '/');
-  if (unpdbg_likely(!nm))
+  if (pdbg_unlikely(!nm))
     return NULL;
   path = ppath_private_tmp();
-  if (unpdbg_likely(!path))
+  if (pdbg_unlikely(!path))
     return NULL;
   nmd = psync_url_decode(nm + 1);
   nmarr[0] = path;
@@ -1963,7 +1963,7 @@ int psync_crypto_change_crypto_pass(const char *oldpass, const char *newpass,
       if (!api)
         return pdbg_return_const(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
       res = papi_send2(api, "crypto_changeuserprivate", params);
-      if (unpdbg_likely(!res)) {
+      if (pdbg_unlikely(!res)) {
         psync_apipool_release_bad(api);
         if (++tries > 5)
           return pdbg_return_const(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
@@ -2010,7 +2010,7 @@ int psync_crypto_change_crypto_pass_unlocked(const char *newpass,
       if (!api)
         return pdbg_return_const(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
       res = papi_send2(api, "crypto_changeuserprivate", params);
-      if (unpdbg_likely(!res)) {
+      if (pdbg_unlikely(!res)) {
         psync_apipool_release_bad(api);
         if (++tries > 5)
           return pdbg_return_const(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
@@ -2042,7 +2042,7 @@ int psync_crypto_crypto_send_change_user_private() {
   if (!api)
     return pdbg_return_const(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
   res = papi_send2(api, "crypto_sendchangeuserprivate", params);
-  if (unpdbg_likely(!res)) {
+  if (pdbg_unlikely(!res)) {
     psync_apipool_release_bad(api);
     return pdbg_return_const(PSYNC_CRYPTO_SETUP_CANT_CONNECT);
   } else {
@@ -2288,7 +2288,7 @@ int psync_get_promo(char **url, uint64_t *width, uint64_t *height) {
 
   res = psync_api_run_command("getpromourl", params);
 
-  if (unpdbg_likely(!res)) {
+  if (pdbg_unlikely(!res)) {
     return -1;
   }
 
@@ -2403,7 +2403,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
 
   sql = psync_sql_query("SELECT localpath FROM syncfolder");
 
-  if (unpdbg_likely(!sql)) {
+  if (pdbg_unlikely(!sql)) {
     return_isyncid(PERROR_DATABASE_ERROR);
   }
 

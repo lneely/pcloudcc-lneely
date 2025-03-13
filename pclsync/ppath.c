@@ -46,7 +46,7 @@ char *ppath_default_db() {
 
 int64_t ppath_free_space(const char *path) {
   struct statvfs buf;
-  if (unpdbg_likely(statvfs(path, &buf)))
+  if (pdbg_unlikely(statvfs(path, &buf)))
     return -1;
   else
     return (int64_t)buf.f_bavail * (int64_t)buf.f_frsize;
@@ -56,14 +56,14 @@ char *ppath_home() {
   struct stat st;
   const char *dir;
   dir = getenv("HOME");
-  if (unpdbg_likely(!dir) || unpdbg_likely(stat(dir, &st)) ||
-      unpdbg_likely(!pfile_stat_mode_ok(&st, 7))) {
+  if (pdbg_unlikely(!dir) || pdbg_unlikely(stat(dir, &st)) ||
+      pdbg_unlikely(!pfile_stat_mode_ok(&st, 7))) {
     struct passwd pwd;
     struct passwd *result;
     char buff[4096];
-    if (unpdbg_likely(getpwuid_r(getuid(), &pwd, buff, sizeof(buff), &result)) ||
-        unpdbg_likely(stat(result->pw_dir, &st)) ||
-        unpdbg_likely(!pfile_stat_mode_ok(&st, 7)))
+    if (pdbg_unlikely(getpwuid_r(getuid(), &pwd, buff, sizeof(buff), &result)) ||
+        pdbg_unlikely(stat(result->pw_dir, &st)) ||
+        pdbg_unlikely(!pfile_stat_mode_ok(&st, 7)))
       return NULL;
     dir = result->pw_dir;
   }
@@ -121,7 +121,7 @@ int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback, void *ptr) {
   struct dirent *de;
 
   dh = opendir(path);
-  if (unpdbg_likely(!dh)) {
+  if (pdbg_unlikely(!dh)) {
     psync_error = PERROR_LOCAL_FOLDER_NOT_FOUND;
     return -1;
   }
@@ -149,7 +149,7 @@ int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback, void *ptr) {
     } else if (de->d_type == DT_UNKNOWN) {
       // Fall back to lstat for unknown file types
       psync_strlcpy(cpath + pl, de->d_name, NAME_MAX + 1);
-      if (!unpdbg_likely(lstat(cpath, &st))) {
+      if (!pdbg_unlikely(lstat(cpath, &st))) {
         pst.isfolder = S_ISDIR(st.st_mode);
         callback(ptr, &pst);
       }
@@ -172,12 +172,12 @@ char *ppath_pcloud() {
 
   path = psync_strcat(homedir, "/", PSYNC_DEFAULT_POSIX_DIR, NULL);
   free(homedir);
-  if (unpdbg_likely(!path)) {
+  if (pdbg_unlikely(!path)) {
     return NULL;
   }
 
   if (stat(path, &st) &&
-      unpdbg_likely(mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE))) {
+      pdbg_unlikely(mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE))) {
     free(path);
     return NULL;
   }

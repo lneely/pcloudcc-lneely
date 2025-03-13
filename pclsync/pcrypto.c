@@ -175,11 +175,11 @@ psync_symmetric_key_t pcrypto_key() {
 pcrypto_ctr_encdec_t pcrypto_ctr_encdec_create(psync_symmetric_key_t key) {
   psync_aes256_encoder enc;
   pcrypto_ctr_encdec_t ret;
-  if (unpdbg_likely(key->keylen < PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE)) {
+  if (pdbg_unlikely(key->keylen < PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE)) {
     return PSYNC_CRYPTO_INVALID_ENCODER;
   }
   enc = paes_create_encoder(key);
-  if (unpdbg_likely(enc == PSYNC_INVALID_ENCODER)) {
+  if (pdbg_unlikely(enc == PSYNC_INVALID_ENCODER)) {
     return PSYNC_CRYPTO_INVALID_ENCODER;
   }
   ret = psync_new(pcrypto_key_t);
@@ -323,7 +323,7 @@ pcrypto_decode_text(pcrypto_textdec_t enc,
       *aessrc, *aesdst, *outptr, *ret;
   size_t len;
   const unsigned char *xorptr;
-  if (unpdbg_likely(datalen % PSYNC_AES256_BLOCK_SIZE || !datalen))
+  if (pdbg_unlikely(datalen % PSYNC_AES256_BLOCK_SIZE || !datalen))
     return NULL;
   aessrc = ALIGN_PTR_A256_BS(buff);
   aesdst = aessrc + PSYNC_AES256_BLOCK_SIZE;
@@ -399,11 +399,11 @@ pcrypto_textenc_t
 pcrypto_textenc_create(psync_symmetric_key_t key) {
   psync_aes256_encoder enc;
   pcrypto_textenc_t ret;
-  if (unpdbg_likely(key->keylen <
+  if (pdbg_unlikely(key->keylen <
                    PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE))
     return PSYNC_CRYPTO_INVALID_ENCODER;
   enc = paes_create_encoder(key);
-  if (unpdbg_likely(enc == PSYNC_INVALID_ENCODER))
+  if (pdbg_unlikely(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
   ret = (pcrypto_textenc_t)malloc(
       offsetof(pcrypto_key_iv_t, iv) + key->keylen -
@@ -425,11 +425,11 @@ pcrypto_textdec_t
 pcrypto_textdec_create(psync_symmetric_key_t key) {
   psync_aes256_encoder enc;
   pcrypto_textenc_t ret;
-  if (unpdbg_likely(key->keylen <
+  if (pdbg_unlikely(key->keylen <
                    PSYNC_AES256_KEY_SIZE + PSYNC_AES256_BLOCK_SIZE))
     return PSYNC_CRYPTO_INVALID_ENCODER;
   enc = paes_create_decoder(key);
-  if (unpdbg_likely(enc == PSYNC_INVALID_ENCODER))
+  if (pdbg_unlikely(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
   ret = (pcrypto_textenc_t)malloc(
       offsetof(pcrypto_key_iv_t, iv) + key->keylen -
@@ -452,13 +452,13 @@ pcrypto_sec_encdec_create(psync_symmetric_key_t key) {
   psync_aes256_encoder enc;
   psync_aes256_decoder dec;
   pcrypto_sector_encdec_t ret;
-  if (unpdbg_likely(key->keylen < PSYNC_AES256_KEY_SIZE))
+  if (pdbg_unlikely(key->keylen < PSYNC_AES256_KEY_SIZE))
     return PSYNC_CRYPTO_INVALID_ENCODER;
   enc = paes_create_encoder(key);
-  if (unpdbg_likely(enc == PSYNC_INVALID_ENCODER))
+  if (pdbg_unlikely(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
   dec = paes_create_decoder(key);
-  if (unpdbg_likely(enc == PSYNC_INVALID_ENCODER)) {
+  if (pdbg_unlikely(enc == PSYNC_INVALID_ENCODER)) {
     paes_free_encoder(enc);
     return PSYNC_CRYPTO_INVALID_ENCODER;
   }

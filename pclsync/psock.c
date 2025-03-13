@@ -461,7 +461,7 @@ psock_t *psock_connect(const char *host, int unsigned port, int ssl) {
   psync_slprintf(sport, sizeof(sport), "%d", port);
 
   sock = connect_socket(host, sport);
-  if (unpdbg_likely(sock == INVALID_SOCKET)) {
+  if (pdbg_unlikely(sock == INVALID_SOCKET)) {
     return NULL;
   }
 
@@ -474,7 +474,7 @@ psock_t *psock_connect(const char *host, int unsigned port, int ssl) {
       }
       ssl = pssl_connect_finish(sslc, host);
     }
-    if (unpdbg_likely(ssl != PSYNC_SSL_SUCCESS)) {
+    if (pdbg_unlikely(ssl != PSYNC_SSL_SUCCESS)) {
       close(sock);
       return NULL;
     }
@@ -1094,7 +1094,7 @@ psock_ifaces_t *psock_list_adapters() {
   struct ifaddrs *addrs, *addr;
   sa_family_t family;
   size_t sz;
-  if (unpdbg_likely(getifaddrs(&addrs)))
+  if (pdbg_unlikely(getifaddrs(&addrs)))
     goto empty;
   cnt = 0;
   addr = addrs;

@@ -356,7 +356,7 @@ static int psync_pagecache_read_range_from_api(psync_request_t *request,
   first_page_id = range->offset / PSYNC_FS_PAGE_SIZE;
   len = range->length / PSYNC_FS_PAGE_SIZE;
   res = papi_result_thread(api);
-  if (unpdbg_likely(!res))
+  if (pdbg_unlikely(!res))
     return -2;
   dlen = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(dlen)) {
@@ -371,7 +371,7 @@ static int psync_pagecache_read_range_from_api(psync_request_t *request,
     page = psync_pagecache_get_free_page(0);
     rb = psync_socket_readall_download_thread(
         api, page->page, dlen < PSYNC_FS_PAGE_SIZE ? dlen : PSYNC_FS_PAGE_SIZE);
-    if (unpdbg_likely(rb <= 0)) {
+    if (pdbg_unlikely(rb <= 0)) {
       psync_pagecache_return_free_page(page);
       ptimer_notify_exception();
       return i == 0 ? -2 : -1;
@@ -557,7 +557,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
   tries = 0;
   while (tries++ <= 5) {
     api = psync_apipool_get();
-    if (unpdbg_likely(!api))
+    if (pdbg_unlikely(!api))
       continue;
     psock_set_write_buffered(api);
     if (unlikely(papi_send_no_res(api, "getfilelink", params) != PTR_OK))
@@ -577,7 +577,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
     }
     mark_api_shared(api);
     ret = papi_result_thread(api);
-    if (unpdbg_likely(!ret)) {
+    if (pdbg_unlikely(!ret)) {
       mark_shared_api_bad(api);
       goto err1;
     }
@@ -600,7 +600,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
     if (request->needkey) {
       pcrypto_sector_encdec_t enc;
       ret = papi_result_thread(api);
-      if (unpdbg_likely(!ret))
+      if (pdbg_unlikely(!ret))
         goto err3;
       result = papi_find_result2(ret, "result", PARAM_NUM)->num;
       if (unlikely(result != 0)) {
@@ -610,7 +610,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
       }
       enc = pcryptofolder_filencoder_from_binresult(request->fileid,
                                                                ret);
-      if (unpdbg_likely(psync_crypto_is_error(enc)))
+      if (pdbg_unlikely(psync_crypto_is_error(enc)))
         goto err4;
       pdbg_logf(D_NOTICE, "got key for fileid %lu", (unsigned long)request->fileid);
       free(ret);
@@ -1221,12 +1221,12 @@ static int check_disk_full() {
   psync_sql_res *res;
   db_cache_max_page = psync_sql_cellint("SELECT MAX(id) FROM pagecache", 0);
   filesize = pfile_size(readcache);
-  if (unpdbg_likely(filesize == -1))
+  if (pdbg_unlikely(filesize == -1))
     return 0;
   freespace =
       ppath_free_space(psync_setting_get_string(_PS(fscachepath)));
   minlocal = psync_setting_get_uint(_PS(minlocalfreespace));
-  if (unpdbg_likely(freespace == -1))
+  if (pdbg_unlikely(freespace == -1))
     return 0;
   if (db_cache_max_page * PSYNC_FS_PAGE_SIZE > filesize)
     addspc = cache_pages_in_hash * PSYNC_FS_PAGE_SIZE;
@@ -1987,7 +1987,7 @@ static int psync_pagecache_read_range_from_sock(psync_request_t *request,
   for (i = 0; i < len; i++) {
     page = psync_pagecache_get_free_page(0);
     rb = psync_http_request_readall(sock, page->page, PSYNC_FS_PAGE_SIZE);
-    if (unpdbg_likely(rb <= 0)) {
+    if (pdbg_unlikely(rb <= 0)) {
       psync_pagecache_return_free_page(page);
       ptimer_notify_exception();
       return -1;
@@ -2210,7 +2210,7 @@ retry:
   }
   if (!sock)
     sock = psync_http_connect_multihost(hosts, &host);
-  if (unpdbg_likely(!sock))
+  if (pdbg_unlikely(!sock))
     goto err0;
   //  pdbg_logf(D_NOTICE, "connected to %s", host);
   path = papi_find_result2(urls->urls, "path", PARAM_STR)->str;
@@ -3311,7 +3311,7 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
     return;
   }
   tree = NULL;
-  if (unpdbg_likely((fs = pfile_size(fd)) == -1 ||
+  if (pdbg_unlikely((fs = pfile_size(fd)) == -1 ||
                    psync_fs_load_interval_tree(fd, fs, &tree) == -1))
     goto err2;
   pfile_close(fd);
@@ -3322,7 +3322,7 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
     goto err1;
   }
   fs = pfile_size(fd);
-  if (unpdbg_likely(fs == -1))
+  if (pdbg_unlikely(fs == -1))
     goto err2;
   pdbg_logf(D_NOTICE,
         "adding blocks of file %s to cache for hash %lu (%ld), old hash %lu "
@@ -3445,7 +3445,7 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
         if (!interval || interval->from >= off + PSYNC_FS_PAGE_SIZE)
           break;
       }
-      if (unpdbg_likely(ret == -1)) {
+      if (pdbg_unlikely(ret == -1)) {
         psync_pagecache_return_free_page(page);
         continue;
       }
@@ -3616,7 +3616,7 @@ int ppagecache_copy_to_file_locked(
     if (pfile_pwrite(of->datafile, buff, rb, i * PSYNC_FS_PAGE_SIZE) != rb)
       return -1;
   }
-  if (unpdbg_likely(pfile_sync(of->datafile)))
+  if (pdbg_unlikely(pfile_sync(of->datafile)))
     return -1;
   else {
     pdbg_logf(D_NOTICE, "copied %lu bytes to data file of %s from cache",
@@ -3693,7 +3693,7 @@ static int psync_pagecache_free_page_from_read_cache() {
       psync_sql_bind_uint(res, 1, sizeinpages);
       psync_sql_run_free(res);
       db_cache_max_page = sizeinpages;
-    } else if (unpdbg_likely(db_cache_max_page < sizeinpages))
+    } else if (pdbg_unlikely(db_cache_max_page < sizeinpages))
       sizeinpages = db_cache_max_page;
     page = psync_pagecache_get_free_page_if_available();
     if (unlikely(!page)) {

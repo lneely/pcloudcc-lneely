@@ -199,7 +199,7 @@ int psync_slprintf(char *str, size_t size, const char *format, ...) {
   va_start(ap, format);
   ret = vsnprintf(str, size, format, ap);
   va_end(ap);
-  if (unpdbg_likely(ret >= size))
+  if (pdbg_unlikely(ret >= size))
     str[size - 1] = 0;
   return ret;
 }

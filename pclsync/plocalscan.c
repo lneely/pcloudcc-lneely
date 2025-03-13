@@ -502,7 +502,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
   char *subpath;
   int cmp;
   // pdbg_logf(D_NOTICE, "scanning folder %s deviceid: %llu", localpath, deviceid);
-  if (unpdbg_likely(scanner_local_folder_to_list(localpath, &disklist))) {
+  if (pdbg_unlikely(scanner_local_folder_to_list(localpath, &disklist))) {
     return;
   }
 
@@ -686,7 +686,7 @@ static void scan_upload_file(sync_folderlist *fl) {
   psync_sql_bind_uint(res, 6, fl->mtimenat);
   psync_sql_bind_string(res, 7, fl->name);
   psync_sql_run_free(res);
-  if (unpdbg_likely(!psync_sql_affected_rows()))
+  if (pdbg_unlikely(!psync_sql_affected_rows()))
     return;
   localfileid = psync_sql_insertid();
   ptask_upload_q(fl->syncid, localfileid, fl->name);
@@ -793,7 +793,7 @@ static void scan_create_folder(sync_folderlist *fl) {
   psync_sql_bind_uint(res, 2, localfolderid);
   psync_sql_bind_uint(res, 3, fl->synctype);
   psync_sql_run_free(res);
-  if (unpdbg_likely(!psync_sql_affected_rows()))
+  if (pdbg_unlikely(!psync_sql_affected_rows()))
     return;
   ptask_rdir_mk(fl->syncid, localfolderid, fl->name);
   return;
@@ -931,7 +931,7 @@ retry:
     return;
   }
   psync_sql_free_result(res);
-  if (unpdbg_likely(!folderid)) {
+  if (pdbg_unlikely(!folderid)) {
     /* folder is not yet created, folderid is not 0 but NULL actually */
     if (tries >= 50) {
       res = psync_sql_query("DELETE FROM task WHERE type=" NTO_STR(

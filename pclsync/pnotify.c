@@ -78,7 +78,7 @@ static void psync_notifications_download_thumb(const binresult *thumb,
   rd = -1;
   path = papi_find_result2(thumb, "path", PARAM_STR)->str;
   filename = strrchr(path, '/');
-  if (unpdbg_likely(!filename++))
+  if (pdbg_unlikely(!filename++))
     return;
   filepath = psync_strcat(thumbpath, "/", filename, NULL);
   if (!stat(filepath, &st)) {
@@ -87,19 +87,19 @@ static void psync_notifications_download_thumb(const binresult *thumb,
   }
   tmpfilepath = psync_strcat(filepath, ".part", NULL);
   pdbg_logf(D_NOTICE, "downloading thumbnail %s", filename);
-  if (unpdbg_likely((fd = pfile_open(tmpfilepath, O_WRONLY,
+  if (pdbg_unlikely((fd = pfile_open(tmpfilepath, O_WRONLY,
                                          O_CREAT | O_TRUNC)) ==
                    INVALID_HANDLE_VALUE))
     goto err1;
   sock = psync_http_connect_multihost(
       papi_find_result2(thumb, "hosts", PARAM_ARRAY), &host);
-  if (unpdbg_likely(!sock))
+  if (pdbg_unlikely(!sock))
     goto err2;
   psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
                  papi_find_result2(thumb, "dwltag", PARAM_STR)->str);
-  if (unpdbg_likely(psync_http_request(sock, host, path, 0, 0, cookie)))
+  if (pdbg_unlikely(psync_http_request(sock, host, path, 0, 0, cookie)))
     goto err3;
-  if (unpdbg_likely(psync_http_next_request(sock)))
+  if (pdbg_unlikely(psync_http_next_request(sock)))
     goto err3;
   buff = (char *)malloc(PSYNC_COPY_BUFFER_SIZE);
   while (1) {
