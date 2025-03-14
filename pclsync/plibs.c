@@ -678,88 +678,9 @@ void psync_sql_transation_add_callbacks(
   psync_list_add_tail(&tran_callbacks, &cb->list);
 }
 
-#if IS_DEBUG && 0
-
-typedef struct {
-  psync_tree tree;
-  const char *sql;
-} psync_sql_tree_t;
-
-static psync_tree *sql_tree = PSYNC_TREE_EMPTY;
-
-static void psync_sql_do_check_query_plan(const char *sql) {
-  sqlite3_stmt *stmt;
-  char *exsql;
-  const char *detail;
-  int code;
-  exsql = psync_strcat("EXPLAIN QUERY PLAN ", sql, NULL);
-  code = sqlite3_prepare_v2(psync_db, exsql, -1, &stmt, 0);
-  free(exsql);
-  if (code != SQLITE_OK) {
-    pdbg_logf(D_ERROR, "EXPLAIN QUERY PLAN %s returned error: %d", sql, code);
-    return;
-  }
-  while (sqlite3_step(stmt) == SQLITE_ROW) {
-    detail = (const char *)sqlite3_column_text(stmt, 3);
-    if (!strncmp(detail, "SCAN TABLE", strlen("SCAN TABLE")))
-      pdbg_logf(D_WARNING, "doing %s on sql %s", detail, sql);
-  }
-  sqlite3_finalize(stmt);
-}
-
-static psync_tree *psync_sql_new_tree_node(const char *sql) {
-  psync_sql_tree_t *node;
-  node = malloc(sizeof(psync_sql_tree_t));
-  node->sql = sql;
-  return &node->tree;
-}
-
-static void psync_sql_check_query_plan_locked(const char *sql) {
-  psync_tree *node;
-  int cmp;
-  if (!sql_tree) {
-    ptree_add_after(&sql_tree, NULL, psync_sql_new_tree_node(sql));
-    return;
-  }
-  node = sql_tree;
-  while (1) {
-    cmp = strcmp(sql, ptree_element(node, psync_sql_tree_t, tree)->sql);
-    if (cmp < 0) {
-      if (node->left)
-        node = node->left;
-      else {
-        ptree_add_before(&sql_tree, node, psync_sql_new_tree_node(sql));
-        break;
-      }
-    } else if (cmp > 0) {
-      if (node->right)
-        node = node->right;
-      else {
-        ptree_add_after(&sql_tree, node, psync_sql_new_tree_node(sql));
-        break;
-      }
-    } else
-      return;
-  }
-  psync_sql_do_check_query_plan(sql);
-}
-
-static void psync_sql_check_query_plan(const char *sql) {
-  psync_sql_lock();
-  psync_sql_check_query_plan_locked(sql);
-  psync_sql_unlock();
-}
-
-#else
-
-#define psync_sql_check_query_plan(s) ((void)0)
-
-#endif
-
 char *psync_sql_cellstr(const char *sql) {
   sqlite3_stmt *stmt;
   int code;
-  psync_sql_check_query_plan(sql);
   psync_sql_rdlock();
   code = sqlite3_prepare_v2(psync_db, sql, -1, &stmt, NULL);
   if (unlikely(code != SQLITE_OK)) {
@@ -795,7 +716,6 @@ char *psync_sql_cellstr(const char *sql) {
 int64_t psync_sql_cellint(const char *sql, int64_t dflt) {
   sqlite3_stmt *stmt;
   int code;
-  psync_sql_check_query_plan(sql);
   psync_sql_rdlock();
   code = sqlite3_prepare_v2(psync_db, sql, -1, &stmt, NULL);
   if (unlikely(code != SQLITE_OK)) {
@@ -822,7 +742,6 @@ int64_t psync_sql_cellint(const char *sql, int64_t dflt) {
 char **psync_sql_rowstr(const char *sql) {
   sqlite3_stmt *stmt;
   int code, cnt;
-  psync_sql_check_query_plan(sql);
   psync_sql_rdlock();
   code = sqlite3_prepare_v2(psync_db, sql, -1, &stmt, NULL);
   if (unlikely(code != SQLITE_OK)) {
@@ -879,7 +798,6 @@ char **psync_sql_rowstr(const char *sql) {
 psync_variant *psync_sql_row(const char *sql) {
   sqlite3_stmt *stmt;
   int code, cnt;
-  psync_sql_check_query_plan(sql);
   psync_sql_rdlock();
   code = sqlite3_prepare_v2(psync_db, sql, -1, &stmt, NULL);
   if (unlikely(code != SQLITE_OK)) {
@@ -956,7 +874,6 @@ psync_sql_res *psync_sql_query_nocache(const char *sql) {
   sqlite3_stmt *stmt;
   psync_sql_res *res;
   int code, cnt;
-  psync_sql_check_query_plan(sql);
 #if IS_DEBUG
   psync_sql_do_lock(file, line);
 #else
@@ -1024,7 +941,6 @@ psync_sql_res *psync_sql_query_rdlock_nocache(const char *sql) {
   sqlite3_stmt *stmt;
   psync_sql_res *res;
   int code, cnt;
-  psync_sql_check_query_plan(sql);
 #if IS_DEBUG
   psync_sql_do_rdlock(file, line);
 #else
@@ -1104,7 +1020,6 @@ psync_sql_res *psync_sql_query_nolock_nocache(const char *sql) {
     abort();
   }
 #endif
-  psync_sql_check_query_plan(sql);
   code = sqlite3_prepare_v2(psync_db, sql, -1, &stmt, NULL);
   if (unlikely(code != SQLITE_OK)) {
     pdbg_logf(D_ERROR, "error running sql statement: %s: %s", sql,
@@ -1215,7 +1130,6 @@ psync_sql_res *psync_sql_prep_statement_nocache(const char *sql) {
   sqlite3_stmt *stmt;
   psync_sql_res *res;
   int code;
-  psync_sql_check_query_plan(sql);
 #if IS_DEBUG
   psync_sql_do_lock(file, line);
 #else
