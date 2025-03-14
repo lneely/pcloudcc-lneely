@@ -39,6 +39,7 @@
 #include "psettings.h"
 #include "psock.h"
 #include "ptimer.h"
+#include "ptask.h"
 
 #define PROXY_NONE 0
 #define PROXY_CONNECT 1

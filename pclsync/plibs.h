@@ -167,24 +167,13 @@ typedef struct {
   uint64_t data[];
 } psync_full_result_int;
 
-struct psync_list_builder_t_;
-
-typedef struct psync_list_builder_t_ psync_list_builder_t;
-
-struct psync_task_manager_t_;
-
-typedef struct psync_task_manager_t_ *psync_task_manager_t;
 
 typedef const uint64_t *psync_uint_row;
 typedef const char *const *psync_str_row;
 typedef const psync_variant *psync_variant_row;
 
 typedef void (*psync_run_after_t)(void *);
-typedef int (*psync_list_builder_sql_callback)(psync_list_builder_t *, void *,
-                                               psync_variant_row);
-
-typedef void (*psync_task_callback_t)(void *, void *);
-
+typedef int (*psync_list_builder_sql_callback)(psync_list_builder_t *, void *, psync_variant_row);
 typedef void (*psync_transaction_callback_t)(void *);
 
 extern int psync_do_run;
@@ -309,36 +298,18 @@ void psync_list_add_lstring_offset(psync_list_builder_t *builder, size_t offset,
                                    size_t length);
 void *psync_list_builder_finalize(psync_list_builder_t *builder);
 
-psync_task_manager_t
-psync_task_run_tasks(psync_task_callback_t const *callbacks,
-                     void *const *params, int cnt);
-void *psync_task_papi_result(psync_task_manager_t tm, int id);
-void psync_task_free(psync_task_manager_t tm);
-int psync_task_complete(void *h, void *data);
 
-void psync_pqsort(void *base, size_t cnt, size_t sort_first, size_t size,
-                  int (*compar)(const void *, const void *));
-void psync_qpartition(void *base, size_t cnt, size_t sort_first, size_t size,
-                      int (*compar)(const void *, const void *));
-
+void psync_pqsort(void *base, size_t cnt, size_t sort_first, size_t size, int (*compar)(const void *, const void *));
+void psync_qpartition(void *base, size_t cnt, size_t sort_first, size_t size, int (*compar)(const void *, const void *));
 void psync_try_free_memory();
 
-uint64_t psync_err_number_expected(const char *file, const char *function,
-                                   int unsigned line,
-                                   const psync_variant *v) PSYNC_COLD;
-const char *psync_err_string_expected(const char *file, const char *function,
-                                      int unsigned line,
-                                      const psync_variant *v) PSYNC_COLD;
-const char *psync_lstring_expected(const char *file, const char *function,
-                                   int unsigned line, const psync_variant *v,
-                                   size_t *len) PSYNC_NONNULL(4, 5);
-double psync_err_real_expected(const char *file, const char *function,
-                               int unsigned line,
-                               const psync_variant *v) PSYNC_COLD;
+uint64_t psync_err_number_expected(const char *file, const char *function, int unsigned line, const psync_variant *v) PSYNC_COLD;
+const char *psync_err_string_expected(const char *file, const char *function, int unsigned line, const psync_variant *v) PSYNC_COLD;
+const char *psync_lstring_expected(const char *file, const char *function, int unsigned line, const psync_variant *v, size_t *len) PSYNC_NONNULL(4, 5);
+double psync_err_real_expected(const char *file, const char *function, int unsigned line, const psync_variant *v) PSYNC_COLD;
 
 /* needs 12 characters of buffer space on top of the length of the prefix */
-static inline void psync_get_string_id(char *dst, const char *prefix,
-                                       uint64_t id) {
+static inline void psync_get_string_id(char *dst, const char *prefix, uint64_t id) {
   size_t plen;
   plen = strlen(prefix);
   dst = (char *)memcpy(dst, prefix, plen) + plen;
@@ -350,8 +321,7 @@ static inline void psync_get_string_id(char *dst, const char *prefix,
 }
 
 /* needs 24 characters of buffer space on top of the length of the prefix */
-static inline void psync_get_string_id2(char *dst, const char *prefix,
-                                        uint64_t id1, uint64_t id2) {
+static inline void psync_get_string_id2(char *dst, const char *prefix, uint64_t id1, uint64_t id2) {
   size_t plen;
   plen = strlen(prefix);
   dst = (char *)memcpy(dst, prefix, plen) + plen;

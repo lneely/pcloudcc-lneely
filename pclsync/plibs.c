@@ -40,6 +40,7 @@
 #include "pdbg.h"
 #include "pfile.h"
 #include "plibs.h"
+#include "plist.h"
 #include "plocks.h"
 #include "pnetlibs.h"
 #include "prun.h"
@@ -470,6 +471,38 @@ void psync_sql_do_rdlock(const char *file, unsigned line) {
 #else
 void psync_sql_rdlock() { plocks_rdlock(&psync_db_lock); }
 #endif
+
+
+void psync_list_bulder_add_sql(psync_list_builder_t *builder,
+                               psync_sql_res *res,
+                               psync_list_builder_sql_callback callback) {
+  psync_variant_row row;
+  while ((row = psync_sql_fetch_row(res))) {
+    if (!builder->last_elements ||
+        builder->last_elements->used >= builder->elements_per_list) {
+      builder->last_elements = (psync_list_element_list *)malloc(
+          offsetof(psync_list_element_list, elements) +
+          builder->element_size * builder->elements_per_list);
+      psync_list_add_tail(&builder->element_list,
+                          &builder->last_elements->list);
+      builder->last_elements->used = 0;
+    }
+    builder->current_element =
+        builder->last_elements->elements +
+        builder->last_elements->used * builder->element_size;
+    builder->cstrcnt = psync_list_bulder_push_num(builder);
+    *builder->cstrcnt = 0;
+    while (callback(builder, builder->current_element, row)) {
+      row = psync_sql_fetch_row(res);
+      if (!row)
+        break;
+      *builder->cstrcnt = 0;
+    }
+    builder->last_elements->used++;
+    builder->cnt++;
+  }
+  psync_sql_free_result(res);
+}
 
 void psync_sql_rdunlock() {
 #if IS_DEBUG
@@ -1544,374 +1577,6 @@ int psync_match_pattern(const char *name, const char *pattern, size_t plen) {
   return name[i] == 0;
 }
 
-typedef struct {
-  psync_list list;
-  unsigned long used;
-  char elements[];
-} psync_list_element_list;
-
-typedef struct {
-  psync_list list;
-  char *next;
-  char *end;
-} psync_list_string_list;
-
-typedef struct {
-  psync_list list;
-  unsigned long used;
-  uint32_t numbers[1000];
-} psync_list_num_list;
-
-struct psync_list_builder_t_ {
-  size_t element_size;
-  size_t elements_offset;
-  size_t elements_per_list;
-  size_t stringalloc;
-  uint64_t cnt;
-  psync_list element_list;
-  psync_list_element_list *last_elements;
-  psync_list string_list;
-  psync_list_string_list *last_strings;
-  psync_list number_list;
-  psync_list_num_list *last_numbers;
-  unsigned long popoff;
-  char *current_element;
-  uint32_t *cstrcnt;
-};
-
-psync_list_builder_t *psync_list_builder_create(size_t element_size,
-                                                size_t offset) {
-  psync_list_builder_t *builder;
-  builder = malloc(sizeof(psync_list_builder_t));
-  builder->element_size = element_size;
-  builder->elements_offset = offset;
-  if (element_size <= 200)
-    builder->elements_per_list = 40;
-  else
-    builder->elements_per_list = 12;
-  builder->cnt = 0;
-  builder->stringalloc = 0;
-  psync_list_init(&builder->element_list);
-  builder->last_elements = NULL;
-  psync_list_init(&builder->string_list);
-  builder->last_strings = NULL;
-  psync_list_init(&builder->number_list);
-  builder->last_numbers = NULL;
-  return builder;
-}
-
-static uint32_t *psync_list_bulder_push_num(psync_list_builder_t *builder) {
-  if (!builder->last_numbers ||
-      builder->last_numbers->used >=
-          sizeof(builder->last_numbers->numbers) / sizeof(uint32_t)) {
-    psync_list_num_list *l = malloc(sizeof(psync_list_num_list));
-    l->used = 0;
-    builder->last_numbers = l;
-    psync_list_add_tail(&builder->number_list, &l->list);
-  }
-  return &builder->last_numbers->numbers[builder->last_numbers->used++];
-}
-
-static uint32_t psync_list_bulder_pop_num(psync_list_builder_t *builder) {
-  uint32_t ret;
-  ret = builder->last_numbers->numbers[builder->popoff++];
-  if (builder->popoff >= builder->last_numbers->used) {
-    builder->last_numbers = psync_list_element(builder->last_numbers->list.next,
-                                               psync_list_num_list, list);
-    builder->popoff = 0;
-  }
-  return ret;
-}
-
-void psync_list_bulder_add_sql(psync_list_builder_t *builder,
-                               psync_sql_res *res,
-                               psync_list_builder_sql_callback callback) {
-  psync_variant_row row;
-  while ((row = psync_sql_fetch_row(res))) {
-    if (!builder->last_elements ||
-        builder->last_elements->used >= builder->elements_per_list) {
-      builder->last_elements = (psync_list_element_list *)malloc(
-          offsetof(psync_list_element_list, elements) +
-          builder->element_size * builder->elements_per_list);
-      psync_list_add_tail(&builder->element_list,
-                          &builder->last_elements->list);
-      builder->last_elements->used = 0;
-    }
-    builder->current_element =
-        builder->last_elements->elements +
-        builder->last_elements->used * builder->element_size;
-    builder->cstrcnt = psync_list_bulder_push_num(builder);
-    *builder->cstrcnt = 0;
-    while (callback(builder, builder->current_element, row)) {
-      row = psync_sql_fetch_row(res);
-      if (!row)
-        break;
-      *builder->cstrcnt = 0;
-    }
-    builder->last_elements->used++;
-    builder->cnt++;
-  }
-  psync_sql_free_result(res);
-}
-
-void *psync_list_bulder_add_element(psync_list_builder_t *builder) {
-  if (!builder->last_elements ||
-      builder->last_elements->used >= builder->elements_per_list) {
-    builder->last_elements = (psync_list_element_list *)malloc(
-        offsetof(psync_list_element_list, elements) +
-        builder->element_size * builder->elements_per_list);
-    psync_list_add_tail(&builder->element_list, &builder->last_elements->list);
-    builder->last_elements->used = 0;
-  }
-  builder->current_element =
-      builder->last_elements->elements +
-      builder->last_elements->used * builder->element_size;
-  builder->cstrcnt = psync_list_bulder_push_num(builder);
-  *builder->cstrcnt = 0;
-  builder->last_elements->used++;
-  builder->cnt++;
-  return builder->current_element;
-}
-
-void psync_list_add_lstring_offset(psync_list_builder_t *builder, size_t offset,
-                                   size_t length) {
-  char **str, *s;
-  psync_list_string_list *l;
-  length++;
-  str = (char **)(builder->current_element + offset);
-  builder->stringalloc += length;
-  if (unlikely(length > 2000)) {
-    l = (psync_list_string_list *)malloc(sizeof(psync_list_string_list) +
-                                               length);
-    s = (char *)(l + 1);
-    psync_list_add_tail(&builder->string_list, &l->list);
-  } else if (!builder->last_strings || builder->last_strings->next + length >
-                                           builder->last_strings->end) {
-    l = (psync_list_string_list *)malloc(sizeof(psync_list_string_list) +
-                                               4000);
-    s = (char *)(l + 1);
-    l->next = s + length;
-    l->end = s + 4000;
-    psync_list_add_tail(&builder->string_list, &l->list);
-    builder->last_strings = l;
-  } else {
-    s = builder->last_strings->next;
-    builder->last_strings->next += length;
-  }
-  memcpy(s, *str, length);
-  *str = s;
-  *(psync_list_bulder_push_num(builder)) = offset;
-  *(psync_list_bulder_push_num(builder)) = length;
-  (*builder->cstrcnt)++;
-}
-
-void psync_list_add_string_offset(psync_list_builder_t *builder,
-                                  size_t offset) {
-  psync_list_add_lstring_offset(
-      builder, offset, strlen(*((char **)(builder->current_element + offset))));
-}
-
-void *psync_list_builder_finalize(psync_list_builder_t *builder) {
-  char *ret, *elem, *str;
-  char **pstr;
-  psync_list_element_list *el;
-  unsigned long i;
-  uint32_t j, scnt, offset, length;
-  size_t sz;
-  sz = builder->elements_offset + builder->element_size * builder->cnt +
-       builder->stringalloc;
-  pdbg_logf(D_NOTICE, "allocating %lu bytes, %lu of which for strings",
-        (unsigned long)sz, (unsigned long)builder->stringalloc);
-  ret = malloc(sizeof(char) * sz);
-  if (builder->elements_offset <= sizeof(builder->cnt))
-    memcpy(ret, &builder->cnt, builder->elements_offset);
-  else
-    memcpy(ret, &builder->cnt, sizeof(builder->cnt));
-  elem = ret + builder->elements_offset;
-  str = elem + builder->element_size * builder->cnt;
-
-  builder->last_numbers =
-      psync_list_element(builder->number_list.next, psync_list_num_list, list);
-  builder->popoff = 0;
-
-  psync_list_for_each_element(el, &builder->element_list,
-                              psync_list_element_list, list) {
-    for (i = 0; i < el->used; i++) {
-      memcpy(elem, el->elements + (i * builder->element_size),
-             builder->element_size);
-      scnt = psync_list_bulder_pop_num(builder);
-      for (j = 0; j < scnt; j++) {
-        offset = psync_list_bulder_pop_num(builder);
-        length = psync_list_bulder_pop_num(builder);
-        pstr = (char **)(elem + offset);
-        memcpy(str, *pstr, length);
-        *pstr = str;
-        str += length;
-      }
-      elem += builder->element_size;
-    }
-  }
-
-  psync_list_for_each_element_call(&builder->element_list, psync_list_element_list, list, free);
-  psync_list_for_each_element_call(&builder->string_list, psync_list_string_list, list, free);
-  psync_list_for_each_element_call(&builder->number_list, psync_list_num_list, list, free);
-  free(builder);
-  return ret;
-}
-
-#define PSYNC_TASK_STATUS_RUNNING 0
-#define PSYNC_TASK_STATUS_READY 1
-#define PSYNC_TASK_STATUS_DONE 2
-#define PSYNC_TASK_STATUS_RETURNED 3
-
-struct psync_task_t_ {
-  psync_task_callback_t callback;
-  void *param;
-  pthread_cond_t cond;
-  int id;
-  int status;
-};
-
-// #define PSYNC_WAIT_ANYBODY -1 // unused, but may be important later
-#define PSYNC_WAIT_NOBODY -2
-#define PSYNC_WAIT_FREED -3
-
-struct psync_task_manager_t_ {
-  pthread_mutex_t mutex;
-  int taskcnt;
-  int refcnt;
-  int waitfor;
-  struct psync_task_t_ tasks[];
-};
-
-static void psync_task_destroy(psync_task_manager_t tm) {
-  int i;
-  for (i = 0; i < tm->taskcnt; i++)
-    pthread_cond_destroy(&tm->tasks[i].cond);
-  pthread_mutex_destroy(&tm->mutex);
-  free(tm);
-}
-
-static void psync_task_dec_refcnt(psync_task_manager_t tm) {
-  int refcnt;
-  pthread_mutex_lock(&tm->mutex);
-  refcnt = --tm->refcnt;
-  pthread_mutex_unlock(&tm->mutex);
-  if (!refcnt)
-    psync_task_destroy(tm);
-}
-
-static psync_task_manager_t psync_get_manager_of_task(struct psync_task_t_ *t) {
-  return (psync_task_manager_t)(((char *)(t - t->id)) -
-                                offsetof(struct psync_task_manager_t_, tasks));
-}
-
-static void psync_task_entry(void *ptr) {
-  struct psync_task_t_ *t;
-  t = (struct psync_task_t_ *)ptr;
-  t->callback(ptr, t->param);
-  psync_task_dec_refcnt(psync_get_manager_of_task(t));
-}
-
-psync_task_manager_t
-psync_task_run_tasks(psync_task_callback_t const *callbacks,
-                     void *const *params, int cnt) {
-  psync_task_manager_t ret;
-  struct psync_task_t_ *t;
-  int i;
-  ret = (psync_task_manager_t)malloc(
-      offsetof(struct psync_task_manager_t_, tasks) +
-      sizeof(struct psync_task_t_) * cnt);
-  pthread_mutex_init(&ret->mutex, NULL);
-  ret->taskcnt = cnt;
-  ret->refcnt = cnt + 1;
-  ret->waitfor = PSYNC_WAIT_NOBODY;
-  for (i = 0; i < cnt; i++) {
-    t = &ret->tasks[i];
-    t->callback = callbacks[i];
-    t->param = params[i];
-    pthread_cond_init(&t->cond, NULL);
-    t->id = i;
-    t->status = PSYNC_TASK_STATUS_RUNNING;
-    prun_thread1("task", psync_task_entry, t);
-  }
-  return ret;
-}
-
-void *psync_task_papi_result(psync_task_manager_t tm, int id) {
-  void *ret;
-  pthread_mutex_lock(&tm->mutex);
-  if (tm->tasks[id].status == PSYNC_TASK_STATUS_RUNNING) {
-    do {
-      tm->waitfor = id;
-      pthread_cond_wait(&tm->tasks[id].cond, &tm->mutex);
-      tm->waitfor = PSYNC_WAIT_NOBODY;
-    } while (tm->tasks[id].status == PSYNC_TASK_STATUS_RUNNING);
-    ret = tm->tasks[id].param;
-    tm->tasks[id].status = PSYNC_TASK_STATUS_DONE;
-  } else if (tm->tasks[id].status == PSYNC_TASK_STATUS_READY) {
-    ret = tm->tasks[id].param;
-    tm->tasks[id].status = PSYNC_TASK_STATUS_DONE;
-    pthread_cond_signal(&tm->tasks[id].cond);
-  } else {
-    pdbg_logf(D_BUG, "invalid status %d of task id %d", (int)tm->tasks[id].status,
-          id);
-    ret = NULL;
-  }
-  pthread_mutex_unlock(&tm->mutex);
-  return ret;
-}
-
-void psync_task_free(psync_task_manager_t tm) {
-  if (tm->refcnt == 1)
-    psync_task_destroy(tm);
-  else {
-    int refcnt, i;
-    pthread_mutex_lock(&tm->mutex);
-    tm->waitfor = PSYNC_WAIT_FREED;
-    for (i = 0; i < tm->taskcnt; i++)
-      if (tm->tasks[i].status == PSYNC_TASK_STATUS_READY) {
-        tm->tasks[i].status = PSYNC_TASK_STATUS_RETURNED;
-        pthread_cond_signal(&tm->tasks[i].cond);
-      }
-    refcnt = --tm->refcnt;
-    pthread_mutex_unlock(&tm->mutex);
-    if (!refcnt)
-      psync_task_destroy(tm);
-  }
-}
-
-int psync_task_complete(void *h, void *data) {
-  psync_task_manager_t tm;
-  struct psync_task_t_ *t;
-  int ret;
-  t = (struct psync_task_t_ *)h;
-  tm = psync_get_manager_of_task(t);
-  pthread_mutex_lock(&tm->mutex);
-  if (tm->waitfor == t->id) {
-    t->param = data;
-    t->status = PSYNC_TASK_STATUS_READY;
-    pthread_cond_signal(&t->cond);
-    ret = 0;
-  } else if (tm->waitfor == PSYNC_WAIT_NOBODY || tm->waitfor >= 0) {
-    t->param = data;
-    t->status = PSYNC_TASK_STATUS_READY;
-    do {
-      pthread_cond_wait(&t->cond, &tm->mutex);
-    } while (t->status == PSYNC_TASK_STATUS_READY);
-    if (t->status == PSYNC_TASK_STATUS_RETURNED)
-      ret = -1;
-    else
-      ret = 0;
-  } else if (tm->waitfor == PSYNC_WAIT_FREED)
-    ret = -1;
-  else {
-    pdbg_logf(D_BUG, "invalid waitfor value %d", tm->waitfor);
-    ret = -1;
-  }
-  pthread_mutex_unlock(&tm->mutex);
-  return ret;
-}
 
 static uint32_t pq_rnd() {
   static uint32_t a = 0x95ae3d25, b = 0xe225d755, c = 0xc63a2ae7,

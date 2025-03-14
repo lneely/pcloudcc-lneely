@@ -127,7 +127,12 @@ typedef struct {
   psync_folderid_t id;
 } insert_folder_key_task;
 
+struct psync_task_manager_t_;
+
+typedef struct psync_task_manager_t_ *psync_task_manager_t;
+
 typedef void (*psync_async_callback_t)(void *, psync_async_result_t *);
+typedef void (*psync_task_callback_t)(void *, void *);
 
 
 /* Important! The interface typically expect all passed pointers to be alive
@@ -165,5 +170,10 @@ void ptask_upload_q(psync_syncid_t syncid, psync_fileid_t localfileid, const cha
 // crypto folder
 void ptask_cfldr_save_fldrkey(void *ptr);
 void ptask_cfldr_save_filekey(void *ptr);
+
+psync_task_manager_t psync_task_run_tasks(psync_task_callback_t const *callbacks, void *const *params, int cnt);
+void *psync_task_papi_result(psync_task_manager_t tm, int id);
+void psync_task_free(psync_task_manager_t tm);
+int psync_task_complete(void *h, void *data);
 
 #endif

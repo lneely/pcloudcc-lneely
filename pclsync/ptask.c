@@ -58,6 +58,15 @@
 
 #define get_len(t) (sizeof(t) - offsetof(t, request))
 
+#define PSYNC_TASK_STATUS_RUNNING 0
+#define PSYNC_TASK_STATUS_READY 1
+#define PSYNC_TASK_STATUS_DONE 2
+#define PSYNC_TASK_STATUS_RETURNED 3
+
+// #define PSYNC_WAIT_ANYBODY -1 // unused, but may be important later
+#define PSYNC_WAIT_NOBODY -2
+#define PSYNC_WAIT_FREED -3
+
 #define TASK_TYPE_EXIT 0
 #define TASK_TYPE_FILE_DWL 1
 #define TASK_TYPE_FILE_DWL_NM 2
@@ -158,6 +167,22 @@ typedef struct {
   uint64_t remsize;
   int fd;
 } download_context_t;
+
+struct psync_task_t_ {
+  psync_task_callback_t callback;
+  void *param;
+  pthread_cond_t cond;
+  int id;
+  int status;
+};
+
+struct psync_task_manager_t_ {
+  pthread_mutex_t mutex;
+  int taskcnt;
+  int refcnt;
+  int waitfor;
+  struct psync_task_t_ tasks[];
+};
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static int running = 0;
@@ -825,6 +850,35 @@ static int task_send_async(const void *task, size_t len) {
   return ret;
 }
 
+static void psync_task_destroy(psync_task_manager_t tm) {
+  int i;
+  for (i = 0; i < tm->taskcnt; i++)
+    pthread_cond_destroy(&tm->tasks[i].cond);
+  pthread_mutex_destroy(&tm->mutex);
+  free(tm);
+}
+
+static void psync_task_dec_refcnt(psync_task_manager_t tm) {
+  int refcnt;
+  pthread_mutex_lock(&tm->mutex);
+  refcnt = --tm->refcnt;
+  pthread_mutex_unlock(&tm->mutex);
+  if (!refcnt)
+    psync_task_destroy(tm);
+}
+
+static psync_task_manager_t psync_get_manager_of_task(struct psync_task_t_ *t) {
+  return (psync_task_manager_t)(((char *)(t - t->id)) -
+                                offsetof(struct psync_task_manager_t_, tasks));
+}
+
+static void psync_task_entry(void *ptr) {
+  struct psync_task_t_ *t;
+  t = (struct psync_task_t_ *)ptr;
+  t->callback(ptr, t->param);
+  psync_task_dec_refcnt(psync_get_manager_of_task(t));
+}
+
 void ptask_ldir_mk(psync_syncid_t syncid,
                                     psync_folderid_t folderid,
                                     psync_folderid_t localfolderid) {
@@ -1081,4 +1135,106 @@ void ptask_cfldr_save_filekey(void *ptr) {
   psync_sql_run_free(res);
   free(t->key);
   free(t);
+}
+
+// from plibs.c
+
+psync_task_manager_t psync_task_run_tasks(psync_task_callback_t const *callbacks, void *const *params, int cnt) {
+  psync_task_manager_t ret;
+  struct psync_task_t_ *t;
+  int i;
+  ret = (psync_task_manager_t)malloc(
+      offsetof(struct psync_task_manager_t_, tasks) +
+      sizeof(struct psync_task_t_) * cnt);
+  pthread_mutex_init(&ret->mutex, NULL);
+  ret->taskcnt = cnt;
+  ret->refcnt = cnt + 1;
+  ret->waitfor = PSYNC_WAIT_NOBODY;
+  for (i = 0; i < cnt; i++) {
+    t = &ret->tasks[i];
+    t->callback = callbacks[i];
+    t->param = params[i];
+    pthread_cond_init(&t->cond, NULL);
+    t->id = i;
+    t->status = PSYNC_TASK_STATUS_RUNNING;
+    prun_thread1("task", psync_task_entry, t);
+  }
+  return ret;
+}
+
+void *psync_task_papi_result(psync_task_manager_t tm, int id) {
+  void *ret;
+  pthread_mutex_lock(&tm->mutex);
+  if (tm->tasks[id].status == PSYNC_TASK_STATUS_RUNNING) {
+    do {
+      tm->waitfor = id;
+      pthread_cond_wait(&tm->tasks[id].cond, &tm->mutex);
+      tm->waitfor = PSYNC_WAIT_NOBODY;
+    } while (tm->tasks[id].status == PSYNC_TASK_STATUS_RUNNING);
+    ret = tm->tasks[id].param;
+    tm->tasks[id].status = PSYNC_TASK_STATUS_DONE;
+  } else if (tm->tasks[id].status == PSYNC_TASK_STATUS_READY) {
+    ret = tm->tasks[id].param;
+    tm->tasks[id].status = PSYNC_TASK_STATUS_DONE;
+    pthread_cond_signal(&tm->tasks[id].cond);
+  } else {
+    pdbg_logf(D_BUG, "invalid status %d of task id %d", (int)tm->tasks[id].status,
+          id);
+    ret = NULL;
+  }
+  pthread_mutex_unlock(&tm->mutex);
+  return ret;
+}
+
+void psync_task_free(psync_task_manager_t tm) {
+  if (tm->refcnt == 1) {
+    psync_task_destroy(tm);
+  }
+  else {
+    int refcnt, i;
+    pthread_mutex_lock(&tm->mutex);
+    tm->waitfor = PSYNC_WAIT_FREED;
+    for (i = 0; i < tm->taskcnt; i++)
+      if (tm->tasks[i].status == PSYNC_TASK_STATUS_READY) {
+        tm->tasks[i].status = PSYNC_TASK_STATUS_RETURNED;
+        pthread_cond_signal(&tm->tasks[i].cond);
+      }
+    refcnt = --tm->refcnt;
+    pthread_mutex_unlock(&tm->mutex);
+    if (!refcnt) {
+      psync_task_destroy(tm);
+    }
+  }
+}
+
+int psync_task_complete(void *h, void *data) {
+  psync_task_manager_t tm;
+  struct psync_task_t_ *t;
+  int ret;
+  t = (struct psync_task_t_ *)h;
+  tm = psync_get_manager_of_task(t);
+  pthread_mutex_lock(&tm->mutex);
+  if (tm->waitfor == t->id) {
+    t->param = data;
+    t->status = PSYNC_TASK_STATUS_READY;
+    pthread_cond_signal(&t->cond);
+    ret = 0;
+  } else if (tm->waitfor == PSYNC_WAIT_NOBODY || tm->waitfor >= 0) {
+    t->param = data;
+    t->status = PSYNC_TASK_STATUS_READY;
+    do {
+      pthread_cond_wait(&t->cond, &tm->mutex);
+    } while (t->status == PSYNC_TASK_STATUS_READY);
+    if (t->status == PSYNC_TASK_STATUS_RETURNED)
+      ret = -1;
+    else
+      ret = 0;
+  } else if (tm->waitfor == PSYNC_WAIT_FREED)
+    ret = -1;
+  else {
+    pdbg_logf(D_BUG, "invalid waitfor value %d", tm->waitfor);
+    ret = -1;
+  }
+  pthread_mutex_unlock(&tm->mutex);
+  return ret;
 }
