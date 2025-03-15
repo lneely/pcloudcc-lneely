@@ -26,6 +26,9 @@
    USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
    DAMAGE.
 */
+#include <stdio.h>
+#include <string.h>
+
 #include "publiclinks.h"
 #include "papi.h"
 #include "pfsfolder.h"
@@ -33,8 +36,7 @@
 #include "pnetlibs.h"
 #include "prun.h"
 #include "ptimer.h"
-#include <stdio.h>
-#include <string.h>
+#include "psql.h"
 
 #define FOLDERID_ENTRY_SIZE 18
 

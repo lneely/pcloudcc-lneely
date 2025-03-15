@@ -3,7 +3,8 @@
 #include <unistd.h>
 #include <sys/resource.h>
 
-#include "plibs.h"
+#include "pdbg.h"
+#include "psql.h"
 #include "psys.h"
 
 static uid_t psync_uid;

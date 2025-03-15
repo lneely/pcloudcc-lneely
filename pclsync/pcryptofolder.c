@@ -53,6 +53,7 @@
 #include "prun.h"
 #include "psys.h"
 #include "ptask.h"
+#include "psql.h"
 
 #include <string.h>
 

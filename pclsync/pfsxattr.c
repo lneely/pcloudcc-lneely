@@ -31,14 +31,15 @@
 
 #define FUSE_USE_VERSION 26
 
-#include "pfsxattr.h"
-#include "pfsfolder.h"
-#include "pfstasks.h"
-
-#include "plibs.h"
 #include <errno.h>
 #include <fuse.h>
 #include <string.h>
+
+#include "pfsxattr.h"
+#include "pfsfolder.h"
+#include "pfstasks.h"
+#include "psql.h"
+#include "plibs.h"
 
 // needed by psync_fs_set_thread_name
 extern PSYNC_THREAD const char *psync_thread_name; 

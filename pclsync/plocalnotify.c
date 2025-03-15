@@ -45,6 +45,7 @@
 #include "prun.h"
 #include "plist.h"
 #include "plocalscan.h"
+#include "psql.h"
 
 #define NOTIFY_MSG_ADD 0
 #define NOTIFY_MSG_DEL 1

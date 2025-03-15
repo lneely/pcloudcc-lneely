@@ -43,6 +43,7 @@
 #include "psys.h"
 #include "ppath.h"
 #include "pfile.h"
+#include "psql.h"
 
 #include <stddef.h>
 #include <string.h>

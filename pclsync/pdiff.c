@@ -70,6 +70,7 @@
 #include "ptools.h"
 #include "publiclinks.h"
 #include "putil.h"
+#include "psql.h"
 
 #define PSYNC_SQL_DOWNLOAD                                                     \
   "synctype&" NTO_STR(PSYNC_DOWNLOAD_ONLY) "=" NTO_STR(PSYNC_DOWNLOAD_ONLY)

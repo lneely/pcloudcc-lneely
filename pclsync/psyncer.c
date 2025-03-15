@@ -29,13 +29,9 @@
    DAMAGE.
 */
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
 #include <pthread.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "pdownload.h"
 #include "pfile.h"
@@ -50,7 +46,9 @@
 #include "ptask.h"
 #include "ptree.h"
 #include "putil.h"
-#include <string.h>
+#include "pdbg.h"
+#include "psql.h"
+
 
 extern const unsigned char pfile_invalid_chars[];
 

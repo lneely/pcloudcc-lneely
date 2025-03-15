@@ -1,5 +1,7 @@
 #include "pcompiler.h"
-#include "plibs.h"
+#include "psql.h"
+#include "pdbg.h"
+
 #include <sys/mman.h>
 
 void *pmem_mmap(size_t size) {

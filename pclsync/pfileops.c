@@ -33,6 +33,7 @@
 #include "pdiff.h"
 #include "pfoldersync.h"
 #include "plibs.h"
+#include "psql.h"
 
 void pfileops_create_fldr(const binresult *meta) {
   psync_sql_res *res;

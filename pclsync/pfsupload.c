@@ -34,12 +34,6 @@
 #include <string.h>
 #include <pthread.h>
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
-
 #include "pcache.h"
 #include "pdiff.h"
 #include "pfile.h"
@@ -59,6 +53,7 @@
 #include "ptimer.h"
 #include "pupload.h"
 #include "putil.h"
+#include "psql.h"
 
 #include "pqevent.h"
 

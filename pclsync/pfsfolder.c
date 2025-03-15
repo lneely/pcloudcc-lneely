@@ -29,12 +29,8 @@
    DAMAGE.
 */
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "pcryptofolder.h"
 #include "pfoldersync.h"
@@ -43,7 +39,9 @@
 #include "pfstasks.h"
 #include "plibs.h"
 #include "psys.h"
-#include <string.h>
+#include "pdbg.h"
+#include "psql.h"
+
 
 static PSYNC_THREAD int cryptoerr = 0;
 

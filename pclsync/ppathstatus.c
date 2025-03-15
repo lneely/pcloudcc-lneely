@@ -29,23 +29,19 @@
    DAMAGE.
 */
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "pcryptofolder.h"
 #include "pfoldersync.h"
-#include "pfs.h"
 #include "plibs.h"
 #include "plist.h"
 #include "ppathstatus.h"
 #include "pstatus.h"
 #include "ptask.h"
 #include "ptree.h"
-#include <string.h>
+#include "psql.h"
+#include "pfstasks.h"
 
 #define PATH_CACHE_SIZE 512
 #define PATH_HASH_SIZE 512

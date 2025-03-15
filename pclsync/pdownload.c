@@ -48,6 +48,7 @@
 #include "ptask.h"
 #include "ptimer.h"
 #include "pupload.h"
+#include "psql.h"
 #include "ppath.h"
 #include "pfile.h"
 

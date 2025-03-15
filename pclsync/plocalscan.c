@@ -29,13 +29,9 @@
    DAMAGE.
 */
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/sha256.h>
-#include <mbedtls/ssl.h>
 #include <pthread.h>
+#include <ctype.h>
+#include <string.h>
 
 #include "pdevice.h"
 #include "pfile.h"
@@ -56,9 +52,8 @@
 #include "pupload.h"
 #include "ppath.h"
 #include "putil.h"
+#include "psql.h"
 
-#include <ctype.h>
-#include <string.h>
 
 typedef struct {
   psync_list list;

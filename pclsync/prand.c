@@ -8,6 +8,7 @@
 #include "ppath.h"
 #include "prand.h"
 #include "psettings.h"
+#include "psql.h"
 
 static void add_file(const char *fn, psync_lhash_ctx *hctx, size_t max) {
   char buff[4096];

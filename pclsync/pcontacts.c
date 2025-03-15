@@ -32,6 +32,7 @@
 #include "pfileops.h"
 #include "plibs.h"
 #include "pnetlibs.h"
+#include "psql.h"
 
 #include <stdio.h>
 

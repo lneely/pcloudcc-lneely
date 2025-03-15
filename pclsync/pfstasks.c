@@ -35,12 +35,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
-
 #include "pcache.h"
 #include "pcryptofolder.h"
 #include "putil.h"
@@ -52,6 +46,7 @@
 #include "ppathstatus.h"
 #include "psettings.h"
 #include "ptimer.h"
+#include "psql.h"
 
 
 typedef struct {

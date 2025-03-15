@@ -49,6 +49,7 @@
 #include "ppath.h"
 #include "psys.h"
 #include "ptree.h"
+#include "psql.h"
 #include "pfile.h"
 
 // required by psync_send_debug

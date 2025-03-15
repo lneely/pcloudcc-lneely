@@ -29,12 +29,10 @@
    DAMAGE.
 */
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
 #include <pthread.h>
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "pcache.h"
 #include "pcrc32c.h"
@@ -50,12 +48,9 @@
 #include "psys.h"
 #include "putil.h"
 #include "pfile.h"
-
 #include "pstatus.h"
 #include "ptimer.h"
-#include <errno.h>
-#include <stdio.h>
-#include <string.h>
+#include "psql.h"
 
 #define CACHE_PAGES (PSYNC_FS_MEMORY_CACHE / PSYNC_FS_PAGE_SIZE)
 #define CACHE_HASH (CACHE_PAGES / 2)

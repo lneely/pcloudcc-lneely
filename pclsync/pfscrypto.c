@@ -33,12 +33,6 @@
 #include <errno.h>
 #include <pthread.h>
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
-
 #include "pcryptofolder.h"
 #include "pfile.h"
 #include "pfscrypto.h"
@@ -47,6 +41,7 @@
 #include "ppath.h"
 #include "prun.h"
 #include "psys.h"
+#include "psql.h"
 
 // this is only for debug, adds needless checks of tree for local files
 #if IS_DEBUG

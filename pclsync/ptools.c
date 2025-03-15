@@ -33,21 +33,20 @@
 */
 
 #include <stdio.h>
-
-#include "papi.h"
-
-#include "plibs.h"
-#include "pnetlibs.h"
-#include "psettings.h"
-#include "ptools.h"
-#include "stdlib.h"
-#include "string.h"
-
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "papi.h"
+#include "plibs.h"
+#include "pnetlibs.h"
+#include "psettings.h"
+#include "ptools.h"
+#include "psql.h"
 
 char *ptools_get_mac_addr() {
   char buffer[128];

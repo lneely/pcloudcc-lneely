@@ -35,12 +35,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
-
 #include "papi.h"
 #include "pbusinessaccount.h"
 #include "pcache.h"
@@ -83,6 +77,7 @@
 #include "publiclinks.h"
 #include "pupload.h"
 #include "putil.h"
+#include "psql.h"
 
 // Variable containing UNIX time of the last backup file deleted event
 time_t lastBupDelEventTime = 0;

@@ -82,8 +82,6 @@ struct psync_list_builder_t_ {
 struct psync_list_builder_t_;
 
 typedef struct psync_list_builder_t_ psync_list_builder_t;
-
-
 typedef int (*psync_list_compare)(const psync_list *, const psync_list *);
 
 #define psync_list_init(l)                                                     \
@@ -150,5 +148,10 @@ void psync_list_sort(psync_list *l, psync_list_compare cmp);
 void psync_list_extract_repeating(psync_list *l1, psync_list *l2, psync_list *extracted1, psync_list *extracted2, psync_list_compare cmp);
 uint32_t *psync_list_bulder_push_num(psync_list_builder_t *builder);
 uint32_t psync_list_bulder_pop_num(psync_list_builder_t *builder);
+psync_list_builder_t *psync_list_builder_create(size_t element_size, size_t offset);
+void *psync_list_bulder_add_element(psync_list_builder_t *builder);
+void psync_list_add_string_offset(psync_list_builder_t *builder, size_t offset);
+void psync_list_add_lstring_offset(psync_list_builder_t *builder, size_t offset, size_t length);
+void *psync_list_builder_finalize(psync_list_builder_t *builder);
 
 #endif

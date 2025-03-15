@@ -8,6 +8,7 @@
 #include "plibs.h"
 #include "ppath.h"
 #include "psettings.h"
+#include "psql.h"
 
 char *ppath_default_db() {
   char *pcdir, *dbp, *home, *oldp;
