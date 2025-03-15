@@ -11,7 +11,6 @@
 #include "pdbg.h"
 #include "putil.h"
 
-
 static char normalize_table[256];
 
 const char base64_table[] = {
@@ -47,11 +46,8 @@ __attribute((constructor)) static void init() {
     normalize_table['\\'] = '_';
 }
 
-// wipe a segment of memory mem of size sz using a DoD 5220.22-M compliant
-// 3-pass wipe. the first pass overwrites the memory with zeroes, the second
-// with ones, and the third with random data using the urandom entropy
-// source. if the urandom source fails, it falls back to a simple
-// (non-cryptographically-secure) RNG.
+// putil_wipe wipes a segment of memory mem of size sz using a DoD 5220.22-M
+// compliant 3-pass wipe.
 void putil_wipe(void *mem, size_t sz) {
     if (!mem || sz == 0) { return; }
 

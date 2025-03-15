@@ -156,14 +156,9 @@ extern PSYNC_THREAD uint32_t psync_error;
 extern uint16_t const *__hex_lookup;
 
 int psync_rename_conflicted_file(const char *path);
-
 void psync_run_after_sec(psync_run_after_t run, void *ptr, uint32_t seconds);
 void psync_free_after_sec(void *ptr, uint32_t seconds);
-
 int psync_match_pattern(const char *name, const char *pattern, size_t plen);
-
-void psync_pqsort(void *base, size_t cnt, size_t sort_first, size_t size, int (*compar)(const void *, const void *));
-void psync_qpartition(void *base, size_t cnt, size_t sort_first, size_t size, int (*compar)(const void *, const void *));
 
 /* needs 12 characters of buffer space on top of the length of the prefix */
 static inline void psync_get_string_id(char *dst, const char *prefix, uint64_t id) {
