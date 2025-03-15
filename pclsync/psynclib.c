@@ -752,20 +752,23 @@ int psync_add_sync_by_path_delayed(const char *localpath,
   struct stat st;
   int unsigned mbedtls_md;
   if (pdbg_unlikely(synctype < PSYNC_SYNCTYPE_MIN ||
-                   synctype > PSYNC_SYNCTYPE_MAX))
+                   synctype > PSYNC_SYNCTYPE_MAX)) {
     psync_error = PERROR_INVALID_SYNCTYPE;
-  return -1;
+    return -1;
+  }
   if (pdbg_unlikely(stat(localpath, &st)) ||
-      pdbg_unlikely(!pfile_stat_isfolder(&st)))
+      pdbg_unlikely(!pfile_stat_isfolder(&st))) {
     psync_error = PERROR_LOCAL_FOLDER_NOT_FOUND;
-  return -1;
+    return -1;
+  }
   if (synctype & PSYNC_DOWNLOAD_ONLY)
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
-  if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md)))
+  if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md))) {
     psync_error = PERROR_LOCAL_FOLDER_ACC_DENIED;
-  return -1;
+    return -1;
+  }
   res = psync_sql_prep_statement("INSERT INTO syncfolderdelayed (localpath, "
                                  "remotepath, synctype) VALUES (?, ?, ?)");
   psync_sql_bind_string(res, 1, localpath);
