@@ -14,9 +14,9 @@ static int psync_gids_cnt;
 
 static void abort_on_sqllock(uint64_t millisec) {
 #if IS_DEBUG
-  if (psync_sql_islocked()) {
+  if (psql_locked()) {
     pdbg_logf(D_CRITICAL, "trying to sleep while holding sql lock, aborting");
-    psync_sql_dump_locks();
+    psql_dump_locks();
     abort();
   }
 #endif

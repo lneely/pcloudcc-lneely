@@ -467,21 +467,21 @@ int64_t do_ptree_public_link(const char *linkname, const char *root,
     ids2 = (char *)malloc(numfiles * FOLDERID_ENTRY_SIZE);
     idsp = ids2;
     for (i = 0; i < numfiles; ++i) {
-      psync_sql_rdlock();
+      psql_rdlock();
       filep = psync_fsfolder_resolve_path(files[i]);
       if (filep) {
-        res = psync_sql_query_nolock("select id from file where parentfolderid "
+        res = psql_query_nolock("select id from file where parentfolderid "
                                      "= ? and name = ? limit 1");
-        psync_sql_bind_uint(res, 1, filep->folderid);
-        psync_sql_bind_string(res, 2, filep->name);
-        row = psync_sql_fetch_rowint(res);
+        psql_bind_uint(res, 1, filep->folderid);
+        psql_bind_str(res, 2, filep->name);
+        row = psql_fetch_int(res);
         id = row[0];
       } else {
-        psync_sql_rdunlock();
+        psql_rdunlock();
         continue;
       }
-      psync_sql_free_result(res);
-      psync_sql_rdunlock();
+      psql_free(res);
+      psql_rdunlock();
 
       k = sprintf(idsp, "%lld", (long long)id);
       if (unlikely(k <= 0))
@@ -564,8 +564,8 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
   int i, linkscnt;
   psync_sql_res *q;
 
-  q = psync_sql_prep_statement("DELETE FROM links WHERE isincomming = 0 ");
-  psync_sql_run_free(q);
+  q = psql_prepare("DELETE FROM links WHERE isincomming = 0 ");
+  psql_run_free(q);
 
   if (psync_my_auth[0]) {
     binparam params[] = {PAPI_STR("auth", psync_my_auth),
@@ -632,7 +632,7 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
   for (i = 0; i < linkscnt; ++i) {
     link = publinks->array[i];
 
-    q = psync_sql_prep_statement(
+    q = psql_prepare(
         "REPLACE INTO links  (id, code, comment, traffic, maxspace, downloads, "
         "created,"
         " modified, name,  isfolder, folderid, fileid, isincomming, icon, "
@@ -645,69 +645,69 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
       pdbg_logf(D_WARNING, "cache links sql prep return NULL");
       return -1;
     }
-    psync_sql_bind_uint(q, 1,
+    psql_bind_uint(q, 1,
                         papi_find_result2(link, "linkid", PARAM_NUM)->num);
-    psync_sql_bind_string(q, 2,
+    psql_bind_str(q, 2,
                           papi_find_result2(link, "code", PARAM_STR)->str);
-    psync_sql_bind_uint(q, 3, 0);
-    psync_sql_bind_uint(q, 4,
+    psql_bind_uint(q, 3, 0);
+    psql_bind_uint(q, 4,
                         papi_find_result2(link, "traffic", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 5, 0);
-    psync_sql_bind_uint(q, 6,
+    psql_bind_uint(q, 5, 0);
+    psql_bind_uint(q, 6,
                         papi_find_result2(link, "downloads", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 7,
+    psql_bind_uint(q, 7,
                         papi_find_result2(link, "created", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 8,
+    psql_bind_uint(q, 8,
                         papi_find_result2(link, "modified", PARAM_NUM)->num);
     meta = papi_find_result2(link, "metadata", PARAM_HASH);
-    psync_sql_bind_string(q, 9,
+    psql_bind_str(q, 9,
                           papi_find_result2(meta, "name", PARAM_STR)->str);
     if (papi_find_result2(meta, "isfolder", PARAM_BOOL)->num) {
-      psync_sql_bind_uint(q, 10, 1);
-      psync_sql_bind_uint(q, 11,
+      psql_bind_uint(q, 10, 1);
+      psql_bind_uint(q, 11,
                           papi_find_result2(meta, "folderid", PARAM_NUM)->num);
-      psync_sql_bind_uint(q, 12, 0);
+      psql_bind_uint(q, 12, 0);
       if (papi_check_result2(link, "enableduploadforchosenusers", PARAM_BOOL)) {
-        psync_sql_bind_uint(
+        psql_bind_uint(
             q, 20,
             papi_find_result2(link, "enableduploadforchosenusers", PARAM_BOOL)
                 ->num);
       } else {
-        psync_sql_bind_uint(q, 20, 0);
+        psql_bind_uint(q, 20, 0);
       }
       if (papi_check_result2(link, "enableduploadforeveryone", PARAM_BOOL)) {
-        psync_sql_bind_uint(
+        psql_bind_uint(
             q, 21,
             papi_find_result2(link, "enableduploadforeveryone", PARAM_BOOL)
                 ->num);
       } else {
-        psync_sql_bind_uint(q, 21, 0);
+        psql_bind_uint(q, 21, 0);
       }
     } else {
-      psync_sql_bind_uint(q, 10, 0);
-      psync_sql_bind_uint(q, 11, 0);
-      psync_sql_bind_uint(q, 12,
+      psql_bind_uint(q, 10, 0);
+      psql_bind_uint(q, 11, 0);
+      psql_bind_uint(q, 12,
                           papi_find_result2(meta, "fileid", PARAM_NUM)->num);
-      psync_sql_bind_uint(q, 20, 0);
-      psync_sql_bind_uint(q, 21, 0);
+      psql_bind_uint(q, 20, 0);
+      psql_bind_uint(q, 21, 0);
     }
-    psync_sql_bind_uint(q, 13, papi_find_result2(meta, "icon", PARAM_NUM)->num);
-    psync_sql_bind_string(q, 14,
+    psql_bind_uint(q, 13, papi_find_result2(meta, "icon", PARAM_NUM)->num);
+    psql_bind_str(q, 14,
                           papi_find_result2(link, "link", PARAM_STR)->str);
-    psync_sql_bind_uint(
+    psql_bind_uint(
         q, 15, papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num);
-    psync_sql_bind_uint(
+    psql_bind_uint(
         q, 16, papi_find_result2(link, "haspassword", PARAM_BOOL)->num);
-    psync_sql_bind_uint(q, 17,
+    psql_bind_uint(q, 17,
                         papi_find_result2(link, "views", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 18, papi_find_result2(link, "type", PARAM_NUM)->num);
+    psql_bind_uint(q, 18, papi_find_result2(link, "type", PARAM_NUM)->num);
     if (papi_check_result2(link, "expires", PARAM_NUM))
-      psync_sql_bind_uint(q, 19,
+      psql_bind_uint(q, 19,
                           papi_find_result2(link, "expires", PARAM_NUM)->num);
     else
-      psync_sql_bind_uint(q, 19, 0);
+      psql_bind_uint(q, 19, 0);
 
-    psync_sql_run_free(q);
+    psql_run_free(q);
   }
 
   free(bres);
@@ -1095,7 +1095,7 @@ plink_info_list_t *do_psync_list_links(char **err /*OUT*/) {
   builder = psync_list_builder_create(sizeof(link_info_t),
                                       offsetof(plink_info_list_t, entries));
 
-  res = psync_sql_query_rdlock(
+  res = psql_query_rdlock(
       "SELECT id, code, comment, traffic, maxspace, downloads, created,"
       " modified, name,  isfolder, folderid, fileid, isincomming, icon, "
       "fulllink,"
@@ -1104,7 +1104,7 @@ plink_info_list_t *do_psync_list_links(char **err /*OUT*/) {
 
   if (!res)
     return NULL;
-  psync_list_bulder_add_sql(builder, res, create_link);
+  psql_list_add(builder, res, create_link);
 
   return (plink_info_list_t *)psync_list_builder_finalize(builder);
 }
@@ -1193,8 +1193,8 @@ int cache_upload_links(char **err /*OUT*/) {
 
   *err = 0;
 
-  q = psync_sql_prep_statement("DELETE FROM links WHERE isincomming = 1 ");
-  psync_sql_run_free(q);
+  q = psql_prepare("DELETE FROM links WHERE isincomming = 1 ");
+  psql_run_free(q);
 
   if (psync_my_auth[0]) {
     binparam params[] = {PAPI_STR("auth", psync_my_auth),
@@ -1249,53 +1249,53 @@ int cache_upload_links(char **err /*OUT*/) {
   for (i = 0; i < linkscnt; ++i) {
     link = publinks->array[i];
 
-    q = psync_sql_prep_statement(
+    q = psql_prepare(
         "REPLACE INTO links  (id, code, comment, traffic, maxspace, downloads, "
         "created,"
         " modified, name,  isfolder, folderid, fileid, isincomming, icon, "
         "fulllink,"
         " parentfolderid, haspassword, views, type)"
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)");
-    psync_sql_bind_uint(
+    psql_bind_uint(
         q, 1, papi_find_result2(link, "uploadlinkid", PARAM_NUM)->num);
-    psync_sql_bind_string(q, 2,
+    psql_bind_str(q, 2,
                           papi_find_result2(link, "code", PARAM_STR)->str);
-    psync_sql_bind_string(q, 3,
+    psql_bind_str(q, 3,
                           papi_find_result2(link, "comment", PARAM_STR)->str);
-    psync_sql_bind_uint(q, 4, papi_find_result2(link, "space", PARAM_NUM)->num);
+    psql_bind_uint(q, 4, papi_find_result2(link, "space", PARAM_NUM)->num);
     if ((br = papi_check_result2(link, "maxspace", PARAM_NUM)))
-      psync_sql_bind_uint(q, 5, br->num);
+      psql_bind_uint(q, 5, br->num);
     else
-      psync_sql_bind_uint(q, 5, 0);
-    psync_sql_bind_uint(q, 6, papi_find_result2(link, "files", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 7,
+      psql_bind_uint(q, 5, 0);
+    psql_bind_uint(q, 6, papi_find_result2(link, "files", PARAM_NUM)->num);
+    psql_bind_uint(q, 7,
                         papi_find_result2(link, "created", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 8,
+    psql_bind_uint(q, 8,
                         papi_find_result2(link, "modified", PARAM_NUM)->num);
 
     meta = papi_find_result2(link, "metadata", PARAM_HASH);
-    psync_sql_bind_string(q, 9,
+    psql_bind_str(q, 9,
                           papi_find_result2(meta, "name", PARAM_STR)->str);
     if (papi_find_result2(meta, "isfolder", PARAM_BOOL)->num) {
-      psync_sql_bind_uint(q, 10, 1);
-      psync_sql_bind_uint(q, 11,
+      psql_bind_uint(q, 10, 1);
+      psql_bind_uint(q, 11,
                           papi_find_result2(meta, "folderid", PARAM_NUM)->num);
-      psync_sql_bind_uint(q, 12, 0);
+      psql_bind_uint(q, 12, 0);
     } else {
-      psync_sql_bind_uint(q, 10, 0);
-      psync_sql_bind_uint(q, 11, 0);
-      psync_sql_bind_uint(q, 12,
+      psql_bind_uint(q, 10, 0);
+      psql_bind_uint(q, 11, 0);
+      psql_bind_uint(q, 12,
                           papi_find_result2(meta, "fileid", PARAM_NUM)->num);
     }
-    psync_sql_bind_uint(q, 13, papi_find_result2(meta, "icon", PARAM_NUM)->num);
-    psync_sql_bind_string(q, 14,
+    psql_bind_uint(q, 13, papi_find_result2(meta, "icon", PARAM_NUM)->num);
+    psql_bind_str(q, 14,
                           papi_find_result2(link, "link", PARAM_STR)->str);
-    psync_sql_bind_uint(
+    psql_bind_uint(
         q, 15, papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 16, 0);
-    psync_sql_bind_uint(q, 17, 0);
-    psync_sql_bind_uint(q, 18, 0);
-    psync_sql_run_free(q);
+    psql_bind_uint(q, 16, 0);
+    psql_bind_uint(q, 17, 0);
+    psql_bind_uint(q, 18, 0);
+    psql_run_free(q);
   }
 
   free(bres);
@@ -1327,12 +1327,12 @@ int do_delete_all_links(int64_t folderid, int64_t fileid, char **err) {
   psync_uint_row row;
   int ret = 0;
 
-  res = psync_sql_query_rdlock("SELECT id, folderid, fileid, isincomming FROM "
+  res = psql_query_rdlock("SELECT id, folderid, fileid, isincomming FROM "
                                "links where folderid = ? or fileid = ? ");
-  psync_sql_bind_int(res, 1, folderid);
-  psync_sql_bind_int(res, 2, fileid);
+  psql_bind_int(res, 1, folderid);
+  psql_bind_int(res, 2, fileid);
 
-  while ((row = psync_sql_fetch_rowint(res))) {
+  while ((row = psql_fetch_int(res))) {
     if (row[3]) {
       ret = do_psync_delete_upload_link(row[0], err);
       if (ret)
@@ -1352,11 +1352,11 @@ int do_delete_all_folder_links(psync_folderid_t folderid, char **err) {
   int ret = 0;
   uint32_t i;
 
-  res = psync_sql_query_rdlock("SELECT id, folderid, fileid, isincomming FROM "
+  res = psql_query_rdlock("SELECT id, folderid, fileid, isincomming FROM "
                                "links where folderid = ? ");
-  psync_sql_bind_uint(res, 1, folderid);
+  psql_bind_uint(res, 1, folderid);
 
-  rows = psync_sql_fetchall_int(res);
+  rows = psql_fetchall_int(res);
 
   for (i = 0; i < rows->rows; ++i) {
     if (psync_get_result_cell(rows, i, 3)) {
@@ -1378,11 +1378,11 @@ int do_delete_all_file_links(psync_fileid_t fileid, char **err) {
   int ret = 0;
   uint32_t i;
 
-  res = psync_sql_query_rdlock(
+  res = psql_query_rdlock(
       "SELECT id, folderid, fileid, isincomming FROM links where fileid = ? ");
-  psync_sql_bind_uint(res, 1, fileid);
+  psql_bind_uint(res, 1, fileid);
 
-  rows = psync_sql_fetchall_int(res);
+  rows = psql_fetchall_int(res);
 
   for (i = 0; i < rows->rows; ++i) {
     if (psync_get_result_cell(rows, i, 3)) {

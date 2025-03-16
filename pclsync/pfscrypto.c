@@ -2022,9 +2022,9 @@ static void psync_fs_pause_task_by_name(const char *fn) {
     mul *= 256;
   }
   pdbg_logf(D_NOTICE, "pausing taskid %lu", (unsigned long)taskid);
-  res = psync_sql_prep_statement("UPDATE fstask SET status=1 WHERE id=?");
-  psync_sql_bind_uint(res, 1, taskid);
-  psync_sql_run_free(res);
+  res = psql_prepare("UPDATE fstask SET status=1 WHERE id=?");
+  psql_bind_uint(res, 1, taskid);
+  psql_run_free(res);
 }
 
 static void psync_fs_crypto_check_log(char *path, const char *fn) {

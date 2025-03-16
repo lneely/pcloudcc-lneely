@@ -80,7 +80,7 @@ psync_folderid_t pfolder_id(const char *path) {
       path++;
     if (*path == 0) {
       if (res)
-        psync_sql_free_result(res);
+        psql_free(res);
       return cfolderid;
     }
     sl = strchr(path, '/');
@@ -89,18 +89,18 @@ psync_folderid_t pfolder_id(const char *path) {
     else
       len = strlen(path);
     if (!res) {
-      res = psync_sql_query_rdlock(
+      res = psql_query_rdlock(
           "SELECT id FROM folder WHERE parentfolderid=? AND name=?");
       if (pdbg_unlikely(!res)) {
         psync_error = PERROR_DATABASE_ERROR;
         return PSYNC_INVALID_FOLDERID;
       }
     } else
-      psync_sql_reset(res);
+      psql_reset(res);
 
-    psync_sql_bind_uint(res, 1, cfolderid);
-    psync_sql_bind_lstring(res, 2, path, len);
-    row = psync_sql_fetch_rowint(res);
+    psql_bind_uint(res, 1, cfolderid);
+    psql_bind_lstr(res, 2, path, len);
+    row = psql_fetch_int(res);
     if (pdbg_unlikely(!row))
       goto err;
     cfolderid = row[0];
@@ -108,7 +108,7 @@ psync_folderid_t pfolder_id(const char *path) {
   }
 err:
   if (res)
-    psync_sql_free_result(res);
+    psql_free(res);
   psync_error = PERROR_REMOTE_FOLDER_NOT_FOUND;
   return PSYNC_INVALID_FOLDERID;
 }
@@ -119,10 +119,10 @@ static psync_folderid_t wait_folder_id_in_db(psync_folderid_t folderid) {
   int tries;
   tries = 0;
   while (++tries <= 20) {
-    res = psync_sql_query_rdlock("SELECT id FROM folder WHERE id=?");
-    psync_sql_bind_uint(res, 1, folderid);
-    row = psync_sql_fetch_rowint(res);
-    psync_sql_free_result(res);
+    res = psql_query_rdlock("SELECT id FROM folder WHERE id=?");
+    psql_bind_uint(res, 1, folderid);
+    row = psql_fetch_int(res);
+    psql_free(res);
     if (row)
       return folderid;
     psys_sleep_milliseconds(50);
@@ -149,7 +149,7 @@ psync_folderid_t pfolder_id_create(const char *path) {
       path++;
     if (*path == 0) {
       if (res)
-        psync_sql_free_result(res);
+        psql_free(res);
       return wait_folder_id_in_db(cfolderid);
     }
     sl = strchr(path, '/');
@@ -158,17 +158,17 @@ psync_folderid_t pfolder_id_create(const char *path) {
     else
       len = strlen(path);
     if (!res) {
-      res = psync_sql_query_rdlock(
+      res = psql_query_rdlock(
           "SELECT id FROM folder WHERE parentfolderid=? AND name=?");
       if (pdbg_unlikely(!res)) {
         psync_error = PERROR_DATABASE_ERROR;
         return PSYNC_INVALID_FOLDERID;
       }
     } else
-      psync_sql_reset(res);
-    psync_sql_bind_uint(res, 1, cfolderid);
-    psync_sql_bind_lstring(res, 2, path, len);
-    row = psync_sql_fetch_rowint(res);
+      psql_reset(res);
+    psql_bind_uint(res, 1, cfolderid);
+    psql_bind_lstr(res, 2, path, len);
+    row = psql_fetch_int(res);
     if (row)
       cfolderid = row[0];
     else {
@@ -210,12 +210,12 @@ psync_folderid_t pfolder_id_create(const char *path) {
   }
 err:
   if (res)
-    psync_sql_free_result(res);
+    psql_free(res);
   psync_error = PERROR_REMOTE_FOLDER_NOT_FOUND;
   return PSYNC_INVALID_FOLDERID;
 errnet:
   if (res)
-    psync_sql_free_result(res);
+    psql_free(res);
   psync_error = PERROR_OFFLINE;
   return PSYNC_INVALID_FOLDERID;
 }
@@ -247,19 +247,19 @@ static int psync_add_path_to_list(psync_list *lst, psync_folderid_t folderid) {
       psync_list_add_head(lst, &e->list);
       return 0;
     }
-    res = psync_sql_query_rdlock(
+    res = psql_query_rdlock(
         "SELECT parentfolderid, name FROM folder WHERE id=?");
-    psync_sql_bind_uint(res, 1, folderid);
-    row = psync_sql_fetch_row(res);
+    psql_bind_uint(res, 1, folderid);
+    row = psql_fetch(res);
     if (unlikely(!row))
       break;
     folderid = psync_get_number(row[0]);
     str = psync_get_lstring(row[1], &len);
     e = str_to_list_element(str, len);
     psync_list_add_head(lst, &e->list);
-    psync_sql_free_result(res);
+    psql_free(res);
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   pdbg_logf(D_ERROR, "folder %lu not found in database", (unsigned long)folderid);
   return -1;
 }
@@ -304,10 +304,10 @@ static int psync_add_path_to_list_decode(psync_list *lst,
       psync_list_add_head(lst, &e->list);
       return 0;
     }
-    res = psync_sql_query_rdlock(
+    res = psql_query_rdlock(
         "SELECT parentfolderid, name, flags FROM folder WHERE id=?");
-    psync_sql_bind_uint(res, 1, folderid);
-    row = psync_sql_fetch_row(res);
+    psql_bind_uint(res, 1, folderid);
+    row = psql_fetch(res);
     if (pdbg_unlikely(!row))
       break;
     cfolderid = folderid;
@@ -315,7 +315,7 @@ static int psync_add_path_to_list_decode(psync_list *lst,
     folderid = psync_get_number(row[0]);
     str = psync_get_lstring(row[1], &len);
     c = str_to_list_element(str, len);
-    psync_sql_free_result(res);
+    psql_free(res);
     if (e) {
       if (flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
         e = str_list_decode(cfolderid, e);
@@ -326,7 +326,7 @@ static int psync_add_path_to_list_decode(psync_list *lst,
     }
     e = c;
   }
-  psync_sql_free_result(res);
+  psql_free(res);
 err:
   pdbg_logf(D_ERROR, "folder %lu not found in database", (unsigned long)folderid);
   return -1;
@@ -363,9 +363,9 @@ char *pfolder_path(psync_folderid_t folderid, size_t *retlen) {
   char *ret;
   int res;
   psync_list_init(&folderlist);
-  psync_sql_rdlock();
+  psql_rdlock();
   res = psync_add_path_to_list(&folderlist, folderid);
-  psync_sql_rdunlock();
+  psql_rdunlock();
   if (pdbg_unlikely(res)) {
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
@@ -413,27 +413,27 @@ char *pfolder_file_path(psync_fileid_t fileid, size_t *retlen) {
   psync_folderid_t folderid;
   size_t len;
   psync_list_init(&folderlist);
-  psync_sql_rdlock();
-  res = psync_sql_query_rdlock(
+  psql_rdlock();
+  res = psql_query_rdlock(
       "SELECT parentfolderid, name FROM file WHERE id=?");
-  psync_sql_bind_uint(res, 1, fileid);
-  row = psync_sql_fetch_row(res);
+  psql_bind_uint(res, 1, fileid);
+  row = psql_fetch(res);
   if (pdbg_unlikely(!row)) {
-    psync_sql_free_result(res);
-    psync_sql_rdunlock();
+    psql_free(res);
+    psql_rdunlock();
     return PSYNC_INVALID_PATH;
   }
   folderid = psync_get_number(row[0]);
   str = psync_get_lstring(row[1], &len);
   e = str_to_list_element(str, len);
   psync_list_add_head(&folderlist, &e->list);
-  psync_sql_free_result(res);
+  psql_free(res);
   if (pdbg_unlikely(psync_add_path_to_list(&folderlist, folderid))) {
-    psync_sql_rdunlock();
+    psql_rdunlock();
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
   }
-  psync_sql_rdunlock();
+  psql_rdunlock();
   ret = psync_join_string_list("/", &folderlist, retlen);
   psync_free_string_list(&folderlist);
   return ret;
@@ -446,35 +446,35 @@ static int psync_add_local_path_to_list_by_localfolderid(
   psync_variant_row row;
   const char *str;
   size_t len;
-  res = psync_sql_query_rdlock("SELECT localpath FROM syncfolder WHERE id=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  row = psync_sql_fetch_row(res);
+  res = psql_query_rdlock("SELECT localpath FROM syncfolder WHERE id=?");
+  psql_bind_uint(res, 1, syncid);
+  row = psql_fetch(res);
   if (unlikely(!row)) {
     pdbg_logf(D_ERROR, "could not find sync id %lu", (long unsigned)syncid);
-    psync_sql_free_result(res);
+    psql_free(res);
     return -1;
   }
   str = psync_get_lstring(row[0], &len);
   le = str_to_list_element(str, len);
-  psync_sql_free_result(res);
+  psql_free(res);
   while (1) {
     if (localfolderid == 0) {
       psync_list_add_head(lst, &le->list);
       return 0;
     }
-    res = psync_sql_query_rdlock(
+    res = psql_query_rdlock(
         "SELECT localparentfolderid, name FROM localfolder WHERE id=?");
-    psync_sql_bind_uint(res, 1, localfolderid);
-    row = psync_sql_fetch_row(res);
+    psql_bind_uint(res, 1, localfolderid);
+    row = psql_fetch(res);
     if (unlikely(!row))
       break;
     localfolderid = psync_get_number(row[0]);
     str = psync_get_lstring(row[1], &len);
     e = str_to_list_element(str, len);
     psync_list_add_head(lst, &e->list);
-    psync_sql_free_result(res);
+    psql_free(res);
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   psync_list_add_head(lst, &le->list);
   pdbg_logf(D_ERROR, "local folder %lu not found in database",
         (unsigned long)localfolderid);
@@ -487,10 +487,10 @@ char *pfolder_lpath_lfldr(psync_folderid_t localfolderid,
   char *ret;
   int res;
   psync_list_init(&folderlist);
-  psync_sql_rdlock();
+  psql_rdlock();
   res = psync_add_local_path_to_list_by_localfolderid(&folderlist,
                                                       localfolderid, syncid);
-  psync_sql_rdunlock();
+  psql_rdunlock();
   if (pdbg_unlikely(res)) {
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
@@ -513,13 +513,13 @@ char *pfolder_lpath_lfile(psync_fileid_t localfileid,
   psync_syncid_t syncid;
   int rs;
   psync_list_init(&folderlist);
-  psync_sql_rdlock();
-  res = psync_sql_query_nolock(
+  psql_rdlock();
+  res = psql_query_nolock(
       "SELECT localparentfolderid, syncid, name FROM localfile WHERE id=?");
-  psync_sql_bind_uint(res, 1, localfileid);
-  if (pdbg_unlikely(!(row = psync_sql_fetch_row(res)))) {
-    psync_sql_free_result(res);
-    psync_sql_rdunlock();
+  psql_bind_uint(res, 1, localfileid);
+  if (pdbg_unlikely(!(row = psql_fetch(res)))) {
+    psql_free(res);
+    psql_rdunlock();
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
   }
@@ -527,11 +527,11 @@ char *pfolder_lpath_lfile(psync_fileid_t localfileid,
   syncid = psync_get_number(row[1]);
   str = psync_get_lstring(row[2], &len);
   e = str_to_list_element(str, len);
-  psync_sql_free_result(res);
+  psql_free(res);
   psync_list_add_head(&folderlist, &e->list);
   rs = psync_add_local_path_to_list_by_localfolderid(&folderlist, localfolderid,
                                                      syncid);
-  psync_sql_rdunlock();
+  psql_rdunlock();
   if (pdbg_unlikely(rs)) {
     psync_free_string_list(&folderlist);
     return PSYNC_INVALID_PATH;
@@ -612,22 +612,22 @@ pfolder_list_t *pfolder_remote_folders(psync_folderid_t folderid,
   char *tmp;
   int parentencrypted = 0;
   if (listtype & PLIST_FOLDERS) {
-    res = psync_sql_query_rdlock("SELECT flags FROM folder WHERE id=?");
-    psync_sql_bind_uint(res, 1, folderid);
-    if ((row = psync_sql_fetch_row(res))) {
+    res = psql_query_rdlock("SELECT flags FROM folder WHERE id=?");
+    psql_bind_uint(res, 1, folderid);
+    if ((row = psql_fetch(res))) {
       parentencrypted =
           (psync_get_number(row[0]) & PSYNC_FOLDER_FLAG_ENCRYPTED) ? 1 : 0;
     } else {
       pdbg_logf(D_ERROR, "Can't find folder with id %lu", folderid);
-      psync_sql_free_result(res);
+      psql_free(res);
       return NULL;
     }
-    psync_sql_free_result(res);
-    res = psync_sql_query_rdlock(
+    psql_free(res);
+    res = psql_query_rdlock(
         "SELECT id, permissions, name, userid, flags FROM folder WHERE "
         "parentfolderid=? ORDER BY name");
-    psync_sql_bind_uint(res, 1, folderid);
-    while ((row = psync_sql_fetch_row(res))) {
+    psql_bind_uint(res, 1, folderid);
+    while ((row = psql_fetch(res))) {
       entry.folder.folderid = psync_get_number(row[0]);
       perms = psync_get_number(row[1]);
       flags = psync_get_number(row[4]);
@@ -666,13 +666,13 @@ pfolder_list_t *pfolder_remote_folders(psync_folderid_t folderid,
       entry.isfolder = 1;
       folder_list_add(list, &entry);
     }
-    psync_sql_free_result(res);
+    psql_free(res);
   }
   if (listtype & PLIST_FILES) {
-    res = psync_sql_query_rdlock(
+    res = psql_query_rdlock(
         "SELECT id, size, name FROM file WHERE parentfolderid=? ORDER BY name");
-    psync_sql_bind_uint(res, 1, folderid);
-    while ((row = psync_sql_fetch_row(res))) {
+    psql_bind_uint(res, 1, folderid);
+    while ((row = psql_fetch(res))) {
       entry.file.fileid = psync_get_number(row[0]);
       entry.file.size = psync_get_number(row[1]);
       entry.name = psync_get_lstring(row[2], &namelen);
@@ -680,7 +680,7 @@ pfolder_list_t *pfolder_remote_folders(psync_folderid_t folderid,
       entry.isfolder = 0;
       folder_list_add(list, &entry);
     }
-    psync_sql_free_result(res);
+    psql_free(res);
   }
   return folder_list_finalize(list);
 }
@@ -755,11 +755,11 @@ pentry_t *pfolder_stat(const char *remotepath) {
   }
   len++;
   olen -= len;
-  res = psync_sql_query_rdlock("SELECT id, permissions, userid, flags FROM "
+  res = psql_query_rdlock("SELECT id, permissions, userid, flags FROM "
                                "folder WHERE parentfolderid=? AND name=?");
-  psync_sql_bind_uint(res, 1, folderid);
-  psync_sql_bind_lstring(res, 2, remotepath + len, olen);
-  if ((row = psync_sql_fetch_rowint(res))) {
+  psql_bind_uint(res, 1, folderid);
+  psql_bind_lstr(res, 2, remotepath + len, olen);
+  if ((row = psql_fetch_int(res))) {
     ret = (pentry_t *)malloc(sizeof(pentry_t) + olen + 1);
     ret->folder.folderid = row[0];
     ret->folder.cansyncup = ((row[1] & PSYNC_PERM_WRITE) == PSYNC_PERM_WRITE);
@@ -770,15 +770,15 @@ pentry_t *pfolder_stat(const char *remotepath) {
     ret->namelen = olen;
     ret->isfolder = 1;
     memcpy(ret + 1, remotepath + len, olen + 1);
-    psync_sql_free_result(res);
+    psql_free(res);
     return ret;
   }
-  psync_sql_free_result(res);
-  res = psync_sql_query_rdlock(
+  psql_free(res);
+  res = psql_query_rdlock(
       "SELECT id, size FROM file WHERE parentfolderid=? AND name=?");
-  psync_sql_bind_uint(res, 1, folderid);
-  psync_sql_bind_lstring(res, 2, remotepath + len, olen);
-  if ((row = psync_sql_fetch_rowint(res))) {
+  psql_bind_uint(res, 1, folderid);
+  psql_bind_lstr(res, 2, remotepath + len, olen);
+  if ((row = psql_fetch_int(res))) {
     ret = (pentry_t *)malloc(sizeof(pentry_t) + olen + 1);
     ret->file.fileid = row[0];
     ret->file.size = row[1];
@@ -786,10 +786,10 @@ pentry_t *pfolder_stat(const char *remotepath) {
     ret->namelen = olen;
     ret->isfolder = 0;
     memcpy(ret + 1, remotepath + len, olen + 1);
-    psync_sql_free_result(res);
+    psql_free(res);
     return ret;
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   return NULL;
 }
 
@@ -831,9 +831,9 @@ psync_folder_list_t *pfolder_sync_folders(char *syncTypes) {
                    "WHERE folderid IS NOT NULL");
   }
 
-  res = psync_sql_query_rdlock(sql);
+  res = psql_query_rdlock(sql);
 
-  while ((row = psync_sql_fetch_row(res))) {
+  while ((row = psql_fetch(res))) {
     if (alloced == lastfolder) {
       alloced = (alloced + 32) * 2;
       folders = (psync_tmp_folder_t *)realloc(
@@ -862,7 +862,7 @@ psync_folder_list_t *pfolder_sync_folders(char *syncTypes) {
     folders[lastfolder].synctype = psync_get_number(row[3]);
     lastfolder++;
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   l = offsetof(psync_folder_list_t, folders) +
       sizeof(psync_folder_t) * lastfolder;
   ret = (psync_folder_list_t *)malloc(l + strlens);

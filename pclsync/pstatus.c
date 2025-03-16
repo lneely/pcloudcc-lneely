@@ -153,11 +153,11 @@ static void proc_recalc_upload() {
 void pstatus_init() {
   memset(&psync_status, 0, sizeof(psync_status));
   statuses[PSTATUS_TYPE_RUN] =
-      psync_sql_cellint("SELECT value FROM setting WHERE id='runstatus'", 0);
+      psql_cellint("SELECT value FROM setting WHERE id='runstatus'", 0);
   if (statuses[PSTATUS_TYPE_RUN] < PSTATUS_RUN_RUN ||
       statuses[PSTATUS_TYPE_RUN] > PSTATUS_RUN_STOP) {
     statuses[PSTATUS_TYPE_RUN] = PSTATUS_RUN_RUN;
-    psync_sql_statement(
+    psql_statement(
         "REPLACE INTO setting (id, value) VALUES ('runstatus', " NTO_STR(
             PSTATUS_RUN_RUN) ")");
   }
@@ -169,17 +169,17 @@ void pstatus_init() {
 void pstatus_download_recalc() {
   psync_sql_res *res;
   psync_uint_row row;
-  res = psync_sql_query_rdlock("SELECT COUNT(*), SUM(f.size) FROM task t, file "
+  res = psql_query_rdlock("SELECT COUNT(*), SUM(f.size) FROM task t, file "
                                "f WHERE t.type=? AND t.itemid=f.id");
-  psync_sql_bind_uint(res, 1, PSYNC_DOWNLOAD_FILE);
-  if ((row = psync_sql_fetch_rowint(res))) {
+  psql_bind_uint(res, 1, PSYNC_DOWNLOAD_FILE);
+  if ((row = psql_fetch_int(res))) {
     psync_status.filestodownload = row[0];
     psync_status.bytestodownload = row[1];
   } else {
     psync_status.filestodownload = 0;
     psync_status.bytestodownload = 0;
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   if (!psync_status.filestodownload) {
     psync_status.downloadspeed = 0;
   }
@@ -195,24 +195,24 @@ void pstatus_upload_recalc() {
   struct stat st;
   uint64_t bytestou;
   uint32_t filestou;
-  res = psync_sql_query_rdlock(
+  res = psql_query_rdlock(
       "SELECT COUNT(*), SUM(f.size) FROM task t, localfile f WHERE t.type=? "
       "AND t.localitemid=f.id");
-  psync_sql_bind_uint(res, 1, PSYNC_UPLOAD_FILE);
-  if ((row = psync_sql_fetch_rowint(res))) {
+  psql_bind_uint(res, 1, PSYNC_UPLOAD_FILE);
+  if ((row = psql_fetch_int(res))) {
     filestou = row[0];
     bytestou = row[1];
   } else {
     filestou = 0;
     bytestou = 0;
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   fscpath = psync_setting_get_string(_PS(fscachepath));
-  res = psync_sql_query_rdlock("SELECT id FROM fstask WHERE type IN (" NTO_STR(
+  res = psql_query_rdlock("SELECT id FROM fstask WHERE type IN (" NTO_STR(
       PSYNC_FS_TASK_CREAT) ", " NTO_STR(PSYNC_FS_TASK_MODIFY) ") AND text1 NOT "
                                                               "LIKE '.%'"
                                                               " AND status!=3");
-  while ((row = psync_sql_fetch_rowint(res))) {
+  while ((row = psql_fetch_int(res))) {
     psync_binhex(fileidhex, &row[0], sizeof(psync_fsfileid_t));
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
@@ -224,7 +224,7 @@ void pstatus_upload_recalc() {
     }
     free(filename);
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   psync_status.filestoupload = filestou;
   psync_status.bytestoupload = bytestou;
   if (!filestou)

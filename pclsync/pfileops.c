@@ -42,7 +42,7 @@ void pfileops_create_fldr(const binresult *meta) {
   flags = 0;
   if ((name = papi_check_result2(meta, "encrypted", PARAM_BOOL)) && name->num)
     flags |= PSYNC_FOLDER_FLAG_ENCRYPTED;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "INSERT OR IGNORE INTO folder (id, parentfolderid, userid, permissions, "
       "name, ctime, mtime, flags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
   if (papi_find_result2(meta, "ismine", PARAM_BOOL)->num) {
@@ -53,19 +53,19 @@ void pfileops_create_fldr(const binresult *meta) {
     perms = pfileops_get_perms(meta);
   }
   name = papi_find_result2(meta, "name", PARAM_STR);
-  psync_sql_bind_uint(res, 1,
+  psql_bind_uint(res, 1,
                       papi_find_result2(meta, "folderid", PARAM_NUM)->num);
-  psync_sql_bind_uint(
+  psql_bind_uint(
       res, 2, papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num);
-  psync_sql_bind_uint(res, 3, userid);
-  psync_sql_bind_uint(res, 4, perms);
-  psync_sql_bind_lstring(res, 5, name->str, name->length);
-  psync_sql_bind_uint(res, 6,
+  psql_bind_uint(res, 3, userid);
+  psql_bind_uint(res, 4, perms);
+  psql_bind_lstr(res, 5, name->str, name->length);
+  psql_bind_uint(res, 6,
                       papi_find_result2(meta, "created", PARAM_NUM)->num);
-  psync_sql_bind_uint(res, 7,
+  psql_bind_uint(res, 7,
                       papi_find_result2(meta, "modified", PARAM_NUM)->num);
-  psync_sql_bind_uint(res, 8, flags);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 8, flags);
+  psql_run_free(res);
 }
 
 void pfileops_update_fldr(const binresult *meta) {

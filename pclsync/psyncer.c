@@ -150,20 +150,20 @@ int psyncer_dl_has_folder(psync_folderid_t folderid) {
 
 void psyncer_folder_inc_tasks(psync_folderid_t lfolderid) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "UPDATE localfolder SET taskcnt=taskcnt+1 WHERE id=?");
-  psync_sql_bind_uint(res, 1, lfolderid);
-  psync_sql_run_free(res);
-  pdbg_assertw(psync_sql_affected_rows() == 1);
+  psql_bind_uint(res, 1, lfolderid);
+  psql_run_free(res);
+  pdbg_assertw(psql_affected() == 1);
 }
 
 void psyncer_folder_dec_tasks(psync_folderid_t lfolderid) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "UPDATE localfolder SET taskcnt=taskcnt+1 WHERE id=?");
-  psync_sql_bind_uint(res, 1, lfolderid);
-  psync_sql_run_free(res);
-  pdbg_assertw(psync_sql_affected_rows() == 1);
+  psql_bind_uint(res, 1, lfolderid);
+  psql_run_free(res);
+  pdbg_assertw(psql_affected() == 1);
 }
 
 psync_folderid_t psyncer_db_folder_create(
@@ -176,16 +176,16 @@ psync_folderid_t psyncer_db_folder_create(
   char *vname;
   pdbg_logf(D_NOTICE, "creating local folder in db as %lu/%s for folderid %lu",
         (unsigned long)localparentfolderid, name, (unsigned long)folderid);
-  res = psync_sql_query(
+  res = psql_query(
       "SELECT id FROM localfolder WHERE syncid=? AND folderid=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  psync_sql_bind_uint(res, 2, folderid);
-  row = psync_sql_fetch_rowint(res);
+  psql_bind_uint(res, 1, syncid);
+  psql_bind_uint(res, 2, folderid);
+  row = psql_fetch_int(res);
   if (row)
     lfolderid = row[0];
   else
     lfolderid = 0;
-  psync_sql_free_result(res);
+  psql_free(res);
   if (lfolderid)
     return lfolderid;
   vname = NULL;
@@ -198,27 +198,27 @@ psync_folderid_t psyncer_db_folder_create(
       }
   if (vname)
     name = vname;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "INSERT OR IGNORE INTO localfolder (localparentfolderid, folderid, "
       "syncid, flags, taskcnt, name) VALUES (?, ?, ?, 0, 1, ?)");
-  psync_sql_bind_uint(res, 1, localparentfolderid);
-  psync_sql_bind_uint(res, 2, folderid);
-  psync_sql_bind_uint(res, 3, syncid);
-  psync_sql_bind_string(res, 4, name);
-  psync_sql_run(res);
-  if (psync_sql_affected_rows() > 0) {
-    lfolderid = psync_sql_insertid();
-    psync_sql_free_result(res);
+  psql_bind_uint(res, 1, localparentfolderid);
+  psql_bind_uint(res, 2, folderid);
+  psql_bind_uint(res, 3, syncid);
+  psql_bind_str(res, 4, name);
+  psql_run(res);
+  if (psql_affected() > 0) {
+    lfolderid = psql_insertid();
+    psql_free(res);
     free(vname);
     return lfolderid;
   }
-  psync_sql_free_result(res);
-  res = psync_sql_query("SELECT id, folderid FROM localfolder WHERE "
+  psql_free(res);
+  res = psql_query("SELECT id, folderid FROM localfolder WHERE "
                         "localparentfolderid=? AND syncid=? AND name=?");
-  psync_sql_bind_uint(res, 1, localparentfolderid);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_string(res, 3, name);
-  row = psync_sql_fetch_rowint(res);
+  psql_bind_uint(res, 1, localparentfolderid);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_str(res, 3, name);
+  row = psql_fetch_int(res);
   if (row) {
     lfolderid = row[0];
     dbfolderid = row[1];
@@ -227,16 +227,16 @@ psync_folderid_t psyncer_db_folder_create(
     dbfolderid = 0;
     pdbg_logf(D_ERROR, "local folder %s not found in the database", name);
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   if (lfolderid && dbfolderid != folderid) {
     pdbg_logf(D_NOTICE,
           "local folder %lu does not have folderid associated, setting to %lu",
           (unsigned long)lfolderid, (unsigned long)folderid);
-    res = psync_sql_prep_statement(
+    res = psql_prepare(
         "UPDATE localfolder SET folderid=? WHERE id=?");
-    psync_sql_bind_uint(res, 1, lfolderid);
-    psync_sql_bind_uint(res, 2, folderid);
-    psync_sql_run_free(res);
+    psql_bind_uint(res, 1, lfolderid);
+    psql_bind_uint(res, 2, folderid);
+    psql_run_free(res);
   }
   psyncer_folder_inc_tasks(lfolderid);
   free(vname);
@@ -252,18 +252,18 @@ void psyncer_dl_folder_add(psync_syncid_t syncid,
   const char *name;
   psync_folderid_t cfolderid, clfolderid;
   res =
-      psync_sql_prep_statement("REPLACE INTO syncedfolder (syncid, folderid, "
+      psql_prepare("REPLACE INTO syncedfolder (syncid, folderid, "
                                "localfolderid, synctype) VALUES (?, ?, ?, ?)");
-  psync_sql_bind_uint(res, 1, syncid);
-  psync_sql_bind_uint(res, 2, folderid);
-  psync_sql_bind_uint(res, 3, lfoiderid);
-  psync_sql_bind_uint(res, 4, synctype);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, syncid);
+  psql_bind_uint(res, 2, folderid);
+  psql_bind_uint(res, 3, lfoiderid);
+  psql_bind_uint(res, 4, synctype);
+  psql_run_free(res);
   psyncer_dl_queue_add(folderid);
-  res = psync_sql_query(
+  res = psql_query(
       "SELECT id, permissions, name FROM folder WHERE parentfolderid=?");
-  psync_sql_bind_uint(res, 1, folderid);
-  while ((row = psync_sql_fetch_row(res))) {
+  psql_bind_uint(res, 1, folderid);
+  while ((row = psql_fetch(res))) {
     if (psync_get_number(row[1]) & PSYNC_PERM_READ) {
       name = psync_get_string(row[2]);
       if (psync_is_name_to_ignore(name))
@@ -276,17 +276,17 @@ void psyncer_dl_folder_add(psync_syncid_t syncid,
                                         clfolderid /*, path*/);
     }
   }
-  psync_sql_free_result(res);
-  res = psync_sql_query("SELECT id, name FROM file WHERE parentfolderid=?");
-  psync_sql_bind_uint(res, 1, folderid);
-  while ((row = psync_sql_fetch_row(res))) {
+  psql_free(res);
+  res = psql_query("SELECT id, name FROM file WHERE parentfolderid=?");
+  psql_bind_uint(res, 1, folderid);
+  while ((row = psql_fetch(res))) {
     name = psync_get_string(row[1]);
     if (psync_is_name_to_ignore(name))
       continue;
     ptask_download_q(syncid, psync_get_number(row[0]), lfoiderid,
                                     name);
   }
-  psync_sql_free_result(res);
+  psql_free(res);
 }
 
 static void psync_sync_newsyncedfolder(psync_syncid_t syncid) {
@@ -295,38 +295,38 @@ static void psync_sync_newsyncedfolder(psync_syncid_t syncid) {
   uint64_t folderid;
   psync_synctype_t synctype;
   char *localpath;
-  psync_sql_start_transaction();
-  res = psync_sql_query("SELECT folderid, synctype, localpath FROM syncfolder "
+  psql_start();
+  res = psql_query("SELECT folderid, synctype, localpath FROM syncfolder "
                         "WHERE id=? AND flags=0");
-  psync_sql_bind_uint(res, 1, syncid);
-  row = psync_sql_fetch_row(res);
+  psql_bind_uint(res, 1, syncid);
+  row = psql_fetch(res);
   if (pdbg_unlikely(!row)) {
-    psync_sql_free_result(res);
-    psync_sql_rollback_transaction();
+    psql_free(res);
+    psql_rollback();
     return;
   }
   folderid = psync_get_number(row[0]);
   synctype = psync_get_number(row[1]);
   localpath =
       psync_strndup(psync_get_string(row[2]), strlen(psync_get_string(row[2])));
-  psync_sql_free_result(res);
+  psql_free(res);
   if (synctype & PSYNC_DOWNLOAD_ONLY) {
     psyncer_dl_folder_add(syncid, synctype, folderid, 0);
   } else {
-    res = psync_sql_prep_statement(
+    res = psql_prepare(
         "REPLACE INTO syncedfolder (syncid, folderid, localfolderid, synctype) "
         "VALUES (?, ?, 0, ?)");
-    psync_sql_bind_uint(res, 1, syncid);
-    psync_sql_bind_uint(res, 2, folderid);
-    psync_sql_bind_uint(res, 3, synctype);
-    psync_sql_run_free(res);
+    psql_bind_uint(res, 1, syncid);
+    psql_bind_uint(res, 2, folderid);
+    psql_bind_uint(res, 3, synctype);
+    psql_run_free(res);
   }
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "UPDATE syncfolder SET flags=1 WHERE flags=0 AND id=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  psync_sql_run_free(res);
-  if (pdbg_likely(psync_sql_affected_rows())) {
-    if (!psync_sql_commit_transaction()) {
+  psql_bind_uint(res, 1, syncid);
+  psql_run_free(res);
+  if (pdbg_likely(psql_affected())) {
+    if (!psql_commit()) {
       if (synctype & PSYNC_UPLOAD_ONLY)
         psync_wake_localscan();
       if (synctype & PSYNC_DOWNLOAD_ONLY) {
@@ -338,7 +338,7 @@ static void psync_sync_newsyncedfolder(psync_syncid_t syncid) {
       psync_restat_sync_folders_add(syncid, localpath);
     }
   } else
-    psync_sql_rollback_transaction();
+    psql_rollback();
   free(localpath);
 }
 
@@ -355,20 +355,20 @@ void psyncer_create(psync_syncid_t syncid) {
 
 static void psync_syncer_thread() {
   int64_t syncid;
-  psync_sql_lock();
-  if (psync_sql_cellint("SELECT COUNT(*) FROM task", -1) == 0)
-    psync_sql_statement("DELETE FROM syncfolder WHERE folderid IS NULL");
-  while ((syncid = psync_sql_cellint("SELECT id FROM syncfolder WHERE flags=0",
+  psql_lock();
+  if (psql_cellint("SELECT COUNT(*) FROM task", -1) == 0)
+    psql_statement("DELETE FROM syncfolder WHERE folderid IS NULL");
+  while ((syncid = psql_cellint("SELECT id FROM syncfolder WHERE flags=0",
                                      -1)) != -1)
     psync_sync_newsyncedfolder(syncid);
-  psync_sql_unlock();
+  psql_unlock();
 }
 
 static void delete_delayed_sync(uint64_t id) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("DELETE FROM syncfolderdelayed WHERE id=?");
-  psync_sql_bind_uint(res, 1, id);
-  psync_sql_run_free(res);
+  res = psql_prepare("DELETE FROM syncfolderdelayed WHERE id=?");
+  psql_bind_uint(res, 1, id);
+  psql_run_free(res);
 }
 
 int psyncer_str_has_prefix(const char *str1, const char *str2) {
@@ -423,9 +423,9 @@ void psyncer_check_delayed() {
   psync_folderid_t folderid;
   int unsigned mbedtls_md;
 re:
-  res = psync_sql_query(
+  res = psql_query(
       "SELECT id, localpath, remotepath, synctype FROM syncfolderdelayed");
-  while ((row = psync_sql_fetch_row(res))) {
+  while ((row = psql_fetch(res))) {
     id = psync_get_number(row[0]);
     localpath = (char *)psync_get_string(row[1]);
     remotepath = (char *)psync_get_string(row[2]);
@@ -444,8 +444,8 @@ re:
       continue;
     }
     mbedtls_md = 0;
-    res2 = psync_sql_query("SELECT localpath FROM syncfolder");
-    while ((srow = psync_sql_fetch_rowstr(res2)))
+    res2 = psql_query("SELECT localpath FROM syncfolder");
+    while ((srow = psql_fetch_str(res2)))
       if (psyncer_str_has_prefix(srow[0], localpath)) {
         pdbg_logf(
             D_WARNING,
@@ -458,7 +458,7 @@ re:
               localpath, remotepath, srow[0]);
         mbedtls_md = 1;
       }
-    psync_sql_free_result(res2);
+    psql_free(res2);
     if (mbedtls_md) {
       delete_delayed_sync(id);
       continue;
@@ -466,7 +466,7 @@ re:
 
     localpath = psync_strdup(localpath);
     remotepath = psync_strdup(remotepath);
-    psync_sql_free_result(res);
+    psql_free(res);
 
     folderid = pfolder_id_create(remotepath);
     if (unlikely(folderid == PSYNC_INVALID_FOLDERID)) {
@@ -479,54 +479,54 @@ re:
       } else
         return;
     }
-    psync_sql_start_transaction();
+    psql_start();
     delete_delayed_sync(id);
-    stmt = psync_sql_query_nolock("SELECT id FROM folder WHERE id=?");
-    psync_sql_bind_uint(stmt, 1, folderid);
-    urow = psync_sql_fetch_rowint(stmt);
-    psync_sql_free_result(stmt);
+    stmt = psql_query_nolock("SELECT id FROM folder WHERE id=?");
+    psql_bind_uint(stmt, 1, folderid);
+    urow = psql_fetch_int(stmt);
+    psql_free(stmt);
     if (!urow) {
-      psync_sql_commit_transaction();
+      psql_commit();
       free(localpath);
       free(remotepath);
       goto re;
     }
-    stmt = psync_sql_prep_statement(
+    stmt = psql_prepare(
         "INSERT OR IGNORE INTO syncfolder (folderid, localpath, synctype, "
         "flags, inode, deviceid) VALUES (?, ?, ?, 0, ?, ?)");
-    psync_sql_bind_uint(stmt, 1, folderid);
-    psync_sql_bind_string(stmt, 2, localpath);
-    psync_sql_bind_uint(stmt, 3, synctype);
-    psync_sql_bind_uint(stmt, 4, pfile_stat_inode(&st));
-    psync_sql_bind_uint(stmt, 5, pfile_stat_device(&st));
-    psync_sql_run(stmt);
-    if (pdbg_likely(psync_sql_affected_rows()))
-      syncid = psync_sql_insertid();
+    psql_bind_uint(stmt, 1, folderid);
+    psql_bind_str(stmt, 2, localpath);
+    psql_bind_uint(stmt, 3, synctype);
+    psql_bind_uint(stmt, 4, pfile_stat_inode(&st));
+    psql_bind_uint(stmt, 5, pfile_stat_device(&st));
+    psql_run(stmt);
+    if (pdbg_likely(psql_affected()))
+      syncid = psql_insertid();
     else
       syncid = -1;
-    psync_sql_free_result(stmt);
+    psql_free(stmt);
     free(localpath);
     free(remotepath);
-    if (!psync_sql_commit_transaction() && syncid != -1) {
+    if (!psql_commit() && syncid != -1) {
       ppathstatus_reload_syncs();
       psyncer_create(syncid);
       goto re;
     }
     return;
   }
-  psync_sql_free_result(res);
+  psql_free(res);
 }
 
 void psyncer_init() {
   psync_sql_res *res;
   psync_uint_row row;
-  res = psync_sql_query(
+  res = psql_query(
       "SELECT folderid FROM syncedfolder WHERE synctype&" NTO_STR(
           PSYNC_DOWNLOAD_ONLY) "=" NTO_STR(PSYNC_DOWNLOAD_ONLY));
   pthread_mutex_lock(&sync_down_mutex);
-  while ((row = psync_sql_fetch_rowint(res)))
+  while ((row = psql_fetch_int(res)))
     psync_add_folder_to_downloadlist_locked(row[0]);
   pthread_mutex_unlock(&sync_down_mutex);
-  psync_sql_free_result(res);
+  psql_free(res);
   prun_thread("syncer", psync_syncer_thread);
 }

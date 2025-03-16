@@ -327,16 +327,16 @@ void get_ba_member_email(uint64_t userid, char **email /*OUT*/,
   psync_variant_row row;
   const char *cstr;
   *length = 0;
-  res = psync_sql_query("SELECT mail FROM baccountemail WHERE id=?");
-  psync_sql_bind_uint(res, 1, userid);
-  if ((row = psync_sql_fetch_row(res))) {
+  res = psql_query("SELECT mail FROM baccountemail WHERE id=?");
+  psql_bind_uint(res, 1, userid);
+  if ((row = psql_fetch(res))) {
     cstr = psync_get_lstring(row[0], length);
     *email = (char *)malloc(*length);
     memcpy(*email, cstr, *length);
-    psync_sql_free_result(res);
+    psql_free(res);
     return;
   } else
-    psync_sql_free_result(res);
+    psql_free(res);
 
   {
     binresult *bres;
@@ -373,13 +373,13 @@ void get_ba_member_email(uint64_t userid, char **email /*OUT*/,
 
     if (*length) {
       psync_sql_res *q;
-      q = psync_sql_prep_statement("REPLACE INTO baccountemail  (id, mail, "
+      q = psql_prepare("REPLACE INTO baccountemail  (id, mail, "
                                    "firstname, lastname) VALUES (?, ?, ?, ?)");
-      psync_sql_bind_uint(q, 1, userid);
-      psync_sql_bind_lstring(q, 2, *email, *length);
-      psync_sql_bind_lstring(q, 3, fname, strlen(fname));
-      psync_sql_bind_lstring(q, 4, lname, strlen(lname));
-      psync_sql_run_free(q);
+      psql_bind_uint(q, 1, userid);
+      psql_bind_lstr(q, 2, *email, *length);
+      psql_bind_lstr(q, 3, fname, strlen(fname));
+      psql_bind_lstr(q, 4, lname, strlen(lname));
+      psql_run_free(q);
     }
   }
 }
@@ -393,16 +393,16 @@ void get_ba_team_name(uint64_t teamid, char **name /*OUT*/,
   binresult *bres;
   const binresult *teams;
 
-  res = psync_sql_query("SELECT name FROM baccountteam WHERE id=?");
-  psync_sql_bind_uint(res, 1, teamid);
-  if ((row = psync_sql_fetch_row(res))) {
+  res = psql_query("SELECT name FROM baccountteam WHERE id=?");
+  psql_bind_uint(res, 1, teamid);
+  if ((row = psql_fetch(res))) {
     cstr = psync_get_lstring(row[0], length);
     *name = (char *)malloc(*length);
     memcpy(*name, cstr, *length);
-    psync_sql_free_result(res);
+    psql_free(res);
     return;
   } else
-    psync_sql_free_result(res);
+    psql_free(res);
 
   // pdbg_logf(D_NOTICE, "Account_teams numids %d\n", nids);
   binparam params[] = {PAPI_STR("auth", psync_my_auth),
@@ -435,11 +435,11 @@ void get_ba_team_name(uint64_t teamid, char **name /*OUT*/,
   free(bres);
 
   psync_sql_res *q;
-  q = psync_sql_prep_statement(
+  q = psql_prepare(
       "REPLACE INTO baccountteam  (id, name) VALUES (?, ?)");
-  psync_sql_bind_uint(q, 1, teamid);
-  psync_sql_bind_lstring(q, 2, *name, *length);
-  psync_sql_run_free(q);
+  psql_bind_uint(q, 1, teamid);
+  psql_bind_lstr(q, 2, *name, *length);
+  psql_run_free(q);
 
   return;
 }
@@ -476,10 +476,10 @@ void cache_account_emails() {
     goto end_close;
   } else {
     psync_sql_res *q;
-    psync_sql_start_transaction();
-    q = psync_sql_prep_statement("DELETE FROM baccountemail");
-    if (unlikely(psync_sql_run_free(q))) {
-      psync_sql_rollback_transaction();
+    psql_start();
+    q = psql_prepare("DELETE FROM baccountemail");
+    if (unlikely(psql_run_free(q))) {
+      psql_rollback();
       goto end_close;
     }
 
@@ -500,20 +500,20 @@ void cache_account_emails() {
       lname = papi_find_result2(user, "lastname", PARAM_STR)->str;
 
       if (userid && (active || frozen)) {
-        res = psync_sql_prep_statement(
+        res = psql_prepare(
             "INSERT INTO baccountemail  (id, mail, firstname, lastname) VALUES "
             "(?, ?, ?, ?)");
-        psync_sql_bind_uint(res, 1, userid);
-        psync_sql_bind_lstring(res, 2, nameret, strlen(nameret));
-        psync_sql_bind_lstring(res, 3, fname, strlen(fname));
-        psync_sql_bind_lstring(res, 4, lname, strlen(lname));
-        if (unlikely(psync_sql_run_free(res))) {
-          psync_sql_rollback_transaction();
+        psql_bind_uint(res, 1, userid);
+        psql_bind_lstr(res, 2, nameret, strlen(nameret));
+        psql_bind_lstr(res, 3, fname, strlen(fname));
+        psql_bind_lstr(res, 4, lname, strlen(lname));
+        if (unlikely(psql_run_free(res))) {
+          psql_rollback();
           goto end_close;
         }
       }
     }
-    psync_sql_commit_transaction();
+    psql_commit();
   }
 end_close:
   free(bres);
@@ -555,10 +555,10 @@ void cache_account_teams() {
     return;
   } else {
     psync_sql_res *q;
-    psync_sql_start_transaction();
-    q = psync_sql_prep_statement("DELETE FROM baccountteam");
-    if (unlikely(psync_sql_run_free(q)))
-      psync_sql_rollback_transaction();
+    psql_start();
+    q = psql_prepare("DELETE FROM baccountteam");
+    if (unlikely(psql_run_free(q)))
+      psql_rollback();
 
     for (i = 0; i < users->length; ++i) {
       const char *nameret = 0;
@@ -569,14 +569,14 @@ void cache_account_teams() {
       teamid = papi_find_result2(users->array[i], "id", PARAM_NUM)->num;
       // pdbg_logf(D_NOTICE, "Team name %s team id %lld\n", nameret,(long
       // long)teamid);
-      res = psync_sql_prep_statement(
+      res = psql_prepare(
           "INSERT INTO baccountteam  (id, name) VALUES (?, ?)");
-      psync_sql_bind_uint(res, 1, teamid);
-      psync_sql_bind_lstring(res, 2, nameret, strlen(nameret));
-      if (unlikely(psync_sql_run_free(res)))
-        psync_sql_rollback_transaction();
+      psql_bind_uint(res, 1, teamid);
+      psql_bind_lstr(res, 2, nameret, strlen(nameret));
+      if (unlikely(psql_run_free(res)))
+        psql_rollback();
     }
-    psync_sql_commit_transaction();
+    psql_commit();
   }
   free(bres);
   return;
@@ -594,10 +594,10 @@ static void cache_my_team(const binresult *team1) {
   teamid = papi_find_result2(team, "id", PARAM_NUM)->num;
   // pdbg_logf(D_NOTICE, "My Team name %s team id %lld\n", nameret,(long
   // long)teamid);
-  q = psync_sql_prep_statement("INSERT INTO myteams  (id, name) VALUES (?, ?)");
-  psync_sql_bind_uint(q, 1, teamid);
-  psync_sql_bind_lstring(q, 2, nameret, strlen(nameret));
-  psync_sql_run_free(q);
+  q = psql_prepare("INSERT INTO myteams  (id, name) VALUES (?, ?)");
+  psql_bind_uint(q, 1, teamid);
+  psql_bind_lstr(q, 2, nameret, strlen(nameret));
+  psql_run_free(q);
 }
 
 void cache_ba_my_teams() {
@@ -628,15 +628,15 @@ void cache_ba_my_teams() {
     return;
   }
 
-  psync_sql_lock();
-  q = psync_sql_prep_statement("DELETE FROM myteams");
-  psync_sql_run_free(q);
+  psql_lock();
+  q = psql_prepare("DELETE FROM myteams");
+  psql_run_free(q);
   user = users->array[0];
   teams = papi_find_result2(user, "teams", PARAM_ARRAY);
   for (i = 0; i < teams->length; i++)
     cache_my_team(teams->array[i]);
   free(bres);
-  psync_sql_unlock();
+  psql_unlock();
 }
 
 int api_error_result(binresult *res) {
@@ -669,27 +669,27 @@ void psync_update_cryptostatus() {
     if (api_error_result(res))
       return;
 
-    q = psync_sql_prep_statement(
+    q = psql_prepare(
         "REPLACE INTO setting (id, value) VALUES (?, ?)");
 
     is_business = papi_find_result2(res, "business", PARAM_BOOL)->num;
 
     u = papi_find_result2(res, "cryptosetup", PARAM_BOOL)->num;
-    psync_sql_bind_string(q, 1, "cryptosetup");
-    psync_sql_bind_uint(q, 2, u);
-    psync_sql_run(q);
+    psql_bind_str(q, 1, "cryptosetup");
+    psql_bind_uint(q, 2, u);
+    psql_run(q);
     if (u)
       crst = 1;
-    psync_sql_bind_string(q, 1, "cryptosubscription");
+    psql_bind_str(q, 1, "cryptosubscription");
     crsub = papi_find_result2(res, "cryptosubscription", PARAM_BOOL)->num;
-    psync_sql_bind_uint(q, 2, crsub);
-    psync_sql_run(q);
+    psql_bind_uint(q, 2, crsub);
+    psql_run(q);
 
     cres = papi_check_result2(res, "cryptoexpires", PARAM_NUM);
     crexp = cres ? cres->num : 0;
-    psync_sql_bind_string(q, 1, "cryptoexpires");
-    psync_sql_bind_uint(q, 2, crexp);
-    psync_sql_run(q);
+    psql_bind_str(q, 1, "cryptoexpires");
+    psql_bind_uint(q, 2, crexp);
+    psql_run(q);
 
     if (is_business || crsub) {
       if (crst)
@@ -706,10 +706,10 @@ void psync_update_cryptostatus() {
           crstat = 2;
       }
     }
-    psync_sql_bind_string(q, 1, "cryptostatus");
-    psync_sql_bind_uint(q, 2, crstat);
-    psync_sql_run(q);
-    psync_sql_free_result(q);
+    psql_bind_str(q, 1, "cryptostatus");
+    psql_bind_uint(q, 2, crstat);
+    psql_run(q);
+    psql_free(q);
   }
 }
 
@@ -719,9 +719,9 @@ static int check_write_permissions(psync_folderid_t folderid) {
   int ret = 0;
 
   res =
-      psync_sql_query("SELECT permissions, flags, name FROM folder WHERE id=?");
-  psync_sql_bind_uint(res, 1, folderid);
-  row = psync_sql_fetch_rowint(res);
+      psql_query("SELECT permissions, flags, name FROM folder WHERE id=?");
+  psql_bind_uint(res, 1, folderid);
+  row = psql_fetch_int(res);
   if (unlikely(!row))
     pdbg_logf(D_ERROR, "could not find folder of folderid %lu",
           (unsigned long)folderid);
@@ -729,7 +729,7 @@ static int check_write_permissions(psync_folderid_t folderid) {
                                                 (row[0] & PSYNC_PERM_CREATE)))
     ret = 1;
 
-  psync_sql_free_result(res);
+  psql_free(res);
   return ret;
 }
 static psync_folderid_t create_index_folder(const char *path) {

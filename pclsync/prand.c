@@ -35,13 +35,13 @@ static void load_sql(psync_lhash_ctx *hctx, psync_sql_res *res) {
   psync_variant_row row;
   struct timespec tm;
   int i;
-  while ((row = psync_sql_fetch_row(res))) {
+  while ((row = psql_fetch(res))) {
     for (i = 0; i < res->column_count; i++)
       if (row[i].type == PSYNC_TSTRING)
         psync_lhash_update(hctx, row[i].str, row[i].length);
     psync_lhash_update(hctx, row, sizeof(psync_variant) * res->column_count);
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   clock_gettime(CLOCK_REALTIME, &tm);
   psync_lhash_update(hctx, &tm, sizeof(tm));
 }
@@ -140,16 +140,16 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
     unsigned char rnd[PSYNC_LHASH_DIGEST_LEN];
     clock_gettime(CLOCK_REALTIME, &tm);
     psync_lhash_update(&hctx, &tm, sizeof(tm));
-    res = psync_sql_query_rdlock("SELECT * FROM setting ORDER BY RANDOM()");
+    res = psql_query_rdlock("SELECT * FROM setting ORDER BY RANDOM()");
     load_sql(&hctx, res);
-    res = psync_sql_query_rdlock(
+    res = psql_query_rdlock(
         "SELECT * FROM resolver ORDER BY RANDOM() LIMIT 50");
     load_sql(&hctx, res);
-    psync_sql_statement(
+    psql_statement(
         "REPLACE INTO setting (id, value) VALUES ('random', RANDOM())");
     clock_gettime(CLOCK_REALTIME, &tm);
     psync_lhash_update(&hctx, &tm, sizeof(tm));
-    psync_sql_sync();
+    psql_sync();
     clock_gettime(CLOCK_REALTIME, &tm);
     psync_lhash_update(&hctx, &tm, sizeof(tm));
     sqlite3_randomness(sizeof(rnd), rnd);
@@ -183,20 +183,20 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
   memcpy(hashbin, seed, PSYNC_LHASH_DIGEST_LEN);
   rehash_cnt(hashbin, 2000);
   psync_binhex(hashhex, hashbin, PSYNC_LHASH_DIGEST_LEN);
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "REPLACE INTO setting (id, value) VALUES ('randomhash', ?)");
-  psync_sql_bind_lstring(res, 1, hashhex, PSYNC_LHASH_DIGEST_HEXLEN);
-  psync_sql_run_free(res);
+  psql_bind_lstr(res, 1, hashhex, PSYNC_LHASH_DIGEST_HEXLEN);
+  psql_run_free(res);
   rehash_cnt(hashbin, 2000);
   psync_binhex(hashhex, hashbin, PSYNC_LHASH_DIGEST_LEN);
   memcpy(nm, "randomhash", 10);
   nm[10] = hashhex[0];
   nm[11] = 0;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "REPLACE INTO setting (id, value) VALUES (?, ?)");
-  psync_sql_bind_lstring(res, 1, nm, 11);
-  psync_sql_bind_lstring(res, 2, hashhex, PSYNC_LHASH_DIGEST_HEXLEN);
-  psync_sql_run_free(res);
+  psql_bind_lstr(res, 1, nm, 11);
+  psql_bind_lstr(res, 2, hashhex, PSYNC_LHASH_DIGEST_HEXLEN);
+  psql_run_free(res);
 
   pdbg_logf(D_NOTICE, "out");
 }

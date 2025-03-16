@@ -74,11 +74,11 @@ int do_call_contactlist(result_visitor vis, void *param) {
     pdbg_logf(D_WARNING, "Account_users returned empty result!\n");
     return -2;
   } else {
-    psync_sql_start_transaction();
-    psync_sql_statement("DELETE FROM contacts");
+    psql_start();
+    psql_statement("DELETE FROM contacts");
     for (i = 0; i < contacts->length; ++i)
       vis(i, contacts->array[i], param);
-    psync_sql_commit_transaction();
+    psql_commit();
   }
 
   free(bres);
@@ -94,10 +94,10 @@ static void insert_cache_contact(int i, const binresult *user, void *_this) {
   // char_field = papi_find_result2(user, "name", PARAM_STR)->str; // not
   id = papi_find_result2(user, "source", PARAM_NUM)->num;
   if ((id == 1) || (id == 3)) {
-    q = psync_sql_prep_statement("REPLACE INTO contacts  (mail) VALUES (?)");
+    q = psql_prepare("REPLACE INTO contacts  (mail) VALUES (?)");
     char_field = papi_find_result2(user, "value", PARAM_STR)->str;
-    psync_sql_bind_lstring(q, 1, char_field, strlen(char_field));
-    psync_sql_run_free(q);
+    psql_bind_lstr(q, 1, char_field, strlen(char_field));
+    psql_run_free(q);
   }
 }
 
@@ -128,7 +128,7 @@ pcontacts_list_t *do_psync_list_contacts() {
   psync_sql_res *res;
   builder = psync_list_builder_create(sizeof(contact_info_t),
                                       offsetof(pcontacts_list_t, entries));
-  res = psync_sql_query_rdlock(
+  res = psql_query_rdlock(
       "select mail, ifnull(name, ' ') , 0 as teamid, 1 as type from contacts "
       "union all "
       "select  mail, (firstname||' '||lastname) as name, 0 as teamid , 2 as "
@@ -136,7 +136,7 @@ pcontacts_list_t *do_psync_list_contacts() {
       "union all "
       "select  '' as mail, name , id as teamid, 3 as type from baccountteam "
       "ORDER BY name ");
-  psync_list_bulder_add_sql(builder, res, create_contact);
+  psql_list_add(builder, res, create_contact);
 
   return (pcontacts_list_t *)psync_list_builder_finalize(builder);
 }
@@ -146,10 +146,10 @@ pcontacts_list_t *do_psync_list_myteams() {
   psync_sql_res *res;
   builder = psync_list_builder_create(sizeof(contact_info_t),
                                       offsetof(pcontacts_list_t, entries));
-  res = psync_sql_query_rdlock(
+  res = psql_query_rdlock(
       "SELECT  '' AS mail, name , id AS teamid, 3 AS type FROM myteams "
       "ORDER BY name ");
-  psync_list_bulder_add_sql(builder, res, create_contact);
+  psql_list_add(builder, res, create_contact);
 
   return (pcontacts_list_t *)psync_list_builder_finalize(builder);
 }
@@ -169,28 +169,28 @@ static void process_shares_out(const binresult *shares_out, int shcnt) {
     psync_get_current_userid(&owneruserid);
     isincomming = (folderowneruserid == owneruserid) ? 0 : 1;
 
-    q = psync_sql_prep_statement(
+    q = psql_prepare(
         "REPLACE INTO sharedfolder (id, folderid, ctime, permissions, userid, "
         "mail, name, isincoming) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     // pdbg_logf(D_NOTICE, "INSERT NORMAL SHARE OUT id: %lld", (long long)
     // papi_find_result2(share, "shareid", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 1,
+    psql_bind_uint(q, 1,
                         papi_find_result2(share, "shareid", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 2,
+    psql_bind_uint(q, 2,
                         papi_find_result2(share, "folderid", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 3,
+    psql_bind_uint(q, 3,
                         papi_find_result2(share, "created", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 4, pfileops_get_perms(share));
-    psync_sql_bind_uint(q, 5,
+    psql_bind_uint(q, 4, pfileops_get_perms(share));
+    psql_bind_uint(q, 5,
                         papi_find_result2(share, "touserid", PARAM_NUM)->num);
     br = papi_find_result2(share, "tomail", PARAM_STR);
-    psync_sql_bind_lstring(q, 6, br->str, br->length);
+    psql_bind_lstr(q, 6, br->str, br->length);
     if (!(br = papi_check_result2(share, "foldername", PARAM_STR)))
       br = papi_check_result2(share, "sharename", PARAM_STR);
-    psync_sql_bind_lstring(q, 7, br->str, br->length);
-    psync_sql_bind_uint(q, 8, isincomming);
-    psync_sql_run_free(q);
+    psql_bind_lstr(q, 7, br->str, br->length);
+    psql_bind_uint(q, 8, isincomming);
+    psql_run_free(q);
   }
 }
 
@@ -203,27 +203,27 @@ static void process_shares_in(const binresult *shares_in, int shcnt) {
   for (i = 0; i < shcnt; ++i) {
     share = shares_in->array[i];
 
-    q = psync_sql_prep_statement(
+    q = psql_prepare(
         "REPLACE INTO sharedfolder (id, isincoming, folderid, ctime, "
         "permissions, userid, mail, name) "
         "VALUES (?, 1, ?, ?, ?, ?, ?, ?)");
     // pdbg_logf(D_WARNING, "INSERT NORMAL SHARE IN id: %lld", (long long)
     // papi_find_result2(share, "shareid", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 1,
+    psql_bind_uint(q, 1,
                         papi_find_result2(share, "shareid", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 2,
+    psql_bind_uint(q, 2,
                         papi_find_result2(share, "folderid", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 3,
+    psql_bind_uint(q, 3,
                         papi_find_result2(share, "created", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 4, pfileops_get_perms(share));
-    psync_sql_bind_uint(q, 5,
+    psql_bind_uint(q, 4, pfileops_get_perms(share));
+    psql_bind_uint(q, 5,
                         papi_find_result2(share, "fromuserid", PARAM_NUM)->num);
     br = papi_find_result2(share, "frommail", PARAM_STR);
-    psync_sql_bind_lstring(q, 6, br->str, br->length);
+    psql_bind_lstr(q, 6, br->str, br->length);
     if (!(br = papi_check_result2(share, "foldername", PARAM_STR)))
       br = papi_check_result2(share, "sharename", PARAM_STR);
-    psync_sql_bind_lstring(q, 7, br->str, br->length);
-    psync_sql_run_free(q);
+    psql_bind_lstr(q, 7, br->str, br->length);
+    psql_run_free(q);
   }
 }
 
@@ -242,33 +242,33 @@ static void process_shares_req_out(const binresult *shares_out, int shcnt) {
     psync_get_current_userid(&owneruserid);
     isincomming = (folderowneruserid == owneruserid) ? 0 : 1;
 
-    q = psync_sql_prep_statement(
+    q = psql_prepare(
         "REPLACE INTO sharerequest (id, folderid, ctime, etime, permissions, "
         "userid, mail, name, message,  isincoming, isba) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    psync_sql_bind_uint(
+    psql_bind_uint(
         q, 1, papi_find_result2(share, "sharerequestid", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 2,
+    psql_bind_uint(q, 2,
                         papi_find_result2(share, "folderid", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 3,
+    psql_bind_uint(q, 3,
                         papi_find_result2(share, "created", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 4,
+    psql_bind_uint(q, 4,
                         papi_find_result2(share, "expires", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 5, pfileops_get_perms(share));
-    psync_sql_bind_uint(q, 6, folderowneruserid);
+    psql_bind_uint(q, 5, pfileops_get_perms(share));
+    psql_bind_uint(q, 6, folderowneruserid);
     br = papi_find_result2(share, "tomail", PARAM_STR);
-    psync_sql_bind_lstring(q, 7, br->str, br->length);
+    psql_bind_lstr(q, 7, br->str, br->length);
     if (!(br = papi_check_result2(share, "foldername", PARAM_STR)))
       br = papi_check_result2(share, "sharename", PARAM_STR);
-    psync_sql_bind_lstring(q, 8, br->str, br->length);
+    psql_bind_lstr(q, 8, br->str, br->length);
     br = papi_check_result2(share, "message", PARAM_STR);
     if (br)
-      psync_sql_bind_lstring(q, 9, br->str, br->length);
+      psql_bind_lstr(q, 9, br->str, br->length);
     else
-      psync_sql_bind_null(q, 9);
-    psync_sql_bind_uint(q, 10, isincomming);
-    psync_sql_bind_uint(q, 11, isincomming);
-    psync_sql_run_free(q);
+      psql_bind_null(q, 9);
+    psql_bind_uint(q, 10, isincomming);
+    psql_bind_uint(q, 11, isincomming);
+    psql_run_free(q);
   }
 }
 
@@ -288,34 +288,34 @@ static void process_shares_req_in(const binresult *shares_in, int shcnt) {
       isincomming = (folderowneruserid == owneruserid) ? 0 : 1;
     }
 
-    q = psync_sql_prep_statement(
+    q = psql_prepare(
         "REPLACE INTO sharerequest (id, folderid, ctime, etime, permissions, "
         "userid, mail, name, message, isincoming, isba) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    psync_sql_bind_uint(
+    psql_bind_uint(
         q, 1, papi_find_result2(share, "sharerequestid", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 2,
+    psql_bind_uint(q, 2,
                         papi_find_result2(share, "folderid", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 3,
+    psql_bind_uint(q, 3,
                         papi_find_result2(share, "created", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 4,
+    psql_bind_uint(q, 4,
                         papi_find_result2(share, "expires", PARAM_NUM)->num);
-    psync_sql_bind_uint(q, 5, pfileops_get_perms(share));
-    psync_sql_bind_uint(q, 6,
+    psql_bind_uint(q, 5, pfileops_get_perms(share));
+    psql_bind_uint(q, 6,
                         papi_find_result2(share, "fromuserid", PARAM_NUM)->num);
     br = papi_find_result2(share, "frommail", PARAM_STR);
-    psync_sql_bind_lstring(q, 7, br->str, br->length);
+    psql_bind_lstr(q, 7, br->str, br->length);
     if (!(br = papi_check_result2(share, "foldername", PARAM_STR)))
       br = papi_check_result2(share, "sharename", PARAM_STR);
-    psync_sql_bind_lstring(q, 8, br->str, br->length);
+    psql_bind_lstr(q, 8, br->str, br->length);
     br = papi_check_result2(share, "message", PARAM_STR);
     if (br)
-      psync_sql_bind_lstring(q, 9, br->str, br->length);
+      psql_bind_lstr(q, 9, br->str, br->length);
     else
-      psync_sql_bind_null(q, 9);
-    psync_sql_bind_uint(q, 10, isincomming);
-    psync_sql_bind_uint(q, 11, !isincomming);
-    psync_sql_run_free(q);
+      psql_bind_null(q, 9);
+    psql_bind_uint(q, 10, isincomming);
+    psql_bind_uint(q, 11, !isincomming);
+    psql_run_free(q);
   }
 }
 
@@ -368,13 +368,13 @@ void cache_shares() {
 
   shares = papi_find_result2(bres, "shares", PARAM_HASH);
 
-  psync_sql_start_transaction();
+  psql_start();
 
-  q = psync_sql_prep_statement("DELETE FROM sharerequest ");
-  psync_sql_run_free(q);
+  q = psql_prepare("DELETE FROM sharerequest ");
+  psql_run_free(q);
 
-  q = psync_sql_prep_statement("DELETE FROM sharedfolder ");
-  psync_sql_run_free(q);
+  q = psql_prepare("DELETE FROM sharedfolder ");
+  psql_run_free(q);
 
   array = papi_find_result2(shares, "outgoing", PARAM_ARRAY);
 
@@ -405,7 +405,7 @@ void cache_shares() {
     process_shares_req_in(array, shcnt);
   }
 
-  psync_sql_commit_transaction();
+  psql_commit();
 
   free(bres);
 }

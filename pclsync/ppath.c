@@ -30,7 +30,7 @@ char *ppath_default_db() {
 
       if (oldp) {
         if (!stat(oldp, &st)) {
-          if (psync_sql_reopen(oldp)) {
+          if (psql_reopen(oldp)) {
             free(dbp);
             return oldp;
           } else {

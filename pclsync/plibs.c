@@ -67,7 +67,6 @@ static const uint8_t __hex_lookupl[513] = {"000102030405060708090a0b0c0d0e0f"
 
 uint16_t const *__hex_lookup = (uint16_t *)__hex_lookupl;
 
-
 char psync_my_auth[64] = "", psync_my_2fa_code[32], *psync_my_user = NULL,
      *psync_my_pass = NULL, *psync_my_2fa_token = NULL,
      *psync_my_verify_token = NULL;

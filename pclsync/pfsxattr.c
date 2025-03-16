@@ -85,9 +85,9 @@ enum {
 
 static void delete_object_id(uint64_t oid) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("DELETE FROM fsxattr WHERE objectid=?");
-  psync_sql_bind_uint(res, 1, oid);
-  psync_sql_run_free(res);
+  res = psql_prepare("DELETE FROM fsxattr WHERE objectid=?");
+  psql_bind_uint(res, 1, oid);
+  psql_run_free(res);
 }
 
 void psync_fs_file_deleted(psync_fileid_t fileid) {
@@ -104,11 +104,11 @@ void psync_fs_task_deleted(uint64_t taskid) {
 
 static void update_object_id(uint64_t ooid, uint64_t noid) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "UPDATE OR REPLACE fsxattr SET objectid=? WHERE objectid=?");
-  psync_sql_bind_uint(res, 1, noid);
-  psync_sql_bind_uint(res, 2, ooid);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, noid);
+  psql_bind_uint(res, 2, ooid);
+  psql_run_free(res);
 }
 
 void psync_fs_task_to_file(uint64_t taskid, psync_fileid_t fileid) {
@@ -165,10 +165,10 @@ static int64_t xattr_get_object_id_locked(const char *path) {
       else if (cr->fileid == 0)
         return static_taskid_to_objid(cr->taskid);
       else {
-        res = psync_sql_query_nolock(
+        res = psql_query_nolock(
             "SELECT type, fileid FROM fstask WHERE id=?");
-        psync_sql_bind_uint(res, 1, -cr->fileid);
-        if ((row = psync_sql_fetch_rowint(res))) {
+        psql_bind_uint(res, 1, -cr->fileid);
+        if ((row = psql_fetch_int(res))) {
           if (row[0] == PSYNC_FS_TASK_CREAT)
             ret = taskid_to_objid(-cr->fileid);
           else {
@@ -181,7 +181,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
                 path, (unsigned long)(-cr->fileid));
           ret = -1;
         }
-        psync_sql_free_result(res);
+        psql_free(res);
         return ret;
       }
     }
@@ -194,30 +194,30 @@ static int64_t xattr_get_object_id_locked(const char *path) {
     return -1;
   }
   if (checkfolder) {
-    res = psync_sql_query_nolock(
+    res = psql_query_nolock(
         "SELECT id FROM folder WHERE parentfolderid=? AND name=?");
-    psync_sql_bind_uint(res, 1, fspath->folderid);
-    psync_sql_bind_string(res, 2, fspath->name);
-    if ((row = psync_sql_fetch_rowint(res)))
+    psql_bind_uint(res, 1, fspath->folderid);
+    psql_bind_str(res, 2, fspath->name);
+    if ((row = psql_fetch_int(res)))
       ret = folderid_to_objid(row[0]);
     else
       ret = -1;
-    psync_sql_free_result(res);
+    psql_free(res);
     if (ret != -1) {
       free(fspath);
       return ret;
     }
   }
   if (checkfile) {
-    res = psync_sql_query_nolock(
+    res = psql_query_nolock(
         "SELECT id FROM file WHERE parentfolderid=? AND name=?");
-    psync_sql_bind_uint(res, 1, fspath->folderid);
-    psync_sql_bind_string(res, 2, fspath->name);
-    if ((row = psync_sql_fetch_rowint(res)))
+    psql_bind_uint(res, 1, fspath->folderid);
+    psql_bind_str(res, 2, fspath->name);
+    if ((row = psql_fetch_int(res)))
       ret = fileid_to_objid(row[0]);
     else
       ret = -1;
-    psync_sql_free_result(res);
+    psql_free(res);
     if (ret != -1) {
       free(fspath);
       return ret;
@@ -230,20 +230,20 @@ static int64_t xattr_get_object_id_locked(const char *path) {
 
 #define LOCK_AND_LOOKUP()                                                      \
   do {                                                                         \
-    psync_sql_lock();                                                          \
+    psql_lock();                                                          \
     oid = xattr_get_object_id_locked(path);                                    \
     if (unlikely(oid == -1)) {                                                 \
-      psync_sql_unlock();                                                      \
+      psql_unlock();                                                      \
       return -pdbg_return_const(ENOENT);                                      \
     }                                                                          \
   } while (0)
 
 #define LOCK_AND_LOOKUPRD()                                                    \
   do {                                                                         \
-    psync_sql_rdlock();                                                        \
+    psql_rdlock();                                                        \
     oid = xattr_get_object_id_locked(path);                                    \
     if (unlikely(oid == -1)) {                                                 \
-      psync_sql_rdunlock();                                                    \
+      psql_rdunlock();                                                    \
       return -pdbg_return_const(ENOENT);                                      \
     }                                                                          \
   } while (0)
@@ -257,37 +257,37 @@ int psync_fs_setxattr(const char *path, const char *name, const char *value,
   pdbg_logf(D_NOTICE, "setting attribute %s of %s", name, path);
   LOCK_AND_LOOKUP();
   if (flags & XATTR_CREATE) {
-    res = psync_sql_prep_statement("INSERT OR IGNORE INTO fsxattr (objectid, "
+    res = psql_prepare("INSERT OR IGNORE INTO fsxattr (objectid, "
                                    "name, value) VALUES (?, ?, ?)");
-    psync_sql_bind_uint(res, 1, oid);
-    psync_sql_bind_string(res, 2, name);
-    psync_sql_bind_blob(res, 3, value, size);
-    psync_sql_run_free(res);
-    if (psync_sql_affected_rows())
+    psql_bind_uint(res, 1, oid);
+    psql_bind_str(res, 2, name);
+    psql_bind_blob(res, 3, value, size);
+    psql_run_free(res);
+    if (psql_affected())
       ret = 0;
     else
       ret = -pdbg_return_const(EEXIST);
   } else if (flags & XATTR_REPLACE) {
-    res = psync_sql_prep_statement(
+    res = psql_prepare(
         "UPDATE fsxattr SET value=? WHERE objectid=? AND name=?");
-    psync_sql_bind_blob(res, 1, value, size);
-    psync_sql_bind_uint(res, 2, oid);
-    psync_sql_bind_string(res, 3, name);
-    psync_sql_run_free(res);
-    if (psync_sql_affected_rows())
+    psql_bind_blob(res, 1, value, size);
+    psql_bind_uint(res, 2, oid);
+    psql_bind_str(res, 3, name);
+    psql_run_free(res);
+    if (psql_affected())
       ret = 0;
     else
       ret = -pdbg_return_const(ENOATTR);
   } else {
-    res = psync_sql_prep_statement(
+    res = psql_prepare(
         "REPLACE INTO fsxattr (objectid, name, value) VALUES (?, ?, ?)");
-    psync_sql_bind_uint(res, 1, oid);
-    psync_sql_bind_string(res, 2, name);
-    psync_sql_bind_blob(res, 3, value, size);
-    psync_sql_run_free(res);
+    psql_bind_uint(res, 1, oid);
+    psql_bind_str(res, 2, name);
+    psql_bind_blob(res, 3, value, size);
+    psql_run_free(res);
     ret = 0;
   }
-  psync_sql_unlock();
+  psql_unlock();
   return ret;
 }
 
@@ -302,11 +302,11 @@ int psync_fs_getxattr(const char *path, const char *name, char *value,
     psync_variant_row row;
     const char *str;
     size_t len;
-    res = psync_sql_query_nolock(
+    res = psql_query_nolock(
         "SELECT value FROM fsxattr WHERE objectid=? AND name=?");
-    psync_sql_bind_uint(res, 1, oid);
-    psync_sql_bind_string(res, 2, name);
-    if ((row = psync_sql_fetch_row(res))) {
+    psql_bind_uint(res, 1, oid);
+    psql_bind_str(res, 2, name);
+    if ((row = psql_fetch(res))) {
       str = psync_get_lstring(row[0], &len);
       if (size >= len) {
         pdbg_logf(D_NOTICE, "returning attribute %s of %s", name, path);
@@ -320,14 +320,14 @@ int psync_fs_getxattr(const char *path, const char *name, char *value,
       ret = -ENOATTR;
       //      pdbg_logf(D_NOTICE, "attribute %s not found for %s", name, path);
     }
-    psync_sql_free_result(res);
+    psql_free(res);
   } else {
     psync_uint_row row;
-    res = psync_sql_query_nolock(
+    res = psql_query_nolock(
         "SELECT LENGTH(value) FROM fsxattr WHERE objectid=? AND name=?");
-    psync_sql_bind_uint(res, 1, oid);
-    psync_sql_bind_string(res, 2, name);
-    if ((row = psync_sql_fetch_rowint(res))) {
+    psql_bind_uint(res, 1, oid);
+    psql_bind_str(res, 2, name);
+    if ((row = psql_fetch_int(res))) {
       ret = row[0];
       pdbg_logf(D_NOTICE, "returning length of attribute %s of %s = %d", name, path,
             ret);
@@ -335,9 +335,9 @@ int psync_fs_getxattr(const char *path, const char *name, char *value,
       ret = -ENOATTR;
       //      pdbg_logf(D_NOTICE, "attribute %s not found for %s", name, path);
     }
-    psync_sql_free_result(res);
+    psql_free(res);
   }
-  psync_sql_rdunlock();
+  psql_rdunlock();
   return ret;
 }
 
@@ -352,9 +352,9 @@ int psync_fs_listxattr(const char *path, char *list, size_t size) {
   if (size && list) {
     psync_variant_row row;
     ret = 0;
-    res = psync_sql_query_nolock("SELECT name FROM fsxattr WHERE objectid=?");
-    psync_sql_bind_uint(res, 1, oid);
-    while ((row = psync_sql_fetch_row(res))) {
+    res = psql_query_nolock("SELECT name FROM fsxattr WHERE objectid=?");
+    psql_bind_uint(res, 1, oid);
+    while ((row = psql_fetch(res))) {
       str = psync_get_lstring(row[0], &len);
       len++;
       if (ret + len > size) {
@@ -364,21 +364,21 @@ int psync_fs_listxattr(const char *path, char *list, size_t size) {
       memcpy(list + ret, str, len);
       ret += len;
     }
-    psync_sql_free_result(res);
+    psql_free(res);
     pdbg_logf(D_NOTICE, "returning list of attributes of %s = %d", path, ret);
   } else {
     psync_uint_row row;
-    res = psync_sql_query_nolock(
+    res = psql_query_nolock(
         "SELECT SUM(LENGTH(name)+1) FROM fsxattr WHERE objectid=?");
-    psync_sql_bind_uint(res, 1, oid);
-    if ((row = psync_sql_fetch_rowint(res)))
+    psql_bind_uint(res, 1, oid);
+    if ((row = psql_fetch_int(res)))
       ret = row[0];
     else
       ret = 0;
-    psync_sql_free_result(res);
+    psql_free(res);
     pdbg_logf(D_NOTICE, "returning length of attributes of %s = %d", path, ret);
   }
-  psync_sql_rdunlock();
+  psql_rdunlock();
   return ret;
 }
 
@@ -388,13 +388,13 @@ int psync_fs_removexattr(const char *path, const char *name) {
   uint32_t aff;
   psync_fs_set_thread_name();
   LOCK_AND_LOOKUP();
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "DELETE FROM fsxattr WHERE objectid=? AND name=?");
-  psync_sql_bind_uint(res, 1, oid);
-  psync_sql_bind_string(res, 2, name);
-  psync_sql_run_free(res);
-  aff = psync_sql_affected_rows();
-  psync_sql_unlock();
+  psql_bind_uint(res, 1, oid);
+  psql_bind_str(res, 2, name);
+  psql_run_free(res);
+  aff = psql_affected();
+  psql_unlock();
   if (aff) {
     pdbg_logf(D_NOTICE, "attribute %s deleted for %s", name, path);
     return 0;
