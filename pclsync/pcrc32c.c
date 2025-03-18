@@ -31,7 +31,7 @@
 
 #include "pcrc32c.h"
 #include "pcompiler.h"
-#include "plibs.h"
+#include "pdbg.h"
 #include <string.h>
 
 #if defined(__GNUC__) &&                                                       \
