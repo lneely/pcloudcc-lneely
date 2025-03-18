@@ -43,6 +43,45 @@ typedef struct _psync_list {
   struct _psync_list *prev;
 } psync_list;
 
+typedef struct {
+  psync_list list;
+  unsigned long used;
+  char elements[];
+} psync_list_element_list;
+
+
+typedef struct {
+  psync_list list;
+  char *next;
+  char *end;
+} psync_list_string_list;
+
+typedef struct {
+  psync_list list;
+  unsigned long used;
+  uint32_t numbers[1000];
+} psync_list_num_list;
+
+struct psync_list_builder_t_ {
+  size_t element_size;
+  size_t elements_offset;
+  size_t elements_per_list;
+  size_t stringalloc;
+  uint64_t cnt;
+  psync_list element_list;
+  psync_list_element_list *last_elements;
+  psync_list string_list;
+  psync_list_string_list *last_strings;
+  psync_list number_list;
+  psync_list_num_list *last_numbers;
+  unsigned long popoff;
+  char *current_element;
+  uint32_t *cstrcnt;
+};
+
+struct psync_list_builder_t_;
+
+typedef struct psync_list_builder_t_ psync_list_builder_t;
 typedef int (*psync_list_compare)(const psync_list *, const psync_list *);
 
 #define psync_list_init(l)                                                     \
@@ -106,9 +145,13 @@ static inline psync_list *psync_list_remove_head(psync_list *l) {
   psync_list_element(psync_list_remove_head(l), t, n)
 
 void psync_list_sort(psync_list *l, psync_list_compare cmp);
-void psync_list_extract_repeating(psync_list *l1, psync_list *l2,
-                                  psync_list *extracted1,
-                                  psync_list *extracted2,
-                                  psync_list_compare cmp);
+void psync_list_extract_repeating(psync_list *l1, psync_list *l2, psync_list *extracted1, psync_list *extracted2, psync_list_compare cmp);
+uint32_t *psync_list_bulder_push_num(psync_list_builder_t *builder);
+uint32_t psync_list_bulder_pop_num(psync_list_builder_t *builder);
+psync_list_builder_t *psync_list_builder_create(size_t element_size, size_t offset);
+void *psync_list_bulder_add_element(psync_list_builder_t *builder);
+void psync_list_add_string_offset(psync_list_builder_t *builder, size_t offset);
+void psync_list_add_lstring_offset(psync_list_builder_t *builder, size_t offset, size_t length);
+void *psync_list_builder_finalize(psync_list_builder_t *builder);
 
 #endif

@@ -29,14 +29,14 @@
    DAMAGE.
 */
 
-#include "pnotify.h"
+#include "pfile.h"
 #include "plibs.h"
 #include "pnetlibs.h"
-#include "psettings.h"
-#include "ptree.h"
+#include "pnotify.h"
 #include "ppath.h"
 #include "prun.h"
-#include "pfile.h"
+#include "psettings.h"
+#include "ptree.h"
 
 
 typedef struct {

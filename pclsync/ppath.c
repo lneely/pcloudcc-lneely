@@ -1,6 +1,7 @@
 #include <dirent.h>
 #include <pwd.h>
 #include <stddef.h>
+
 #include <sys/statvfs.h>
 
 #include "pcompiler.h"
@@ -8,6 +9,7 @@
 #include "plibs.h"
 #include "ppath.h"
 #include "psettings.h"
+#include "psql.h"
 
 char *ppath_default_db() {
   char *pcdir, *dbp, *home, *oldp;
@@ -29,7 +31,7 @@ char *ppath_default_db() {
 
       if (oldp) {
         if (!stat(oldp, &st)) {
-          if (psync_sql_reopen(oldp)) {
+          if (psql_reopen(oldp)) {
             free(dbp);
             return oldp;
           } else {

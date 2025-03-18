@@ -29,15 +29,16 @@
    DAMAGE.
 */
 
-#include "psuggest.h"
+#include <stdio.h>
+#include <string.h>
+
 #include "pfile.h"
 #include "plibs.h"
 #include "plist.h"
-#include "pscanexts.h"
 #include "ppath.h"
+#include "pscanexts.h"
 #include "psettings.h"
-#include <stdio.h>
-#include <string.h>
+#include "psuggest.h"
 
 typedef struct {
   psync_list nextfolder;
@@ -162,7 +163,7 @@ static void suggest_folders(scan_folder *f, psync_list *suggestions) {
   if (sum >= PSYNC_SCANNER_MIN_FILES &&
       sum >= (f->filecnt[0] + sum) * PSYNC_SCANNER_PERCENT / 100) {
     //    pdbg_logf(D_NOTICE, "suggesting %s sum %u", f->path, sum);
-    s = psync_new(suggested_folder);
+    s = malloc(sizeof(suggested_folder));
     s->folder = f;
     s->filecnt = sum;
     psync_list_add_tail(suggestions, &s->list);
@@ -199,7 +200,7 @@ psuggested_folders_t *psuggest_scan_folder(const char *path) {
   size_t descslen[PSYNC_SCANNER_MAX_SUGGESTIONS];
   char buff[256];
   uint32_t scnt[PSYNC_SCAN_TYPES_CNT][2];
-  f = psync_new(scan_folder);
+  f = malloc(sizeof(scan_folder));
   psync_list_init(&f->nextfolder);
   psync_list_init(&f->subfolders);
   f->path = path;

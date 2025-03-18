@@ -1,6 +1,6 @@
-#include "ptevent.h"
-#include "plibs.h"
+#include "pdbg.h"
 #include "prun.h"
+#include "ptevent.h"
 
 data_event_callback data_event_fptr = NULL;
 
@@ -27,7 +27,7 @@ void ptevent_process(event_data_struct *data) {
   event_data_struct *event_data;
 
   if (data_event_fptr) {
-    event_data = psync_new(event_data_struct);
+    event_data = malloc(sizeof(event_data_struct));
     event_data->eventid = data->eventid;
     event_data->uint1 = data->uint1;
     event_data->uint2 = data->uint2;

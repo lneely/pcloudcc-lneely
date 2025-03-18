@@ -33,18 +33,20 @@
 #include <errno.h>
 #include <stddef.h>
 #include <string.h>
+#include <unistd.h>
+
 #include <sys/epoll.h>
 #include <sys/inotify.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 
-#include "plocalnotify.h"
 #include "pfoldersync.h"
 #include "plibs.h"
-#include "prun.h"
 #include "plist.h"
+#include "plocalnotify.h"
 #include "plocalscan.h"
+#include "prun.h"
+#include "psql.h"
 
 #define NOTIFY_MSG_ADD 0
 #define NOTIFY_MSG_DEL 1
@@ -135,17 +137,17 @@ static void add_syncid(psync_syncid_t syncid) {
   const char *str;
   size_t len;
   struct epoll_event e;
-  res = psync_sql_query("SELECT localpath FROM syncfolder WHERE id=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  if (likely(row = psync_sql_fetch_row(res))) {
+  res = psql_query("SELECT localpath FROM syncfolder WHERE id=?");
+  psql_bind_uint(res, 1, syncid);
+  if (likely(row = psql_fetch(res))) {
     str = psync_get_lstring(row[0], &len);
     len++;
     dir =
         (localnotify_dir *)malloc(offsetof(localnotify_dir, path) + len);
     memcpy(dir->path, str, len);
-    psync_sql_free_result(res);
+    psql_free(res);
   } else {
-    psync_sql_free_result(res);
+    psql_free(res);
     pdbg_logf(D_ERROR, "could not find syncfolder with id %u",
           (unsigned int)syncid);
     return;

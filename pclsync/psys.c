@@ -1,9 +1,11 @@
 #include <errno.h>
 #include <signal.h>
 #include <unistd.h>
+
 #include <sys/resource.h>
 
-#include "plibs.h"
+#include "pdbg.h"
+#include "psql.h"
 #include "psys.h"
 
 static uid_t psync_uid;
@@ -13,9 +15,9 @@ static int psync_gids_cnt;
 
 static void abort_on_sqllock(uint64_t millisec) {
 #if IS_DEBUG
-  if (psync_sql_islocked()) {
+  if (psql_locked()) {
     pdbg_logf(D_CRITICAL, "trying to sleep while holding sql lock, aborting");
-    psync_sql_dump_locks();
+    psql_dump_locks();
     abort();
   }
 #endif
@@ -47,7 +49,7 @@ void psys_init() {
   psync_uid = getuid();
   psync_gid = getgid();
   psync_gids_cnt = getgroups(0, NULL);
-  psync_gids = psync_new_cnt(gid_t, psync_gids_cnt);
+  psync_gids = malloc(sizeof(gid_t) * psync_gids_cnt);
   if (pdbg_unlikely(getgroups(psync_gids_cnt, psync_gids) != psync_gids_cnt))
     psync_gids_cnt = 0;
   pdbg_logf(D_NOTICE, "detected page size %ld", sysconf(_SC_PAGESIZE));

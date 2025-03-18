@@ -48,10 +48,12 @@
 #include "ptask.h"
 #include "ptimer.h"
 #include "pupload.h"
+#include "psql.h"
 #include "ppath.h"
 #include "pfile.h"
 
 extern const unsigned char pfile_invalid_chars[];
+pstatus_t psync_status;
 
 typedef struct {
   psync_list list;
@@ -214,14 +216,14 @@ static void update_local_folder_mtime(const char *localpath,
     pdbg_logf(D_ERROR, "stat failed for %s", localpath);
     return;
   }
-  res = psync_sql_prep_statement("UPDATE localfolder SET inode=?, deviceid=?, "
+  res = psql_prepare("UPDATE localfolder SET inode=?, deviceid=?, "
                                  "mtime=?, mtimenative=? WHERE id=?");
-  psync_sql_bind_uint(res, 1, pfile_stat_inode(&st));
-  psync_sql_bind_uint(res, 2, pfile_stat_device(&st));
-  psync_sql_bind_uint(res, 3, pfile_stat_mtime(&st));
-  psync_sql_bind_uint(res, 4, pfile_stat_mtime_native(&st));
-  psync_sql_bind_uint(res, 5, localfolderid);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, pfile_stat_inode(&st));
+  psql_bind_uint(res, 2, pfile_stat_device(&st));
+  psql_bind_uint(res, 3, pfile_stat_mtime(&st));
+  psql_bind_uint(res, 4, pfile_stat_mtime_native(&st));
+  psql_bind_uint(res, 5, localfolderid);
+  psql_run_free(res);
 }
 
 static int call_func_for_folder(psync_folderid_t localfolderid,
@@ -282,29 +284,29 @@ static void delete_local_folder_from_db(psync_folderid_t localfolderid,
   psync_sql_res *res;
   psync_uint_row row;
   if (likely(localfolderid)) {
-    res = psync_sql_query(
+    res = psql_query(
         "SELECT id, syncid FROM localfolder WHERE localparentfolderid=?");
-    psync_sql_bind_uint(res, 1, localfolderid);
-    while ((row = psync_sql_fetch_rowint(res)))
+    psql_bind_uint(res, 1, localfolderid);
+    while ((row = psql_fetch_int(res)))
       delete_local_folder_from_db(row[0], row[1]);
-    psync_sql_free_result(res);
+    psql_free(res);
     res =
-        psync_sql_query("SELECT id FROM localfile WHERE localparentfolderid=?");
-    psync_sql_bind_uint(res, 1, localfolderid);
-    while ((row = psync_sql_fetch_rowint(res)))
+        psql_query("SELECT id FROM localfile WHERE localparentfolderid=?");
+    psql_bind_uint(res, 1, localfolderid);
+    while ((row = psql_fetch_int(res)))
       pupload_del_tasks(row[0]);
-    psync_sql_free_result(res);
-    res = psync_sql_prep_statement(
+    psql_free(res);
+    res = psql_prepare(
         "DELETE FROM localfile WHERE localparentfolderid=?");
-    psync_sql_bind_uint(res, 1, localfolderid);
-    psync_sql_run_free(res);
-    res = psync_sql_prep_statement(
+    psql_bind_uint(res, 1, localfolderid);
+    psql_run_free(res);
+    res = psql_prepare(
         "DELETE FROM syncedfolder WHERE localfolderid=?");
-    psync_sql_bind_uint(res, 1, localfolderid);
-    psync_sql_run_free(res);
-    res = psync_sql_prep_statement("DELETE FROM localfolder WHERE id=?");
-    psync_sql_bind_uint(res, 1, localfolderid);
-    psync_sql_run_free(res);
+    psql_bind_uint(res, 1, localfolderid);
+    psql_run_free(res);
+    res = psql_prepare("DELETE FROM localfolder WHERE id=?");
+    psql_bind_uint(res, 1, localfolderid);
+    psql_run_free(res);
   }
   ppathstatus_syncfldr_deleted(syncid, localfolderid);
 }
@@ -322,12 +324,12 @@ static int task_renamefolder(psync_syncid_t newsyncid,
   int ret;
   pdbg_assert(newname != NULL);
   task_wait_no_downloads();
-  res = psync_sql_query(
+  res = psql_query(
       "SELECT syncid, localparentfolderid, name FROM localfolder WHERE id=?");
-  psync_sql_bind_uint(res, 1, localfolderid);
-  row = psync_sql_fetch_row(res);
+  psql_bind_uint(res, 1, localfolderid);
+  row = psql_fetch(res);
   if (unlikely(!row)) {
-    psync_sql_free_result(res);
+    psql_free(res);
     pdbg_logf(D_ERROR, "could not find local folder id %lu",
           (unsigned long)localfolderid);
     return 0;
@@ -336,44 +338,44 @@ static int task_renamefolder(psync_syncid_t newsyncid,
   if (oldsyncid == newsyncid &&
       psync_get_number(row[1]) == newlocalparentfolderid &&
       !strcmp(psync_get_string(row[2]), newname)) {
-    psync_sql_free_result(res);
+    psql_free(res);
     pdbg_logf(D_NOTICE,
           "folder %s already renamed locally, probably update initiated from "
           "this client",
           newname);
     return 0;
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   oldpath = pfolder_lpath_lfldr(localfolderid, oldsyncid, NULL);
   if (unlikely(!oldpath)) {
     pdbg_logf(D_ERROR, "could not get local path for folder id %lu",
           (unsigned long)localfolderid);
     return 0;
   }
-  psync_sql_start_transaction();
+  psql_start();
   psync_restart_localscan();
-  res = psync_sql_query_nolock(
+  res = psql_query_nolock(
       "SELECT syncid, localparentfolderid FROM localfolder WHERE id=?");
-  psync_sql_bind_uint(res, 1, localfolderid);
-  if ((urow = psync_sql_fetch_rowint(res))) {
+  psql_bind_uint(res, 1, localfolderid);
+  if ((urow = psql_fetch_int(res))) {
     ppathstatus_syncfldr_moved(localfolderid, urow[0], urow[1],
                                         newsyncid, newlocalparentfolderid);
-    psync_sql_free_result(res);
+    psql_free(res);
   } else {
-    psync_sql_free_result(res);
+    psql_free(res);
     pdbg_logf(D_NOTICE, "localfolderid %u not found in localfolder",
           (unsigned)localfolderid);
   }
-  res = psync_sql_prep_statement("UPDATE localfolder SET syncid=?, "
+  res = psql_prepare("UPDATE localfolder SET syncid=?, "
                                  "localparentfolderid=?, name=? WHERE id=?");
-  psync_sql_bind_uint(res, 1, newsyncid);
-  psync_sql_bind_uint(res, 2, newlocalparentfolderid);
-  psync_sql_bind_string(res, 3, newname);
-  psync_sql_bind_uint(res, 4, localfolderid);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, newsyncid);
+  psql_bind_uint(res, 2, newlocalparentfolderid);
+  psql_bind_str(res, 3, newname);
+  psql_bind_uint(res, 4, localfolderid);
+  psql_run_free(res);
   newpath = pfolder_lpath_lfldr(localfolderid, newsyncid, NULL);
   if (unlikely(!newpath)) {
-    psync_sql_rollback_transaction();
+    psql_rollback();
     free(oldpath);
     pdbg_logf(D_ERROR, "could not get local path for folder id %lu",
           (unsigned long)localfolderid);
@@ -381,10 +383,10 @@ static int task_renamefolder(psync_syncid_t newsyncid,
   }
   ret = task_renamedir(oldpath, newpath);
   if (ret)
-    psync_sql_rollback_transaction();
+    psql_rollback();
   else {
     psyncer_folder_dec_tasks(localfolderid);
-    psync_sql_commit_transaction();
+    psql_commit();
     pqevent_queue_sync_event_id(PEVENT_LOCAL_FOLDER_RENAMED, newsyncid, newpath,
                            folderid);
     pdbg_logf(D_NOTICE, "local folder renamed from %s to %s", oldpath, newpath);
@@ -402,12 +404,12 @@ static int create_conflicted(const char *name, psync_folderid_t localfolderid,
     psync_resume_localscan();
     return -1;
   }
-  res = psync_sql_prep_statement("DELETE FROM localfile WHERE syncid=? AND "
+  res = psql_prepare("DELETE FROM localfile WHERE syncid=? AND "
                                  "localparentfolderid=? AND name=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  psync_sql_bind_uint(res, 2, localfolderid);
-  psync_sql_bind_string(res, 3, filename);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, syncid);
+  psql_bind_uint(res, 2, localfolderid);
+  psql_bind_str(res, 3, filename);
+  psql_run_free(res);
   psync_resume_localscan();
   psync_wake_localscan();
   return 0;
@@ -455,27 +457,27 @@ static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
       pdbg_unlikely(pfile_stat_size(&st) != serversize))
     return -1;
   localfileid = 0;
-  psync_sql_start_transaction();
-  sql = psync_sql_query_nolock("SELECT id FROM localfile WHERE syncid=? AND "
+  psql_start();
+  sql = psql_query_nolock("SELECT id FROM localfile WHERE syncid=? AND "
                                "localparentfolderid=? AND name=?");
-  psync_sql_bind_uint(sql, 1, syncid);
-  psync_sql_bind_uint(sql, 2, localfolderid);
-  psync_sql_bind_string(sql, 3, filename);
-  if ((row = psync_sql_fetch_rowint(sql)))
+  psql_bind_uint(sql, 1, syncid);
+  psql_bind_uint(sql, 2, localfolderid);
+  psql_bind_str(sql, 3, filename);
+  if ((row = psql_fetch_int(sql)))
     localfileid = row[0];
-  psync_sql_free_result(sql);
+  psql_free(sql);
 
-  sql = psync_sql_query_nolock("SELECT parentfolderid FROM file WHERE id=?");
-  psync_sql_bind_uint(sql, 1, fileid);
-  row = psync_sql_fetch_rowint(sql);
+  sql = psql_query_nolock("SELECT parentfolderid FROM file WHERE id=?");
+  psql_bind_uint(sql, 1, fileid);
+  row = psql_fetch_int(sql);
   if (!row || !psyncer_dl_has_folder(row[0])) {
-    psync_sql_free_result(sql);
+    psql_free(sql);
     if (localfileid) {
-      sql = psync_sql_prep_statement("DELETE FROM localfile WHERE id=?");
-      psync_sql_bind_uint(sql, 1, localfileid);
-      psync_sql_run_free(sql);
+      sql = psql_prepare("DELETE FROM localfile WHERE id=?");
+      psql_bind_uint(sql, 1, localfileid);
+      psql_run_free(sql);
     }
-    psync_sql_commit_transaction(sql);
+    psql_commit(sql);
     pfile_delete(name);
     if (row)
       pdbg_logf(D_NOTICE,
@@ -488,43 +490,43 @@ static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
             (unsigned long)fileid, filename, name);
     return 0;
   }
-  psync_sql_free_result(sql);
+  psql_free(sql);
 
   if (localfileid) {
-    sql = psync_sql_prep_statement(
+    sql = psql_prepare(
         "UPDATE localfile SET localparentfolderid=?, fileid=?, hash=?, "
         "syncid=?, size=?, inode=?, mtime=?, mtimenative=?, "
         "name=?, checksum=? WHERE id=?");
-    psync_sql_bind_uint(sql, 1, localfolderid);
-    psync_sql_bind_uint(sql, 2, fileid);
-    psync_sql_bind_uint(sql, 3, hash);
-    psync_sql_bind_uint(sql, 4, syncid);
-    psync_sql_bind_uint(sql, 5, pfile_stat_size(&st));
-    psync_sql_bind_uint(sql, 6, pfile_stat_inode(&st));
-    psync_sql_bind_uint(sql, 7, pfile_stat_mtime(&st));
-    psync_sql_bind_uint(sql, 8, pfile_stat_mtime_native(&st));
-    psync_sql_bind_string(sql, 9, filename);
-    psync_sql_bind_lstring(sql, 10, (char *)checksum, PSYNC_HASH_DIGEST_HEXLEN);
-    psync_sql_bind_uint(sql, 11, localfileid);
-    psync_sql_run_free(sql);
+    psql_bind_uint(sql, 1, localfolderid);
+    psql_bind_uint(sql, 2, fileid);
+    psql_bind_uint(sql, 3, hash);
+    psql_bind_uint(sql, 4, syncid);
+    psql_bind_uint(sql, 5, pfile_stat_size(&st));
+    psql_bind_uint(sql, 6, pfile_stat_inode(&st));
+    psql_bind_uint(sql, 7, pfile_stat_mtime(&st));
+    psql_bind_uint(sql, 8, pfile_stat_mtime_native(&st));
+    psql_bind_str(sql, 9, filename);
+    psql_bind_lstr(sql, 10, (char *)checksum, PSYNC_HASH_DIGEST_HEXLEN);
+    psql_bind_uint(sql, 11, localfileid);
+    psql_run_free(sql);
   } else {
-    sql = psync_sql_prep_statement(
+    sql = psql_prepare(
         "REPLACE INTO localfile (localparentfolderid, fileid, hash, syncid, "
         "size, inode, mtime, mtimenative, name, checksum)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    psync_sql_bind_uint(sql, 1, localfolderid);
-    psync_sql_bind_uint(sql, 2, fileid);
-    psync_sql_bind_uint(sql, 3, hash);
-    psync_sql_bind_uint(sql, 4, syncid);
-    psync_sql_bind_uint(sql, 5, pfile_stat_size(&st));
-    psync_sql_bind_uint(sql, 6, pfile_stat_inode(&st));
-    psync_sql_bind_uint(sql, 7, pfile_stat_mtime(&st));
-    psync_sql_bind_uint(sql, 8, pfile_stat_mtime_native(&st));
-    psync_sql_bind_string(sql, 9, filename);
-    psync_sql_bind_lstring(sql, 10, (char *)checksum, PSYNC_HASH_DIGEST_HEXLEN);
-    psync_sql_run_free(sql);
+    psql_bind_uint(sql, 1, localfolderid);
+    psql_bind_uint(sql, 2, fileid);
+    psql_bind_uint(sql, 3, hash);
+    psql_bind_uint(sql, 4, syncid);
+    psql_bind_uint(sql, 5, pfile_stat_size(&st));
+    psql_bind_uint(sql, 6, pfile_stat_inode(&st));
+    psql_bind_uint(sql, 7, pfile_stat_mtime(&st));
+    psql_bind_uint(sql, 8, pfile_stat_mtime_native(&st));
+    psql_bind_str(sql, 9, filename);
+    psql_bind_lstr(sql, 10, (char *)checksum, PSYNC_HASH_DIGEST_HEXLEN);
+    psql_run_free(sql);
   }
-  return psync_sql_commit_transaction();
+  return psql_commit();
 }
 
 // rename_and_create_local(dt->tmpname, dt->localname, dt->dwllist.syncid,
@@ -606,30 +608,30 @@ static int task_download_file(download_task_t *dt) {
     pstatus_send_update();
   }
 
-  sql = psync_sql_query_rdlock(
+  sql = psql_query_rdlock(
       "SELECT fileid, id, hash FROM localfile WHERE size=? AND checksum=? AND "
       "localparentfolderid=? AND syncid=? AND name=?");
-  psync_sql_bind_uint(sql, 1, serversize);
-  psync_sql_bind_lstring(sql, 2, (char *)serverhashhex,
+  psql_bind_uint(sql, 1, serversize);
+  psql_bind_lstr(sql, 2, (char *)serverhashhex,
                          PSYNC_HASH_DIGEST_HEXLEN);
-  psync_sql_bind_uint(sql, 3, dt->localfolderid);
-  psync_sql_bind_uint(sql, 4, dt->dwllist.syncid);
-  psync_sql_bind_string(sql, 5, dt->filename);
-  if ((row = psync_sql_fetch_rowint(sql))) {
+  psql_bind_uint(sql, 3, dt->localfolderid);
+  psql_bind_uint(sql, 4, dt->dwllist.syncid);
+  psql_bind_str(sql, 5, dt->filename);
+  if ((row = psql_fetch_int(sql))) {
     rt = row[0] != dt->dwllist.fileid || row[2] != hash;
     result = row[1];
-    psync_sql_free_result(sql);
+    psql_free(sql);
     if (rt) {
-      sql = psync_sql_prep_statement(
+      sql = psql_prepare(
           "UPDATE localfile SET fileid=?, hash=? WHERE id=?");
-      psync_sql_bind_uint(sql, 1, dt->dwllist.fileid);
-      psync_sql_bind_uint(sql, 2, hash);
-      psync_sql_bind_uint(sql, 3, result);
-      psync_sql_run_free(sql);
+      psql_bind_uint(sql, 1, dt->dwllist.fileid);
+      psql_bind_uint(sql, 2, hash);
+      psql_bind_uint(sql, 3, result);
+      psql_run_free(sql);
     }
     return 0;
   }
-  psync_sql_free_result(sql);
+  psql_free(sql);
 
   if (dt->localexists && dt->localsize == serversize &&
       !memcmp(dt->checksum, serverhashhex, PSYNC_HASH_DIGEST_HEXLEN)) {
@@ -646,16 +648,16 @@ static int task_download_file(download_task_t *dt) {
     }
   }
 
-  sql = psync_sql_query_rdlock(
+  sql = psql_query_rdlock(
       "SELECT id FROM localfile WHERE size=? AND checksum=?");
-  psync_sql_bind_uint(sql, 1, serversize);
-  psync_sql_bind_lstring(sql, 2, (char *)serverhashhex,
+  psql_bind_uint(sql, 1, serversize);
+  psql_bind_lstr(sql, 2, (char *)serverhashhex,
                          PSYNC_HASH_DIGEST_HEXLEN);
-  while ((row = psync_sql_fetch_rowint(sql))) {
+  while ((row = psql_fetch_int(sql))) {
     tmpold = pfolder_lpath_lfile(row[0], NULL);
     if (pdbg_unlikely(!tmpold))
       continue;
-    psync_sql_free_result(sql);
+    psql_free(sql);
     sql = NULL;
     rt = psync_copy_local_file_if_checksum_matches(tmpold, dt->tmpname,
                                                    serverhashhex, serversize);
@@ -674,7 +676,7 @@ static int task_download_file(download_task_t *dt) {
       break;
   }
   if (sql)
-    psync_sql_free_result(sql);
+    psql_free(sql);
 
   if (dt->dwllist.stop)
     return 0;
@@ -892,14 +894,14 @@ static int task_delete_file(psync_syncid_t syncid, psync_fileid_t fileid,
   ret = 0;
   task_wait_no_downloads();
   if (syncid) {
-    res = psync_sql_query(
+    res = psql_query(
         "SELECT id, syncid FROM localfile WHERE fileid=? AND syncid=?");
-    psync_sql_bind_uint(res, 2, syncid);
+    psql_bind_uint(res, 2, syncid);
   } else
-    res = psync_sql_query("SELECT id, syncid FROM localfile WHERE fileid=?");
-  psync_sql_bind_uint(res, 1, fileid);
+    res = psql_query("SELECT id, syncid FROM localfile WHERE fileid=?");
+  psql_bind_uint(res, 1, fileid);
   psync_restart_localscan();
-  while ((row = psync_sql_fetch_rowint(res))) {
+  while ((row = psql_fetch_int(res))) {
     name = pfolder_lpath_lfile(row[0], NULL);
     if (pdbg_likely(name)) {
       if (unlikely(pfile_delete(name))) {
@@ -918,11 +920,11 @@ static int task_delete_file(psync_syncid_t syncid, psync_fileid_t fileid,
       //      fileid, remotepath);
       free(name);
     }
-    stmt = psync_sql_prep_statement("DELETE FROM localfile WHERE id=?");
-    psync_sql_bind_uint(stmt, 1, row[0]);
-    psync_sql_run_free(stmt);
+    stmt = psql_prepare("DELETE FROM localfile WHERE id=?");
+    psql_bind_uint(stmt, 1, row[0]);
+    psql_run_free(stmt);
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   return ret;
 }
 
@@ -939,11 +941,11 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
   psync_syncid_t syncid;
   int ret;
   task_wait_no_downloads();
-  res = psync_sql_query("SELECT id, localparentfolderid, syncid, name FROM "
+  res = psql_query("SELECT id, localparentfolderid, syncid, name FROM "
                         "localfile WHERE fileid=?");
-  psync_sql_bind_uint(res, 1, fileid);
+  psql_bind_uint(res, 1, fileid);
   lfileid = 0;
-  while ((row = psync_sql_fetch_row(res))) {
+  while ((row = psql_fetch(res))) {
     syncid = psync_get_number(row[2]);
     if (psync_get_number(row[1]) == newlocalfolderid && syncid == newsyncid &&
         !strcmp(psync_get_string(row[3]), newname)) {
@@ -951,14 +953,14 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
             "file %s already renamed locally, probably update initiated from "
             "this client",
             newname);
-      psync_sql_free_result(res);
+      psql_free(res);
       return 0;
     } else if (syncid == oldsyncid) {
       lfileid = psync_get_number(row[0]);
       break;
     }
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   if (pdbg_unlikely(!lfileid)) {
     ptask_download(newsyncid, fileid, newlocalfolderid, newname);
     return 0;
@@ -985,17 +987,17 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
       ret = -1;
   } else {
     if (pdbg_likely(!stat(newpath, &st))) {
-      res = psync_sql_prep_statement(
+      res = psql_prepare(
           "UPDATE OR REPLACE localfile SET localparentfolderid=?, syncid=?, "
           "name=?, inode=?, mtime=?, mtimenative=? WHERE id=?");
-      psync_sql_bind_uint(res, 1, newlocalfolderid);
-      psync_sql_bind_uint(res, 2, newsyncid);
-      psync_sql_bind_string(res, 3, newname);
-      psync_sql_bind_uint(res, 4, pfile_stat_inode(&st));
-      psync_sql_bind_uint(res, 5, pfile_stat_mtime(&st));
-      psync_sql_bind_uint(res, 6, pfile_stat_mtime_native(&st));
-      psync_sql_bind_uint(res, 7, lfileid);
-      psync_sql_run_free(res);
+      psql_bind_uint(res, 1, newlocalfolderid);
+      psql_bind_uint(res, 2, newsyncid);
+      psql_bind_str(res, 3, newname);
+      psql_bind_uint(res, 4, pfile_stat_inode(&st));
+      psql_bind_uint(res, 5, pfile_stat_mtime(&st));
+      psql_bind_uint(res, 6, pfile_stat_mtime_native(&st));
+      psql_bind_uint(res, 7, lfileid);
+      psql_run_free(res);
       pdbg_logf(D_NOTICE, "renamed %s to %s", oldpath, newpath);
     }
     psync_resume_localscan();
@@ -1008,17 +1010,17 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
 
 static void set_task_inprogress(uint64_t taskid, uint32_t val) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("UPDATE task SET inprogress=? WHERE id=?");
-  psync_sql_bind_uint(res, 1, val);
-  psync_sql_bind_uint(res, 2, taskid);
-  psync_sql_run_free(res);
+  res = psql_prepare("UPDATE task SET inprogress=? WHERE id=?");
+  psql_bind_uint(res, 1, val);
+  psql_bind_uint(res, 2, taskid);
+  psql_run_free(res);
 }
 
 static void delete_task(uint64_t taskid) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("DELETE FROM task WHERE id=?");
-  psync_sql_bind_uint(res, 1, taskid);
-  psync_sql_run_free(res);
+  res = psql_prepare("DELETE FROM task WHERE id=?");
+  psql_bind_uint(res, 1, taskid);
+  psql_run_free(res);
 }
 
 static void free_download_task(download_task_t *dt) {
@@ -1059,11 +1061,11 @@ static void handle_async_error(download_task_t *dt, psync_async_result_t *res) {
     psync_sql_res *sres;
     pdbg_assert(res->file.size > PSYNC_MAX_SIZE_FOR_ASYNC_DOWNLOAD);
     sres =
-        psync_sql_prep_statement("UPDATE file SET size=?, hash=? WHERE id=?");
-    psync_sql_bind_uint(sres, 1, res->file.size);
-    psync_sql_bind_uint(sres, 2, res->file.hash);
-    psync_sql_bind_uint(sres, 3, dt->dwllist.fileid);
-    psync_sql_run_free(sres);
+        psql_prepare("UPDATE file SET size=?, hash=? WHERE id=?");
+    psql_bind_uint(sres, 1, res->file.size);
+    psql_bind_uint(sres, 2, res->file.hash);
+    psql_bind_uint(sres, 3, dt->dwllist.fileid);
+    psql_run_free(sres);
     set_task_inprogress(dt->taskid, 0);
     free_download_task(dt);
     pstatus_send_status_update();
@@ -1158,10 +1160,10 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
   size_t len;
   unsigned char targetchecksum[PSYNC_HASH_DIGEST_HEXLEN];
   int hastargetchecksum, ret;
-  res = psync_sql_query_rdlock(
+  res = psql_query_rdlock(
       "SELECT size, hash, ctime, mtime FROM file WHERE id=?");
-  psync_sql_bind_uint(res, 1, fileid);
-  row = psync_sql_fetch_rowint(res);
+  psql_bind_uint(res, 1, fileid);
+  row = psql_fetch_int(res);
   if (row) {
     size = row[0];
     hash = row[1];
@@ -1174,23 +1176,23 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
     crtime = 0;
     mtime = 0;
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   if (!row) {
     pdbg_logf(D_NOTICE, "possible race, fileid %lu not found in file table",
           (unsigned long)size);
     return 0; // this will delete the task
   }
-  res = psync_sql_query_rdlock(
+  res = psql_query_rdlock(
       "SELECT checksum FROM hashchecksum WHERE hash=? AND size=?");
-  psync_sql_bind_uint(res, 1, hash);
-  psync_sql_bind_uint(res, 2, size);
-  srow = psync_sql_fetch_rowstr(res);
+  psql_bind_uint(res, 1, hash);
+  psql_bind_uint(res, 2, size);
+  srow = psql_fetch_str(res);
   if (srow) {
     memcpy(targetchecksum, srow[0], PSYNC_HASH_DIGEST_HEXLEN);
     hastargetchecksum = 1;
   } else
     hastargetchecksum = 0;
-  psync_sql_free_result(res);
+  psql_free(res);
   localpath = pfolder_lpath_lfldr(localfolderid, syncid, NULL);
   if (pdbg_unlikely(!localpath))
     return 0;
@@ -1328,11 +1330,11 @@ static void task_del_folder_rec_do(const char *localpath,
   psync_sql_res *res;
   psync_variant_row vrow;
   char *nm;
-  res = psync_sql_query("SELECT id, name FROM localfile WHERE "
+  res = psql_query("SELECT id, name FROM localfile WHERE "
                         "localparentfolderid=? AND syncid=?");
-  psync_sql_bind_uint(res, 1, localfolderid);
-  psync_sql_bind_uint(res, 2, syncid);
-  while ((vrow = psync_sql_fetch_row(res))) {
+  psql_bind_uint(res, 1, localfolderid);
+  psql_bind_uint(res, 2, syncid);
+  while ((vrow = psql_fetch(res))) {
     pupload_del_tasks(psync_get_number(vrow[0]));
     nm = psync_strcat(localpath, "/",
                       psync_get_string(vrow[1]), NULL);
@@ -1340,33 +1342,33 @@ static void task_del_folder_rec_do(const char *localpath,
     pfile_delete(nm);
     free(nm);
   }
-  psync_sql_free_result(res);
-  res = psync_sql_prep_statement(
+  psql_free(res);
+  res = psql_prepare(
       "DELETE FROM localfile WHERE localparentfolderid=? AND syncid=?");
-  psync_sql_bind_uint(res, 1, localfolderid);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_run_free(res);
-  res = psync_sql_query("SELECT id, name FROM localfolder WHERE "
+  psql_bind_uint(res, 1, localfolderid);
+  psql_bind_uint(res, 2, syncid);
+  psql_run_free(res);
+  res = psql_query("SELECT id, name FROM localfolder WHERE "
                         "localparentfolderid=? AND syncid=?");
-  psync_sql_bind_uint(res, 1, localfolderid);
-  psync_sql_bind_uint(res, 2, syncid);
-  while ((vrow = psync_sql_fetch_row(res))) {
+  psql_bind_uint(res, 1, localfolderid);
+  psql_bind_uint(res, 2, syncid);
+  while ((vrow = psql_fetch(res))) {
     nm = psync_strcat(localpath, "/",
                       psync_get_string(vrow[1]), NULL);
     task_del_folder_rec_do(nm, psync_get_number(vrow[0]), syncid);
     free(nm);
   }
-  psync_sql_free_result(res);
-  res = psync_sql_prep_statement(
+  psql_free(res);
+  res = psql_prepare(
       "DELETE FROM localfolder WHERE localparentfolderid=? AND syncid=?");
-  psync_sql_bind_uint(res, 1, localfolderid);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_run_free(res);
-  if (psync_sql_affected_rows()) {
-    res = psync_sql_prep_statement(
+  psql_bind_uint(res, 1, localfolderid);
+  psql_bind_uint(res, 2, syncid);
+  psql_run_free(res);
+  if (psql_affected()) {
+    res = psql_prepare(
         "DELETE FROM syncedfolder WHERE localfolderid=?");
-    psync_sql_bind_uint(res, 1, localfolderid);
-    psync_sql_run_free(res);
+    psql_bind_uint(res, 1, localfolderid);
+    psql_run_free(res);
   }
   ppathstatus_syncfldr_deleted(syncid, localfolderid);
 }
@@ -1385,20 +1387,20 @@ static int task_del_folder_rec(psync_folderid_t localfolderid,
   }
   pdbg_logf(D_NOTICE, "got recursive delete for localfolder %lu %s",
         (unsigned long)localfolderid, localpath);
-  psync_sql_start_transaction();
+  psql_start();
   task_del_folder_rec_do(localpath, localfolderid, syncid);
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "DELETE FROM localfolder WHERE id=? AND syncid=?");
-  psync_sql_bind_uint(res, 1, localfolderid);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_run_free(res);
-  if (psync_sql_affected_rows()) {
-    res = psync_sql_prep_statement(
+  psql_bind_uint(res, 1, localfolderid);
+  psql_bind_uint(res, 2, syncid);
+  psql_run_free(res);
+  if (psql_affected()) {
+    res = psql_prepare(
         "DELETE FROM syncedfolder WHERE localfolderid=?");
-    psync_sql_bind_uint(res, 1, localfolderid);
-    psync_sql_run_free(res);
+    psql_bind_uint(res, 1, localfolderid);
+    psql_run_free(res);
   }
-  psync_sql_commit_transaction();
+  psql_commit();
   psync_rmdir_with_trashes(localpath);
   psync_resume_localscan();
   return 0;
@@ -1435,9 +1437,9 @@ static int download_task(uint64_t taskid, uint32_t type, psync_syncid_t syncid,
                                     PEVENT_LOCAL_FOLDER_DELETED, task_rmdir, 0,
                                     "local folder deleted");
     if (!res) {
-      psync_sql_start_transaction();
+      psql_start();
       delete_local_folder_from_db(localitemid, syncid);
-      psync_sql_commit_transaction();
+      psql_commit();
     }
     break;
   case PSYNC_DELREC_LOCAL_FOLDER:
@@ -1475,7 +1477,7 @@ static void download_thread() {
   while (psync_do_run) {
     pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
 
-    row = psync_sql_row(
+    row = psql_row(
         "SELECT id, type, syncid, itemid, localitemid, newitemid, name, "
         "newsyncid FROM task WHERE "
         "inprogress=0 AND type&" NTO_STR(PSYNC_TASK_DWLUPL_MASK) "=" NTO_STR(
@@ -1526,18 +1528,18 @@ void pdownload_tasks_delete(psync_fileid_t fileid,
   download_list_t *dwl;
   uint32_t aff;
   if (syncid)
-    res = psync_sql_prep_statement(
+    res = psql_prepare(
         "DELETE FROM task WHERE type=? AND itemid=? AND syncid=?");
   else
     res =
-        psync_sql_prep_statement("DELETE FROM task WHERE type=? AND itemid=?");
-  psync_sql_bind_uint(res, 1, PSYNC_DOWNLOAD_FILE);
-  psync_sql_bind_uint(res, 2, fileid);
+        psql_prepare("DELETE FROM task WHERE type=? AND itemid=?");
+  psql_bind_uint(res, 1, PSYNC_DOWNLOAD_FILE);
+  psql_bind_uint(res, 2, fileid);
   if (syncid)
-    psync_sql_bind_uint(res, 3, syncid);
-  psync_sql_run(res);
-  aff = psync_sql_affected_rows();
-  psync_sql_free_result(res);
+    psql_bind_uint(res, 3, syncid);
+  psql_run(res);
+  aff = psql_affected();
+  psql_free(res);
   if (aff)
     pstatus_download_recalc_async();
   if (deltemp)
@@ -1564,11 +1566,11 @@ void pdownload_stop_file(psync_fileid_t fileid, psync_syncid_t syncid) {
 void pdownload_stop_sync(psync_syncid_t syncid) {
   download_list_t *dwl;
   psync_sql_res *res;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "DELETE FROM task WHERE syncid=? AND type&" NTO_STR(
           PSYNC_TASK_DWLUPL_MASK) "=" NTO_STR(PSYNC_TASK_DOWNLOAD));
-  psync_sql_bind_uint(res, 1, syncid);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, syncid);
+  psql_run_free(res);
   pstatus_download_recalc_async();
   pthread_mutex_lock(&current_downloads_mutex);
   psync_list_for_each_element(dwl, &downloads, download_list_t,

@@ -31,23 +31,24 @@
 
 #include <errno.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "papi.h"
-#include "pfile.h"
 #include "pcrypto.h"
 #include "pdownload.h"
+#include "pfile.h"
 #include "pfoldersync.h"
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "pp2p.h"
 #include "prun.h"
 #include "psettings.h"
+#include "psql.h"
 #include "pssl.h"
 #include "pstatus.h"
 #include "psys.h"
 #include "ptimer.h"
 #include "putil.h"
-#include <string.h>
 
 #define P2P_ENCTYPE_RSA_AES 0
 
@@ -155,11 +156,11 @@ static psync_fileid_t has_file(const unsigned char *hashstart,
   like[PSYNC_P2P_HEXHASH_BYTES] = '%';
   memcpy(hashsource + PSYNC_HASH_DIGEST_HEXLEN, rand,
          PSYNC_HASH_BLOCK_SIZE - PSYNC_HASH_DIGEST_HEXLEN);
-  res = psync_sql_query_rdlock(
+  res = psql_query_rdlock(
       "SELECT id, checksum FROM localfile WHERE checksum LIKE ? AND size=?");
-  psync_sql_bind_lstring(res, 1, like, PSYNC_P2P_HEXHASH_BYTES + 1);
-  psync_sql_bind_uint(res, 2, filesize);
-  while ((row = psync_sql_fetch_row(res))) {
+  psql_bind_lstr(res, 1, like, PSYNC_P2P_HEXHASH_BYTES + 1);
+  psql_bind_uint(res, 2, filesize);
+  while ((row = psql_fetch(res))) {
     pdbg_assertw(row[1].type == PSYNC_TSTRING &&
             row[1].length == PSYNC_HASH_DIGEST_HEXLEN);
     memcpy(hashsource, row[1].str, PSYNC_HASH_DIGEST_HEXLEN);
@@ -169,11 +170,11 @@ static psync_fileid_t has_file(const unsigned char *hashstart,
       if (realhash)
         memcpy(realhash, row[1].str, PSYNC_HASH_DIGEST_HEXLEN);
       ret = psync_get_number(row[0]);
-      psync_sql_free_result(res);
+      psql_free(res);
       return ret;
     }
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   return 0;
 }
 
@@ -352,7 +353,7 @@ static void psync_p2p_tcphandler(void *ptr) {
     free(binpubrsa);
     goto err0;
   }
-  token = psync_new_cnt(char, packet.tokenlen);
+  token = malloc(sizeof(char) * packet.tokenlen);
   if (pdbg_unlikely(socket_read_all(sock, token, packet.tokenlen)) ||
       pdbg_unlikely(!check_token(token, packet.tokenlen, binpubrsa->data,
                                 packet.keylen, hashhex))) {
@@ -508,7 +509,7 @@ static void psync_p2p_thread() {
       else
         psys_sleep_milliseconds(1);
     } else if (sret == 1) {
-      inconn = psync_new(int);
+      inconn = malloc(sizeof(int));
       *inconn = accept(tcpsock, NULL, NULL);
       if (pdbg_unlikely(*inconn == INVALID_SOCKET))
         free(inconn);
@@ -761,7 +762,7 @@ int pp2p_check_download(psync_fileid_t fileid,
   psync_binhex(pct1.genhash, hashbin, PSYNC_HASH_DIGEST_LEN);
   memcpy(pct1.computername, computername, PSYNC_HASH_DIGEST_HEXLEN);
   il = psock_list_adapters();
-  sockets = psync_new_cnt(int, il->interfacecnt);
+  sockets = malloc(sizeof(int) * il->interfacecnt);
   FD_ZERO(&rfds);
   msock = 0;
   for (i = 0; i < il->interfacecnt; i++) {

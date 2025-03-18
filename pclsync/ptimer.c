@@ -29,13 +29,12 @@
    DAMAGE.
 */
 
-#include "ptimer.h"
 #include "pcache.h"
 #include "pcompiler.h"
-#include "prun.h"
 #include "plibs.h"
+#include "prun.h"
 #include "psys.h"
-#include "psynclib.h"
+#include "ptimer.h"
 
 /* Maximum timeout possible is TIMER_ARRAY_SIZE^TIMER_LEVELS seconds, in the
  * worst case TIMER_LEVELS operations will be preformed for each timer to
@@ -193,7 +192,7 @@ psync_timer_t ptimer_register(psync_timer_callback func, time_t numsec,
   psync_timer_t timer;
   uint32_t i;
   time_t n;
-  timer = psync_new(psync_timer_structure_t);
+  timer = malloc(sizeof(psync_timer_structure_t));
   timer->call = func;
   timer->param = param;
   n = TIMER_ARRAY_SIZE;
@@ -242,7 +241,7 @@ int ptimer_stop(psync_timer_t timer) {
 
 void ptimer_exception_handler(psync_exception_callback func) {
   struct exception_list *t;
-  t = psync_new(struct exception_list);
+  t = malloc(sizeof(struct exception_list));
   t->next = NULL;
   t->func = func;
   t->threadid = pthread_self();
@@ -254,7 +253,7 @@ void ptimer_exception_handler(psync_exception_callback func) {
 
 void ptimer_sleep_handler(psync_exception_callback func) {
   struct exception_list *t;
-  t = psync_new(struct exception_list);
+  t = malloc(sizeof(struct exception_list));
   t->next = NULL;
   t->func = func;
   t->threadid = pthread_self();

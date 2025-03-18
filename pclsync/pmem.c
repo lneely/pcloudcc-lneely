@@ -1,6 +1,8 @@
-#include "pcompiler.h"
-#include "plibs.h"
 #include <sys/mman.h>
+
+#include "pcompiler.h"
+#include "psql.h"
+#include "pdbg.h"
 
 void *pmem_mmap(size_t size) {
 #if defined(MAP_ANONYMOUS)
@@ -14,7 +16,7 @@ void *pmem_mmap(size_t size) {
 PSYNC_NOINLINE static void *psync_mmap_anon_emergency(size_t size) {
   void *ret;
   pdbg_logf(D_WARNING, "could not allocate %lu bytes", size);
-  psync_try_free_memory();
+  psql_try_free();
   ret = pmem_mmap(size);
   if (likely(ret))
     return ret;

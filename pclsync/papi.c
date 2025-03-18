@@ -378,8 +378,8 @@ static binresult *parse_result(unsigned char *data, size_t datalen) {
   retlen = calc_ret_len(&datac, &datalenc, &strcnt);
   if (retlen == -1)
     return NULL;
-  datac = psync_new_cnt(unsigned char, retlen);
-  strings = psync_new_cnt(binresult *, strcnt);
+  datac = malloc(sizeof(unsigned char) * retlen);
+  strings = malloc(sizeof(binresult *) * strcnt);
   strcnt = 0;
   res = do_parse_result(&data, &datac, strings, &strcnt);
   free(strings);

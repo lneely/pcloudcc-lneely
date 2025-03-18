@@ -34,13 +34,11 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "plibs.h"
-#include "psynclib.h"
-#include "prun.h"
-
-
 #include "pdevmon.h"
+#include "plibs.h"
 #include "plocalscan.h"
+#include "prun.h"
+#include "psynclib.h"
 #include "ptimer.h"
 
 #define DEV_MONITOR_ACTIVITY_TIMER_INT 20

@@ -33,13 +33,6 @@
 #include <pthread.h>
 #include <stddef.h>
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
-#include <pthread.h>
-
 #include "papi.h"
 #include "pdeflate.h"
 #include "pdownload.h"
@@ -49,6 +42,7 @@
 #include "ppathstatus.h"
 #include "prun.h"
 #include "psettings.h"
+#include "psql.h"
 #include "pssl.h"
 #include "pstatus.h"
 #include "psys.h"
@@ -57,6 +51,15 @@
 #include "pupload.h"
 
 #define get_len(t) (sizeof(t) - offsetof(t, request))
+
+#define PSYNC_TASK_STATUS_RUNNING 0
+#define PSYNC_TASK_STATUS_READY 1
+#define PSYNC_TASK_STATUS_DONE 2
+#define PSYNC_TASK_STATUS_RETURNED 3
+
+// #define PSYNC_WAIT_ANYBODY -1 // unused, but may be important later
+#define PSYNC_WAIT_NOBODY -2
+#define PSYNC_WAIT_FREED -3
 
 #define TASK_TYPE_EXIT 0
 #define TASK_TYPE_FILE_DWL 1
@@ -158,6 +161,22 @@ typedef struct {
   uint64_t remsize;
   int fd;
 } download_context_t;
+
+struct psync_task_t_ {
+  psync_task_callback_t callback;
+  void *param;
+  pthread_cond_t cond;
+  int id;
+  int status;
+};
+
+struct psync_task_manager_t_ {
+  pthread_mutex_t mutex;
+  int taskcnt;
+  int refcnt;
+  int waitfor;
+  struct psync_task_t_ tasks[];
+};
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static int running = 0;
@@ -337,38 +356,38 @@ static int download_process_headers(stream_t *s,
         "got headers for file %s size %" PRIu64 " hash %" PRIu64
         " sha1 %.40s",
         fda->localpath, fda->size, fda->hash, fda->sha1hex);
-  psync_sql_start_transaction();
-  res = psync_sql_prep_statement(
+  psql_start();
+  res = psql_prepare(
       "REPLACE INTO hashchecksum (hash, size, checksum) VALUES (?, ?, ?)");
-  psync_sql_bind_uint(res, 1, r.hash);
-  psync_sql_bind_uint(res, 2, r.size);
-  psync_sql_bind_lstring(res, 3, (const char *)r.sha1hex,
+  psql_bind_uint(res, 1, r.hash);
+  psql_bind_uint(res, 2, r.size);
+  psql_bind_lstr(res, 3, (const char *)r.sha1hex,
                          PSYNC_SHA1_DIGEST_HEXLEN);
   if (r.oldmtime) {
-    psync_sql_run(res);
-    psync_sql_bind_uint(res, 1, r.oldhash);
-    psync_sql_bind_uint(res, 2, fda->osize);
-    psync_sql_bind_lstring(res, 3, (const char *)fda->osha1hex,
+    psql_run(res);
+    psql_bind_uint(res, 1, r.oldhash);
+    psql_bind_uint(res, 2, fda->osize);
+    psql_bind_lstr(res, 3, (const char *)fda->osha1hex,
                            PSYNC_SHA1_DIGEST_HEXLEN);
-    psync_sql_run_free(res);
+    psql_run_free(res);
   } else
-    psync_sql_run_free(res);
-  res = psync_sql_prep_statement("REPLACE INTO filerevision (fileid, hash, "
+    psql_run_free(res);
+  res = psql_prepare("REPLACE INTO filerevision (fileid, hash, "
                                  "ctime, size) VALUES (?, ?, ?, ?)");
-  psync_sql_bind_uint(res, 1, fda->fileid);
-  psync_sql_bind_uint(res, 2, r.hash);
-  psync_sql_bind_uint(res, 3, r.mtime);
-  psync_sql_bind_uint(res, 4, r.size);
+  psql_bind_uint(res, 1, fda->fileid);
+  psql_bind_uint(res, 2, r.hash);
+  psql_bind_uint(res, 3, r.mtime);
+  psql_bind_uint(res, 4, r.size);
   if (r.oldmtime) {
-    psync_sql_run(res);
-    psync_sql_bind_uint(res, 1, fda->fileid);
-    psync_sql_bind_uint(res, 2, r.oldhash);
-    psync_sql_bind_uint(res, 3, r.oldmtime);
-    psync_sql_bind_uint(res, 4, fda->osize);
-    psync_sql_run_free(res);
+    psql_run(res);
+    psql_bind_uint(res, 1, fda->fileid);
+    psql_bind_uint(res, 2, r.oldhash);
+    psql_bind_uint(res, 3, r.oldmtime);
+    psql_bind_uint(res, 4, fda->osize);
+    psql_run_free(res);
   } else
-    psync_sql_run_free(res);
-  psync_sql_commit_transaction();
+    psql_run_free(res);
+  psql_commit();
   fda->fd = pfile_open(fda->localpath, O_WRONLY, O_CREAT | O_TRUNC);
   if (fda->fd == INVALID_HANDLE_VALUE) {
     pdbg_logf(D_WARNING, "could not open file %s, errno %d", fda->localpath,
@@ -655,7 +674,7 @@ static int proc_start_async_transfer() {
     pdbg_logf(D_NOTICE, "pdeflate_init() failed");
     goto err3;
   }
-  tparams = psync_new(async_params_t);
+  tparams = malloc(sizeof(async_params_t));
   memset(tparams, 0, sizeof(async_params_t));
   tparams->enc = enc;
   tparams->dec = dec;
@@ -825,67 +844,96 @@ static int task_send_async(const void *task, size_t len) {
   return ret;
 }
 
+static void psync_task_destroy(psync_task_manager_t tm) {
+  int i;
+  for (i = 0; i < tm->taskcnt; i++)
+    pthread_cond_destroy(&tm->tasks[i].cond);
+  pthread_mutex_destroy(&tm->mutex);
+  free(tm);
+}
+
+static void psync_task_dec_refcnt(psync_task_manager_t tm) {
+  int refcnt;
+  pthread_mutex_lock(&tm->mutex);
+  refcnt = --tm->refcnt;
+  pthread_mutex_unlock(&tm->mutex);
+  if (!refcnt)
+    psync_task_destroy(tm);
+}
+
+static psync_task_manager_t psync_get_manager_of_task(struct psync_task_t_ *t) {
+  return (psync_task_manager_t)(((char *)(t - t->id)) -
+                                offsetof(struct psync_task_manager_t_, tasks));
+}
+
+static void psync_task_entry(void *ptr) {
+  struct psync_task_t_ *t;
+  t = (struct psync_task_t_ *)ptr;
+  t->callback(ptr, t->param);
+  psync_task_dec_refcnt(psync_get_manager_of_task(t));
+}
+
 void ptask_ldir_mk(psync_syncid_t syncid,
                                     psync_folderid_t folderid,
                                     psync_folderid_t localfolderid) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
+  res = psql_prepare("INSERT INTO task (type, syncid, itemid, "
                                  "localitemid) VALUES (?, ?, ?, ?)");
-  psync_sql_bind_uint(res, 1, PSYNC_CREATE_LOCAL_FOLDER);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_uint(res, 3, folderid);
-  psync_sql_bind_uint(res, 4, localfolderid);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_CREATE_LOCAL_FOLDER);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_uint(res, 3, folderid);
+  psql_bind_uint(res, 4, localfolderid);
+  psql_run_free(res);
 }
 
 void ptask_ldir_rm(psync_syncid_t syncid, psync_folderid_t folderid, psync_folderid_t localfolderid, const char *remotepath) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
+  res = psql_prepare("INSERT INTO task (type, syncid, itemid, "
                                  "localitemid, name) VALUES (?, ?, ?, ?, ?)");
-  psync_sql_bind_uint(res, 1, PSYNC_DELETE_LOCAL_FOLDER);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_uint(res, 3, folderid);
-  psync_sql_bind_uint(res, 4, localfolderid);
-  psync_sql_bind_string(res, 5, remotepath);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_DELETE_LOCAL_FOLDER);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_uint(res, 3, folderid);
+  psql_bind_uint(res, 4, localfolderid);
+  psql_bind_str(res, 5, remotepath);
+  psql_run_free(res);
 }
 
 void ptask_ldir_rm_r(psync_syncid_t syncid, psync_folderid_t folderid, psync_folderid_t localfolderid) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
+  res = psql_prepare("INSERT INTO task (type, syncid, itemid, "
                                  "localitemid) VALUES (?, ?, ?, ?)");
-  psync_sql_bind_uint(res, 1, PSYNC_DELREC_LOCAL_FOLDER);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_uint(res, 3, folderid);
-  psync_sql_bind_uint(res, 4, localfolderid);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_DELREC_LOCAL_FOLDER);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_uint(res, 3, folderid);
+  psql_bind_uint(res, 4, localfolderid);
+  psql_run_free(res);
 }
 
 void ptask_ldir_rename(psync_syncid_t syncid, psync_folderid_t folderid, psync_folderid_t localfolderid, psync_folderid_t newlocalparentfolderid, const char *newname) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "INSERT INTO task (type, syncid, itemid, localitemid, newitemid, name) "
       "VALUES (?, ?, ?, ?, ?, ?)");
-  psync_sql_bind_uint(res, 1, PSYNC_RENAME_LOCAL_FOLDER);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_uint(res, 3, folderid);
-  psync_sql_bind_uint(res, 4, localfolderid);
-  psync_sql_bind_uint(res, 5, newlocalparentfolderid);
-  psync_sql_bind_string(res, 6, newname);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_RENAME_LOCAL_FOLDER);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_uint(res, 3, folderid);
+  psql_bind_uint(res, 4, localfolderid);
+  psql_bind_uint(res, 5, newlocalparentfolderid);
+  psql_bind_str(res, 6, newname);
+  psql_run_free(res);
 }
 
 void ptask_download_q(psync_syncid_t syncid, psync_fileid_t fileid, psync_folderid_t localfolderid, const char *name) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
+  res = psql_prepare("INSERT INTO task (type, syncid, itemid, "
                                  "localitemid, name) VALUES (?, ?, ?, ?, ?)");
-  psync_sql_bind_uint(res, 1, PSYNC_DOWNLOAD_FILE);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_uint(res, 3, fileid);
-  psync_sql_bind_uint(res, 4, localfolderid);
-  psync_sql_bind_string(res, 5, name);
+  psql_bind_uint(res, 1, PSYNC_DOWNLOAD_FILE);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_uint(res, 3, fileid);
+  psql_bind_uint(res, 4, localfolderid);
+  psql_bind_str(res, 5, name);
   ppath_syncfldr_task_added_locked(syncid, localfolderid);
-  psync_sql_run_free(res);
+  psql_run_free(res);
 }
 
 void ptask_download(psync_syncid_t syncid, psync_fileid_t fileid, psync_folderid_t localfolderid, const char *name) {
@@ -897,124 +945,124 @@ void ptask_download(psync_syncid_t syncid, psync_fileid_t fileid, psync_folderid
 
 void ptask_lfile_rename(psync_syncid_t oldsyncid, psync_syncid_t newsyncid, psync_fileid_t fileid, psync_folderid_t oldlocalfolderid, psync_folderid_t newlocalfolderid, const char *newname) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "INSERT INTO task (type, syncid, newsyncid, itemid, localitemid, "
       "newitemid, name) VALUES (?, ?, ?, ?, ?, ?, ?)");
-  psync_sql_bind_uint(res, 1, PSYNC_RENAME_LOCAL_FILE);
-  psync_sql_bind_uint(res, 2, oldsyncid);
-  psync_sql_bind_uint(res, 3, newsyncid);
-  psync_sql_bind_uint(res, 4, fileid);
-  psync_sql_bind_uint(res, 5, oldlocalfolderid);
-  psync_sql_bind_uint(res, 6, newlocalfolderid);
-  psync_sql_bind_string(res, 7, newname);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_RENAME_LOCAL_FILE);
+  psql_bind_uint(res, 2, oldsyncid);
+  psql_bind_uint(res, 3, newsyncid);
+  psql_bind_uint(res, 4, fileid);
+  psql_bind_uint(res, 5, oldlocalfolderid);
+  psql_bind_uint(res, 6, newlocalfolderid);
+  psql_bind_str(res, 7, newname);
+  psql_run_free(res);
 }
 
 void ptask_lfile_rm(psync_fileid_t fileid, const char *remotepath) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "INSERT INTO task (type, itemid, localitemid, name) VALUES (?, ?, 0, ?)");
-  psync_sql_bind_uint(res, 1, PSYNC_DELETE_LOCAL_FILE);
-  psync_sql_bind_uint(res, 2, fileid);
-  psync_sql_bind_string(res, 3, remotepath);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_DELETE_LOCAL_FILE);
+  psql_bind_uint(res, 2, fileid);
+  psql_bind_str(res, 3, remotepath);
+  psql_run_free(res);
 }
 
 void ptask_lfile_rm_id(psync_syncid_t syncid, psync_fileid_t fileid, const char *remotepath) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
+  res = psql_prepare("INSERT INTO task (type, syncid, itemid, "
                                  "localitemid, name) VALUES (?, ?, ?, 0, ?)");
-  psync_sql_bind_uint(res, 1, PSYNC_DELETE_LOCAL_FILE);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_uint(res, 3, fileid);
-  psync_sql_bind_string(res, 4, remotepath);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_DELETE_LOCAL_FILE);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_uint(res, 3, fileid);
+  psql_bind_str(res, 4, remotepath);
+  psql_run_free(res);
 }
 
 void ptask_rdir_mk(psync_syncid_t syncid, psync_folderid_t localfolderid, const char *name) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
+  res = psql_prepare("INSERT INTO task (type, syncid, itemid, "
                                  "localitemid, name) VALUES (?, ?, ?, ?, ?)");
-  psync_sql_bind_uint(res, 1, PSYNC_CREATE_REMOTE_FOLDER);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_uint(res, 3, 0);
-  psync_sql_bind_uint(res, 4, localfolderid);
-  psync_sql_bind_string(res, 5, name);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_CREATE_REMOTE_FOLDER);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_uint(res, 3, 0);
+  psql_bind_uint(res, 4, localfolderid);
+  psql_bind_str(res, 5, name);
+  psql_run_free(res);
 }
 
 void ptask_upload_q(psync_syncid_t syncid, psync_fileid_t localfileid, const char *name) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
+  res = psql_prepare("INSERT INTO task (type, syncid, itemid, "
                                  "localitemid, name) VALUES (?, ?, ?, ?, ?)");
-  psync_sql_bind_uint(res, 1, PSYNC_UPLOAD_FILE);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_uint(res, 3, 0);
-  psync_sql_bind_uint(res, 4, localfileid);
-  psync_sql_bind_string(res, 5, name);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_UPLOAD_FILE);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_uint(res, 3, 0);
+  psql_bind_uint(res, 4, localfileid);
+  psql_bind_str(res, 5, name);
+  psql_run_free(res);
 }
 
 void ptask_upload(psync_syncid_t syncid, psync_fileid_t localfileid, const char *name) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
+  res = psql_prepare("INSERT INTO task (type, syncid, itemid, "
                                  "localitemid, name) VALUES (?, ?, ?, ?, ?)");
-  psync_sql_bind_uint(res, 1, PSYNC_UPLOAD_FILE);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_uint(res, 3, 0);
-  psync_sql_bind_uint(res, 4, localfileid);
-  psync_sql_bind_string(res, 5, name);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_UPLOAD_FILE);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_uint(res, 3, 0);
+  psql_bind_uint(res, 4, localfileid);
+  psql_bind_str(res, 5, name);
+  psql_run_free(res);
   pupload_wake();
   pstatus_upload_recalc_async();
 }
 
 void ptask_rfile_rename(psync_syncid_t oldsyncid, psync_syncid_t newsyncid, psync_fileid_t localfileid, psync_folderid_t newlocalparentfolderid, const char *newname) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "INSERT INTO task (type, syncid, newsyncid, localitemid, newitemid, "
       "name, itemid) VALUES (?, ?, ?, ?, ?, ?, 0)");
-  psync_sql_bind_uint(res, 1, PSYNC_RENAME_REMOTE_FILE);
-  psync_sql_bind_uint(res, 2, oldsyncid);
-  psync_sql_bind_uint(res, 3, newsyncid);
-  psync_sql_bind_uint(res, 4, localfileid);
-  psync_sql_bind_uint(res, 5, newlocalparentfolderid);
-  psync_sql_bind_string(res, 6, newname);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_RENAME_REMOTE_FILE);
+  psql_bind_uint(res, 2, oldsyncid);
+  psql_bind_uint(res, 3, newsyncid);
+  psql_bind_uint(res, 4, localfileid);
+  psql_bind_uint(res, 5, newlocalparentfolderid);
+  psql_bind_str(res, 6, newname);
+  psql_run_free(res);
 }
 
 void ptask_rdir_rename(psync_syncid_t oldsyncid, psync_syncid_t newsyncid, psync_fileid_t localfileid, psync_folderid_t newlocalparentfolderid, const char *newname) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "INSERT INTO task (type, syncid, newsyncid, localitemid, newitemid, "
       "name, itemid) VALUES (?, ?, ?, ?, ?, ?, 0)");
-  psync_sql_bind_uint(res, 1, PSYNC_RENAME_REMOTE_FOLDER);
-  psync_sql_bind_uint(res, 2, oldsyncid);
-  psync_sql_bind_uint(res, 3, newsyncid);
-  psync_sql_bind_uint(res, 4, localfileid);
-  psync_sql_bind_uint(res, 5, newlocalparentfolderid);
-  psync_sql_bind_string(res, 6, newname);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_RENAME_REMOTE_FOLDER);
+  psql_bind_uint(res, 2, oldsyncid);
+  psql_bind_uint(res, 3, newsyncid);
+  psql_bind_uint(res, 4, localfileid);
+  psql_bind_uint(res, 5, newlocalparentfolderid);
+  psql_bind_str(res, 6, newname);
+  psql_run_free(res);
 }
 
 void ptask_rfile_rm(psync_syncid_t syncid, psync_fileid_t fileid) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
+  res = psql_prepare("INSERT INTO task (type, syncid, itemid, "
                                  "localitemid) VALUES (?, ?, ?, 0)");
-  psync_sql_bind_uint(res, 1, PSYNC_DELETE_REMOTE_FILE);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_uint(res, 3, fileid);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_DELETE_REMOTE_FILE);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_uint(res, 3, fileid);
+  psql_run_free(res);
 }
 
 void ptask_rdir_rm(psync_syncid_t syncid, psync_folderid_t folderid) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement("INSERT INTO task (type, syncid, itemid, "
+  res = psql_prepare("INSERT INTO task (type, syncid, itemid, "
                                  "localitemid) VALUES (?, ?, ?, 0)");
-  psync_sql_bind_uint(res, 1, PSYNC_DELETE_REMOTE_FILE);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_bind_uint(res, 3, folderid);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, PSYNC_DELETE_REMOTE_FILE);
+  psql_bind_uint(res, 2, syncid);
+  psql_bind_uint(res, 3, folderid);
+  psql_run_free(res);
 }
 
 void ptask_stop_async() {
@@ -1060,11 +1108,11 @@ void ptask_cfldr_save_fldrkey(void *ptr) {
   insert_folder_key_task *t;
   psync_sql_res *res;
   t = (insert_folder_key_task *)ptr;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "REPLACE INTO cryptofolderkey (folderid, enckey) VALUES (?, ?)");
-  psync_sql_bind_uint(res, 1, t->id);
-  psync_sql_bind_blob(res, 2, (const char *)t->key->data, t->key->datalen);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, t->id);
+  psql_bind_blob(res, 2, (const char *)t->key->data, t->key->datalen);
+  psql_run_free(res);
   free(t->key);
   free(t);
 }
@@ -1073,12 +1121,114 @@ void ptask_cfldr_save_filekey(void *ptr) {
   insert_file_key_task *t;
   psync_sql_res *res;
   t = (insert_file_key_task *)ptr;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "REPLACE INTO cryptofilekey (fileid, hash, enckey) VALUES (?, ?, ?)");
-  psync_sql_bind_uint(res, 1, t->id);
-  psync_sql_bind_uint(res, 2, t->hash);
-  psync_sql_bind_blob(res, 3, (const char *)t->key->data, t->key->datalen);
-  psync_sql_run_free(res);
+  psql_bind_uint(res, 1, t->id);
+  psql_bind_uint(res, 2, t->hash);
+  psql_bind_blob(res, 3, (const char *)t->key->data, t->key->datalen);
+  psql_run_free(res);
   free(t->key);
   free(t);
+}
+
+// from plibs.c
+
+psync_task_manager_t psync_task_run_tasks(psync_task_callback_t const *callbacks, void *const *params, int cnt) {
+  psync_task_manager_t ret;
+  struct psync_task_t_ *t;
+  int i;
+  ret = (psync_task_manager_t)malloc(
+      offsetof(struct psync_task_manager_t_, tasks) +
+      sizeof(struct psync_task_t_) * cnt);
+  pthread_mutex_init(&ret->mutex, NULL);
+  ret->taskcnt = cnt;
+  ret->refcnt = cnt + 1;
+  ret->waitfor = PSYNC_WAIT_NOBODY;
+  for (i = 0; i < cnt; i++) {
+    t = &ret->tasks[i];
+    t->callback = callbacks[i];
+    t->param = params[i];
+    pthread_cond_init(&t->cond, NULL);
+    t->id = i;
+    t->status = PSYNC_TASK_STATUS_RUNNING;
+    prun_thread1("task", psync_task_entry, t);
+  }
+  return ret;
+}
+
+void *psync_task_papi_result(psync_task_manager_t tm, int id) {
+  void *ret;
+  pthread_mutex_lock(&tm->mutex);
+  if (tm->tasks[id].status == PSYNC_TASK_STATUS_RUNNING) {
+    do {
+      tm->waitfor = id;
+      pthread_cond_wait(&tm->tasks[id].cond, &tm->mutex);
+      tm->waitfor = PSYNC_WAIT_NOBODY;
+    } while (tm->tasks[id].status == PSYNC_TASK_STATUS_RUNNING);
+    ret = tm->tasks[id].param;
+    tm->tasks[id].status = PSYNC_TASK_STATUS_DONE;
+  } else if (tm->tasks[id].status == PSYNC_TASK_STATUS_READY) {
+    ret = tm->tasks[id].param;
+    tm->tasks[id].status = PSYNC_TASK_STATUS_DONE;
+    pthread_cond_signal(&tm->tasks[id].cond);
+  } else {
+    pdbg_logf(D_BUG, "invalid status %d of task id %d", (int)tm->tasks[id].status,
+          id);
+    ret = NULL;
+  }
+  pthread_mutex_unlock(&tm->mutex);
+  return ret;
+}
+
+void psync_task_free(psync_task_manager_t tm) {
+  if (tm->refcnt == 1) {
+    psync_task_destroy(tm);
+  }
+  else {
+    int refcnt, i;
+    pthread_mutex_lock(&tm->mutex);
+    tm->waitfor = PSYNC_WAIT_FREED;
+    for (i = 0; i < tm->taskcnt; i++)
+      if (tm->tasks[i].status == PSYNC_TASK_STATUS_READY) {
+        tm->tasks[i].status = PSYNC_TASK_STATUS_RETURNED;
+        pthread_cond_signal(&tm->tasks[i].cond);
+      }
+    refcnt = --tm->refcnt;
+    pthread_mutex_unlock(&tm->mutex);
+    if (!refcnt) {
+      psync_task_destroy(tm);
+    }
+  }
+}
+
+int psync_task_complete(void *h, void *data) {
+  psync_task_manager_t tm;
+  struct psync_task_t_ *t;
+  int ret;
+  t = (struct psync_task_t_ *)h;
+  tm = psync_get_manager_of_task(t);
+  pthread_mutex_lock(&tm->mutex);
+  if (tm->waitfor == t->id) {
+    t->param = data;
+    t->status = PSYNC_TASK_STATUS_READY;
+    pthread_cond_signal(&t->cond);
+    ret = 0;
+  } else if (tm->waitfor == PSYNC_WAIT_NOBODY || tm->waitfor >= 0) {
+    t->param = data;
+    t->status = PSYNC_TASK_STATUS_READY;
+    do {
+      pthread_cond_wait(&t->cond, &tm->mutex);
+    } while (t->status == PSYNC_TASK_STATUS_READY);
+    if (t->status == PSYNC_TASK_STATUS_RETURNED)
+      ret = -1;
+    else
+      ret = 0;
+  } else if (tm->waitfor == PSYNC_WAIT_FREED)
+    ret = -1;
+  else {
+    pdbg_logf(D_BUG, "invalid waitfor value %d", tm->waitfor);
+    ret = -1;
+  }
+  pthread_mutex_unlock(&tm->mutex);
+  return ret;
 }

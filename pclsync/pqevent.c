@@ -27,13 +27,14 @@
    IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "pqevent.h"
+#include <string.h>
+
 #include "pfoldersync.h"
 #include "plibs.h"
 #include "plist.h"
+#include "pqevent.h"
 #include "prun.h"
 #include "psys.h"
-#include <string.h>
 
 #define MAX_STATUS_STR_LEN 64
 #define DONT_SHOW_TIME_IF_SEC_OVER (2 * 86400)
@@ -416,7 +417,7 @@ void pqevent_queue_eventid(psync_eventtype_t eventid) {
   if (eventthreadrunning) {
     event_list_t *event;
 
-    event = psync_new(event_list_t);
+    event = malloc(sizeof(event_list_t));
     event->data.ptr = NULL;
     event->event = eventid;
     event->freedata = 0;
@@ -432,7 +433,7 @@ void pqevent_queue_event(psync_eventtype_t eventid, void *eventdata) {
   if (eventthreadrunning) {
     event_list_t *event;
 
-    event = psync_new(event_list_t);
+    event = malloc(sizeof(event_list_t));
     event->data.ptr = eventdata;
     event->event = eventid;
     event->freedata = 1;

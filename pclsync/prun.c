@@ -1,8 +1,6 @@
 #include <pthread.h>
 
-#include "plibs.h"
 #include "psettings.h"
-#include "psynclib.h"
 #include "prun.h"
 
 // required by thread_entry
@@ -34,7 +32,7 @@ static void start_thread(const char *name, void *run, void *ptr) {
   pthread_t thread;
   pthread_attr_t attr;
   
-  data = psync_new(thread_data);
+  data = malloc(sizeof(thread_data));
   data->run = run;
   data->ptr = ptr;
   data->name = name;

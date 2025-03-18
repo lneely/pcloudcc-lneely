@@ -33,7 +33,6 @@
 
 #include "pfsstatic.h"
 #include "pfstasks.h"
-#include "plibs.h"
 
 static const char *rootdir = "[Desktop Entry]\nIcon=./.pcloudicon.png\n";
 

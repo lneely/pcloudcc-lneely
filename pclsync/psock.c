@@ -31,13 +31,16 @@
 #include <errno.h>
 #include <ifaddrs.h>
 #include <netdb.h>
-#include <netinet/tcp.h>
 #include <pthread.h>
 #include <unistd.h>
+
+#include <netinet/tcp.h>
 
 #include "plibs.h"
 #include "psettings.h"
 #include "psock.h"
+#include "psql.h"
+#include "ptask.h"
 #include "ptimer.h"
 
 #define PROXY_NONE 0
@@ -162,14 +165,14 @@ static struct addrinfo *addr_load(const char *host, const char *port) {
   const char *str;
   uint64_t i;
   size_t len;
-  psync_sql_rdlock();
-  res = psync_sql_query_nolock("SELECT COUNT(*), SUM(LENGTH(data)) FROM "
+  psql_rdlock();
+  res = psql_query_nolock("SELECT COUNT(*), SUM(LENGTH(data)) FROM "
                                "resolver WHERE hostname=? AND port=?");
-  psync_sql_bind_string(res, 1, host);
-  psync_sql_bind_string(res, 2, port);
-  if (!(row = psync_sql_fetch_rowint(res)) || row[0] == 0) {
-    psync_sql_free_result(res);
-    psync_sql_rdunlock();
+  psql_bind_str(res, 1, host);
+  psql_bind_str(res, 2, port);
+  if (!(row = psql_fetch_int(res)) || row[0] == 0) {
+    psql_free(res);
+    psql_rdunlock();
     return NULL;
   }
   ret = (struct addrinfo *)malloc(sizeof(struct addrinfo) * row[0] +
@@ -178,14 +181,14 @@ static struct addrinfo *addr_load(const char *host, const char *port) {
   for (i = 0; i < row[0] - 1; i++)
     ret[i].ai_next = &ret[i + 1];
   ret[i].ai_next = NULL;
-  psync_sql_free_result(res);
-  res = psync_sql_query_nolock(
+  psql_free(res);
+  res = psql_query_nolock(
       "SELECT family, socktype, protocol, data FROM resolver WHERE hostname=? "
       "AND port=? ORDER BY prio");
-  psync_sql_bind_string(res, 1, host);
-  psync_sql_bind_string(res, 2, port);
+  psql_bind_str(res, 1, host);
+  psql_bind_str(res, 2, port);
   i = 0;
-  while ((vrow = psync_sql_fetch_row(res))) {
+  while ((vrow = psql_fetch(res))) {
     ret[i].ai_family = psync_get_snumber(vrow[0]);
     ret[i].ai_socktype = psync_get_snumber(vrow[1]);
     ret[i].ai_protocol = psync_get_snumber(vrow[2]);
@@ -196,8 +199,8 @@ static struct addrinfo *addr_load(const char *host, const char *port) {
     memcpy(data, str, len);
     data += len;
   }
-  psync_sql_free_result(res);
-  psync_sql_rdunlock();
+  psql_free(res);
+  psql_rdunlock();
   return ret;
 }
 
@@ -205,36 +208,36 @@ static void addr_save(const char *host, const char *port,
                             struct addrinfo *addr) {
   psync_sql_res *res;
   uint64_t id;
-  if (psync_sql_isrdlocked()) {
-    if (psync_sql_tryupgradelock())
+  if (psql_rdlocked()) {
+    if (psql_tryupgradeLock())
       return;
     else
       pdbg_logf(D_NOTICE, "upgraded read to write lock to save data to DB");
   }
-  psync_sql_start_transaction();
-  res = psync_sql_prep_statement(
+  psql_start();
+  res = psql_prepare(
       "DELETE FROM resolver WHERE hostname=? AND port=?");
-  psync_sql_bind_string(res, 1, host);
-  psync_sql_bind_string(res, 2, port);
-  psync_sql_run_free(res);
-  res = psync_sql_prep_statement(
+  psql_bind_str(res, 1, host);
+  psql_bind_str(res, 2, port);
+  psql_run_free(res);
+  res = psql_prepare(
       "INSERT INTO resolver (hostname, port, prio, created, family, socktype, "
       "protocol, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-  psync_sql_bind_string(res, 1, host);
-  psync_sql_bind_string(res, 2, port);
-  psync_sql_bind_uint(res, 4, ptimer_time());
+  psql_bind_str(res, 1, host);
+  psql_bind_str(res, 2, port);
+  psql_bind_uint(res, 4, ptimer_time());
   id = 0;
   do {
-    psync_sql_bind_uint(res, 3, id++);
-    psync_sql_bind_int(res, 5, addr->ai_family);
-    psync_sql_bind_int(res, 6, addr->ai_socktype);
-    psync_sql_bind_int(res, 7, addr->ai_protocol);
-    psync_sql_bind_blob(res, 8, (char *)addr->ai_addr, addr->ai_addrlen);
-    psync_sql_run(res);
+    psql_bind_uint(res, 3, id++);
+    psql_bind_int(res, 5, addr->ai_family);
+    psql_bind_int(res, 6, addr->ai_socktype);
+    psql_bind_int(res, 7, addr->ai_protocol);
+    psql_bind_blob(res, 8, (char *)addr->ai_addr, addr->ai_addrlen);
+    psql_run(res);
     addr = addr->ai_next;
   } while (addr);
-  psync_sql_free_result(res);
-  psync_sql_commit_transaction();
+  psql_free(res);
+  psql_commit();
 }
 
 static int connect_res(struct addrinfo *res) {
@@ -481,7 +484,7 @@ psock_t *psock_connect(const char *host, int unsigned port, int ssl) {
   } else {
     sslc = NULL;
   }
-  ret = psync_new(psock_t);
+  ret = malloc(sizeof(psock_t));
   ret->ssl = sslc;
   ret->buffer = NULL;
   ret->sock = sock;

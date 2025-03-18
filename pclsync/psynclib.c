@@ -35,12 +35,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
-
 #include "papi.h"
 #include "pbusinessaccount.h"
 #include "pcache.h"
@@ -83,6 +77,7 @@
 #include "publiclinks.h"
 #include "pupload.h"
 #include "putil.h"
+#include "psql.h"
 
 // Variable containing UNIX time of the last backup file deleted event
 time_t lastBupDelEventTime = 0;
@@ -94,6 +89,8 @@ typedef struct {
 } string_list;
 
 PSYNC_THREAD const char *psync_thread_name = "no name";
+
+extern int psync_recache_contacts;
 
 const char *psync_database = NULL;
 
@@ -108,11 +105,6 @@ static inline int psync_status_is_offline() {
   return pstatus_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_OFFLINE;
 }
 
-#define return_error(err)                                                      \
-  do {                                                                         \
-    psync_error = err;                                                         \
-    return -1;                                                                 \
-  } while (0)
 #define return_isyncid(err)                                                    \
   do {                                                                         \
     psync_error = err;                                                         \
@@ -178,23 +170,26 @@ int psync_init() {
     if (pdbg_unlikely(!psync_database)) {
       if (IS_DEBUG)
         pthread_mutex_unlock(&psync_libstate_mutex);
-      return_error(PERROR_NO_HOMEDIR);
+
+      psync_error = PERROR_NO_HOMEDIR;
+      return -1;
     }
   }
-  if (psync_sql_connect(psync_database)) {
+  if (psql_connect(psync_database)) {
     if (IS_DEBUG)
       pthread_mutex_unlock(&psync_libstate_mutex);
-    return_error(PERROR_DATABASE_OPEN);
+    psync_error = PERROR_DATABASE_OPEN;
+    return -1;
   }
-  psync_sql_statement("UPDATE task SET inprogress=0 WHERE inprogress=1");
+  psql_statement("UPDATE task SET inprogress=0 WHERE inprogress=1");
   ptimer_init();
   if (pdbg_unlikely(pssl_init())) {
     if (IS_DEBUG)
       pthread_mutex_unlock(&psync_libstate_mutex);
-    return_error(PERROR_SSL_INIT_FAILED);
+    psync_error = PERROR_SSL_INIT_FAILED;
+    return -1;
   }
 
-  psync_libs_init();
   psync_settings_init();
   pstatus_init();
   ptimer_sleep_handler(psync_stop_crypto_on_sleep);
@@ -268,21 +263,21 @@ void psync_destroy() {
   ptask_stop_async();
   ptimer_wake();
   ptimer_notify_exception();
-  psync_sql_sync();
+  psql_sync();
   psys_sleep_milliseconds(20);
-  psync_sql_lock();
+  psql_lock();
   pcache_clean();
-  psync_sql_close();
+  psql_close();
 }
 
 void psync_get_status(pstatus_t *status) { pstatus_get_cb(status); }
 
 char *psync_get_username() {
-  return psync_sql_cellstr("SELECT value FROM setting WHERE id='username'");
+  return psql_cellstr("SELECT value FROM setting WHERE id='username'");
 }
 
 static void clear_db(int save) {
-  psync_sql_statement("DELETE FROM setting WHERE id IN ('pass', 'auth')");
+  psql_statement("DELETE FROM setting WHERE id IN ('pass', 'auth')");
   psync_setting_set_bool(_PS(saveauth), save);
 }
 
@@ -342,7 +337,7 @@ void psync_logout(uint32_t auth_status, int doinvauth) {
   tfa = 0;
   pdbg_logf(D_NOTICE, "logout");
 
-  psync_sql_statement("DELETE FROM setting WHERE id IN ('pass', 'auth', 'saveauth')");
+  psql_statement("DELETE FROM setting WHERE id IN ('pass', 'auth', 'saveauth')");
   if (doinvauth) {
     psync_invalidate_auth(psync_my_auth);
   }
@@ -449,7 +444,7 @@ void psync_unlink() {
   int ret;
   char *errMsg;
 
-  deviceid = psync_sql_cellstr("SELECT value FROM setting WHERE id='deviceid'");
+  deviceid = psql_cellstr("SELECT value FROM setting WHERE id='deviceid'");
   pdbg_logf(D_NOTICE, "unlink");
 
   pdiff_lock();
@@ -468,15 +463,15 @@ void psync_unlink() {
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   psys_sleep_milliseconds(20);
   psync_stop_localscan();
-  psync_sql_checkpoint_lock();
+  psql_checkpt_lock();
   pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
   pstatus_set(PSTATUS_TYPE_RUN, PSTATUS_RUN_STOP);
   ptimer_notify_exception();
-  psync_sql_lock();
+  psql_lock();
   pdbg_logf(D_NOTICE, "clearing database, locked");
   pcache_clean();
-  ret = psync_sql_close();
+  ret = psql_close();
   pfile_delete(psync_database);
   if (ret) {
     free(deviceid);
@@ -484,11 +479,11 @@ void psync_unlink() {
     exit(1);
   }
   ppagecache_clean();
-  psync_sql_connect(psync_database);
+  psql_connect(psync_database);
   if (deviceid) {
-    res = psync_sql_prep_statement("REPLACE INTO setting (id, value) VALUES ('deviceid', ?)");
-    psync_sql_bind_string(res, 1, deviceid);
-    psync_sql_run_free(res);
+    res = psql_prepare("REPLACE INTO setting (id, value) VALUES ('deviceid', ?)");
+    psql_bind_str(res, 1, deviceid);
+    psql_run_free(res);
     free(deviceid);
   }
   pthread_mutex_lock(&psync_my_auth_mutex);
@@ -503,8 +498,8 @@ void psync_unlink() {
   psync_fs_clean_tasks();
   ppathstatus_init();
   psyncer_dl_queue_clear();
-  psync_sql_unlock();
-  psync_sql_checkpoint_unlock();
+  psql_unlock();
+  psql_checkpt_unlock();
   psync_settings_reset();
   pcache_clean();
   pnotify_clean();
@@ -692,30 +687,30 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
     }
     free(syncmp);
   }
-  res = psync_sql_query("SELECT localpath FROM syncfolder");
+  res = psql_query("SELECT localpath FROM syncfolder");
   if (pdbg_unlikely(!res))
     return_isyncid(PERROR_DATABASE_ERROR);
-  while ((srow = psync_sql_fetch_rowstr(res)))
+  while ((srow = psql_fetch_str(res)))
     if (psyncer_str_has_prefix(srow[0], localpath)) {
-      psync_sql_free_result(res);
+      psql_free(res);
       return_isyncid(PERROR_PARENT_OR_SUBFOLDER_ALREADY_SYNCING);
     } else if (!strcmp(srow[0], localpath)) {
-      psync_sql_free_result(res);
+      psql_free(res);
       return_isyncid(PERROR_FOLDER_ALREADY_SYNCING);
     }
-  psync_sql_free_result(res);
+  psql_free(res);
   if (folderid) {
-    res = psync_sql_query("SELECT permissions FROM folder WHERE id=?");
+    res = psql_query("SELECT permissions FROM folder WHERE id=?");
     if (pdbg_unlikely(!res))
       return_isyncid(PERROR_DATABASE_ERROR);
-    psync_sql_bind_uint(res, 1, folderid);
-    row = psync_sql_fetch_rowint(res);
+    psql_bind_uint(res, 1, folderid);
+    row = psql_fetch_int(res);
     if (pdbg_unlikely(!row)) {
-      psync_sql_free_result(res);
+      psql_free(res);
       return_isyncid(PERROR_REMOTE_FOLDER_NOT_FOUND);
     }
     perms = row[0];
-    psync_sql_free_result(res);
+    psql_free(res);
   } else
     perms = PSYNC_PERM_ALL;
   if (pdbg_unlikely((synctype & PSYNC_DOWNLOAD_ONLY &&
@@ -723,25 +718,25 @@ psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
                    (synctype & PSYNC_UPLOAD_ONLY &&
                     (perms & PSYNC_PERM_WRITE) != PSYNC_PERM_WRITE)))
     return_isyncid(PERROR_REMOTE_FOLDER_ACC_DENIED);
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "INSERT OR IGNORE INTO syncfolder (folderid, localpath, synctype, flags, "
       "inode, deviceid) VALUES (?, ?, ?, 0, ?, ?)");
   if (pdbg_unlikely(!res))
     return_isyncid(PERROR_DATABASE_ERROR);
-  psync_sql_bind_uint(res, 1, folderid);
-  psync_sql_bind_string(res, 2, localpath);
-  psync_sql_bind_uint(res, 3, synctype);
-  psync_sql_bind_uint(res, 4, pfile_stat_inode(&st));
-  psync_sql_bind_uint(res, 5, pfile_stat_device(&st));
-  psync_sql_run(res);
-  if (pdbg_likely(psync_sql_affected_rows()))
-    ret = psync_sql_insertid();
+  psql_bind_uint(res, 1, folderid);
+  psql_bind_str(res, 2, localpath);
+  psql_bind_uint(res, 3, synctype);
+  psql_bind_uint(res, 4, pfile_stat_inode(&st));
+  psql_bind_uint(res, 5, pfile_stat_device(&st));
+  psql_run(res);
+  if (pdbg_likely(psql_affected()))
+    ret = psql_insertid();
   else
     ret = PSYNC_INVALID_SYNCID;
-  psync_sql_free_result(res);
+  psql_free(res);
   if (ret == PSYNC_INVALID_SYNCID)
     return_isyncid(PERROR_FOLDER_ALREADY_SYNCING);
-  psync_sql_sync();
+  psql_sync();
   ppathstatus_reload_syncs();
   psyncer_create(ret);
   return ret;
@@ -754,24 +749,30 @@ int psync_add_sync_by_path_delayed(const char *localpath,
   struct stat st;
   int unsigned mbedtls_md;
   if (pdbg_unlikely(synctype < PSYNC_SYNCTYPE_MIN ||
-                   synctype > PSYNC_SYNCTYPE_MAX))
-    return_error(PERROR_INVALID_SYNCTYPE);
+                   synctype > PSYNC_SYNCTYPE_MAX)) {
+    psync_error = PERROR_INVALID_SYNCTYPE;
+    return -1;
+  }
   if (pdbg_unlikely(stat(localpath, &st)) ||
-      pdbg_unlikely(!pfile_stat_isfolder(&st)))
-    return_error(PERROR_LOCAL_FOLDER_NOT_FOUND);
+      pdbg_unlikely(!pfile_stat_isfolder(&st))) {
+    psync_error = PERROR_LOCAL_FOLDER_NOT_FOUND;
+    return -1;
+  }
   if (synctype & PSYNC_DOWNLOAD_ONLY)
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
-  if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md)))
-    return_error(PERROR_LOCAL_FOLDER_ACC_DENIED);
-  res = psync_sql_prep_statement("INSERT INTO syncfolderdelayed (localpath, "
+  if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md))) {
+    psync_error = PERROR_LOCAL_FOLDER_ACC_DENIED;
+    return -1;
+  }
+  res = psql_prepare("INSERT INTO syncfolderdelayed (localpath, "
                                  "remotepath, synctype) VALUES (?, ?, ?)");
-  psync_sql_bind_string(res, 1, localpath);
-  psync_sql_bind_string(res, 2, remotepath);
-  psync_sql_bind_uint(res, 3, synctype);
-  psync_sql_run_free(res);
-  psync_sql_sync();
+  psql_bind_str(res, 1, localpath);
+  psql_bind_str(res, 2, remotepath);
+  psql_bind_uint(res, 3, synctype);
+  psql_run_free(res);
+  psql_sync();
   if (pstatus_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_ONLINE)
     prun_thread("check delayed syncs", psyncer_check_delayed);
   return 0;
@@ -789,86 +790,87 @@ int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   if (pdbg_unlikely(synctype < PSYNC_SYNCTYPE_MIN ||
                    synctype > PSYNC_SYNCTYPE_MAX))
     return_isyncid(PERROR_INVALID_SYNCTYPE);
-  psync_sql_start_transaction();
-  res = psync_sql_query(
+  psql_start();
+  res = psql_query(
       "SELECT folderid, localpath, synctype FROM syncfolder WHERE id=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  row = psync_sql_fetch_row(res);
+  psql_bind_uint(res, 1, syncid);
+  row = psql_fetch(res);
   if (pdbg_unlikely(!row)) {
-    psync_sql_free_result(res);
-    psync_sql_rollback_transaction();
-    return_error(PERROR_INVALID_SYNCID);
+    psql_free(res);
+    psql_rollback();
+    psync_error = PERROR_INVALID_SYNCID;
+    return -1;
   }
   folderid = psync_get_number(row[0]);
   oldsynctype = psync_get_number(row[2]);
   if (oldsynctype == synctype) {
-    psync_sql_free_result(res);
-    psync_sql_rollback_transaction();
+    psql_free(res);
+    psql_rollback();
     return 0;
   }
   if (pdbg_unlikely(stat(psync_get_string(row[1]), &st)) ||
       pdbg_unlikely(!pfile_stat_isfolder(&st))) {
-    psync_sql_free_result(res);
-    psync_sql_rollback_transaction();
+    psql_free(res);
+    psql_rollback();
     return_isyncid(PERROR_LOCAL_FOLDER_NOT_FOUND);
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   if (synctype & PSYNC_DOWNLOAD_ONLY)
     mbedtls_md = 7;
   else
     mbedtls_md = 5;
   if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md))) {
-    psync_sql_rollback_transaction();
+    psql_rollback();
     return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
   }
   if (folderid) {
-    res = psync_sql_query("SELECT permissions FROM folder WHERE id=?");
+    res = psql_query("SELECT permissions FROM folder WHERE id=?");
     if (pdbg_unlikely(!res))
       return_isyncid(PERROR_DATABASE_ERROR);
-    psync_sql_bind_uint(res, 1, folderid);
-    urow = psync_sql_fetch_rowint(res);
+    psql_bind_uint(res, 1, folderid);
+    urow = psql_fetch_int(res);
     if (pdbg_unlikely(!urow)) {
-      psync_sql_free_result(res);
-      psync_sql_rollback_transaction();
+      psql_free(res);
+      psql_rollback();
       return_isyncid(PERROR_REMOTE_FOLDER_NOT_FOUND);
     }
     perms = urow[0];
-    psync_sql_free_result(res);
+    psql_free(res);
   } else
     perms = PSYNC_PERM_ALL;
   if (pdbg_unlikely((synctype & PSYNC_DOWNLOAD_ONLY &&
                     (perms & PSYNC_PERM_READ) != PSYNC_PERM_READ) ||
                    (synctype & PSYNC_UPLOAD_ONLY &&
                     (perms & PSYNC_PERM_WRITE) != PSYNC_PERM_WRITE))) {
-    psync_sql_rollback_transaction();
+    psql_rollback();
     return_isyncid(PERROR_REMOTE_FOLDER_ACC_DENIED);
   }
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "UPDATE syncfolder SET synctype=?, flags=0 WHERE id=?");
-  psync_sql_bind_uint(res, 1, synctype);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_run_free(res);
-  res = psync_sql_query("SELECT folderid FROM syncedfolder WHERE syncid=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  while ((urow = psync_sql_fetch_rowint(res)))
+  psql_bind_uint(res, 1, synctype);
+  psql_bind_uint(res, 2, syncid);
+  psql_run_free(res);
+  res = psql_query("SELECT folderid FROM syncedfolder WHERE syncid=?");
+  psql_bind_uint(res, 1, syncid);
+  while ((urow = psql_fetch_int(res)))
     psyncer_dl_queue_del(urow[0]);
-  psync_sql_free_result(res);
-  res = psync_sql_prep_statement("DELETE FROM syncedfolder WHERE syncid=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  psync_sql_run_free(res);
-  res = psync_sql_prep_statement("DELETE FROM localfile WHERE syncid=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  psync_sql_run_free(res);
-  res = psync_sql_prep_statement("DELETE FROM localfolder WHERE syncid=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  psync_sql_run_free(res);
+  psql_free(res);
+  res = psql_prepare("DELETE FROM syncedfolder WHERE syncid=?");
+  psql_bind_uint(res, 1, syncid);
+  psql_run_free(res);
+  res = psql_prepare("DELETE FROM localfile WHERE syncid=?");
+  psql_bind_uint(res, 1, syncid);
+  psql_run_free(res);
+  res = psql_prepare("DELETE FROM localfolder WHERE syncid=?");
+  psql_bind_uint(res, 1, syncid);
+  psql_run_free(res);
   ppathstatus_syncfldr_delete(syncid);
-  psync_sql_commit_transaction();
+  psql_commit();
   psync_localnotify_del_sync(syncid);
   psync_restat_sync_folders_del(syncid);
   pdownload_stop_sync(syncid);
   pupload_stop_sync(syncid);
-  psync_sql_sync();
+  psql_sync();
   ppathstatus_reload_syncs();
   psyncer_create(syncid);
   return 0;
@@ -878,41 +880,41 @@ static void psync_delete_local_recursive(psync_syncid_t syncid,
                                          psync_folderid_t localfolderid) {
   psync_sql_res *res;
   psync_uint_row row;
-  res = psync_sql_query(
+  res = psql_query(
       "SELECT id FROM localfolder WHERE localparentfolderid=? AND syncid=?");
-  psync_sql_bind_uint(res, 1, localfolderid);
-  psync_sql_bind_uint(res, 2, syncid);
-  while ((row = psync_sql_fetch_rowint(res)))
+  psql_bind_uint(res, 1, localfolderid);
+  psql_bind_uint(res, 2, syncid);
+  while ((row = psql_fetch_int(res)))
     psync_delete_local_recursive(syncid, row[0]);
-  psync_sql_free_result(res);
-  res = psync_sql_prep_statement(
+  psql_free(res);
+  res = psql_prepare(
       "DELETE FROM localfile WHERE localparentfolderid=? AND syncid=?");
-  psync_sql_bind_uint(res, 1, localfolderid);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_run_free(res);
-  res = psync_sql_prep_statement(
+  psql_bind_uint(res, 1, localfolderid);
+  psql_bind_uint(res, 2, syncid);
+  psql_run_free(res);
+  res = psql_prepare(
       "DELETE FROM localfolder WHERE id=? AND syncid=?");
-  psync_sql_bind_uint(res, 1, localfolderid);
-  psync_sql_bind_uint(res, 2, syncid);
-  psync_sql_run_free(res);
-  if (psync_sql_affected_rows()) {
-    res = psync_sql_prep_statement(
+  psql_bind_uint(res, 1, localfolderid);
+  psql_bind_uint(res, 2, syncid);
+  psql_run_free(res);
+  if (psql_affected()) {
+    res = psql_prepare(
         "DELETE FROM syncedfolder WHERE localfolderid=?");
-    psync_sql_bind_uint(res, 1, localfolderid);
-    psync_sql_run_free(res);
+    psql_bind_uint(res, 1, localfolderid);
+    psql_run_free(res);
   }
 }
 
 int psync_delete_sync(psync_syncid_t syncid) {
   psync_sql_res *res;
-  psync_sql_start_transaction();
+  psql_start();
 
   psync_delete_local_recursive(syncid, 0);
-  res = psync_sql_prep_statement("DELETE FROM syncfolder WHERE id=?");
-  psync_sql_bind_uint(res, 1, syncid);
-  psync_sql_run_free(res);
+  res = psql_prepare("DELETE FROM syncfolder WHERE id=?");
+  psql_bind_uint(res, 1, syncid);
+  psql_run_free(res);
 
-  if (psync_sql_commit_transaction())
+  if (psql_commit())
     return -1;
   else {
     pdownload_stop_sync(syncid);
@@ -920,7 +922,7 @@ int psync_delete_sync(psync_syncid_t syncid) {
     psync_localnotify_del_sync(syncid);
     psync_restat_sync_folders_del(syncid);
     psync_restart_localscan();
-    psync_sql_sync();
+    psql_sync();
     ppathstatus_syncfldr_delete(syncid);
     ppathstatus_reload_syncs();
 
@@ -1233,14 +1235,14 @@ int psync_has_value(const char *valuename) {
   psync_sql_res *res;
   psync_uint_row row;
   int ret;
-  res = psync_sql_query_rdlock("SELECT COUNT(*) FROM setting WHERE id=?");
-  psync_sql_bind_string(res, 1, valuename);
-  row = psync_sql_fetch_rowint(res);
+  res = psql_query_rdlock("SELECT COUNT(*) FROM setting WHERE id=?");
+  psql_bind_str(res, 1, valuename);
+  row = psql_fetch_int(res);
   if (row)
     ret = row[0];
   else
     ret = 0;
-  psync_sql_free_result(res);
+  psql_free(res);
   return ret;
 }
 
@@ -1264,48 +1266,48 @@ uint64_t psync_get_uint_value(const char *valuename) {
   psync_sql_res *res;
   psync_uint_row row;
   uint64_t ret;
-  res = psync_sql_query_rdlock("SELECT value FROM setting WHERE id=?");
-  psync_sql_bind_string(res, 1, valuename);
-  row = psync_sql_fetch_rowint(res);
+  res = psql_query_rdlock("SELECT value FROM setting WHERE id=?");
+  psql_bind_str(res, 1, valuename);
+  row = psql_fetch_int(res);
   if (row)
     ret = row[0];
   else
     ret = 0;
-  psync_sql_free_result(res);
+  psql_free(res);
   return ret;
 }
 
 void psync_set_uint_value(const char *valuename, uint64_t value) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "REPLACE INTO setting (id, value) VALUES (?, ?)");
-  psync_sql_bind_string(res, 1, valuename);
-  psync_sql_bind_uint(res, 2, value);
-  psync_sql_run_free(res);
+  psql_bind_str(res, 1, valuename);
+  psql_bind_uint(res, 2, value);
+  psql_run_free(res);
 }
 
 char *psync_get_string_value(const char *valuename) {
   psync_sql_res *res;
   psync_str_row row;
   char *ret;
-  res = psync_sql_query_rdlock("SELECT value FROM setting WHERE id=?");
-  psync_sql_bind_string(res, 1, valuename);
-  row = psync_sql_fetch_rowstr(res);
+  res = psql_query_rdlock("SELECT value FROM setting WHERE id=?");
+  psql_bind_str(res, 1, valuename);
+  row = psql_fetch_str(res);
   if (row)
     ret = psync_strdup(row[0]);
   else
     ret = NULL;
-  psync_sql_free_result(res);
+  psql_free(res);
   return ret;
 }
 
 void psync_set_string_value(const char *valuename, const char *value) {
   psync_sql_res *res;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "REPLACE INTO setting (id, value) VALUES (?, ?)");
-  psync_sql_bind_string(res, 1, valuename);
-  psync_sql_bind_string(res, 2, value);
-  psync_sql_run_free(res);
+  psql_bind_str(res, 1, valuename);
+  psql_bind_str(res, 2, value);
+  psql_run_free(res);
 }
 
 void psync_network_exception() { ptimer_notify_exception(); }
@@ -1354,11 +1356,11 @@ psync_sharerequest_list_t *psync_list_sharerequests(int incoming) {
       sizeof(psync_sharerequest_t),
       offsetof(psync_sharerequest_list_t, sharerequests));
   incoming = !!incoming;
-  res = psync_sql_query_rdlock(
+  res = psql_query_rdlock(
       "SELECT id, folderid, ctime, permissions, userid, mail, name, message, "
       "ifnull(isba, 0) FROM sharerequest WHERE isincoming=? ORDER BY name");
-  psync_sql_bind_uint(res, 1, incoming);
-  psync_list_bulder_add_sql(builder, res, create_request);
+  psql_bind_uint(res, 1, incoming);
+  psql_list_add(builder, res, create_request);
   return (psync_sharerequest_list_t *)psync_list_builder_finalize(builder);
 }
 
@@ -1416,7 +1418,7 @@ psync_share_list_t *psync_list_shares(int incoming) {
                                       offsetof(psync_share_list_t, shares));
   incoming = !!incoming;
   if (incoming) {
-    res = psync_sql_query_rdlock(
+    res = psql_query_rdlock(
         "SELECT id, folderid, ctime, permissions, userid, ifnull(mail, ''), "
         "ifnull(mail, '') as frommail, name, ifnull(bsharedfolderid, 0), 0 "
         "FROM sharedfolder WHERE isincoming=1 AND id >= 0 "
@@ -1430,9 +1432,9 @@ psync_share_list_t *psync_list_shares(int incoming) {
         " name, id as bsharedfolderid, 0 from bsharedfolder where isincoming = "
         "1 "
         " ORDER BY name;");
-    psync_list_bulder_add_sql(builder, res, create_share);
+    psql_list_add(builder, res, create_share);
   } else {
-    res = psync_sql_query_rdlock(
+    res = psql_query_rdlock(
         "SELECT sf.id, sf.folderid, sf.ctime, sf.permissions, sf.userid, "
         "ifnull(sf.mail, ''), ifnull(sf.mail, '') as frommail, f.name as "
         "fname, ifnull(sf.bsharedfolderid, 0), 0 "
@@ -1451,7 +1453,7 @@ psync_share_list_t *psync_list_shares(int incoming) {
         " bsf.name as fname, bsf.id, bsf.isteam from bsharedfolder bsf, folder "
         "f where bsf.isincoming = 0 "
         " and bsf.folderid = f.id ORDER BY fname ");
-    psync_list_bulder_add_sql(builder, res, create_share);
+    psql_list_add(builder, res, create_share);
   }
 
   return (psync_share_list_t *)psync_list_builder_finalize(builder);
@@ -1863,19 +1865,19 @@ int psync_crypto_mkdir(psync_folderid_t folderid, const char *name,
 }
 
 int psync_crypto_hassubscription() {
-  return psync_sql_cellint(
+  return psql_cellint(
       "SELECT value FROM setting WHERE id='cryptosubscription'", 0);
 }
 
 int psync_crypto_isexpired() {
   int64_t ce;
-  ce = psync_sql_cellint("SELECT value FROM setting WHERE id='cryptoexpires'",
+  ce = psql_cellint("SELECT value FROM setting WHERE id='cryptoexpires'",
                          0);
   return ce ? (ce < ptimer_time()) : 0;
 }
 
 time_t psync_crypto_expires() {
-  return psync_sql_cellint("SELECT value FROM setting WHERE id='cryptoexpires'",
+  return psql_cellint("SELECT value FROM setting WHERE id='cryptoexpires'",
                            0);
 }
 
@@ -1888,14 +1890,14 @@ int psync_crypto_reset() {
 
 psync_folderid_t psync_crypto_folderid() {
   int64_t id;
-  id = psync_sql_cellint(
+  id = psql_cellint(
       "SELECT id FROM folder WHERE parentfolderid=0 AND "
       "flags&" NTO_STR(PSYNC_FOLDER_FLAG_ENCRYPTED) "=" NTO_STR(
           PSYNC_FOLDER_FLAG_ENCRYPTED) " LIMIT 1",
       0);
   if (id)
     return id;
-  id = psync_sql_cellint(
+  id = psql_cellint(
       "SELECT f1.id FROM folder f1, folder f2 WHERE f1.parentfolderid=f2.id "
       "AND "
       "f1.flags&" NTO_STR(PSYNC_FOLDER_FLAG_ENCRYPTED) "=" NTO_STR(
@@ -1918,15 +1920,15 @@ psync_folderid_t *psync_crypto_folderids() {
   size_t alloc, l;
   alloc = 2;
   l = 0;
-  ret = psync_new_cnt(psync_folderid_t, alloc);
-  res = psync_sql_query_rdlock(
+  ret = malloc(sizeof(psync_folderid_t) * alloc);
+  res = psql_query_rdlock(
       "SELECT f1.id FROM folder f1, folder f2 WHERE f1.parentfolderid=f2.id "
       "AND "
       "f1.flags&" NTO_STR(PSYNC_FOLDER_FLAG_ENCRYPTED) "=" NTO_STR(
           PSYNC_FOLDER_FLAG_ENCRYPTED) " AND "
                                        "f2.flags&" NTO_STR(
                                            PSYNC_FOLDER_FLAG_ENCRYPTED) "=0");
-  while ((row = psync_sql_fetch_rowint(res))) {
+  while ((row = psql_fetch_int(res))) {
     ret[l] = row[0];
     if (++l == alloc) {
       alloc *= 2;
@@ -1934,7 +1936,7 @@ psync_folderid_t *psync_crypto_folderids() {
                                               sizeof(psync_folderid_t) * alloc);
     }
   }
-  psync_sql_free_result(res);
+  psql_free(res);
   ret[l] = PSYNC_CRYPTO_INVALID_FOLDERID;
   return ret;
 }
@@ -2245,21 +2247,21 @@ void psync_get_current_userid(psync_userid_t *ret) {
   psync_sql_res *res;
   psync_uint_row row;
 
-  res = psync_sql_query_rdlock("SELECT value FROM setting WHERE id= 'userid' ");
-  while ((row = psync_sql_fetch_rowint(res)))
+  res = psql_query_rdlock("SELECT value FROM setting WHERE id= 'userid' ");
+  while ((row = psql_fetch_int(res)))
     *ret = row[0];
-  psync_sql_free_result(res);
+  psql_free(res);
 }
 
 void psync_get_folder_ownerid(psync_folderid_t folderid, psync_userid_t *ret) {
   psync_sql_res *res;
   psync_uint_row row;
 
-  res = psync_sql_query_rdlock("SELECT userid FROM folder WHERE id=?");
-  psync_sql_bind_uint(res, 1, folderid);
-  while ((row = psync_sql_fetch_rowint(res)))
+  res = psql_query_rdlock("SELECT userid FROM folder WHERE id=?");
+  psql_bind_uint(res, 1, folderid);
+  while ((row = psql_fetch_int(res)))
     *ret = row[0];
-  psync_sql_free_result(res);
+  psql_free(res);
 }
 
 int psync_setlanguage(const char *language, char **err) {
@@ -2348,15 +2350,15 @@ uint64_t psync_crypto_priv_key_flags() {
   psync_sql_res *res;
   psync_uint_row row;
   uint64_t ret = 0;
-  res = psync_sql_query_rdlock_nocache(
+  res = psql_rdlock_nocache(
       "SELECT value FROM setting WHERE id='crypto_private_flags'");
-  if ((row = psync_sql_fetch_rowint(res))) {
+  if ((row = psql_fetch_int(res))) {
     ret = row[0];
-    psync_sql_free_result(res);
+    psql_free(res);
     return ret;
   } else
     pdbg_logf(D_NOTICE, "Can't read private key flags from the DB");
-  psync_sql_free_result(res);
+  psql_free(res);
   return ret;
 }
 
@@ -2364,14 +2366,14 @@ int psync_has_crypto_folders() {
   psync_sql_res *res;
   psync_uint_row row;
   uint64_t cnt = 0;
-  res = psync_sql_query_rdlock_nocache(
+  res = psql_rdlock_nocache(
       "SELECT count(*) FROM folder WHERE flags&" NTO_STR(
           PSYNC_FOLDER_FLAG_ENCRYPTED) "");
-  if ((row = psync_sql_fetch_rowint(res))) {
+  if ((row = psql_fetch_int(res))) {
     cnt = row[0];
   } else
     pdbg_logf(D_NOTICE, "There are no crypto folders in the DB");
-  psync_sql_free_result(res);
+  psql_free(res);
   return cnt > 0;
 }
 
@@ -2401,28 +2403,28 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
   pdbg_logf(D_NOTICE, "Check if folder is already synced. LocalPath [%s]",
         localPath);
 
-  sql = psync_sql_query("SELECT localpath FROM syncfolder");
+  sql = psql_query("SELECT localpath FROM syncfolder");
 
   if (pdbg_unlikely(!sql)) {
     return_isyncid(PERROR_DATABASE_ERROR);
   }
 
-  while ((srow = psync_sql_fetch_rowstr(sql))) {
+  while ((srow = psql_fetch_str(sql))) {
     if (psyncer_str_has_prefix(srow[0], localPath)) {
-      psync_sql_free_result(sql);
+      psql_free(sql);
 
       *errMsg = psync_strdup("There is already an active sync or backup for a "
                              "parent of this folder.");
       return PERROR_PARENT_OR_SUBFOLDER_ALREADY_SYNCING;
     } else if (!strcmp(srow[0], localPath)) {
-      psync_sql_free_result(sql);
+      psql_free(sql);
 
       *errMsg = psync_strdup(
           "There is already an active sync or backup for this folder.");
       return PERROR_FOLDER_ALREADY_SYNCING;
     }
   }
-  psync_sql_free_result(sql);
+  psql_free(sql);
 
   pdbg_logf(D_NOTICE, "Check if folder is not on the Drive.");
 
@@ -2500,10 +2502,10 @@ psync_folderid_t create_bup_mach_folder(char **msgErr) {
         (binresult *)papi_find_result2(retData, "folderid", PARAM_NUM);
 
     // Store the root folder id in the local DB
-    sql = psync_sql_prep_statement(
+    sql = psql_prepare(
         "REPLACE INTO setting (id, value) VALUES ('BackupRootFoId', ?)");
-    psync_sql_bind_uint(sql, 1, rootFolIdObj->num);
-    psync_sql_run_free(sql);
+    psql_bind_uint(sql, 1, rootFolIdObj->num);
+    psql_run_free(sql);
 
     free(retData);
   }
@@ -2536,7 +2538,7 @@ int psync_create_backup(char *path, char **errMsg) {
     return res;
   }
 
-  bFId = psync_sql_cellint(
+  bFId = psql_cellint(
       "SELECT value FROM setting WHERE id='BackupRootFoId'", 0);
 
   if (bFId == 0) {
@@ -2593,9 +2595,9 @@ int psync_create_backup(char *path, char **errMsg) {
     pdbg_logf(D_NOTICE,
           "Backup folder id is not valid. Delete it and create a new one.");
 
-    psync_sql_start_transaction();
-    psync_sql_statement("DELETE FROM setting WHERE id='BackupRootFoId'");
-    psync_sql_commit_transaction();
+    psql_start();
+    psql_statement("DELETE FROM setting WHERE id='BackupRootFoId'");
+    psql_commit();
 
     goto retryRootCrt;
   }
@@ -2612,20 +2614,20 @@ int psync_delete_backup(psync_syncid_t syncId, char **errMsg) {
   int res = 0;
 
   sqlRes =
-      psync_sql_query_rdlock("SELECT folderid FROM syncfolder WHERE id = ?");
+      psql_query_rdlock("SELECT folderid FROM syncfolder WHERE id = ?");
 
-  psync_sql_bind_uint(sqlRes, 1, syncId);
-  row = psync_sql_fetch_rowint(sqlRes);
+  psql_bind_uint(sqlRes, 1, syncId);
+  row = psql_fetch_int(sqlRes);
 
   if (unlikely(!row)) {
     pdbg_logf(D_ERROR, "Failed to find folder id for syncId: [%u]", syncId);
-    psync_sql_free_result(sqlRes);
+    psql_free(sqlRes);
 
     res = -1;
   } else {
     folderId = row[0];
 
-    psync_sql_free_result(sqlRes);
+    psql_free(sqlRes);
   }
 
   if (res == 0) {
@@ -2656,7 +2658,7 @@ void psync_stop_device(psync_folderid_t folderId, char **errMsg) {
   int res = 0;
 
   if (folderId == 0) {
-    bFId = psync_sql_cellint(
+    bFId = psql_cellint(
         "SELECT value FROM setting WHERE id='BackupRootFoId'", 0);
   } else {
     bFId = folderId;
@@ -2684,7 +2686,7 @@ void psync_stop_device(psync_folderid_t folderId, char **errMsg) {
 }
 
 char *get_backup_root_name() {
-  return psync_sql_cellstr("SELECT name FROM setting s JOIN folder f ON "
+  return psql_cellstr("SELECT name FROM setting s JOIN folder f ON "
                            "s.value = f.id AND s.id = 'BackupRootFoId'");
 }
 
@@ -2723,17 +2725,17 @@ int psync_delete_sync_by_folderid(psync_folderid_t fId) {
   psync_syncid_t syncId;
 
   sqlRes =
-      psync_sql_query_rdlock("SELECT id FROM syncfolder WHERE folderid = ?");
-  psync_sql_bind_uint(sqlRes, 1, fId);
-  row = psync_sql_fetch_rowint(sqlRes);
+      psql_query_rdlock("SELECT id FROM syncfolder WHERE folderid = ?");
+  psql_bind_uint(sqlRes, 1, fId);
+  row = psql_fetch_int(sqlRes);
   if (unlikely(!row)) {
     pdbg_logf(D_ERROR, "Sync to delete not found!");
-    psync_sql_free_result(sqlRes);
+    psql_free(sqlRes);
     return -1;
   }
 
   syncId = (psync_syncid_t)row[0];
-  psync_sql_free_result(sqlRes);
+  psql_free(sqlRes);
 
   prun_thread1("psync_async_sync_delete", psync_async_delete_sync,
                     (void *)(uintptr_t)syncId);
@@ -2746,15 +2748,15 @@ int psync_delete_backup_device(psync_folderid_t fId) {
 
   pdbg_logf(D_NOTICE, "Check if the local device was stopped. Id: [%lu]", fId);
 
-  bFId = psync_sql_cellint(
+  bFId = psql_cellint(
       "SELECT value FROM setting WHERE id='BackupRootFoId'", 0);
 
   if (bFId == fId) {
-    psync_sql_start_transaction();
+    psql_start();
 
-    psync_sql_statement("DELETE FROM setting WHERE id='BackupRootFoId'");
+    psql_statement("DELETE FROM setting WHERE id='BackupRootFoId'");
 
-    psync_sql_commit_transaction();
+    psql_commit();
   } else {
     pdbg_logf(D_NOTICE, "Stop for different device. Id: [%lu]", bFId);
   }
@@ -2878,14 +2880,14 @@ void psync_init_data_event_handler(void *ptr) { ptevent_init(ptr); }
 
 // moved from pdiff
 void psync_delete_cached_crypto_keys() { 
-  psync_sql_statement(
+  psql_statement(
       "DELETE FROM setting WHERE id IN ('crypto_public_key', "
       "'crypto_private_key', 'crypto_private_iter', "
       "'crypto_private_salt', 'crypto_private_sha1', 'crypto_public_sha1')");
-  if (psync_sql_affected_rows()) {
+  if (psql_affected()) {
     pdbg_logf(D_NOTICE, "deleted cached crypto keys");
     pcryptofolder_cache_clean();
   }
-  psync_sql_statement("DELETE FROM cryptofolderkey");
-  psync_sql_statement("DELETE FROM cryptofilekey");
+  psql_statement("DELETE FROM cryptofolderkey");
+  psql_statement("DELETE FROM cryptofilekey");
 }

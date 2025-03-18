@@ -33,21 +33,22 @@
 */
 
 #include <stdio.h>
-
-#include "papi.h"
-
-#include "plibs.h"
-#include "pnetlibs.h"
-#include "psettings.h"
-#include "ptools.h"
-#include "stdlib.h"
-#include "string.h"
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #include <net/if.h>
+
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <unistd.h>
+
+#include "papi.h"
+#include "plibs.h"
+#include "pnetlibs.h"
+#include "psettings.h"
+#include "psql.h"
+#include "ptools.h"
 
 char *ptools_get_mac_addr() {
   char buffer[128];
@@ -416,11 +417,11 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
 
   time(&rawtime);
 
-  syncEventFlag = psync_sql_cellint(
+  syncEventFlag = psql_cellint(
       "SELECT value FROM setting WHERE id='syncEventSentFlag'", 0);
 
   if (syncEventFlag != 1) {
-    syncCnt = psync_sql_cellint(
+    syncCnt = psql_cellint(
         "SELECT COUNT(*) FROM syncfolder WHERE synctype != 7", 0);
 
     if (syncCnt < 1) {
@@ -441,10 +442,10 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
     pdbg_logf(D_NOTICE, "Syncs Count Event Result:[%d], Message: [%s] .", intRes,
           errMsg);
 
-    sql = psync_sql_prep_statement(
+    sql = psql_prepare(
         "REPLACE INTO setting (id, value) VALUES ('syncEventSentFlag', ?)");
-    psync_sql_bind_uint(sql, 1, 1);
-    psync_sql_run_free(sql);
+    psql_bind_uint(sql, 1, 1);
+    psql_run_free(sql);
   }
 
   free(errMsg);
@@ -494,15 +495,15 @@ psync_syncid_t ptools_syncid_from_fid(psync_folderid_t fid) {
   psync_variant_row row;
   psync_syncid_t syncId = -1;
 
-  res = psync_sql_query("SELECT syncid FROM syncedfolder WHERE folderid = ?");
+  res = psql_query("SELECT syncid FROM syncedfolder WHERE folderid = ?");
 
-  psync_sql_bind_uint(res, 1, fid);
+  psql_bind_uint(res, 1, fid);
 
-  if ((row = psync_sql_fetch_row(res))) {
+  if ((row = psql_fetch(res))) {
     syncId = psync_get_number(row[0]);
   }
 
-  psync_sql_free_result(res);
+  psql_free(res);
 
   return syncId;
 }
@@ -513,20 +514,20 @@ char *ptools_sfldr_by_syncid(uint64_t syncId) {
   const char *syncName;
   char *retName;
 
-  res = psync_sql_query("SELECT localpath FROM syncfolder sf WHERE sf.id = ?");
+  res = psql_query("SELECT localpath FROM syncfolder sf WHERE sf.id = ?");
 
-  psync_sql_bind_uint(res, 1, syncId);
+  psql_bind_uint(res, 1, syncId);
 
-  if ((row = psync_sql_fetch_row(res))) {
+  if ((row = psql_fetch(res))) {
     syncName = psync_get_string(row[0]);
   } else {
-    psync_sql_free_result(res);
+    psql_free(res);
     return NULL;
   }
 
   retName = strdup(syncName);
 
-  psync_sql_free_result(res);
+  psql_free(res);
 
   return retName;
 }

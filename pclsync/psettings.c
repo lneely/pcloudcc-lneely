@@ -29,23 +29,19 @@
    DAMAGE.
 */
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
+#include <ctype.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "pfs.h"
 #include "plibs.h"
 #include "plocalscan.h"
 #include "pp2p.h"
 #include "ppagecache.h"
-#include "psettings.h"
 #include "ppath.h"
+#include "psettings.h"
+#include "psql.h"
 #include "ptimer.h"
-#include <ctype.h>
-#include <string.h>
 
 typedef void (*setting_callback)();
 typedef void (*filter_callback)(void *);
@@ -211,8 +207,8 @@ void psync_settings_init() {
   }
   free(defaultfs);
   free(defaultcache);
-  res = psync_sql_query("SELECT id, value FROM setting");
-  while ((row = psync_sql_fetch_rowstr(res))) {
+  res = psql_query("SELECT id, value FROM setting");
+  while ((row = psql_fetch_str(res))) {
     name = row[0];
     for (i = 0; i < ARRAY_SIZE(settings); i++)
       if (!strcmp(name, settings[i].name)) {
@@ -235,7 +231,7 @@ void psync_settings_init() {
                 name, settings[i].type);
       }
   }
-  psync_sql_free_result(res);
+  psql_free(res);
 }
 
 psync_settingid_t psync_setting_getid(const char *name) {
@@ -275,11 +271,11 @@ int psync_setting_set_bool(psync_settingid_t settingid, int value) {
   if (settings[settingid].fix_callback)
     settings[settingid].fix_callback(&value);
   settings[settingid].boolean = value;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "REPLACE INTO setting (id, value) VALUES (?, ?)");
-  psync_sql_bind_string(res, 1, settings[settingid].name);
-  psync_sql_bind_uint(res, 2, value);
-  psync_sql_run_free(res);
+  psql_bind_str(res, 1, settings[settingid].name);
+  psql_bind_uint(res, 2, value);
+  psql_run_free(res);
   if (settings[settingid].change_callback)
     settings[settingid].change_callback();
   return 0;
@@ -296,11 +292,11 @@ int psync_setting_set_uint(psync_settingid_t settingid, uint64_t value) {
   if (settings[settingid].fix_callback)
     settings[settingid].fix_callback(&value);
   settings[settingid].num = value;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "REPLACE INTO setting (id, value) VALUES (?, ?)");
-  psync_sql_bind_string(res, 1, settings[settingid].name);
-  psync_sql_bind_uint(res, 2, value);
-  psync_sql_run_free(res);
+  psql_bind_str(res, 1, settings[settingid].name);
+  psql_bind_uint(res, 2, value);
+  psql_run_free(res);
   if (settings[settingid].change_callback)
     settings[settingid].change_callback();
   return 0;
@@ -317,11 +313,11 @@ int psync_setting_set_int(psync_settingid_t settingid, int64_t value) {
   if (settings[settingid].fix_callback)
     settings[settingid].fix_callback(&value);
   settings[settingid].snum = value;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "REPLACE INTO setting (id, value) VALUES (?, ?)");
-  psync_sql_bind_string(res, 1, settings[settingid].name);
-  psync_sql_bind_int(res, 2, value);
-  psync_sql_run_free(res);
+  psql_bind_str(res, 1, settings[settingid].name);
+  psql_bind_int(res, 2, value);
+  psql_run_free(res);
   if (settings[settingid].change_callback)
     settings[settingid].change_callback();
   return 0;
@@ -341,11 +337,11 @@ int psync_setting_set_string(psync_settingid_t settingid, const char *value) {
   if (settings[settingid].fix_callback)
     settings[settingid].fix_callback(&newval);
   settings[settingid].str = newval;
-  res = psync_sql_prep_statement(
+  res = psql_prepare(
       "REPLACE INTO setting (id, value) VALUES (?, ?)");
-  psync_sql_bind_string(res, 1, settings[settingid].name);
-  psync_sql_bind_string(res, 2, value);
-  psync_sql_run_free(res);
+  psql_bind_str(res, 1, settings[settingid].name);
+  psql_bind_str(res, 2, value);
+  psql_run_free(res);
   if (settings[settingid].change_callback)
     settings[settingid].change_callback();
   psync_free_after_sec(oldval, 600);

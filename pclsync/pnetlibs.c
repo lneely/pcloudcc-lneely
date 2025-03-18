@@ -39,17 +39,18 @@
 #include "papi.h"
 #include "pcache.h"
 #include "pdevice.h"
+#include "pfile.h"
 #include "plibs.h"
 #include "pnetlibs.h"
+#include "ppath.h"
 #include "prun.h"
 #include "psettings.h"
+#include "psql.h"
 #include "pssl.h"
 #include "pstatus.h"
-#include "ptimer.h"
-#include "ppath.h"
 #include "psys.h"
+#include "ptimer.h"
 #include "ptree.h"
-#include "pfile.h"
 
 // required by psync_send_debug
 extern PSYNC_THREAD const char *psync_thread_name; 
@@ -416,11 +417,11 @@ int psync_get_remote_file_checksum(psync_fileid_t fileid, unsigned char *hexsum,
   psync_variant_row row;
   uint64_t result, h;
   binparam params[] = {PAPI_STR("auth", psync_my_auth), PAPI_NUM("fileid", fileid)};
-  sres = psync_sql_query_rdlock(
+  sres = psql_query_rdlock(
       "SELECT h.checksum, f.size, f.hash FROM hashchecksum h, file f WHERE "
       "f.id=? AND f.hash=h.hash AND f.size=h.size");
-  psync_sql_bind_uint(sres, 1, fileid);
-  row = psync_sql_fetch_row(sres);
+  psql_bind_uint(sres, 1, fileid);
+  row = psql_fetch(sres);
   if (row) {
     pdbg_assertw(row[0].length == PSYNC_HASH_DIGEST_HEXLEN);
     memcpy(hexsum, psync_get_string(row[0]), PSYNC_HASH_DIGEST_HEXLEN);
@@ -428,10 +429,10 @@ int psync_get_remote_file_checksum(psync_fileid_t fileid, unsigned char *hexsum,
       *fsize = psync_get_number(row[1]);
     if (hash)
       *hash = psync_get_number(row[2]);
-    psync_sql_free_result(sres);
+    psql_free(sres);
     return PSYNC_NET_OK;
   }
-  psync_sql_free_result(sres);
+  psql_free(sres);
   res = psync_api_run_command("checksumfile", params);
   if (!res)
     return PSYNC_NET_TEMPFAIL;
@@ -449,12 +450,12 @@ int psync_get_remote_file_checksum(psync_fileid_t fileid, unsigned char *hexsum,
     *fsize = result;
   if (hash)
     *hash = h;
-  sres = psync_sql_prep_statement(
+  sres = psql_prepare(
       "REPLACE INTO hashchecksum (hash, size, checksum) VALUES (?, ?, ?)");
-  psync_sql_bind_uint(sres, 1, h);
-  psync_sql_bind_uint(sres, 2, result);
-  psync_sql_bind_lstring(sres, 3, checksum->str, checksum->length);
-  psync_sql_run_free(sres);
+  psql_bind_uint(sres, 1, h);
+  psql_bind_uint(sres, 2, result);
+  psql_bind_lstr(sres, 3, checksum->str, checksum->length);
+  psql_run_free(sres);
   memcpy(hexsum, checksum->str, checksum->length);
   free(res);
   return PSYNC_NET_OK;
@@ -1742,7 +1743,7 @@ static psync_block_checksum
 **psync_net_get_sorted_checksums(psync_file_checksums *checksums){
   psync_block_checksum **ret;
   uint32_t i;
-  ret=psync_new_cnt(psync_block_checksum *, checksums->blockcnt);
+  ret=malloc(sizeof(psync_block_checksum *) * checksums->blockcnt);
   for (i=0; i<checksums->blockcnt; i++)
     ret[i]=&checksums->blocks[i];
   qsort(ret, checksums->blockcnt, sizeof(psync_block_checksum *),
@@ -2092,12 +2093,12 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
     return PSYNC_NET_TEMPFAIL;
   }
   hash = psync_net_create_hash(checksums);
-  blockactions = psync_new_cnt(psync_block_action, checksums->blockcnt);
+  blockactions = malloc(sizeof(psync_block_action) * checksums->blockcnt);
   memset(blockactions, 0, sizeof(psync_block_action) * checksums->blockcnt);
   for (i = 0; i < filecnt; i++)
     psync_net_check_file_for_blocks(files[i], checksums, hash, blockactions, i);
   free(hash);
-  range = psync_new(psync_range_list_t);
+  range = malloc(sizeof(psync_range_list_t));
   range->len = checksums->blocksize;
   range->type = blockactions[0].type;
   if (range->type == PSYNC_RANGE_COPY) {
@@ -2117,7 +2118,7 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
         (range->type == PSYNC_RANGE_COPY &&
          (range->filename != files[blockactions[i].idx] ||
           range->off + range->len != blockactions[i].off))) {
-      range = psync_new(psync_range_list_t);
+      range = malloc(sizeof(psync_range_list_t));
       range->len = bs;
       range->type = blockactions[i].type;
       if (range->type == PSYNC_RANGE_COPY) {
@@ -2133,7 +2134,7 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
   free(blockactions);
   return PSYNC_NET_OK;
 fulldownload:
-  range = psync_new(psync_range_list_t);
+  range = malloc(sizeof(psync_range_list_t));
   range->off = 0;
   range->len = filesize;
   range->type = PSYNC_RANGE_TRANSFER;
@@ -2204,7 +2205,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
             ur->uploadoffset + ur->len == off + buffoff + outbyteoff)
           ur->len += blen;
         else {
-          ur = psync_new(psync_upload_range_list_t);
+          ur = malloc(sizeof(psync_upload_range_list_t));
           ur->uploadoffset = off + buffoff + outbyteoff;
           ur->off = (uint64_t)(blockidx - 1) * checksums->blocksize;
           ur->len = blen;
@@ -2309,7 +2310,7 @@ static void merge_list_to_element(psync_upload_range_list_t *le,
       psync_list_add_after(&le->list, &ur->list);
       le->len -= ur->len;
     } else {
-      n = psync_new(psync_upload_range_list_t);
+      n = malloc(sizeof(psync_upload_range_list_t));
       n->uploadoffset = n->off = ur->uploadoffset + ur->len;
       pdbg_assertw(le->len > ur->uploadoffset - le->uploadoffset + ur->len);
       n->len = le->len - (ur->uploadoffset - le->uploadoffset) - ur->len;
@@ -2411,15 +2412,15 @@ static int is_revision_local(const unsigned char *localhashhex,
   // listrevisions does not return zero sized revisions, so do we
   if (filesize == 0)
     return 1;
-  res = psync_sql_query_rdlock(
+  res = psql_query_rdlock(
       "SELECT f.fileid FROM filerevision f, hashchecksum h WHERE f.fileid=? "
       "AND f.hash=h.hash AND h.size=? AND h.checksum=?");
-  psync_sql_bind_uint(res, 1, fileid);
-  psync_sql_bind_uint(res, 2, filesize);
-  psync_sql_bind_lstring(res, 3, (const char *)localhashhex,
+  psql_bind_uint(res, 1, fileid);
+  psql_bind_uint(res, 2, filesize);
+  psql_bind_lstr(res, 3, (const char *)localhashhex,
                          PSYNC_HASH_DIGEST_HEXLEN);
-  row = psync_sql_fetch_rowint(res);
-  psync_sql_free_result(res);
+  row = psql_fetch_int(res);
+  psql_free(res);
   return row ? 1 : 0;
 }
 
@@ -2451,42 +2452,42 @@ static int download_file_revisions(psync_fileid_t fileid) {
   }
   revs = papi_find_result2(res, "revisions", PARAM_ARRAY);
   meta = papi_find_result2(res, "metadata", PARAM_HASH);
-  psync_sql_start_transaction();
-  fr = psync_sql_prep_statement("REPLACE INTO filerevision (fileid, hash, "
+  psql_start();
+  fr = psql_prepare("REPLACE INTO filerevision (fileid, hash, "
                                 "ctime, size) VALUES (?, ?, ?, ?)");
-  hc = psync_sql_prep_statement(
+  hc = psql_prepare(
       "REPLACE INTO hashchecksum (hash, size, checksum) VALUES (?, ?, ?)");
   for (i = 0; i < revs->length; i++) {
     hash = papi_find_result2(revs->array[i], "hash", PARAM_NUM)->num;
     size = papi_find_result2(revs->array[i], "size", PARAM_NUM)->num;
-    psync_sql_bind_uint(fr, 1, fileid);
-    psync_sql_bind_uint(fr, 2, hash);
-    psync_sql_bind_uint(
+    psql_bind_uint(fr, 1, fileid);
+    psql_bind_uint(fr, 2, hash);
+    psql_bind_uint(
         fr, 3, papi_find_result2(revs->array[i], "created", PARAM_NUM)->num);
-    psync_sql_bind_uint(fr, 4, size);
-    psync_sql_run(fr);
-    psync_sql_bind_uint(hc, 1, hash);
-    psync_sql_bind_uint(hc, 2, size);
-    psync_sql_bind_lstring(
+    psql_bind_uint(fr, 4, size);
+    psql_run(fr);
+    psql_bind_uint(hc, 1, hash);
+    psql_bind_uint(hc, 2, size);
+    psql_bind_lstr(
         hc, 3,
         papi_find_result2(revs->array[i], PSYNC_CHECKSUM, PARAM_STR)->str,
         PSYNC_HASH_DIGEST_HEXLEN);
-    psync_sql_run(hc);
+    psql_run(hc);
   }
   hash = papi_find_result2(meta, "hash", PARAM_NUM)->num;
-  psync_sql_bind_uint(fr, 1, fileid);
-  psync_sql_bind_uint(fr, 2, hash);
-  psync_sql_bind_uint(fr, 3,
+  psql_bind_uint(fr, 1, fileid);
+  psql_bind_uint(fr, 2, hash);
+  psql_bind_uint(fr, 3,
                       papi_find_result2(meta, "modified", PARAM_NUM)->num);
-  psync_sql_bind_uint(fr, 4, papi_find_result2(meta, "size", PARAM_NUM)->num);
-  psync_sql_run_free(fr);
-  psync_sql_bind_uint(hc, 1, hash);
-  psync_sql_bind_uint(hc, 2, papi_find_result2(meta, "size", PARAM_NUM)->num);
-  psync_sql_bind_lstring(hc, 3,
+  psql_bind_uint(fr, 4, papi_find_result2(meta, "size", PARAM_NUM)->num);
+  psql_run_free(fr);
+  psql_bind_uint(hc, 1, hash);
+  psql_bind_uint(hc, 2, papi_find_result2(meta, "size", PARAM_NUM)->num);
+  psql_bind_lstr(hc, 3,
                          papi_find_result2(res, PSYNC_CHECKSUM, PARAM_STR)->str,
                          PSYNC_HASH_DIGEST_HEXLEN);
-  psync_sql_run_free(hc);
-  psync_sql_commit_transaction();
+  psql_run_free(hc);
+  psql_commit();
   free(res);
   return PSYNC_NET_OK;
 }
