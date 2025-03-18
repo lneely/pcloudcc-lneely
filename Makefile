@@ -1,6 +1,10 @@
-CC			:= gcc
-CXX			:= g++
-AR			:= ar
+CC		:= gcc
+CXX		:= g++
+AR		:= ar
+
+DIST_CFLAGS	:= $(CFLAGS)
+DIST_CXXFLAGS	:= $(CXXFLAGS)
+
 COMMONFLAGS	= -fsanitize=address
 CFLAGS		= -fPIC $(COMMONFLAGS) -I./pclsync -I/usr/include
 ifneq (,$(filter clang%,$(CC)))
@@ -40,6 +44,11 @@ else ifeq ($(BUILD), release)
 else
     $(error Invalid BUILD. Use 'debug' or 'release')
 endif
+
+CFLAGS		+= $(DIST_CFLAGS)
+CXXFLAGS	+= $(DIST_CXXFLAGS)
+LIBLDFLAGS	+= $(LDFLAGS)
+EXECLDFLAGS	+= $(LDFLAGS)
 
 ifeq ($(SCAN), 1)
 	CC := scan-build -o scanresults $(CC)
