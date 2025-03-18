@@ -1,14 +1,16 @@
+#include <sqlite3.h>
+
+#include <sys/stat.h>
+
+#include "pcache.h"
 #include "pdatabase.h"
 #include "pdbg.h"
 #include "plocks.h"
+#include "pnetlibs.h"
 #include "prun.h"
 #include "psettings.h"
 #include "psql.h"
-#include "pcache.h"
 #include "psys.h"
-#include "pnetlibs.h"
-#include <sqlite3.h>
-#include <sys/stat.h>
 
 #define SQL_NO_LOCK 0
 #define SQL_READ_LOCK 1

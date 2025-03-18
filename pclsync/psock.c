@@ -31,16 +31,17 @@
 #include <errno.h>
 #include <ifaddrs.h>
 #include <netdb.h>
-#include <netinet/tcp.h>
 #include <pthread.h>
 #include <unistd.h>
+
+#include <netinet/tcp.h>
 
 #include "plibs.h"
 #include "psettings.h"
 #include "psock.h"
-#include "ptimer.h"
 #include "psql.h"
 #include "ptask.h"
+#include "ptimer.h"
 
 #define PROXY_NONE 0
 #define PROXY_CONNECT 1

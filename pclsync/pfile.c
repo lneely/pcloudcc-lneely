@@ -33,8 +33,6 @@
 #include <fcntl.h>
 #include <grp.h>
 #include <ifaddrs.h>
-#include <net/if.h>
-#include <netinet/tcp.h>
 #include <pthread.h>
 #include <pwd.h>
 #include <stddef.h>
@@ -44,6 +42,8 @@
 #include <unistd.h>
 #include <utime.h>
 
+#include <net/if.h>
+#include <netinet/tcp.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -53,11 +53,10 @@
 #include <sys/utsname.h>
 #include <sys/wait.h>
 
+#include "pdbg.h"
 #include "pfile.h"
-#include "plibs.h"
 #include "prun.h"
 #include "psettings.h"
-#include "psynclib.h"
 #include "psys.h"
 
 extern char **environ;

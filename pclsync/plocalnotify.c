@@ -33,18 +33,19 @@
 #include <errno.h>
 #include <stddef.h>
 #include <string.h>
+#include <unistd.h>
+
 #include <sys/epoll.h>
 #include <sys/inotify.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 
-#include "plocalnotify.h"
 #include "pfoldersync.h"
 #include "plibs.h"
-#include "prun.h"
 #include "plist.h"
+#include "plocalnotify.h"
 #include "plocalscan.h"
+#include "prun.h"
 #include "psql.h"
 
 #define NOTIFY_MSG_ADD 0

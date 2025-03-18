@@ -33,10 +33,9 @@
 #include <stddef.h>
 
 #include "papi.h"
-#include "ptevent.h"
-#include "pfile.h"
 #include "pcompiler.h"
 #include "pdiff.h"
+#include "pfile.h"
 #include "pfileops.h"
 #include "pfoldersync.h"
 #include "plibs.h"
@@ -45,14 +44,15 @@
 #include "ppathstatus.h"
 #include "prun.h"
 #include "psettings.h"
-#include "psys.h"
+#include "psql.h"
 #include "pstatus.h"
+#include "psys.h"
 #include "ptask.h"
+#include "ptevent.h"
 #include "ptimer.h"
 #include "ptools.h"
 #include "pupload.h"
 #include "putil.h"
-#include "psql.h"
 
 extern const unsigned char pfile_invalid_chars[];
 

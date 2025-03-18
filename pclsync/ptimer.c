@@ -29,13 +29,12 @@
    DAMAGE.
 */
 
-#include "ptimer.h"
 #include "pcache.h"
 #include "pcompiler.h"
-#include "prun.h"
 #include "plibs.h"
+#include "prun.h"
 #include "psys.h"
-#include "psynclib.h"
+#include "ptimer.h"
 
 /* Maximum timeout possible is TIMER_ARRAY_SIZE^TIMER_LEVELS seconds, in the
  * worst case TIMER_LEVELS operations will be preformed for each timer to

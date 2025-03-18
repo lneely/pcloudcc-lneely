@@ -1,8 +1,8 @@
+#include <sys/mman.h>
+
 #include "pcompiler.h"
 #include "psql.h"
 #include "pdbg.h"
-
-#include <sys/mman.h>
 
 void *pmem_mmap(size_t size) {
 #if defined(MAP_ANONYMOUS)

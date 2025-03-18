@@ -31,12 +31,6 @@
 
 #include <errno.h>
 #include <ctype.h>
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/sha1.h>
-#include <mbedtls/ssl.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <unistd.h>

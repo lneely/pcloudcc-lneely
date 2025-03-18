@@ -37,7 +37,6 @@
 
 #include "pcache.h"
 #include "pcryptofolder.h"
-#include "putil.h"
 #include "pfoldersync.h"
 #include "pfs.h"
 #include "pfstasks.h"
@@ -45,8 +44,9 @@
 #include "plibs.h"
 #include "ppathstatus.h"
 #include "psettings.h"
-#include "ptimer.h"
 #include "psql.h"
+#include "ptimer.h"
+#include "putil.h"
 
 
 typedef struct {

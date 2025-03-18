@@ -33,6 +33,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "pdbg.h"
 #include "pdownload.h"
 #include "pfile.h"
 #include "pfoldersync.h"
@@ -41,13 +42,11 @@
 #include "plocalscan.h"
 #include "ppathstatus.h"
 #include "prun.h"
+#include "psql.h"
 #include "pstatus.h"
-#include "pfoldersync.h"
 #include "ptask.h"
 #include "ptree.h"
 #include "putil.h"
-#include "pdbg.h"
-#include "psql.h"
 
 
 extern const unsigned char pfile_invalid_chars[];

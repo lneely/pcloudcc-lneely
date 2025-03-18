@@ -1,8 +1,6 @@
 #include <pthread.h>
 
-#include "plibs.h"
 #include "psettings.h"
-#include "psynclib.h"
 #include "prun.h"
 
 // required by thread_entry

@@ -34,14 +34,14 @@
 
 #include "pcryptofolder.h"
 #include "pfoldersync.h"
+#include "pfstasks.h"
 #include "plibs.h"
 #include "plist.h"
 #include "ppathstatus.h"
+#include "psql.h"
 #include "pstatus.h"
 #include "ptask.h"
 #include "ptree.h"
-#include "psql.h"
-#include "pfstasks.h"
 
 #define PATH_CACHE_SIZE 512
 #define PATH_HASH_SIZE 512

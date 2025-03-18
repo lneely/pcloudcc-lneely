@@ -31,12 +31,13 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "pdevice.h"
-#include "plibs.h"
 #include "psettings.h"
-#include "psynclib.h"
+#include "putil.h"
+
 
 static const char *psync_os_name = NULL;
 static const char *psync_software_name = PSYNC_LIB_VERSION;

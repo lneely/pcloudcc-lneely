@@ -29,15 +29,8 @@
    DAMAGE.
 */
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pk.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/sha1.h>
-#include <mbedtls/sha256.h>
-#include <mbedtls/ssl.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "papi.h"
 #include "pcache.h"
@@ -55,7 +48,6 @@
 #include "ptask.h"
 #include "psql.h"
 
-#include <string.h>
 
 #define PSYNC_CRYPTO_API_ERR_INTERNAL -511
 

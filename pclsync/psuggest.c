@@ -29,15 +29,16 @@
    DAMAGE.
 */
 
-#include "psuggest.h"
+#include <stdio.h>
+#include <string.h>
+
 #include "pfile.h"
 #include "plibs.h"
 #include "plist.h"
-#include "pscanexts.h"
 #include "ppath.h"
+#include "pscanexts.h"
 #include "psettings.h"
-#include <stdio.h>
-#include <string.h>
+#include "psuggest.h"
 
 typedef struct {
   psync_list nextfolder;

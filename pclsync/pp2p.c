@@ -34,21 +34,21 @@
 #include <string.h>
 
 #include "papi.h"
-#include "pfile.h"
 #include "pcrypto.h"
 #include "pdownload.h"
+#include "pfile.h"
 #include "pfoldersync.h"
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "pp2p.h"
 #include "prun.h"
 #include "psettings.h"
+#include "psql.h"
 #include "pssl.h"
 #include "pstatus.h"
 #include "psys.h"
 #include "ptimer.h"
 #include "putil.h"
-#include "psql.h"
 
 #define P2P_ENCTYPE_RSA_AES 0
 

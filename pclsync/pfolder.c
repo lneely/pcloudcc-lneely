@@ -31,6 +31,8 @@
 
 #include <pthread.h>
 #include <stddef.h>
+#include <stddef.h>
+#include <string.h>
 
 #include "papi.h"
 #include "pcryptofolder.h"
@@ -44,9 +46,6 @@
 #include "ppath.h"
 #include "pfile.h"
 #include "psql.h"
-
-#include <stddef.h>
-#include <string.h>
 
 #define INITIAL_NAME_BUFF 2000
 #define INITIAL_ENTRY_CNT 128

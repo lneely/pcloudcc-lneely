@@ -29,11 +29,11 @@
    DAMAGE.
 */
 
-#include "plist.h"
-#include "pdbg.h"
-#include "pfile.h"
 #include <stdlib.h>
 #include <string.h>
+
+#include "plist.h"
+#include "pdbg.h"
 
 /* Fairly simple in-place merge sort with constant storage requirements.
  *

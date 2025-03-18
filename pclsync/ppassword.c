@@ -28,20 +28,14 @@
   DAMAGE.
 */
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
 #include <pthread.h>
-
-#include "plibs.h"
-#include "ppassword.h"
-#include "ppassworddict.h"
-#include "pssl.h"
-#include "putil.h"
 #include <ctype.h>
 #include <string.h>
+
+#include "ppassword.h"
+#include "pdbg.h"
+#include "ppassworddict.h"
+#include "putil.h"
 
 static int find_in_dict(const unsigned char *pwd, size_t len) {
   size_t hi, lo, med, l;

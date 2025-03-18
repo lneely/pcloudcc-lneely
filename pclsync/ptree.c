@@ -29,10 +29,11 @@
    DAMAGE.
 */
 
-#include "ptree.h"
-#include "pdbg.h"
 #include <assert.h>
 #include <string.h>
+
+#include "pdbg.h"
+#include "ptree.h"
 
 static inline long int ptree_max(long int a, long int b) {
   return a > b ? a : b;

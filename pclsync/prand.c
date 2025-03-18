@@ -1,8 +1,9 @@
+#include <unistd.h>
+
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
-#include <unistd.h>
 
 #include "plibs.h"
 #include "ppath.h"

@@ -29,8 +29,8 @@
    DAMAGE.
 */
 
-#include <pthread.h>
 #include <ctype.h>
+#include <pthread.h>
 #include <string.h>
 
 #include "pfs.h"
@@ -38,10 +38,10 @@
 #include "plocalscan.h"
 #include "pp2p.h"
 #include "ppagecache.h"
-#include "psettings.h"
 #include "ppath.h"
-#include "ptimer.h"
+#include "psettings.h"
 #include "psql.h"
+#include "ptimer.h"
 
 typedef void (*setting_callback)();
 typedef void (*filter_callback)(void *);

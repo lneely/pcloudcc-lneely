@@ -27,13 +27,14 @@
    IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "pqevent.h"
+#include <string.h>
+
 #include "pfoldersync.h"
 #include "plibs.h"
 #include "plist.h"
+#include "pqevent.h"
 #include "prun.h"
 #include "psys.h"
-#include <string.h>
 
 #define MAX_STATUS_STR_LEN 64
 #define DONT_SHOW_TIME_IF_SEC_OVER (2 * 86400)

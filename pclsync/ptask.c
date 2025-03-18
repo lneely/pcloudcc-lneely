@@ -32,7 +32,6 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stddef.h>
-#include <pthread.h>
 
 #include "papi.h"
 #include "pdeflate.h"
@@ -43,13 +42,13 @@
 #include "ppathstatus.h"
 #include "prun.h"
 #include "psettings.h"
+#include "psql.h"
 #include "pssl.h"
 #include "pstatus.h"
 #include "psys.h"
 #include "ptask.h"
 #include "ptree.h"
 #include "pupload.h"
-#include "psql.h"
 
 #define get_len(t) (sizeof(t) - offsetof(t, request))
 

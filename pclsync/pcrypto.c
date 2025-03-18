@@ -29,21 +29,14 @@
    DAMAGE.
 */
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
 #include <pthread.h>
-
-#include "pcompiler.h"
-
-#include "pssl.h"
-
-#include "pcrypto.h"
-#include "plibs.h"
 #include <stddef.h>
 #include <string.h>
+
+#include "pcompiler.h"
+#include "pcrypto.h"
+#include "pdbg.h"
+#include "pssl.h"
 
 typedef struct {
   psync_sha512_ctx sha1ctx;

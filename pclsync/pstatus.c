@@ -28,18 +28,19 @@
    USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
    DAMAGE.
 */
+
 #include <stdarg.h>
 #include <string.h>
 
 #include "pfile.h"
-#include "pstatus.h"
 #include "pfstasks.h"
 #include "plibs.h"
 #include "prunthrottled.h"
 #include "psettings.h"
+#include "psql.h"
+#include "pstatus.h"
 #include "ptask.h"
 #include "putil.h"
-#include "psql.h"
 
 static uint32_t statuses[PSTATUS_NUM_STATUSES] = {
     PSTATUS_INVALID,     PSTATUS_ONLINE_OFFLINE,

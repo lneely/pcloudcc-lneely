@@ -29,28 +29,28 @@
    DAMAGE.
 */
 
-#include <pthread.h>
 #include <errno.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "pcache.h"
 #include "pcrc32c.h"
+#include "pfile.h"
 #include "pfscrypto.h"
 #include "pfsupload.h"
 #include "plibs.h"
 #include "pmem.h"
 #include "pnetlibs.h"
 #include "ppagecache.h"
+#include "ppath.h"
 #include "prun.h"
 #include "psettings.h"
-#include "ppath.h"
-#include "psys.h"
-#include "putil.h"
-#include "pfile.h"
-#include "pstatus.h"
-#include "ptimer.h"
 #include "psql.h"
+#include "pstatus.h"
+#include "psys.h"
+#include "ptimer.h"
+#include "putil.h"
 
 #define CACHE_PAGES (PSYNC_FS_MEMORY_CACHE / PSYNC_FS_PAGE_SIZE)
 #define CACHE_HASH (CACHE_PAGES / 2)

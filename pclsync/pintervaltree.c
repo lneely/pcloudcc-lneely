@@ -30,7 +30,7 @@
 */
 
 #include "pintervaltree.h"
-#include "plibs.h"
+#include "pdbg.h"
 
 static psync_interval_tree_t *psync_interval_tree_new(uint64_t from,
                                                       uint64_t to) {

@@ -46,16 +46,15 @@
 #include "plist.h"
 #include "pnetlibs.h"
 #include "ppagecache.h"
+#include "pqevent.h"
 #include "prun.h"
 #include "psettings.h"
-#include "psys.h"
+#include "psql.h"
 #include "pstatus.h"
+#include "psys.h"
 #include "ptimer.h"
 #include "pupload.h"
 #include "putil.h"
-#include "psql.h"
-
-#include "pqevent.h"
 
 
 typedef struct {

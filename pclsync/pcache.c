@@ -29,20 +29,14 @@
 */
 
 
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/ssl.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "pcache.h"
 #include "plibs.h"
 #include "plist.h"
-#include "psynclib.h"
 #include "psys.h"
 #include "ptimer.h"
-#include <string.h>
 
 // required by psync_cache_get
 extern PSYNC_THREAD const char *psync_thread_name; 

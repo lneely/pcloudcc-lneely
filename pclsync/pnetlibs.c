@@ -39,18 +39,18 @@
 #include "papi.h"
 #include "pcache.h"
 #include "pdevice.h"
+#include "pfile.h"
 #include "plibs.h"
 #include "pnetlibs.h"
+#include "ppath.h"
 #include "prun.h"
 #include "psettings.h"
+#include "psql.h"
 #include "pssl.h"
 #include "pstatus.h"
-#include "ptimer.h"
-#include "ppath.h"
 #include "psys.h"
+#include "ptimer.h"
 #include "ptree.h"
-#include "psql.h"
-#include "pfile.h"
 
 // required by psync_send_debug
 extern PSYNC_THREAD const char *psync_thread_name; 

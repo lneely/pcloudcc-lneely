@@ -29,10 +29,13 @@
    DAMAGE.
 */
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <zlib.h>
 
 #include "pdeflate.h"
-#include "plibs.h"
+#include "pdbg.h"
 
 #define BUFFER_SIZE (4 * 1024)
 

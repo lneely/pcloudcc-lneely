@@ -29,30 +29,30 @@
    DAMAGE.
 */
 
-#include <pthread.h>
 #include <ctype.h>
+#include <pthread.h>
 #include <string.h>
 
 #include "pdevice.h"
 #include "pfile.h"
 #include "pfoldersync.h"
 #include "plibs.h"
-#include "prun.h"
 #include "plist.h"
 #include "plocalnotify.h"
 #include "plocalscan.h"
+#include "ppath.h"
 #include "ppathstatus.h"
+#include "prun.h"
 #include "prunthrottled.h"
 #include "psettings.h"
+#include "psql.h"
 #include "pssl.h"
 #include "pstatus.h"
 #include "psys.h"
 #include "ptask.h"
 #include "ptimer.h"
 #include "pupload.h"
-#include "ppath.h"
 #include "putil.h"
-#include "psql.h"
 
 
 typedef struct {

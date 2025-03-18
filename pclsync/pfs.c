@@ -43,7 +43,6 @@
 #include "pcryptofolder.h"
 #include "pfile.h"
 #include "pfoldersync.h"
-
 #include "pfs.h"
 #include "pfscrypto.h"
 #include "pfsfolder.h"
@@ -51,18 +50,17 @@
 #include "pfstasks.h"
 #include "pfsupload.h"
 #include "pfsxattr.h"
-
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "ppagecache.h"
+#include "ppath.h"
 #include "prun.h"
 #include "psettings.h"
+#include "psql.h"
 #include "pssl.h"
 #include "pstatus.h"
 #include "psys.h"
-#include "ppath.h"
 #include "ptimer.h"
-#include "psql.h"
 
 
 #ifndef FUSE_STAT
