@@ -3,6 +3,7 @@
 
 #include <fcntl.h>
 #include <stdint.h>
+#include <sys/stat.h>
 
 typedef struct {
   const char *name;
