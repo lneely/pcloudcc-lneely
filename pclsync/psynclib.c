@@ -30,7 +30,11 @@
 */
 
 #include <ctype.h>
+#ifdef __GLIBC__
 #include <execinfo.h>
+#else
+#include <libunwind.h>
+#endif
 #include <pthread.h>
 #include <stddef.h>
 #include <string.h>
