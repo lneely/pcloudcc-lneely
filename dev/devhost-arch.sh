@@ -13,13 +13,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# This script builds a development host based on Fedora.
+# This script builds a development host based on Arch.
 
 set -e
 
 HOST_USER="$USER"
-CONTAINER_NAME="devhost-fedora-${HOST_USER}"
-IMAGE="fedora:latest"
+CONTAINER_NAME="devhost-arch-${HOST_USER}"
+IMAGE="archlinux:latest"
 USERNAME="dev"
 USER_PASSWORD="devhost"
 SOURCE_DIR="$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")" 
@@ -28,10 +28,10 @@ SSH_PORT="2222"
 
 show_help() {
     echo "Usage: $0 [OPTIONS]"
-    echo "Set up a fully-fledged Fedora distribution in a Podman container with FUSE support and SSH access."
+    echo "Set up a fully-fledged Arch distribution in a Podman container with FUSE support and SSH access."
     echo
     echo "Options:"
-    echo "  -n, --name NAME      Specify the name for the container (default: devhost-fedora-${HOST_USER})"
+    echo "  -n, --name NAME      Specify the name for the container (default: devhost-arch-${HOST_USER})"
     echo "  -u, --user USER      Specify the username to create (default: dev)"
     echo "  -p, --password PASS  Specify the user's password (default: devhost)"
     echo "  -s, --ssh-port PORT  Specify the SSH port to forward (default: 2222)"
@@ -83,7 +83,7 @@ enter_container() {
 }
 
 build_container() {
-    echo "Setting up Fedora container: $CONTAINER_NAME"
+    echo "Setting up Arch container: $CONTAINER_NAME"
     echo "Source root directory: $SOURCE_DIR"
     echo "Source name: $SOURCE_NAME"
     echo "SSH Port: $SSH_PORT"
@@ -98,13 +98,13 @@ build_container() {
         "$IMAGE" sleep infinity
 
     # install system
-    podman exec "$CONTAINER_NAME" dnf update -y
-    podman exec "$CONTAINER_NAME" dnf install -y \
+    podman exec "$CONTAINER_NAME" pacman -Syyu --noconfirm
+    podman exec "$CONTAINER_NAME" pacman -S --noconfirm \
         sudo vim nano curl wget git htop tmux man-db \
-        bash-completion ca-certificates openssh-server \
-        gcc gcc-c++ make fuse-devel systemd-devel sqlite-devel \
-        mbedtls-devel zlib-devel boost-devel fuse llvm gdb iproute \
-        rsync readline-devel
+        bash-completion ca-certificates openssh \
+        base-devel gcc gcc-libs make fuse2 systemd sqlite3 \
+        mbedtls zlib boost llvm gdb iproute \
+        rsync readline
 
     # verify fuse
     if ! podman exec "$CONTAINER_NAME" ls /dev/fuse > /dev/null 2>&1; then
@@ -153,7 +153,7 @@ build_container() {
     podman exec "$CONTAINER_NAME" /usr/sbin/sshd
 
     # mop up
-    podman exec "$CONTAINER_NAME" dnf clean all
+    podman exec "$CONTAINER_NAME" pacman -Scc --noconfirm
 
     echo "Fedora container setup complete!"
     echo "Container name: $CONTAINER_NAME"

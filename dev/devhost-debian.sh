@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -141,14 +141,18 @@ build_container() {
     podman exec "$CONTAINER_NAME" chown -R "$USERNAME:$USERNAME" "/home/$USERNAME/.ssh"
     podman exec "$CONTAINER_NAME" chmod 700 "/home/$USERNAME/.ssh"
     podman exec "$CONTAINER_NAME" chmod 600 "/home/$USERNAME/.ssh/authorized_keys"
-    for pubkey in "$HOME"/.ssh/*.pub; do
+    for privkey in "$HOME"/.ssh/id_*; do
+        podman cp "$privkey" "$CONTAINER_NAME:/home/$USERNAME/.ssh"
+    done
+    for pubkey in "$HOME"/.ssh/id_*.pub; do
         if [ -f "$pubkey" ]; then
+            podman cp "$pubkey" "$CONTAINER_NAME:/home/$USERNAME/.ssh"
             podman cp "$pubkey" "$CONTAINER_NAME:/tmp/$(basename "$pubkey")"
             podman exec "$CONTAINER_NAME" bash -c "cat /tmp/$(basename "$pubkey") >> /home/$USERNAME/.ssh/authorized_keys"
             podman exec "$CONTAINER_NAME" rm "/tmp/$(basename "$pubkey")"
         fi
     done
-
+    
     # setup and run sshd
     podman exec "$CONTAINER_NAME" sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
     podman exec "$CONTAINER_NAME" sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
