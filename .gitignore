@@ -21,3 +21,5 @@ compile_commands.events.json
 /lib/poverlay_linux/overlay_client
 pcloudcc
 /scanresults/
+result
+.kateproject.build
