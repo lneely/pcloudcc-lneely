@@ -6,7 +6,7 @@
 
 The target operating system and platform for this program is `linux/amd64`, and has been reported to work on `linux/aarch64`. Program behavior on 32-bit architectures is [considered undefined](https://github.com/lneely/pcloudcc-lneely/issues/85).
 
-I aim to support as many distributions as possible, and maintain an [AUR](https://aur.archlinux.org/packages/pcloudcc-lneely) package. I do not plan on providing or maintaining any other packages, but encourage anyone interested in doing so for their own distributions.
+I aim to support as many distributions as possible. I maintain a package for [AUR](https://aur.archlinux.org/packages/pcloudcc-lneely) and [Nix](https://github.com/lneely/nixpkgs). I do not plan on providing or maintaining any other packages, but encourage anyone interested in doing so for their own distributions.
 
 # Notices
 
