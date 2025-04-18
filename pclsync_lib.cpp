@@ -37,13 +37,14 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "pcryptofolder.h"
-#include "prpc.h"
-#include "psynclib.h"
-#include "pshm.h"
-#include "pdevice.h"
-#include "pcommands.h"
-#include "putil.h"
+#include "pclsync/pcryptofolder.h"
+#include "pclsync/pfoldersync.h"
+#include "pclsync/prpc.h"
+#include "pclsync/psynclib.h"
+#include "pclsync/pshm.h"
+#include "pclsync/pdevice.h"
+#include "pclsync/pcommands.h"
+#include "pclsync/putil.h"
 
 #include "pclsync_lib.h"
 
@@ -390,7 +391,7 @@ int clib::pclsync_lib::add_sync_folder(const char *combined_path) {
 
   std::string localpath = combined.substr(0, delimiter_pos);
   std::string remotepath = combined.substr(delimiter_pos + 1);
-  psync_syncid_t syncid = psync_add_sync_by_path(localpath.c_str(), remotepath.c_str(), PSYNC_FULL);
+  psync_syncid_t syncid = pfolder_add_sync_path(localpath.c_str(), remotepath.c_str(), PSYNC_FULL);
 
   pthread_mutex_lock(&mtx);
   if (syncid == PSYNC_INVALID_SYNCID) {
@@ -419,7 +420,7 @@ int clib::pclsync_lib::list_sync_folders(const char *unused) {
   psync_folder_list_t *folders;
   size_t folderssz;
 
-  folders = psync_get_sync_list();
+  folders = pfolder_sync_folders((char *)PSYNC_STR_ALLSYNCS);
   if (!folders) {
     return -1;
   }

@@ -52,6 +52,19 @@
 #define PSYNC_FOLDER_FLAG_BACKUP_ROOT 32
 #define PSYNC_FOLDER_FLAG_BACKUP 64
 
+#define PSYNC_DOWNLOAD_ONLY 1
+#define PSYNC_UPLOAD_ONLY 2
+#define PSYNC_FULL 3
+#define PSYNC_BACKUPS 7
+#define PSYNC_STR_DOWNLOAD_ONLY "1"
+#define PSYNC_STR_UPLOAD_ONLY "2"
+#define PSYNC_STR_FULL "3"
+#define PSYNC_STR_ALLSYNCS "1,2,3"
+#define PSYNC_STR_BACKUPS "7"
+#define PSYNC_SYNCTYPE_MIN 1
+#define PSYNC_SYNCTYPE_MAX 7
+
+
 // limitation: path length of 255, plus null terminator.
 #define PSYNC_MAX_PATH_LENGTH 256
 
@@ -140,8 +153,39 @@ char *pfolder_lpath_lfile(psync_fileid_t localfileid, size_t *retlen);
 pfolder_list_t *pfolder_remote_folders(psync_folderid_t folderid, psync_listtype_t listtype);
 pfolder_list_t *pfolder_local_folders(const char *path, psync_listtype_t listtype) PSYNC_NONNULL(1);
 pentry_t *pfolder_stat(const char *remotepath);
+
+// Gets a list of local syncs, based on their type. Type empty string means all.
+// Accepts comma separated list of types example: 1,2,3
 psync_folder_list_t *pfolder_sync_folders(char *syncTypes);
 psync_folderid_t pfolder_db_wait(psync_folderid_t folderid);
+
+
+/* Use the following functions to list local or remote folders.
+ * For local folders fileid and folderid will be set to a value that
+ * should in general uniquely identify the entry (e.g. inode number).
+ * Remote paths use slashes (/) and start with one.
+ * In case of success the returned folder list is to be freed with a
+ * single call to free(). In case of error NULL is returned. Parameter
+ * listtype should be one of PLIST_FILES, PLIST_FOLDERS or PLIST_ALL.
+ *
+ * Folders do not contain "." or ".." entries.
+ *
+ * All files/folders are listed regardless if they are to be ignored
+ * based on 'ignorepatterns' setting. If needed, pass the names to
+ * psync_is_name_to_ignore that returns 1 for files that are to be
+ * ignored and 0 for others.
+ *
+ * Remote root folder has 0 folderid.
+ */
+
+// Adds a sync folder to the database. localpath is the path on the
+// local machine where pcloudcc is running. remotepath is the path in
+// pcloud remote storage (it must already exist). synctype may be
+// PSYNC_FULL, PSYNC_DOWNLOAD_ONLY, or PSYNC_UPLOAD_ONLY.
+psync_syncid_t pfolder_add_sync_path(const char *localpath, const char *remotepath, psync_synctype_t synctype);
+psync_syncid_t pfolder_add_sync(const char *localpath, psync_folderid_t folderid, psync_synctype_t synctype);
+int pfolder_add_sync_path_delay(const char *localpath, const char *remotepath, psync_synctype_t synctype);
+pfolder_list_t *pfolder_remote_folders_path(const char *remotepath, psync_listtype_t listtype);
 
 // "syncer" API (impl. psync.c)
 void psyncer_check_delayed();
@@ -157,5 +201,7 @@ void psyncer_folder_inc_tasks(psync_folderid_t lfolderid);
 void psyncer_init();
 int psyncer_str_has_prefix(const char *str1, const char *str2);
 int psyncer_str_starts_with(const char *str1, const char *str2);
+
+
 
 #endif

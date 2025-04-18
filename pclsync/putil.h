@@ -18,6 +18,12 @@ extern "C" {
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 #define rot(x, k) (((x) << (k)) | ((x) >> (32 - (k))))
 
+#define return_isyncid(err)                             \
+  do {                                                 \
+    psync_error = err;                                 \
+    return PSYNC_INVALID_SYNCID;                       \
+  } while (0)
+
 extern const char base64_table[];
 
 void putil_wipe(void *mem, size_t sz);

@@ -109,12 +109,6 @@ static inline int psync_status_is_offline() {
   return pstatus_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_OFFLINE;
 }
 
-#define return_isyncid(err)                                                    \
-  do {                                                                         \
-    psync_error = err;                                                         \
-    return PSYNC_INVALID_SYNCID;                                               \
-  } while (0)
-
 uint32_t psync_get_last_error() { return psync_error; }
 
 void psync_set_database_path(const char *databasepath) {
@@ -644,144 +638,6 @@ void psync_tfa_set_code(const char *code, int trusted, int is_recovery) {
   pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
 }
 
-psync_syncid_t psync_add_sync_by_path(const char *localpath,
-                                      const char *remotepath,
-                                      psync_synctype_t synctype) {
-  psync_folderid_t folderid = pfolder_id(remotepath);
-  if (pdbg_likely(folderid != PSYNC_INVALID_FOLDERID))
-    return psync_add_sync_by_folderid(localpath, folderid, synctype);
-  else
-    return PSYNC_INVALID_SYNCID;
-}
-
-psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
-                                          psync_folderid_t folderid,
-                                          psync_synctype_t synctype) {
-  psync_sql_res *res;
-  char *syncmp;
-  psync_uint_row row;
-  psync_str_row srow;
-  uint64_t perms;
-  struct stat st;
-  psync_syncid_t ret;
-  int unsigned mbedtls_md;
-
-  pdbg_logf(D_NOTICE, "Add sync by folder id localpath: [%s]", localpath);
-
-  if (pdbg_unlikely(synctype < PSYNC_SYNCTYPE_MIN ||
-                   synctype > PSYNC_SYNCTYPE_MAX))
-    return_isyncid(PERROR_INVALID_SYNCTYPE);
-  if (pdbg_unlikely(stat(localpath, &st)) ||
-      pdbg_unlikely(!pfile_stat_isfolder(&st)))
-    return_isyncid(PERROR_LOCAL_FOLDER_NOT_FOUND);
-  if (synctype & PSYNC_DOWNLOAD_ONLY)
-    mbedtls_md = 7;
-  else
-    mbedtls_md = 5;
-  if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md)))
-    return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
-  syncmp = psync_fs_getmountpoint();
-  if (syncmp) {
-    size_t len = strlen(syncmp);
-    if (!memcmp(syncmp, localpath, len) &&
-        (localpath[len] == 0 || localpath[len] == '/' ||
-         localpath[len] == '\\')) {
-      free(syncmp);
-      return_isyncid(PERROR_LOCAL_IS_ON_PDRIVE);
-    }
-    free(syncmp);
-  }
-  res = psql_query("SELECT localpath FROM syncfolder");
-  if (pdbg_unlikely(!res))
-    return_isyncid(PERROR_DATABASE_ERROR);
-  while ((srow = psql_fetch_str(res)))
-    if (psyncer_str_has_prefix(srow[0], localpath)) {
-      psql_free(res);
-      return_isyncid(PERROR_PARENT_OR_SUBFOLDER_ALREADY_SYNCING);
-    } else if (!strcmp(srow[0], localpath)) {
-      psql_free(res);
-      return_isyncid(PERROR_FOLDER_ALREADY_SYNCING);
-    }
-  psql_free(res);
-  if (folderid) {
-    res = psql_query("SELECT permissions FROM folder WHERE id=?");
-    if (pdbg_unlikely(!res))
-      return_isyncid(PERROR_DATABASE_ERROR);
-    psql_bind_uint(res, 1, folderid);
-    row = psql_fetch_int(res);
-    if (pdbg_unlikely(!row)) {
-      psql_free(res);
-      return_isyncid(PERROR_REMOTE_FOLDER_NOT_FOUND);
-    }
-    perms = row[0];
-    psql_free(res);
-  } else
-    perms = PSYNC_PERM_ALL;
-  if (pdbg_unlikely((synctype & PSYNC_DOWNLOAD_ONLY &&
-                    (perms & PSYNC_PERM_READ) != PSYNC_PERM_READ) ||
-                   (synctype & PSYNC_UPLOAD_ONLY &&
-                    (perms & PSYNC_PERM_WRITE) != PSYNC_PERM_WRITE)))
-    return_isyncid(PERROR_REMOTE_FOLDER_ACC_DENIED);
-  res = psql_prepare(
-      "INSERT OR IGNORE INTO syncfolder (folderid, localpath, synctype, flags, "
-      "inode, deviceid) VALUES (?, ?, ?, 0, ?, ?)");
-  if (pdbg_unlikely(!res))
-    return_isyncid(PERROR_DATABASE_ERROR);
-  psql_bind_uint(res, 1, folderid);
-  psql_bind_str(res, 2, localpath);
-  psql_bind_uint(res, 3, synctype);
-  psql_bind_uint(res, 4, pfile_stat_inode(&st));
-  psql_bind_uint(res, 5, pfile_stat_device(&st));
-  psql_run(res);
-  if (pdbg_likely(psql_affected()))
-    ret = psql_insertid();
-  else
-    ret = PSYNC_INVALID_SYNCID;
-  psql_free(res);
-  if (ret == PSYNC_INVALID_SYNCID)
-    return_isyncid(PERROR_FOLDER_ALREADY_SYNCING);
-  psql_sync();
-  ppathstatus_reload_syncs();
-  psyncer_create(ret);
-  return ret;
-}
-
-int psync_add_sync_by_path_delayed(const char *localpath,
-                                   const char *remotepath,
-                                   psync_synctype_t synctype) {
-  psync_sql_res *res;
-  struct stat st;
-  int unsigned mbedtls_md;
-  if (pdbg_unlikely(synctype < PSYNC_SYNCTYPE_MIN ||
-                   synctype > PSYNC_SYNCTYPE_MAX)) {
-    psync_error = PERROR_INVALID_SYNCTYPE;
-    return -1;
-  }
-  if (pdbg_unlikely(stat(localpath, &st)) ||
-      pdbg_unlikely(!pfile_stat_isfolder(&st))) {
-    psync_error = PERROR_LOCAL_FOLDER_NOT_FOUND;
-    return -1;
-  }
-  if (synctype & PSYNC_DOWNLOAD_ONLY)
-    mbedtls_md = 7;
-  else
-    mbedtls_md = 5;
-  if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md))) {
-    psync_error = PERROR_LOCAL_FOLDER_ACC_DENIED;
-    return -1;
-  }
-  res = psql_prepare("INSERT INTO syncfolderdelayed (localpath, "
-                                 "remotepath, synctype) VALUES (?, ?, ?)");
-  psql_bind_str(res, 1, localpath);
-  psql_bind_str(res, 2, remotepath);
-  psql_bind_uint(res, 3, synctype);
-  psql_run_free(res);
-  psql_sync();
-  if (pstatus_get(PSTATUS_TYPE_ONLINE) == PSTATUS_ONLINE_ONLINE)
-    prun_thread("check delayed syncs", psyncer_check_delayed);
-  return 0;
-}
-
 int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype) {
   psync_sql_res *res;
   psync_variant_row row;
@@ -934,10 +790,6 @@ int psync_delete_sync(psync_syncid_t syncid) {
   }
 }
 
-psync_folder_list_t *psync_get_sync_list() {
-  return pfolder_sync_folders(PSYNC_STR_ALLSYNCS);
-}
-
 psuggested_folders_t *psync_get_sync_suggestions() {
   char *home;
   psuggested_folders_t *ret;
@@ -950,26 +802,6 @@ psuggested_folders_t *psync_get_sync_suggestions() {
     psync_error = PERROR_NO_HOMEDIR;
     return NULL;
   }
-}
-
-pfolder_list_t *psync_list_local_folder_by_path(const char *localpath,
-                                                psync_listtype_t listtype) {
-  return pfolder_local_folders(localpath, listtype);
-}
-
-pfolder_list_t *psync_list_remote_folder_by_path(const char *remotepath,
-                                                 psync_listtype_t listtype) {
-  psync_folderid_t folderid = pfolder_id(remotepath);
-  if (folderid != PSYNC_INVALID_FOLDERID)
-    return pfolder_remote_folders(folderid, listtype);
-  else
-    return NULL;
-}
-
-pfolder_list_t *
-psync_list_remote_folder_by_folderid(psync_folderid_t folderid,
-                                     psync_listtype_t listtype) {
-  return pfolder_remote_folders(folderid, listtype);
 }
 
 pentry_t *psync_stat_path(const char *remotepath) {
@@ -2468,12 +2300,6 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
   return 0;
 }
 
-psync_folder_list_t *psync_get_syncs_bytype(const char *syncType) {
-  pdbg_logf(D_NOTICE, "Get syncs type: [%s]", syncType);
-
-  return pfolder_sync_folders((char *)syncType);
-}
-
 psync_folderid_t create_bup_mach_folder(char **msgErr) {
   binresult *rootFolIdObj;
   binresult *retData;
@@ -2583,7 +2409,7 @@ int psync_create_backup(char *path, char **errMsg) {
 
     folId = (binresult *)papi_find_result2(retData, FOLDER_ID, PARAM_NUM);
 
-    syncFId = psync_add_sync_by_folderid(path, folId->num, PSYNC_BACKUPS);
+    syncFId = pfolder_add_sync(path, folId->num, PSYNC_BACKUPS);
 
     free(retData);
 

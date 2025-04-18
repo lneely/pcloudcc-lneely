@@ -176,22 +176,6 @@ typedef struct {
 #define PNOTIFICATION_ACTION_GO_TO_URL 2
 #define PNOTIFICATION_ACTION_SHARE_REQUEST 3
 
-// Sync constants
-#define PSYNC_DOWNLOAD_ONLY 1
-#define PSYNC_UPLOAD_ONLY 2
-#define PSYNC_FULL 3
-#define PSYNC_BACKUPS 7
-
-#define PSYNC_STR_DOWNLOAD_ONLY "1"
-#define PSYNC_STR_UPLOAD_ONLY "2"
-#define PSYNC_STR_FULL "3"
-#define PSYNC_STR_ALLSYNCS "1,2,3"
-#define PSYNC_STR_BACKUPS "7"
-
-#define PSYNC_SYNCTYPE_MIN 1
-#define PSYNC_SYNCTYPE_MAX 7
-// Sync constants end
-
 #define PERROR_LOCAL_FOLDER_NOT_FOUND 1
 #define PERROR_REMOTE_FOLDER_NOT_FOUND 2
 #define PERROR_DATABASE_OPEN 3
@@ -715,27 +699,13 @@ void psync_tfa_set_code(const char *code, int trusted, int is_recovery);
  *
  */
 
-psync_syncid_t psync_add_sync_by_path(const char *localpath,
-                                      const char *remotepath,
-                                      psync_synctype_t synctype);
-psync_syncid_t psync_add_sync_by_folderid(const char *localpath,
-                                          psync_folderid_t folderid,
-                                          psync_synctype_t synctype);
-int psync_add_sync_by_path_delayed(const char *localpath,
-                                   const char *remotepath,
-                                   psync_synctype_t synctype);
 int psync_change_synctype(psync_syncid_t syncid, psync_synctype_t synctype);
 int psync_delete_sync(psync_syncid_t syncid);
-psync_folder_list_t *psync_get_sync_list();
 
 psuggested_folders_t *psync_get_sync_suggestions();
 
 // Backups
 int psync_is_folder_syncable(char *localPath, char **errMsg);
-
-// Gets a list of local syncs, based on their type. Type empty string means all.
-// Accepts comma separated list of types example: 1,2,3
-psync_folder_list_t *psync_get_syncs_bytype(const char *syncType);
 
 // Create a backup for the local folder defined by path parameter.
 int psync_create_backup(char *path, char **err);
@@ -770,30 +740,6 @@ void psync_async_ui_callback(void *ptr);
 
 // Backups
 
-/* Use the following functions to list local or remote folders.
- * For local folders fileid and folderid will be set to a value that
- * should in general uniquely identify the entry (e.g. inode number).
- * Remote paths use slashes (/) and start with one.
- * In case of success the returned folder list is to be freed with a
- * single call to free(). In case of error NULL is returned. Parameter
- * listtype should be one of PLIST_FILES, PLIST_FOLDERS or PLIST_ALL.
- *
- * Folders do not contain "." or ".." entries.
- *
- * All files/folders are listed regardless if they are to be ignored
- * based on 'ignorepatterns' setting. If needed, pass the names to
- * psync_is_name_to_ignore that returns 1 for files that are to be
- * ignored and 0 for others.
- *
- * Remote root folder has 0 folderid.
- */
-
-pfolder_list_t *psync_list_local_folder_by_path(const char *localpath,
-                                                psync_listtype_t listtype);
-pfolder_list_t *psync_list_remote_folder_by_path(const char *remotepath,
-                                                 psync_listtype_t listtype);
-pfolder_list_t *psync_list_remote_folder_by_folderid(psync_folderid_t folderid,
-                                                     psync_listtype_t listtype);
 pentry_t *psync_stat_path(const char *remotepath);
 psync_folderid_t psync_get_fsfolderid_by_path(const char *path,
                                               uint32_t *pflags,
