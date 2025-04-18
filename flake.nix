@@ -21,6 +21,7 @@
             readline
             fuse
             mbedtls
+            watchexec
           ];
 
           CFLAGS = [
