@@ -1,4 +1,5 @@
 #include <pthread.h>
+#include <stdlib.h>
 
 #include "psettings.h"
 #include "prun.h"
