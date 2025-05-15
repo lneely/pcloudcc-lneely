@@ -477,7 +477,7 @@ static int stat_and_create_local(psync_syncid_t syncid, psync_fileid_t fileid,
       psql_bind_uint(sql, 1, localfileid);
       psql_run_free(sql);
     }
-    psql_commit(sql);
+    psql_commit();
     pfile_delete(name);
     if (row)
       pdbg_logf(D_NOTICE,
