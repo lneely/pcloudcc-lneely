@@ -39,3 +39,6 @@ file.
 
 - [Usage Guide](./doc/USAGE.md): Read this if you're unsure how to start using
   `pcloudcc`.
+
+- [Log Management Guide](./LOG-MANAGEMENT.md): Read this to configure log rotation,
+  cache size limits, and custom log paths.

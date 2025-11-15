@@ -45,6 +45,9 @@
 #include "pclsync/pdevice.h"
 #include "pclsync/pcommands.h"
 #include "pclsync/putil.h"
+#include "pclsync/pdbg.h"
+#include "pclsync/psock.h"
+#include "pclsync/plibs.h"
 
 #include "pclsync_lib.h"
 
@@ -54,6 +57,47 @@ namespace clib = cc::clibrary;
 static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 
 static const std::string client_name = "pCloud CC v3.0.0";
+
+static const char *psync_error_to_string(uint32_t error_code) {
+  switch (error_code) {
+  case PERROR_LOCAL_FOLDER_NOT_FOUND:
+    return "local folder not found";
+  case PERROR_REMOTE_FOLDER_NOT_FOUND:
+    return "remote folder not found";
+  case PERROR_DATABASE_OPEN:
+    return "failed to open database";
+  case PERROR_NO_HOMEDIR:
+    return "cannot determine home directory or create .pcloud directory";
+  case PERROR_SSL_INIT_FAILED:
+    return "SSL initialization failed";
+  case PERROR_DATABASE_ERROR:
+    return "database error";
+  case PERROR_LOCAL_FOLDER_ACC_DENIED:
+    return "local folder access denied";
+  case PERROR_REMOTE_FOLDER_ACC_DENIED:
+    return "remote folder access denied";
+  case PERROR_FOLDER_ALREADY_SYNCING:
+    return "folder already syncing";
+  case PERROR_INVALID_SYNCTYPE:
+    return "invalid sync type";
+  case PERROR_OFFLINE:
+    return "offline";
+  case PERROR_INVALID_SYNCID:
+    return "invalid sync ID";
+  case PERROR_PARENT_OR_SUBFOLDER_ALREADY_SYNCING:
+    return "parent or subfolder already syncing";
+  case PERROR_LOCAL_IS_ON_PDRIVE:
+    return "local path is on pCloud Drive";
+  case PERROR_NO_MEMORY:
+    return "out of memory";
+  case PERROR_NET_ERROR:
+    return "network error";
+  case PERROR_PARENT_IS_IGNORED:
+    return "parent folder is ignored";
+  default:
+    return "unknown error";
+  }
+}
 
 clib::pclsync_lib::pclsync_lib()
     : setup_crypto_(false), status_(new pstatus_struct_()), was_init_(false) {}
@@ -447,7 +491,8 @@ int clib::pclsync_lib::init() {
   }
 
   if (psync_init()) {
-    std::cout << "init failed\n";
+    std::cerr << "Initialization failed: " << psync_error_to_string(psync_error)
+              << " (error code: " << psync_error << ")" << std::endl;
     return 1;
   }
 
@@ -455,6 +500,12 @@ int clib::pclsync_lib::init() {
 
   if (!get_mount().empty()) {
     psync_set_string_setting("fsroot", get_mount().c_str());
+  }
+
+  const char *cache_size_env = getenv("PCLOUD_CACHE_SIZE");
+  if (cache_size_env && cache_size_env[0] != '\0') {
+    uint64_t cache_size = std::stoull(cache_size_env);
+    psync_set_uint_setting("fscachesize", cache_size);
   }
 
   psync_start_sync(status_change, event_handler);

@@ -920,6 +920,21 @@ static void process_createfolder(const binresult *entry) {
   psql_bind_uint(st2, 1, mtime);
   psql_bind_uint(st2, 2, parentfolderid);
   psql_run(st2);
+
+  // Log remote folder creation (both synced and FUSE-only)
+  {
+    char *folderpath = psync_fs_get_path_by_folderid(folderid);
+    if (likely(folderpath)) {
+      pdbg_write_fs_event("folder created %s", folderpath);
+      free(folderpath);
+    }
+    folderpath = pfolder_path(folderid, NULL);
+    if (likely(folderpath)) {
+      pdbg_logf(D_NOTICE, "remote folder created %s", folderpath);
+      free(folderpath);
+    }
+  }
+
   if (psyncer_dl_has_folder(parentfolderid) &&
       !psync_is_name_to_ignore(name->str)) {
     psyncer_dl_queue_add(folderid);
@@ -1075,6 +1090,10 @@ static void process_modifyfolder(const binresult *entry) {
     psync_delete_backup_device(folderid);
   }
 
+  // Get old folder path before database update (for move detection)
+  char *oldfolderpath = psync_fs_get_path_by_folderid(folderid);
+  char *oldfolderpath_rel = pfolder_path(folderid, NULL);
+
   mtime = papi_find_result2(meta, "modified", PARAM_NUM)->num;
   psql_bind_uint(st, 1, parentfolderid);
   psql_bind_uint(st, 2, userid);
@@ -1086,6 +1105,27 @@ static void process_modifyfolder(const binresult *entry) {
   psql_bind_uint(st, 7, flags);
   psql_bind_uint(st, 8, folderid);
   psql_run(st);
+
+  // Log folder move/rename if location or name changed
+  {
+    int is_move = (oldparentfolderid != parentfolderid ||
+                   strcmp(name->str, oldname) != 0);
+    if (is_move) {
+      char *newfolderpath = psync_fs_get_path_by_folderid(folderid);
+      if (likely(oldfolderpath && newfolderpath)) {
+        pdbg_write_fs_event("folder moved %s -> %s", oldfolderpath, newfolderpath);
+      }
+      free(newfolderpath);
+
+      char *newfolderpath_rel = pfolder_path(folderid, NULL);
+      if (likely(oldfolderpath_rel && newfolderpath_rel)) {
+        pdbg_logf(D_NOTICE, "remote folder moved %s -> %s", oldfolderpath_rel, newfolderpath_rel);
+      }
+      free(newfolderpath_rel);
+    }
+    free(oldfolderpath);
+    free(oldfolderpath_rel);
+  }
 
   if (oldparentfolderid != parentfolderid) {
     res = psql_prepare(
@@ -1235,6 +1275,11 @@ static void process_deletefolder(const binresult *entry) {
   meta = papi_find_result2(entry, "metadata", PARAM_HASH);
   folderid = papi_find_result2(meta, "folderid", PARAM_NUM)->num;
   ppathstatus_fldr_deleted(folderid);
+
+  // Get folder path BEFORE deletion from database
+  path = pfolder_path(folderid, NULL);
+  char *fullpath = psync_fs_get_path_by_folderid(folderid);
+
   if (psyncer_dl_has_folder(folderid)) {
     psyncer_dl_queue_del(folderid);
     res = psql_query(
@@ -1247,9 +1292,9 @@ static void process_deletefolder(const binresult *entry) {
       psql_bind_uint(stmt, 2, folderid);
       psql_run_free(stmt);
       if (psql_affected() == 1) {
-        path = pfolder_path(folderid, NULL);
-        ptask_ldir_rm(row[0], folderid, row[1], path);
-        free(path);
+        char *syncpath = pfolder_path(folderid, NULL);
+        ptask_ldir_rm(row[0], folderid, row[1], syncpath);
+        free(syncpath);
         needdownload = 1;
       }
     }
@@ -1258,6 +1303,13 @@ static void process_deletefolder(const binresult *entry) {
   psql_bind_uint(st, 1, folderid);
   psql_run(st);
   if (psql_affected()) {
+    // Log remote folder deletion (both synced and FUSE-only)
+    if (likely(fullpath)) {
+      pdbg_write_fs_event("folder deleted %s", fullpath);
+    }
+    if (likely(path)) {
+      pdbg_logf(D_NOTICE, "remote folder deleted %s", path);
+    }
     psql_bind_uint(st2, 1,
                         papi_find_result2(meta, "modified", PARAM_NUM)->num);
     psql_bind_uint(
@@ -1265,6 +1317,10 @@ static void process_deletefolder(const binresult *entry) {
     psql_run(st2);
     psync_fs_folder_deleted(folderid);
   }
+  if (path)
+    free(path);
+  if (fullpath)
+    free(fullpath);
 }
 
 static void check_for_deletedfileid(const binresult *meta) {
@@ -1392,6 +1448,21 @@ static void process_createfile(const binresult *entry) {
   }
   insert_revision(fileid, hash,
                   papi_find_result2(meta, "modified", PARAM_NUM)->num, size);
+
+  // Log all remote file creations (both synced and FUSE-only)
+  {
+    char *filepath = psync_fs_get_path_by_fileid(fileid);
+    if (likely(filepath)) {
+      pdbg_write_fs_event("file created %s", filepath);
+      free(filepath);
+    }
+    filepath = pfolder_file_path(fileid, NULL);
+    if (likely(filepath)) {
+      pdbg_logf(D_NOTICE, "remote file created %s", filepath);
+      free(filepath);
+    }
+  }
+
   if (psyncer_dl_has_folder(parentfolderid) &&
       !psync_is_name_to_ignore(name->str)) {
     res = psql_query("SELECT syncid, localfolderid FROM syncedfolder "
@@ -1467,6 +1538,13 @@ static void process_modifyfile(const binresult *entry) {
   oldsize = psync_get_number(row[2]);
   if (psync_get_number(row[1]) == psync_my_userid)
     used_quota -= oldsize;
+
+  // Get old path before database update (for move detection)
+  oldparentfolderid = psync_get_number(row[0]);
+  oldname = psync_get_lstring(row[4], &oldnamelen);
+  char *oldfilepath = psync_fs_get_path_by_fileid(fileid);
+  char *oldfilepath_rel = pfolder_file_path(fileid, NULL);
+
   if (!st)
     st = psql_prepare(
         "UPDATE file SET id=?, parentfolderid=?, userid=?, size=?, hash=?, "
@@ -1502,7 +1580,41 @@ static void process_modifyfile(const binresult *entry) {
   psql_run(st);
   insert_revision(fileid, hash,
                   papi_find_result2(meta, "modified", PARAM_NUM)->num, size);
-  oldparentfolderid = psync_get_number(row[0]);
+
+  // Log file move/rename or modification (both synced and FUSE-only)
+  {
+    int is_move = (oldparentfolderid != parentfolderid ||
+                   name->length != oldnamelen ||
+                   memcmp(name->str, oldname, oldnamelen) != 0);
+    int is_content_change = (hash != psync_get_number(row[3]) || size != oldsize);
+
+    if (is_move) {
+      char *newfilepath = psync_fs_get_path_by_fileid(fileid);
+      if (likely(oldfilepath && newfilepath)) {
+        pdbg_write_fs_event("file moved %s -> %s", oldfilepath, newfilepath);
+      }
+      free(newfilepath);
+
+      char *newfilepath_rel = pfolder_file_path(fileid, NULL);
+      if (likely(oldfilepath_rel && newfilepath_rel)) {
+        pdbg_logf(D_NOTICE, "remote file moved %s -> %s", oldfilepath_rel, newfilepath_rel);
+      }
+      free(newfilepath_rel);
+    } else if (is_content_change) {
+      char *filepath = psync_fs_get_path_by_fileid(fileid);
+      if (likely(filepath)) {
+        pdbg_write_fs_event("file modified %s", filepath);
+        free(filepath);
+      }
+      filepath = pfolder_file_path(fileid, NULL);
+      if (likely(filepath)) {
+        pdbg_logf(D_NOTICE, "remote file modified %s", filepath);
+        free(filepath);
+      }
+    }
+    free(oldfilepath);
+    free(oldfilepath_rel);
+  }
   oldsync = psyncer_dl_has_folder(oldparentfolderid);
   if (oldparentfolderid == parentfolderid)
     newsync = oldsync;
@@ -1521,7 +1633,6 @@ static void process_modifyfile(const binresult *entry) {
       return;
     }
     lneeddownload = hash != psync_get_number(row[3]) || size != oldsize;
-    oldname = psync_get_lstring(row[4], &oldnamelen);
     if (lneeddownload)
       pdownload_tasks_delete(fileid, 0, 0);
     needrename = oldparentfolderid != parentfolderid ||
@@ -1617,18 +1728,34 @@ static void process_deletefile(const binresult *entry) {
     pdownload_tasks_delete(fileid, 0, 1);
     path = pfolder_file_path(fileid, NULL);
     if (likely(path)) {
+      pdbg_logf(D_NOTICE, "remote file deleted %s", path);
       ptask_lfile_rm(fileid, path);
       free(path);
       needdownload = 1;
     }
   }
+  // Get path BEFORE deleting from database
+  path = pfolder_file_path(fileid, NULL);
+  char *fullpath = psync_fs_get_path_by_fileid(fileid);
+
   psql_bind_uint(st, 1, fileid);
   psql_run(st);
   if (psql_affected()) {
+    // Log all remote file deletions (both synced and FUSE-only)
+    if (likely(fullpath)) {
+      pdbg_write_fs_event("file deleted %s", fullpath);
+    }
+    if (likely(path)) {
+      pdbg_logf(D_NOTICE, "remote file deleted %s", path);
+    }
     if (papi_find_result2(meta, "ismine", PARAM_BOOL)->num)
       used_quota -= papi_find_result2(meta, "size", PARAM_NUM)->num;
     psync_fs_file_deleted(fileid);
   }
+  if (path)
+    free(path);
+  if (fullpath)
+    free(fullpath);
 }
 
 static void start_download() {

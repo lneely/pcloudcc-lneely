@@ -272,19 +272,19 @@ psync_pagecache_get_free_page(int runflushcacheinside) {
       } while (flush_page_running && psync_list_isempty(&free_pages));
     }
     if (psync_list_isempty(&free_pages)) {
-      pdbg_logf(D_NOTICE, "no free pages, flushing cache");
+      pdbg_logf(D_BUG, "no free pages, flushing cache");
       pthread_mutex_unlock(&cache_mutex);
       flush_pages(1);
       pthread_mutex_lock(&cache_mutex);
       while (unlikely(psync_list_isempty(&free_pages))) {
         pthread_mutex_unlock(&cache_mutex);
-        pdbg_logf(D_NOTICE, "no free pages after flush, sleeping");
+        pdbg_logf(D_BUG, "no free pages after flush, sleeping");
         psys_sleep_milliseconds(200);
         flush_pages(1);
         pthread_mutex_lock(&cache_mutex);
       }
     } else
-      pdbg_logf(D_NOTICE, "waited for a free page");
+      pdbg_logf(D_BUG, "waited for a free page");
     page =
         psync_list_remove_head_element(&free_pages, psync_cache_page_t, list);
   }
@@ -458,7 +458,7 @@ static int pass_shared_api(psock_t *api) {
                                             shared_api_waiter_t, list);
     waiter->api = api;
     pthread_cond_signal(&waiter->cond);
-    pdbg_logf(D_NOTICE, "passing shared api connection");
+    pdbg_logf(D_BUG, "passing shared api connection");
   }
   pthread_mutex_unlock(&sharedapi_mutex);
   return ret;
@@ -490,7 +490,7 @@ static int wait_shared_api() {
   pthread_cond_init(&waiter->cond, NULL);
   waiter->api = NULL;
   psync_list_add_tail(&sharedapiwaiters, &waiter->list);
-  pdbg_logf(D_NOTICE, "waiting for shared API connection");
+  pdbg_logf(D_BUG, "waiting for shared API connection");
   do {
     pthread_cond_wait(&waiter->cond, &sharedapi_mutex);
   } while (!waiter->api);
@@ -498,7 +498,7 @@ static int wait_shared_api() {
     pdbg_assertw(waiter->api == (psock_t *)-1);
     ret = -1;
   } else {
-    pdbg_logf(D_NOTICE, "waited for shared API connection");
+    pdbg_logf(D_BUG, "waited for shared API connection");
     ret = 0;
   }
   pthread_mutex_unlock(&sharedapi_mutex);
@@ -571,7 +571,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
     totalreqlen = 0;
     psync_list_for_each_element(range, &request->ranges, psync_request_range_t,
                                 list) {
-      pdbg_logf(D_NOTICE, "sending request for offset %lu, size %lu to API",
+      pdbg_logf(D_BUG, "sending request for offset %lu, size %lu to API",
             (unsigned long)range->offset, (unsigned long)range->length);
       if (unlikely(psync_api_send_read_request(api, request->fileid,
                                                request->hash, range->offset,
@@ -595,7 +595,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
       break;
     }
     hosts = papi_find_result2(ret, "hosts", PARAM_ARRAY);
-    pdbg_logf(D_NOTICE, "got file URLs of fileid %lu, hash %lu",
+    pdbg_logf(D_BUG, "got file URLs of fileid %lu, hash %lu",
           (unsigned long)request->fileid, (unsigned long)request->hash);
     if (pdbg_likely(hosts->length && hosts->array[0]->type == PARAM_STR) &&
         request->of->initialsize > totalreqlen)
@@ -616,7 +616,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
                                                                ret);
       if (pdbg_unlikely(psync_crypto_is_error(enc)))
         goto err4;
-      pdbg_logf(D_NOTICE, "got key for fileid %lu", (unsigned long)request->fileid);
+      pdbg_logf(D_BUG, "got key for fileid %lu", (unsigned long)request->fileid);
       free(ret);
       psync_fs_lock_file(request->of);
       if (pdbg_likely(request->of->encoder ==
@@ -634,7 +634,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
       if (psync_pagecache_read_range_from_api(request, range, api))
         goto err2;
       psync_list_del(l1);
-      pdbg_logf(D_NOTICE, "request for offset %lu, size %lu read from API",
+      pdbg_logf(D_BUG, "request for offset %lu, size %lu read from API",
             (unsigned long)range->offset, (unsigned long)range->length);
       free(range);
     }
@@ -2452,7 +2452,7 @@ retry:
       psock_set_write_buffered(api);
       psync_list_for_each_element(range, &request->ranges,
                                   psync_request_range_t, list) {
-        pdbg_logf(D_NOTICE, "sending request for offset %lu, size %lu to API",
+        pdbg_logf(D_BUG, "sending request for offset %lu, size %lu to API",
               (unsigned long)range->offset, (unsigned long)range->length);
         if (psync_api_send_read_request(api, request->fileid, request->hash,
                                         range->offset, range->length))
@@ -2856,10 +2856,10 @@ static void wait_waiter(psync_page_waiter_t *pwt, uint64_t hash,
                         const char *pt) {
   lock_wait(hash);
   while (!pwt->ready) {
-    pdbg_logf(D_NOTICE, "waiting for %s page #%lu to be read", pt,
+    pdbg_logf(D_BUG, "waiting for %s page #%lu to be read", pt,
           (unsigned long)pwt->waiting_for->pageid);
     pthread_cond_wait(&pwt->cond, &wait_page_mutex);
-    pdbg_logf(D_NOTICE, "waited for %s page",
+    pdbg_logf(D_BUG, "waited for %s page",
           pt); // not safe to use pwt->waiting_for here
   }
   unlock_wait(hash);

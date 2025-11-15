@@ -33,6 +33,7 @@
 #include "control_tools.h"
 
 #include "pclsync_lib.h"
+#include "pclsync/psettings.h"
 
 namespace po = boost::program_options;
 namespace ct = control_tools;
@@ -71,7 +72,11 @@ int main(int argc, char **argv) {
     ("mountpoint,m", po::value<std::string>(), "Specify where pCloud filesystem is mounted.")
     ("commands_only,k", po::bool_switch(&commands_only), "Open command prompt to interact with running daemon.")
     ("newuser,n", po::bool_switch(&newuser), "Register a new pCloud user account.")
-    ("savepassword,s", po::bool_switch(&save_pass), "Save user password in the database.");
+    ("savepassword,s", po::bool_switch(&save_pass), "Save user password in the database.")
+    ("cache-size", po::value<uint64_t>(), "Maximum cache size in GB (default: 5GB).")
+    ("log-path", po::value<std::string>(), "Custom path for debug.log (default: ~/.pcloud/debug.log).")
+    ("log-level", po::value<std::string>(), "Logging level: NONE, ERROR, WARNING, INFO (default), NOTICE, DEBUG.")
+    ("fs-event-log", po::value<std::string>(), "Path to filesystem events log (default: disabled).");
 
     po::command_line_parser parser{argc, argv};
     po::positional_options_description p;
@@ -135,6 +140,30 @@ int main(int argc, char **argv) {
     if (vm.count("mountpoint")) {
       cc::clibrary::pclsync_lib::get_lib().set_mount(
           vm["mountpoint"].as<std::string>());
+    }
+
+    if (vm.count("cache-size")) {
+      uint64_t cache_size_gb = vm["cache-size"].as<uint64_t>();
+      uint64_t cache_size_bytes = cache_size_gb * 1024ULL * 1024ULL * 1024ULL;
+      char cache_size_str[32];
+      snprintf(cache_size_str, sizeof(cache_size_str), "%llu",
+               (unsigned long long)cache_size_bytes);
+      setenv("PCLOUD_CACHE_SIZE", cache_size_str, 1);
+    }
+
+    if (vm.count("log-path")) {
+      setenv("PCLOUD_LOG_PATH", vm["log-path"].as<std::string>().c_str(), 1);
+    }
+
+    if (vm.count("log-level")) {
+      setenv("PCLOUD_LOG_LEVEL", vm["log-level"].as<std::string>().c_str(), 1);
+    } else {
+      /* Set default log level to INFO */
+      setenv("PCLOUD_LOG_LEVEL", "INFO", 1);
+    }
+
+    if (vm.count("fs-event-log")) {
+      setenv("PCLOUD_FS_EVENT_LOG", vm["fs-event-log"].as<std::string>().c_str(), 1);
     }
 
     cc::clibrary::pclsync_lib::get_lib().newuser_ = newuser;
