@@ -3690,6 +3690,30 @@ static int psync_fs_do_start() {
   }
   fuse_opt_add_arg(&args, "-ohard_remove");
 
+  // Add user-specified FUSE options from environment variable
+  const char *fuse_opts_env = getenv("PCLOUD_FUSE_OPTS");
+  if (fuse_opts_env && fuse_opts_env[0] != '\0') {
+    char *fuse_opts = strdup(fuse_opts_env);
+    if (fuse_opts) {
+      char *token = strtok(fuse_opts, ",");
+      while (token) {
+        // Trim leading/trailing whitespace
+        while (*token == ' ' || *token == '\t') token++;
+        char *end = token + strlen(token) - 1;
+        while (end > token && (*end == ' ' || *end == '\t')) *end-- = '\0';
+
+        if (strlen(token) > 0) {
+          char opt_arg[256];
+          snprintf(opt_arg, sizeof(opt_arg), "-o%s", token);
+          fuse_opt_add_arg(&args, opt_arg);
+          pdbg_logf(D_NOTICE, "Adding FUSE option: %s", token);
+        }
+        token = strtok(NULL, ",");
+      }
+      free(fuse_opts);
+    }
+  }
+
   memset(&psync_oper, 0, sizeof(psync_oper));
 
   psync_oper.init = psync_fs_init;

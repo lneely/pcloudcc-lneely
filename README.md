@@ -41,4 +41,5 @@ file.
   `pcloudcc`.
 
 - [Log Management Guide](./LOG-MANAGEMENT.md): Read this to configure log rotation,
-  cache size limits, and custom log paths.
+  cache size limits, and custom log paths. To set up automatic log rotation, copy
+  `pcloudcc.logrotate` to `/etc/logrotate.d/pcloudcc`.

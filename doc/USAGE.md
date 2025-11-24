@@ -84,6 +84,30 @@ Wed, 12 Nov 2025 05:25:10.445 +0000 file created /tmp/newfile.txt
 
 See [LOG-MANAGEMENT.md](../LOG-MANAGEMENT.md) for monitoring scripts and log rotation setup.
 
+### FUSE Mount Options
+
+Pass custom FUSE mount options with `--fuse-opts`:
+
+```bash
+# Allow other users to access the mount
+pcloudcc -u example@myemail.com -d --fuse-opts allow_other
+
+# Multiple options (comma-separated)
+pcloudcc -u example@myemail.com -d --fuse-opts allow_other,allow_root
+
+# Set custom permissions
+pcloudcc -u example@myemail.com -d --fuse-opts default_permissions,uid=1000,gid=1000
+```
+
+**Common FUSE options:**
+- `allow_other` - Allow all users to access files (requires `/etc/fuse.conf` setting)
+- `allow_root` - Allow root to access files
+- `default_permissions` - Enable kernel permission checking
+- `uid=N`, `gid=N` - Set file owner/group
+- `umask=OCTAL` - Set file permission mask
+
+See `man fuse` for complete list of available options.
+
 ## First Use
 
 Start the service in the foreground using the -p switch to enter your

@@ -76,7 +76,8 @@ int main(int argc, char **argv) {
     ("cache-size", po::value<uint64_t>(), "Maximum cache size in GB (default: 5GB).")
     ("log-path", po::value<std::string>(), "Custom path for debug.log (default: ~/.pcloud/debug.log).")
     ("log-level", po::value<std::string>(), "Logging level: NONE, ERROR, WARNING, INFO (default), NOTICE, DEBUG.")
-    ("fs-event-log", po::value<std::string>(), "Path to filesystem events log (default: disabled).");
+    ("fs-event-log", po::value<std::string>(), "Path to filesystem events log (default: disabled).")
+    ("fuse-opts,O", po::value<std::string>(), "FUSE mount options (e.g., 'allow_other,allow_root').");
 
     po::command_line_parser parser{argc, argv};
     po::positional_options_description p;
@@ -164,6 +165,10 @@ int main(int argc, char **argv) {
 
     if (vm.count("fs-event-log")) {
       setenv("PCLOUD_FS_EVENT_LOG", vm["fs-event-log"].as<std::string>().c_str(), 1);
+    }
+
+    if (vm.count("fuse-opts")) {
+      setenv("PCLOUD_FUSE_OPTS", vm["fuse-opts"].as<std::string>().c_str(), 1);
     }
 
     cc::clibrary::pclsync_lib::get_lib().newuser_ = newuser;
