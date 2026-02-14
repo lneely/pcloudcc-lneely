@@ -102,7 +102,6 @@ public:
   static int add_sync_folder(const char *path);
   static int remove_sync_folder(const char *path);
 
-  char *get_token();
   int logout();
   int unlink();
   int login(const char *user, const char *pass, int save);
