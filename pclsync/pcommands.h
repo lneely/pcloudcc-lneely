@@ -4,5 +4,6 @@ enum command_ids_ {
   FINALIZE,
   LISTSYNC,
   ADDSYNC,
-  STOPSYNC
+  STOPSYNC,
+  CHECKPENDING
 };
