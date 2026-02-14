@@ -1289,18 +1289,13 @@ uint64_t psync_crypto_priv_key_flags();
  * status. Possible statuses are  INSYNC means everything is OK, INPROG -
  * synchronization in progress, NOSYNC - file or folder not synced.
  *
- * psync_status_file() returns the status of a file in pCloud drive. Path is
- * given from the mount point of the drive. psync_status_folder() returns the
- * status of a folder in pCloud drive. Path is given from the mount point of the
- * drive. psync_filesystem_status() returns the status of a folder or a folder
- * in pCloud drive of file system. Path is the absolute path including mount
- * point of the drive and/or drive letter. Can be used for synced folders. For
- * files and folders not in drive or sync folder INSYNC is returned.
+ * psync_filesystem_status() returns the status of a file or folder in pCloud
+ * drive or file system. Path is the absolute path including mount point of the
+ * drive and/or drive letter. Can be used for synced folders. For files and
+ * folders not in drive or sync folder INSYNC is returned.
  */
 
 external_status_t psync_filesystem_status(const char *path);
-external_status_t psync_status_file(const char *path);
-external_status_t psync_status_folder(const char *path);
 
 /*
  * Publik links API functions.
