@@ -97,6 +97,7 @@ public:
   static int start_crypto(const char *pass);
   static int stop_crypto(const char *path);
   static int finalize(const char *path);
+  static int check_pending(const char *unused);
   static int list_sync_folders(const char *path);
   static int add_sync_folder(const char *path);
   static int remove_sync_folder(const char *path);

@@ -59,6 +59,7 @@ static char* command_generator(const char* text, int state) {
     "c", "c start", "c stop",
     "sync", "sync ls", "sync add", "sync remove", "sync rm",
     "s", "s ls", "s add", "s remove", "s rm",
+    "pending", "p",
     "finalize", "f",
     "quit", "q",
     nullptr
@@ -100,6 +101,7 @@ void setup_app(CLI::App *app) {
               << "    list(ls): List sync folders" << std::endl
               << "    add <localpath> <remotepath>: Add sync folder" << std::endl
               << "    remove(rm) <folderid>: Remove sync folder" << std::endl
+              << "  pending(p): Check for pending transfers" << std::endl
               << "  finalize(f): Kill daemon and quit" << std::endl
               << "  quit(q): Exit this program" << std::endl;
   });
@@ -113,6 +115,29 @@ void setup_app(CLI::App *app) {
     char *errm = NULL;
     size_t errm_size = 0;
     RpcClient *rpc = new RpcClient();
+    
+    // Check for pending transfers first
+    if (rpc->Call(CHECKPENDING, "", &errm, &errm_size) == 0) {
+      uint32_t *pending = nullptr;
+      if (pshm_read((void**)&pending, nullptr) && pending) {
+        if (*pending > 0) {
+          std::cout << "Warning: " << *pending << " pending transfer(s) detected" << std::endl;
+          std::cout << "Stopping daemon will break pending transfers. Continue? (y/n): ";
+          std::string response;
+          std::getline(std::cin, response);
+          if (response != "y" && response != "Y") {
+            std::cout << "Finalize cancelled" << std::endl;
+            free(pending);
+            if (errm) { free(errm); }
+            delete rpc;
+            return;
+          }
+        }
+        free(pending);
+      }
+    }
+    if (errm) { free(errm); errm = NULL; }
+    
     rpc->Call(FINALIZE, "", &errm, &errm_size);
     delete rpc;
     std::cout << "Exiting ..." << std::endl;
@@ -122,6 +147,17 @@ void setup_app(CLI::App *app) {
 
   app->add_subcommand("quit", "Quit the program")->alias("q")->callback([] {
     exit(0);
+  });
+
+  // pending command
+  app->add_subcommand("pending", "Check for pending transfers")->alias("p")->callback([] {
+    char *errm = NULL;
+    size_t errm_size = 0;
+    RpcClient *rpc = new RpcClient();
+    rpc->Call(CHECKPENDING, "", &errm, &errm_size);
+    delete rpc;
+    if (errm) { free(errm); }
+    return 0;
   });
 
   // crypto start

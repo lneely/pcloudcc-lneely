@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
@@ -392,9 +393,37 @@ int clib::pclsync_lib::stop_crypto(const char *unused) {
   return 0;
 }
 
+int clib::pclsync_lib::check_pending(const char *unused) {
+  (void)unused;
+  
+  pstatus_t status;
+  psync_get_status(&status);
+  
+  uint32_t pending = status.filestoupload + status.filestodownload;
+  
+  // Write result to shared memory for client
+  pshm_write(&pending, sizeof(uint32_t));
+  
+  if (pending > 0) {
+    std::cout << "Warning: " << pending << " pending transfer(s) detected";
+    if (status.filestoupload > 0 && status.filestodownload > 0) {
+      std::cout << " (" << status.filestoupload << " upload(s), " 
+                << status.filestodownload << " download(s))";
+    } else if (status.filestoupload > 0) {
+      std::cout << " (" << status.filestoupload << " upload(s))";
+    } else {
+      std::cout << " (" << status.filestodownload << " download(s))";
+    }
+    std::cout << std::endl;
+    return 1;
+  }
+  
+  std::cout << "No pending transfers detected" << std::endl;
+  return 0;
+}
+
 int clib::pclsync_lib::finalize(const char *unused) {
   (void)unused;
-
   psync_destroy();
   exit(0);
 }
@@ -499,6 +528,7 @@ int clib::pclsync_lib::init() {
   prpc_register(STARTCRYPTO, &start_crypto);
   prpc_register(STOPCRYPTO, &stop_crypto);
   prpc_register(FINALIZE, &finalize);
+  prpc_register(CHECKPENDING, &check_pending);
   prpc_register(LISTSYNC, &list_sync_folders);
   prpc_register(ADDSYNC, &add_sync_folder);
   prpc_register(STOPSYNC, &remove_sync_folder);
