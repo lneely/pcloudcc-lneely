@@ -113,8 +113,6 @@ clib::pclsync_lib &clib::pclsync_lib::get_lib() {
   return g_lib;
 }
 
-char *clib::pclsync_lib::get_token() { return psync_get_token(); }
-
 void clib::pclsync_lib::read_password() {
   read_from_stdin(password_);
 }
