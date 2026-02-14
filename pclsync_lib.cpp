@@ -124,8 +124,33 @@ void clib::pclsync_lib::read_tfa_code()
     std::cout << "Not able to read 2fa code when started as daemon." << std::endl;
     exit(1);
   }
-  std::cout << "Please enter 2fa code" << std::endl;
-  getline(std::cin, tfa_code_);
+  
+  std::cout << "2FA required. Enter code from authenticator app, or type 'sms' to receive code via SMS: ";
+  std::string input;
+  std::getline(std::cin, input);
+  
+  if (input == "sms" || input == "SMS") {
+    char *country_code = nullptr;
+    char *phone_number = nullptr;
+    int result = psync_tfa_send_sms(&country_code, &phone_number);
+    
+    if (result == 0) {
+      if (country_code && phone_number) {
+        std::cout << "SMS sent to +" << country_code << " " << phone_number << std::endl;
+        free(country_code);
+        free(phone_number);
+      } else {
+        std::cout << "SMS sent successfully" << std::endl;
+      }
+      std::cout << "Enter code from SMS: ";
+      std::getline(std::cin, tfa_code_);
+    } else {
+      std::cerr << "Failed to send SMS (error " << result << "). Enter code from authenticator app: ";
+      std::getline(std::cin, tfa_code_);
+    }
+  } else {
+    tfa_code_ = input;
+  }
 }
 
 void clib::pclsync_lib::read_cryptopass() {
