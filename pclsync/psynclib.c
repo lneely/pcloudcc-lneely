@@ -1911,14 +1911,6 @@ external_status_t psync_filesystem_status(const char *path) {
   }
 }
 
-external_status_t psync_status_file(const char *path) {
-  return psync_filesystem_status(path);
-}
-
-external_status_t psync_status_folder(const char *path) {
-  return psync_filesystem_status(path);
-}
-
 int64_t psync_file_public_link(const char *path, char **link /*OUT*/,
                                char **err /*OUT*/) {
   int64_t ret = 0;
