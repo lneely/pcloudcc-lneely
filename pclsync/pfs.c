@@ -3695,7 +3695,8 @@ static int psync_fs_do_start() {
   if (fuse_opts_env && fuse_opts_env[0] != '\0') {
     char *fuse_opts = strdup(fuse_opts_env);
     if (fuse_opts) {
-      char *token = strtok(fuse_opts, ",");
+      char *saveptr = NULL;
+      char *token = strtok_r(fuse_opts, ",", &saveptr);
       while (token) {
         // Trim leading/trailing whitespace
         while (*token == ' ' || *token == '\t') token++;
@@ -3703,12 +3704,16 @@ static int psync_fs_do_start() {
         while (end > token && (*end == ' ' || *end == '\t')) *end-- = '\0';
 
         if (strlen(token) > 0) {
-          char opt_arg[256];
-          snprintf(opt_arg, sizeof(opt_arg), "-o%s", token);
-          fuse_opt_add_arg(&args, opt_arg);
-          pdbg_logf(D_NOTICE, "Adding FUSE option: %s", token);
+          if (strlen(token) > 250) {
+            pdbg_logf(D_WARNING, "FUSE option too long, skipping: %s", token);
+          } else {
+            char opt_arg[256];
+            snprintf(opt_arg, sizeof(opt_arg), "-o%s", token);
+            fuse_opt_add_arg(&args, opt_arg);
+            pdbg_logf(D_NOTICE, "Adding FUSE option: %s", token);
+          }
         }
-        token = strtok(NULL, ",");
+        token = strtok_r(NULL, ",", &saveptr);
       }
       free(fuse_opts);
     }

@@ -801,9 +801,9 @@ prsa_sign_sha256_hash(psync_rsa_privatekey_t rsa,
   if (!ret)
     return (psync_rsa_signature_t)(void *)PERROR_NO_MEMORY;
   ret->datalen = rsalen;
-  /* Save current padding settings (assume PKCS_V21 with SHA1 as default) */
-  padding = MBEDTLS_RSA_PKCS_V21;
-  hash_id = MBEDTLS_MD_SHA1;
+  /* Save current padding settings using getter functions */
+  padding = mbedtls_rsa_get_padding_mode(rsa);
+  hash_id = mbedtls_rsa_get_md_alg(rsa);
   mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
   if (mbedtls_rsa_rsassa_pss_sign(rsa, rng_get, &rng,
                                   MBEDTLS_MD_SHA256,

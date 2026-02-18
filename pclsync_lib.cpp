@@ -504,8 +504,12 @@ int clib::pclsync_lib::init() {
 
   const char *cache_size_env = getenv("PCLOUD_CACHE_SIZE");
   if (cache_size_env && cache_size_env[0] != '\0') {
-    uint64_t cache_size = std::stoull(cache_size_env);
-    psync_set_uint_setting("fscachesize", cache_size);
+    try {
+      uint64_t cache_size = std::stoull(cache_size_env);
+      psync_set_uint_setting("fscachesize", cache_size);
+    } catch (const std::exception &e) {
+      pdbg_logf(D_ERROR, "Invalid PCLOUD_CACHE_SIZE: %s", cache_size_env);
+    }
   }
 
   psync_start_sync(status_change, event_handler);
