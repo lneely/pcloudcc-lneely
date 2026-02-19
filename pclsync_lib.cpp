@@ -139,6 +139,9 @@ void clib::pclsync_lib::set_tfa_code(const std::string &arg) {
 void clib::pclsync_lib::set_username(const std::string &arg) {
   username_ = arg;
 }
+void clib::pclsync_lib::set_password(const std::string &arg) {
+  password_ = arg;
+}
 void clib::pclsync_lib::set_crypto_pass(const std::string &arg) {
   crypto_pass_ = arg;
 };

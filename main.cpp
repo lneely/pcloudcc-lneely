@@ -25,6 +25,7 @@
   USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
   DAMAGE.
 */
+#include <cstdlib>
 #include <iostream>
 #include <string>
 
@@ -106,9 +107,16 @@ int main(int argc, char **argv) {
     }
 
 
-    if ((!vm.count("username"))) {
+    // Environment variable fallbacks
+    if (!vm.count("username")) {
+      const char *env_user = std::getenv("PCLOUD_USER");
+      if (env_user && env_user[0])
+        username = env_user;
+    }
+
+    if (!vm.count("username") && username.empty()) {
       std::cout << "Username option is required, specify with "
-                << "-u or --username." << std::endl;
+                << "-u or --username, or set PCLOUD_USER." << std::endl;
       return 1;
     }
 
@@ -124,6 +132,11 @@ int main(int argc, char **argv) {
     cc::clibrary::pclsync_lib::get_lib().set_username(username);
     if (passwordsw) {
       cc::clibrary::pclsync_lib::get_lib().read_password();
+    } else {
+      const char *env_pass = std::getenv("PCLOUD_ACCOUNT_PASSWORD");
+      if (env_pass && env_pass[0]) {
+        cc::clibrary::pclsync_lib::get_lib().set_password(std::string(env_pass));
+      }
     }
     cc::clibrary::pclsync_lib::get_lib().set_tfa_code(tfa_code);
     cc::clibrary::pclsync_lib::get_lib().set_trusted_device(trusted_device);
@@ -132,8 +145,13 @@ int main(int argc, char **argv) {
       if (vm.count("passascrypto")) {
         cc::clibrary::pclsync_lib::get_lib().set_crypto_pass(password);
       } else {
-        std::cout << "Enter crypto password." << std::endl;
-        cc::clibrary::pclsync_lib::get_lib().read_cryptopass();
+        const char *env_crypto = std::getenv("PCLOUD_CRYPTO_PASSWORD");
+        if (env_crypto && env_crypto[0]) {
+          cc::clibrary::pclsync_lib::get_lib().set_crypto_pass(std::string(env_crypto));
+        } else {
+          std::cout << "Enter crypto password." << std::endl;
+          cc::clibrary::pclsync_lib::get_lib().read_cryptopass();
+        }
       }
     } else
       cc::clibrary::pclsync_lib::get_lib().setup_crypto_ = false;
