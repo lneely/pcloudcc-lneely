@@ -163,6 +163,11 @@ int main(int argc, char **argv) {
 
     if (vm.count("cache-size")) {
       uint64_t cache_size_gb = vm["cache-size"].as<uint64_t>();
+      /* Validate cache size: minimum 1GB, maximum 1TB */
+      if (cache_size_gb < 1 || cache_size_gb > 1024) {
+        std::cerr << "error: cache-size must be between 1 and 1024 GB" << std::endl;
+        return 1;
+      }
       uint64_t cache_size_bytes = cache_size_gb * 1024ULL * 1024ULL * 1024ULL;
       char cache_size_str[32];
       snprintf(cache_size_str, sizeof(cache_size_str), "%llu",
@@ -171,7 +176,13 @@ int main(int argc, char **argv) {
     }
 
     if (vm.count("log-path")) {
-      setenv("PCLOUD_LOG_PATH", vm["log-path"].as<std::string>().c_str(), 1);
+      std::string log_path = vm["log-path"].as<std::string>();
+      /* Validate log path: must not be empty or start with /etc or /sys */
+      if (log_path.empty() || log_path.compare(0, 5, "/etc/") == 0 || log_path.compare(0, 5, "/sys/") == 0) {
+        std::cerr << "error: invalid log-path" << std::endl;
+        return 1;
+      }
+      setenv("PCLOUD_LOG_PATH", log_path.c_str(), 1);
     }
 
     if (vm.count("log-level")) {
@@ -182,7 +193,13 @@ int main(int argc, char **argv) {
     }
 
     if (vm.count("fs-event-log")) {
-      setenv("PCLOUD_FS_EVENT_LOG", vm["fs-event-log"].as<std::string>().c_str(), 1);
+      std::string fs_event_log = vm["fs-event-log"].as<std::string>();
+      /* Validate fs-event-log path: must not be empty or start with /etc or /sys */
+      if (fs_event_log.empty() || fs_event_log.compare(0, 5, "/etc/") == 0 || fs_event_log.compare(0, 5, "/sys/") == 0) {
+        std::cerr << "error: invalid fs-event-log" << std::endl;
+        return 1;
+      }
+      setenv("PCLOUD_FS_EVENT_LOG", fs_event_log.c_str(), 1);
     }
 
     if (vm.count("fuse-opts")) {

@@ -1629,6 +1629,8 @@ static void process_modifyfile(const binresult *entry) {
       path = pfolder_file_path(fileid, NULL);
       ptask_lfile_rm(fileid, path);
       free(path);
+      free(oldfilepath);
+      free(oldfilepath_rel);
       needdownload = 1;
       return;
     }
@@ -1728,7 +1730,6 @@ static void process_deletefile(const binresult *entry) {
     pdownload_tasks_delete(fileid, 0, 1);
     path = pfolder_file_path(fileid, NULL);
     if (likely(path)) {
-      pdbg_logf(D_NOTICE, "remote file deleted %s", path);
       ptask_lfile_rm(fileid, path);
       free(path);
       needdownload = 1;
