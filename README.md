@@ -39,3 +39,8 @@ file.
 
 - [Usage Guide](./doc/USAGE.md): Read this if you're unsure how to start using
   `pcloudcc`.
+
+- [pcloudcc-service](https://github.com/ibressler/pcloudcc-service): Container-based
+  systemd service for running `pcloudcc` in userspace with podman. Includes multi-stage
+  Dockerfile that builds `pcloudcc` from source and Quadlet systemd unit for automated
+  background syncing.
