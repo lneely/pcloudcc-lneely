@@ -125,11 +125,19 @@ int pfile_open(const char *path, int access, int flags) {
   flags |= O_NOATIME;
 #endif
   fd = open(path, access | flags, PSYNC_DEFAULT_POSIX_FILE_MODE);
-  if (unlikely(fd == -1)) {
-    while (errno == EINTR) {
+
+#if defined(O_NOATIME)
+  if ((-1 == fd ) && (EPERM == errno)) {
+    flags &= ~O_NOATIME;
+    fd = open(path, access | flags, PSYNC_DEFAULT_POSIX_FILE_MODE);
+  }
+#endif
+
+  if (unlikely(-1 == fd)) {
+    while (EINTR == errno) {
       pdbg_logf(D_NOTICE, "got EINTR while opening file");
       fd = open(path, access | flags, PSYNC_DEFAULT_POSIX_FILE_MODE);
-      if (fd != -1)
+      if (-1 != fd)
         return fd;
     }
   }
