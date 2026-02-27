@@ -40,6 +40,10 @@ file.
 - [Usage Guide](./doc/USAGE.md): Read this if you're unsure how to start using
   `pcloudcc`.
 
+- [Log Management Guide](./LOG-MANAGEMENT.md): Read this to configure log rotation,
+  cache size limits, and custom log paths. To set up automatic log rotation, copy
+  `pcloudcc.logrotate` to `/etc/logrotate.d/pcloudcc`.
+
 - [pcloudcc-service](https://github.com/ibressler/pcloudcc-service): Container-based
   systemd service for running `pcloudcc` in userspace with podman. Includes multi-stage
   Dockerfile that builds `pcloudcc` from source and Quadlet systemd unit for automated

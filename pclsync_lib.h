@@ -68,6 +68,7 @@ public:
   void set_trusted_device(bool arg);
   void set_tfa_code(const std::string& arg);
   void set_username(const std::string &arg);
+  void set_password(const std::string &arg);
   void set_crypto_pass(const std::string &arg);
   void set_mount(const std::string &arg);
   void set_savepass(bool s);

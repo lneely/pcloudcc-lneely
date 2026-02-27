@@ -242,8 +242,12 @@ void psql_do_lock(const char *file, unsigned line) {
     clock_gettime(CLOCK_REALTIME, &end);
     msec = (end.tv_sec - start.tv_sec) * 1000 + end.tv_nsec / 1000000 -
            start.tv_nsec / 1000000;
-    if (msec >= 5)
+    if (msec >= 1000)
+      pdbg_logf(D_ERROR, "waited %lu milliseconds for database write lock", msec);
+    else if (msec >= 250)
       pdbg_logf(D_WARNING, "waited %lu milliseconds for database write lock", msec);
+    else if (msec >= 5)
+      pdbg_logf(D_BUG, "waited %lu milliseconds for database write lock", msec);
     pdbg_assert(lockctr == 0);
     lockctr++;
     memcpy(&lockstart, &end, sizeof(struct timespec));
@@ -270,8 +274,12 @@ void psql_do_rdlock(const char *file, unsigned line) {
     clock_gettime(CLOCK_REALTIME, &end);
     msec = (end.tv_sec - start.tv_sec) * 1000 + end.tv_nsec / 1000000 -
            start.tv_nsec / 1000000;
-    if (msec >= 5)
+    if (msec >= 1000)
+      pdbg_logf(D_ERROR, "waited %lu milliseconds for database read lock", msec);
+    else if (msec >= 250)
       pdbg_logf(D_WARNING, "waited %lu milliseconds for database read lock", msec);
+    else if (msec >= 5)
+      pdbg_logf(D_BUG, "waited %lu milliseconds for database read lock", msec);
     rdlockctr++;
     memcpy(&rdlockstart, &end, sizeof(struct timespec));
     record_rdlock(file, line, &rdlockstart);
@@ -430,8 +438,16 @@ void psql_unlock() {
     clock_gettime(CLOCK_REALTIME, &end);
     msec = (end.tv_sec - lockstart.tv_sec) * 1000 + end.tv_nsec / 1000000 -
            lockstart.tv_nsec / 1000000;
-    if (msec >= 10)
+    if (msec >= 2000)
+      pdbg_logf(D_ERROR,
+            "held database write lock for %lu milliseconds taken from %s:%u",
+            msec, wrlockfile, wrlockline);
+    else if (msec >= 500)
       pdbg_logf(D_WARNING,
+            "held database write lock for %lu milliseconds taken from %s:%u",
+            msec, wrlockfile, wrlockline);
+    else if (msec >= 10)
+      pdbg_logf(D_BUG,
             "held database write lock for %lu milliseconds taken from %s:%u",
             msec, wrlockfile, wrlockline);
     record_wrunlock();
@@ -487,8 +503,16 @@ void psql_rdunlock() {
     lock = record_rdunlock();
     msec = (end.tv_sec - rdlockstart.tv_sec) * 1000 + end.tv_nsec / 1000000 -
            rdlockstart.tv_nsec / 1000000;
-    if (msec >= 20)
+    if (msec >= 2000)
+      pdbg_logf(D_ERROR,
+            "held database read lock for %lu milliseconds taken at %s:%u", msec,
+            lock->file, lock->line);
+    else if (msec >= 500)
       pdbg_logf(D_WARNING,
+            "held database read lock for %lu milliseconds taken at %s:%u", msec,
+            lock->file, lock->line);
+    else if (msec >= 20)
+      pdbg_logf(D_BUG,
             "held database read lock for %lu milliseconds taken at %s:%u", msec,
             lock->file, lock->line);
     free(lock);

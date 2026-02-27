@@ -1158,6 +1158,7 @@ void psync_fs_stop();
 char *psync_fs_getmountpoint();
 void psync_fs_register_start_callback(psync_generic_callback_t callback);
 char *psync_fs_get_path_by_folderid(psync_folderid_t folderid);
+char *psync_fs_get_path_by_fileid(psync_fileid_t fileid);
 
 void psync_fs_clean_read_cache();
 int psync_fs_move_cache(const char *path);

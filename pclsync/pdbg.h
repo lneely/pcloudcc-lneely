@@ -11,17 +11,22 @@ extern "C" {
 
 
 #define D_NONE 0
-#define D_BUG 10
-#define D_CRITICAL 20
-#define D_ERROR 30
-#define D_WARNING 40
+#define D_CRITICAL 10
+#define D_ERROR 20
+#define D_WARNING 30
+#define D_INFO 40
 #define D_NOTICE 50
+#define D_BUG 60
 
-#define DEBUG_LEVELS {{D_BUG, "BUG"}, {D_CRITICAL, "CRITICAL ERROR"}, {D_ERROR, "ERROR"}, {D_WARNING, "WARNING"}, {D_NOTICE, "NOTICE" } }
+#define DEBUG_LEVELS {{D_BUG, "DEBUG"}, {D_CRITICAL, "CRITICAL ERROR"}, {D_ERROR, "ERROR"}, {D_WARNING, "WARNING"}, {D_INFO, "INFO"}, {D_NOTICE, "NOTICE" } }
 
+/* Compile-time debug level for conditional compilation */
 #ifndef DEBUG_LEVEL
 #define DEBUG_LEVEL D_NOTICE
 #endif
+
+/* Runtime debug level - can be set via environment variable */
+extern unsigned int pdbg_runtime_level;
 
 #define IS_DEBUG (DEBUG_LEVEL >= D_WARNING)
 
@@ -31,7 +36,7 @@ extern "C" {
 
 #define pdbg_logf(level, ...)                                                      \
   do {                                                                         \
-    if (level <= DEBUG_LEVEL)                                                  \
+    if (level <= pdbg_runtime_level)                                           \
       pdbg_printf(__FILE__, __FUNCTION__, __LINE__, level, __VA_ARGS__);       \
   } while (0)
 #define pdbg_assert(cond)                                                           \
@@ -92,6 +97,8 @@ extern "C" {
 #endif
 
 int pdbg_printf(const char *file, const char *function, int unsigned line, int unsigned level, const char *fmt, ...) PSYNC_COLD PSYNC_FORMAT(printf, 5, 6) PSYNC_NONNULL(5);
+void pdbg_reopen_log(void);
+void pdbg_write_fs_event(const char *fmt, ...) PSYNC_FORMAT(printf, 1, 2) PSYNC_NONNULL(1);
 
 #ifdef __cplusplus
 }

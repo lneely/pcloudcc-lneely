@@ -275,8 +275,12 @@ unsigned char *psync_base64_encode(const unsigned char *str, size_t length,
     if (length > 1) {
       *p++ = base64_table[((current[0] & 0x03) << 4) + (current[1] >> 4)];
       *p++ = base64_table[(current[1] & 0x0f) << 2];
-    } else
+      *p++ = '=';  /* Add padding */
+    } else {
       *p++ = base64_table[(current[0] & 0x03) << 4];
+      *p++ = '=';  /* Add padding */
+      *p++ = '=';  /* Add padding */
+    }
   }
 
   *ret_length = p - result;

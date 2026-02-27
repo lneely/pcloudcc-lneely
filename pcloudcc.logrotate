@@ -1,0 +1,47 @@
+# Logrotate configuration for pcloudcc
+# Install to: /etc/logrotate.d/pcloudcc
+#
+# For system-wide logs (when using --log-path /var/log/pcloudcc.log)
+/var/log/pcloudcc.log /var/log/pcloudcc-fs-events.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 root root
+    dateext
+    dateformat -%Y%m%d
+    maxsize 100M
+
+    postrotate
+        # Send USR2 signal to pcloudcc if it's running
+        # This causes the daemon to reopen both log files
+        # SIGUSR2 is used because SIGHUP exits the daemon and SIGUSR1 is for debug dumps
+        pkill -USR2 pcloudcc 2>/dev/null || true
+    endscript
+}
+
+# For user-specific logs in home directories
+# Note: These need to be configured per-user since logrotate typically runs as root
+# Users can add their own logrotate configs or use this template
+#
+# Example for user-specific log rotation (requires user cron job):
+# Create ~/.logrotate.conf with:
+#
+# /home/username/.pcloud/debug.log /home/username/.pcloud/fs-events.log {
+#     weekly
+#     rotate 4
+#     compress
+#     missingok
+#     notifempty
+#     create 0600 username username
+#     maxsize 50M
+#
+#     postrotate
+#         pkill -USR2 -u username pcloudcc 2>/dev/null || true
+#     endscript
+# }
+#
+# Then add to user's crontab:
+# 0 2 * * * /usr/sbin/logrotate -s ~/.logrotate.state ~/.logrotate.conf

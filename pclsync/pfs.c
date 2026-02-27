@@ -3393,11 +3393,42 @@ void psync_fs_refresh_folder(psync_folderid_t folderid) {
 static char *psync_fuse_get_mountpoint() {
   struct stat st;
   char *mp;
+  int stat_result;
+  int stat_errno;
+
   mp = psync_strdup(psync_setting_get_string(_PS(fsroot)));
-  if (stat(mp, &st) && mkdir(mp, PSYNC_DEFAULT_POSIX_FOLDER_MODE)) {
+
+  stat_result = stat(mp, &st);
+  stat_errno = errno;
+
+  if (stat_result != 0) {
+    /* Provide detailed error message based on errno */
+    if (stat_errno == ENOTCONN) {
+      pdbg_logf(D_CRITICAL,
+                "Mount point %s has a stale FUSE mount (Transport endpoint is not connected). "
+                "Please unmount it first with: fusermount -u %s", mp, mp);
+    } else if (stat_errno == ENOENT) {
+      pdbg_logf(D_CRITICAL,
+                "Mount point %s does not exist. "
+                "Please create the directory first with: mkdir -p %s", mp, mp);
+    } else {
+      pdbg_logf(D_CRITICAL,
+                "Cannot access mount point %s (errno=%d: %s). "
+                "Please verify the path exists and is accessible.",
+                mp, stat_errno, strerror(stat_errno));
+    }
     free(mp);
     return NULL;
   }
+
+  /* Verify it's a directory */
+  if (!S_ISDIR(st.st_mode)) {
+    pdbg_logf(D_CRITICAL,
+              "Mount point %s exists but is not a directory", mp);
+    free(mp);
+    return NULL;
+  }
+
   return mp;
 }
 
@@ -3428,6 +3459,27 @@ char *psync_fs_get_path_by_folderid(psync_folderid_t folderid) {
     return mp;
   path =
       pfolder_path_sep(folderid, "/", NULL);
+  if (path == PSYNC_INVALID_PATH) {
+    free(mp);
+    return NULL;
+  }
+  ret = psync_strcat(mp, path, NULL);
+  free(mp);
+  free(path);
+  return ret;
+}
+
+char *psync_fs_get_path_by_fileid(psync_fileid_t fileid) {
+  char *mp, *path, *ret;
+  pthread_mutex_lock(&start_mutex);
+  if (started == 1)
+    mp = psync_strdup(psync_current_mountpoint);
+  else
+    mp = NULL;
+  pthread_mutex_unlock(&start_mutex);
+  if (!mp)
+    return NULL;
+  path = pfolder_file_path(fileid, NULL);
   if (path == PSYNC_INVALID_PATH) {
     free(mp);
     return NULL;
@@ -3531,6 +3583,11 @@ static void psync_usr1_handler(int sig) {
 }
 #endif
 
+static void psync_usr2_handler(int sig) {
+  /* Signal handler must be signal-safe - just set flag, don't log here */
+  pdbg_reopen_log();
+}
+
 static void psync_set_signal(int sig, void (*handler)(int)) {
   struct sigaction sa;
 
@@ -3553,6 +3610,7 @@ static void psync_setup_signals() {
 #if IS_DEBUG
   psync_set_signal(SIGUSR1, psync_usr1_handler);
 #endif
+  psync_set_signal(SIGUSR2, psync_usr2_handler);
 }
 
 static void psync_fs_init_once() {
@@ -3632,6 +3690,35 @@ static int psync_fs_do_start() {
   }
   fuse_opt_add_arg(&args, "-ohard_remove");
 
+  // Add user-specified FUSE options from environment variable
+  const char *fuse_opts_env = getenv("PCLOUD_FUSE_OPTS");
+  if (fuse_opts_env && fuse_opts_env[0] != '\0') {
+    char *fuse_opts = strdup(fuse_opts_env);
+    if (fuse_opts) {
+      char *saveptr = NULL;
+      char *token = strtok_r(fuse_opts, ",", &saveptr);
+      while (token) {
+        // Trim leading/trailing whitespace
+        while (*token == ' ' || *token == '\t') token++;
+        char *end = token + strlen(token) - 1;
+        while (end > token && (*end == ' ' || *end == '\t')) *end-- = '\0';
+
+        if (strlen(token) > 0) {
+          if (strlen(token) > 250) {
+            pdbg_logf(D_WARNING, "FUSE option too long, skipping: %s", token);
+          } else {
+            char opt_arg[256];
+            snprintf(opt_arg, sizeof(opt_arg), "-o%s", token);
+            fuse_opt_add_arg(&args, opt_arg);
+            pdbg_logf(D_NOTICE, "Adding FUSE option: %s", token);
+          }
+        }
+        token = strtok_r(NULL, ",", &saveptr);
+      }
+      free(fuse_opts);
+    }
+  }
+
   memset(&psync_oper, 0, sizeof(psync_oper));
 
   psync_oper.init = psync_fs_init;
@@ -3677,9 +3764,20 @@ static int psync_fs_do_start() {
     goto err00;
   mp = psync_fuse_get_mountpoint();
 
+  if (!mp) {
+    pdbg_logf(D_CRITICAL,
+              "CRITICAL ERROR: Cannot initialize FUSE filesystem. "
+              "Mount point is unavailable. See error messages above for details.");
+    goto err00;
+  }
+
   psync_fuse_channel = fuse_mount(mp, &args);
-  if (pdbg_unlikely(!psync_fuse_channel))
+  if (pdbg_unlikely(!psync_fuse_channel)) {
+    pdbg_logf(D_CRITICAL,
+              "CRITICAL ERROR: fuse_mount() failed for mount point %s. "
+              "The FUSE filesystem cannot be started.", mp);
     goto err0;
+  }
   psync_fuse = fuse_new(psync_fuse_channel, &args, &psync_oper,
                         sizeof(psync_oper), NULL);
   if (pdbg_unlikely(!psync_fuse))
