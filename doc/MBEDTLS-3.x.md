@@ -25,8 +25,8 @@ The symbolic link at the end resolves the ambiguity between `/usr/include/mbedtl
 # run from the source root directory (e.g., pcloudcc-lneely)
 
 sed -i 's/-lmbedtls/-l:libmbedtls.a/;s/-lmbedcrypto/-l:libmbedcrypto.a/;s/-lmbedx509/-l:libmbedx509.a/' Makefile
+sed -i 's/LIBLDFLAGS\t= \$(COMMONFLAGS)/LIBLDFLAGS\t= $(COMMONFLAGS) -L\/usr\/local\/lib\//' Makefile
 sed -i '5s/$/ -I\/usr\/local\/include/' Makefile
-sed -i '10s/$/ -L\/usr\/local\/lib\//' Makefile
 find . -type f -name "*.[ch]" -exec sed -i 's/#include <mbedtls/#include <mbedtls3/' {} +
 make clean all
 ```
