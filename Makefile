@@ -6,12 +6,20 @@ DIST_CFLAGS	:= $(CFLAGS)
 DIST_CXXFLAGS	:= $(CXXFLAGS)
 
 COMMONFLAGS	= -fsanitize=address
-CFLAGS		= -fPIC $(COMMONFLAGS) -I./pclsync -I/usr/include
+CFLAGS		= -fPIC $(COMMONFLAGS) -I./pclsync -I/usr/include $(shell pkg-config --cflags $$(pkg-config --list-all | grep -o 'mbedtls[0-9.]*\s' | head -1) 2>/dev/null || pkg-config --cflags mbedtls 2>/dev/null || echo "-I/usr/local/include")
 ifneq (,$(filter clang%,$(CC)))
     CFLAGS += -Wthread-safety
 endif
 CXXFLAGS	= $(CFLAGS)
-LIBLDFLAGS	= $(COMMONFLAGS) -lreadline -lpthread -ludev -lsqlite3 -lz -lmbedtls -lmbedx509 -lmbedcrypto
+LIBLDFLAGS	= $(COMMONFLAGS) -lreadline -lpthread -ludev -lsqlite3 -lz $(shell \
+	MBEDTLS_PKG=$$(pkg-config --list-all 2>/dev/null | grep -o 'mbedtls[0-9.]*\s' | head -1 | tr -d ' '); \
+	if [ -n "$$MBEDTLS_PKG" ]; then \
+		MBEDX509=$$(echo $$MBEDTLS_PKG | sed 's/mbedtls/mbedx509/'); \
+		MBEDCRYPTO=$$(echo $$MBEDTLS_PKG | sed 's/mbedtls/mbedcrypto/'); \
+		pkg-config --libs $$MBEDTLS_PKG $$MBEDX509 $$MBEDCRYPTO 2>/dev/null; \
+	else \
+		pkg-config --libs mbedtls mbedx509 mbedcrypto 2>/dev/null || echo "-L/usr/local/lib -lmbedtls -lmbedx509 -lmbedcrypto"; \
+	fi)
 EXECLDFLAGS	= $(COMMONFLAGS) -lboost_program_options -lfuse
 
 SCAN		:= 0
