@@ -343,8 +343,8 @@ int pssl_connect(int sock, void **sslconn,
     goto err0;
   }
 
-  mbedtls_ssl_conf_max_tls_version(&conn->cfg, MBEDTLS_SSL_VERSION_TLS1_2);
-  mbedtls_ssl_conf_min_tls_version(&conn->cfg, MBEDTLS_SSL_VERSION_TLS1_2);      
+  mbedtls_ssl_conf_max_version(&conn->cfg, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);
+  mbedtls_ssl_conf_min_version(&conn->cfg, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);      
 
   mbedtls_ssl_conf_endpoint(&conn->cfg, MBEDTLS_SSL_IS_CLIENT);
   mbedtls_ssl_conf_dbg(&conn->cfg, debug_cb, debug_ctx);
@@ -673,13 +673,12 @@ psymkey_generate(const char *password, size_t keylen,
       keylen + offsetof(psync_symmetric_key_struct_t, key));
   mbedtls_md_context_t ctx;
   mbedtls_md_init(&ctx);
-  mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1);
+  const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA512);
+  mbedtls_md_setup(&ctx, md_info, 1);
   key->keylen = keylen;
-  const mbedtls_md_info_t *md_info = mbedtls_md_info_from_ctx(&ctx);
-  mbedtls_md_type_t md_type = mbedtls_md_get_type(md_info);
-  mbedtls_pkcs5_pbkdf2_hmac_ext(md_type, (const unsigned char *)password,
-                               strlen(password), salt, saltlen, iterations, keylen,
-                               key->key);
+  mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char *)password,
+                           strlen(password), salt, saltlen, iterations,
+                           keylen, key->key);
   mbedtls_md_free(&ctx);
   return key;
 }
@@ -700,10 +699,9 @@ char *psymkey_derive(const char *username,
   psync_sha512(usercopy, userlen, usersha512);
   free(usercopy);
   mbedtls_md_init(&ctx);
-  mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1);
-  const mbedtls_md_info_t *md_info = mbedtls_md_info_from_ctx(&ctx);
-  mbedtls_md_type_t md_type = mbedtls_md_get_type(md_info);
-  mbedtls_pkcs5_pbkdf2_hmac_ext(md_type, (const unsigned char *)passphrase, strlen(passphrase), usersha512, 
+  const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA512);
+  mbedtls_md_setup(&ctx, md_info, 1);
+  mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char *)passphrase, strlen(passphrase), usersha512,
     PSYNC_SHA512_DIGEST_LEN, 5000, sizeof(passwordbin), passwordbin);
   mbedtls_md_free(&ctx);
   usercopy = psync_base64_encode(passwordbin, sizeof(passwordbin), &userlen);
@@ -741,8 +739,8 @@ psync_symmetric_key_t prsa_decrypt_data(psync_rsa_privatekey_t rsa,
   psync_symmetric_key_t ret;
   size_t len;
   if (mbedtls_rsa_rsaes_oaep_decrypt(rsa, rng_get,
-                                     &rng, NULL,
-                                     0, &len, data, buff, sizeof(buff)))
+                                     &rng,
+                                     NULL, 0, &len, data, buff, sizeof(buff)))
     return PSYNC_INVALID_SYM_KEY;
   ret = (psync_symmetric_key_t)malloc(
       offsetof(psync_symmetric_key_struct_t, key) + len);
@@ -803,6 +801,7 @@ prsa_sign_sha256_hash(psync_rsa_privatekey_t rsa,
   if (!ret)
     return (psync_rsa_signature_t)(void *)PERROR_NO_MEMORY;
   ret->datalen = rsalen;
+  /* Save current padding settings using getter functions */
   padding = mbedtls_rsa_get_padding_mode(rsa);
   hash_id = mbedtls_rsa_get_md_alg(rsa);
   mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);

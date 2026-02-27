@@ -861,6 +861,7 @@ static int task_download_file(download_task_t *dt) {
   //  pqevent_queue_sync_event_id(PEVENT_FILE_DOWNLOAD_FINISHED, syncid, name,
   //  fileid);
   pdbg_logf(D_NOTICE, "file downloaded %s", dt->localname);
+  pdbg_write_fs_event("file downloaded %s", dt->localname);
   psync_list_for_each_element_call(&ranges, psync_range_list_t, list, free);
   if (tmpold) {
     pfile_delete(tmpold);

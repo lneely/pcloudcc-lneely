@@ -25,6 +25,7 @@ CPPOBJ		:= $(notdir $(CPPSRC:%.cpp=%.o))
 
 DESTDIR		:= /usr/local
 STATIC		:= 1
+FULLSTATIC	:= 0
 BUILD		:= release
 SSLDBGLVL   := 0
 
@@ -45,6 +46,12 @@ else
     $(error Invalid BUILD. Use 'debug' or 'release')
 endif
 
+ifeq ($(FULLSTATIC), 1)
+    # Force static linking of all libraries
+    LIBLDFLAGS += -static
+    EXECLDFLAGS += -static
+endif
+
 CFLAGS		+= $(DIST_CFLAGS)
 CXXFLAGS	+= $(DIST_CXXFLAGS)
 LIBLDFLAGS	+= $(LDFLAGS)
@@ -63,7 +70,7 @@ else
 	EXECLDFLAGS += $(LIBLDFLAGS)
 endif
 
-.PHONY: all clean install uninstall
+.PHONY: all clean install install-logrotate uninstall
 
 all: $(TARGETS)
 
@@ -88,6 +95,14 @@ ifeq ($(STATIC), 0)
 	install -m 755 libpcloudcc_lib.so $(DESTDIR)/lib/libpcloudcc_lib.so
 endif
 
+install-logrotate:
+	@echo "Installing logrotate configuration (requires root)..."
+	install -D -m 644 pcloudcc.logrotate /etc/logrotate.d/pcloudcc
+	@echo "Logrotate configuration installed to /etc/logrotate.d/pcloudcc"
+	@echo "Note: This handles system-wide logs at /var/log/pcloudcc.log"
+	@echo "For user-specific logs, see comments in pcloudcc.logrotate"
+
 uninstall:
 	rm -f $(DESTDIR)/bin/pcloudcc
 	rm -f $(DESTDIR)/lib/libpcloudcc_lib.so
+	rm -f /etc/logrotate.d/pcloudcc
