@@ -34,7 +34,8 @@
 
 static const char *psync_ssl_trusted_pk_sha256[] = {
     "c4fe0872215f16af17c1f2da80ca23863105590a5e64c8ddc9693d21cb835a4e",
-    "cc5e7d264759ce57d8d2616532ddc7224d2ea721433bd3828e9f70fd89fcf81d"};
+    "cc5e7d264759ce57d8d2616532ddc7224d2ea721433bd3828e9f70fd89fcf81d",
+    "1b1b4d26a98774c84709c5400cd5c0b5e2f0bc7d46ef6053c9a872efe825b116"};
 
 static const char *psync_ssl_trusted_certs[] = {
     // SwissSign_Silver_CA_-_G2.crt until Oct 25 08:32:46 2036 GMT
