@@ -1067,7 +1067,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
       sql = psql_query_rdlock("SELECT name FROM localfile WHERE id=?");
       psql_bind_uint(sql, 1, localfileid);
       if ((srow = psql_fetch_str(sql))) {
-        char *nname = psync_strdup(srow[0]);
+        char *nname = putil_strdup(srow[0]);
         psql_free(sql);
         pdbg_logf(D_NOTICE, "looking for folderid=%lu and name=%s in file",
               (unsigned long)folderid, nname);
@@ -1463,7 +1463,7 @@ static int task_uploadfile(psync_syncid_t syncid, psync_folderid_t localfileid,
       }
       if (*s1 == *s2) { //==0
         pdbg_logf(D_NOTICE, "uploading %s as %s", name, srow[0]);
-        nname = psync_strdup(srow[0]);
+        nname = putil_strdup(srow[0]);
         name = nname;
       }
     }

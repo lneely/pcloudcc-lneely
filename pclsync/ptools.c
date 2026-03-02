@@ -76,10 +76,10 @@ char *ptools_get_mac_addr() {
   buffer[12] = 0;
 
   if (buffer[0] == 0) {
-    return psync_strdup("GENERIC_MAC");
+    return putil_strdup("GENERIC_MAC");
 
   } else {
-    return psync_strdup(buffer);
+    return putil_strdup(buffer);
   }
 }
 
@@ -102,7 +102,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
 
   if (pdbg_unlikely(!sock)) {
     if (err) {
-      *err = psync_strdup("Could not connect to the server.");
+      *err = putil_strdup("Could not connect to the server.");
     }
 
     return -1;
@@ -189,7 +189,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
     psock_close(sock);
 
     if (err) {
-      *err = psync_strdup("Could not connect to the server.");
+      *err = putil_strdup("Could not connect to the server.");
     }
 
     return -1;
@@ -201,7 +201,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
 
   if (result) {
     if (err) {
-      *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
+      *err = putil_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     }
 
     pdbg_logf(D_CRITICAL, "Event command failed. Error:[%s]", *err);
@@ -298,7 +298,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
 
   if (pdbg_unlikely(!sock)) {
     if (err) {
-      *err = psync_strdup("Could not connect to the server.");
+      *err = putil_strdup("Could not connect to the server.");
     }
 
     return -1;
@@ -313,7 +313,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
     psock_close(sock);
 
     if (err) {
-      *err = psync_strdup("Could not connect to the server.");
+      *err = putil_strdup("Could not connect to the server.");
     }
 
     return -1;
@@ -325,7 +325,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
 
   if (result) {
     if (err) {
-      *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
+      *err = putil_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     }
 
     pdbg_logf(D_CRITICAL, "Backend command failed. Error:[%s]", *err);
@@ -353,7 +353,7 @@ char *ptools_get_machine_name() {
     strcpy(pcName, "LinuxMachine");
   }
 
-  return psync_strdup(pcName);
+  return putil_strdup(pcName);
 }
 
 void ptools_parse_os_path(char *path, folderPath *folders, char *delim, int mode) {
@@ -371,8 +371,8 @@ void ptools_parse_os_path(char *path, folderPath *folders, char *delim, int mode
         // In case we meet a ":" as in C:\ we set the name to Drive + the string
         // before the ":"
         fName[k] = '\0';
-        buff = psync_strcat("Drive ", &fName, NULL);
-        psync_strlcpy(fName, buff, strlen(buff) + 1);
+        buff = putil_strcat("Drive ", &fName, NULL);
+        putil_strlcpy(fName, buff, strlen(buff) + 1);
 
         k = k + strlen("Drive ");
       } else {
@@ -381,7 +381,7 @@ void ptools_parse_os_path(char *path, folderPath *folders, char *delim, int mode
       }
     } else {
       fName[k] = 0;
-      folders->folders[j] = psync_strdup(fName);
+      folders->folders[j] = putil_strdup(fName);
 
       k = 0;
       j++;
@@ -393,7 +393,7 @@ void ptools_parse_os_path(char *path, folderPath *folders, char *delim, int mode
       fName[k] = 0;
 
       if (strlen(fName) > 0) {
-        folders->folders[j] = psync_strdup(fName);
+        folders->folders[j] = putil_strdup(fName);
         j++;
       }
 

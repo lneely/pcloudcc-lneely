@@ -199,7 +199,7 @@ void psql_dump_locks() {
   rd_lock_data *lock;
   char dttime[36];
   if (wrlocked) {
-    time_format(lockstart.tv_sec, lockstart.tv_nsec, dttime);
+    putil_time_format(lockstart.tv_sec, lockstart.tv_nsec, dttime);
     pdbg_logf(D_ERROR, "write lock taken by thread %s from %s:%u at %s",
           wrlockthread, wrlockfile, wrlockline, dttime);
     sendpdbg_logf("write lock taken by thread %s from %s:%u at %s", wrlockthread,
@@ -207,7 +207,7 @@ void psql_dump_locks() {
   }
   pthread_mutex_lock(&rdmutex);
   psync_list_for_each_element(lock, &rdlocks, rd_lock_data, list) {
-    time_format(lock->tm.tv_sec, lock->tm.tv_nsec, dttime);
+    putil_time_format(lock->tm.tv_sec, lock->tm.tv_nsec, dttime);
     pdbg_logf(D_ERROR, "read lock taken by thread %s from %s:%u at %s",
           lock->thread, lock->file, lock->line, dttime);
     sendpdbg_logf("read lock taken by thread %s from %s:%u at %s", lock->thread,
@@ -628,7 +628,7 @@ char *psql_cellstr(const char *sql) {
     char *ret;
     ret = (char *)sqlite3_column_text(stmt, 0);
     if (ret)
-      ret = psync_strdup(ret);
+      ret = putil_strdup(ret);
     sqlite3_finalize(stmt);
     psql_rdunlock();
     return ret;

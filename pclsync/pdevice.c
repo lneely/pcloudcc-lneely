@@ -59,7 +59,7 @@ char *pdevice_id() {
           (de->d_name[1] != 0 &&
            (de->d_name[1] != '.' || de->d_name[2] != 0))) {
         path =
-            psync_strcat("/sys/class/power_supply/", de->d_name, "/type", NULL);
+            putil_strcat("/sys/class/power_supply/", de->d_name, "/type", NULL);
         fd = open(path, O_RDONLY);
         free(path);
         if (fd == -1)
@@ -74,19 +74,19 @@ char *pdevice_id() {
     }
     closedir(dh);
   }
-  device = psync_strcat(hardware, ", Linux", NULL);
+  device = putil_strcat(hardware, ", Linux", NULL);
   return device;
 }
 
 char *pdevice_name() {
   char *osname = pdevice_get_os();
-  char *ret = psync_strcat(osname, ", ", psync_software_name, NULL);
+  char *ret = putil_strcat(osname, ", ", psync_software_name, NULL);
   free(osname);
   return ret;
 }
 
 char *pdevice_get_os() {
-  return psync_os_name ? psync_strdup(psync_os_name) : pdevice_id();
+  return psync_os_name ? putil_strdup(psync_os_name) : pdevice_id();
 }
 
 void pdevice_set_software(const char *snm) { 

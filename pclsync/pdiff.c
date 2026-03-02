@@ -251,7 +251,7 @@ static int check_active_subscribtion(const binresult *res) {
   char *status;
   sub = papi_check_result2(res, "lastsubscription", PARAM_HASH);
   if (sub) {
-    status = psync_strdup(papi_find_result2(sub, "status", PARAM_STR)->str);
+    status = putil_strdup(papi_find_result2(sub, "status", PARAM_STR)->str);
     if (!strcmp(status, "active")) {
       free(status);
       return 1;
@@ -332,7 +332,7 @@ static psock_t *get_connected_socket() {
         "REPLACE INTO setting (id, value) VALUES ('deviceid', ?)");
     psql_bind_str(q, 1, deviceidhex);
     psql_run_free(q);
-    deviceid = psync_strdup(deviceidhex);
+    deviceid = putil_strdup(deviceidhex);
   }
 
   pdbg_logf(D_NOTICE, "using deviceid %s", deviceid);
@@ -367,11 +367,11 @@ static psock_t *get_connected_socket() {
     }
 
     if (!auth && psync_my_auth[0])
-      auth = psync_strdup(psync_my_auth);
+      auth = putil_strdup(psync_my_auth);
     if (!user && psync_my_user)
-      user = psync_strdup(psync_my_user);
+      user = putil_strdup(psync_my_user);
     if (!pass && psync_my_pass)
-      pass = psync_strdup(psync_my_pass);
+      pass = putil_strdup(psync_my_pass);
     if (!auth && (!pass || !user)) {
       if (tfa) {
         tfa = 0;
@@ -463,7 +463,7 @@ static psock_t *get_connected_socket() {
       if (result == 2297) {
         free(psync_my_2fa_token);
         psync_my_2fa_token =
-            psync_strdup(papi_find_result2(res, "token", PARAM_STR)->str);
+            putil_strdup(papi_find_result2(res, "token", PARAM_STR)->str);
         psync_my_2fa_has_devices =
             papi_find_result2(res, "hasdevices", PARAM_BOOL)->num;
         psync_my_2fa_type = papi_find_result2(res, "tfatype", PARAM_NUM)->num;
@@ -479,7 +479,7 @@ static psock_t *get_connected_socket() {
       if (result == 2306) {
         free(psync_my_verify_token);
         psync_my_verify_token =
-            psync_strdup(papi_find_result2(res, "verifytoken", PARAM_STR)->str);
+            putil_strdup(papi_find_result2(res, "verifytoken", PARAM_STR)->str);
         pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_VERIFYREQ);
         pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         psock_close(sock);
@@ -491,7 +491,7 @@ static psock_t *get_connected_socket() {
         cres = papi_check_result2(res, "location", PARAM_HASH);
         if (cres) {
           binapi =
-              psync_strdup(papi_find_result2(cres, "binapi", PARAM_STR)->str);
+              putil_strdup(papi_find_result2(cres, "binapi", PARAM_STR)->str);
 
           locationid = papi_find_result2(cres, "id", PARAM_NUM)->num;
           psync_set_apiserver(binapi, locationid);
@@ -566,7 +566,7 @@ static psock_t *get_connected_socket() {
     psync_is_business = papi_find_result2(res, "business", PARAM_BOOL)->num;
     lid = psync_setting_get_uint(_PS(location_id));
     psql_start();
-    psync_strlcpy(psync_my_auth, papi_find_result2(res, "auth", PARAM_STR)->str,
+    putil_strlcpy(psync_my_auth, papi_find_result2(res, "auth", PARAM_STR)->str,
                   sizeof(psync_my_auth));
 
     if (luserid) {
@@ -2918,7 +2918,7 @@ static void psync_run_analyze_if_needed() {
       for (i = 0; i < ARRAY_SIZE(skiptables); i++)
         if (!strcmp(srow[0], skiptables[i]))
           goto skip;
-      tablenames[tablecnt++] = psync_strdup(srow[0]);
+      tablenames[tablecnt++] = putil_strdup(srow[0]);
     skip:;
     }
     psql_free(res);
@@ -2926,7 +2926,7 @@ static void psync_run_analyze_if_needed() {
     while (tablecnt) {
       --tablecnt;
       pdbg_logf(D_NOTICE, "running ANALYZE on %s", tablenames[tablecnt]);
-      sql = psync_strcat("ANALYZE ", tablenames[tablecnt], ";", NULL);
+      sql = putil_strcat("ANALYZE ", tablenames[tablecnt], ";", NULL);
       free(tablenames[tablecnt]);
       psql_statement(sql);
       free(sql);

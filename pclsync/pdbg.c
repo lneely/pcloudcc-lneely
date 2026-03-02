@@ -160,7 +160,7 @@ int pdbg_printf(const char *file, const char *function, int unsigned line, int u
   }
 
   clock_gettime(CLOCK_REALTIME, &ts);
-  time_format(ts.tv_sec, ts.tv_nsec, dttime);
+  putil_time_format(ts.tv_sec, ts.tv_nsec, dttime);
   threadid = pthread_self();
   memcpy(&u, &threadid, sizeof(u));
   snprintf(format, sizeof(format), "%s %u %s %s: %s:%u (function %s): %s\n",
@@ -251,7 +251,7 @@ void pdbg_write_fs_event(const char *fmt, ...) {
 
   /* Get timestamp */
   clock_gettime(CLOCK_REALTIME, &ts);
-  time_format(ts.tv_sec, ts.tv_nsec, dttime);
+  putil_time_format(ts.tv_sec, ts.tv_nsec, dttime);
 
   /* Write timestamp followed by event message */
   fprintf(fs_event_log, "%s ", dttime);

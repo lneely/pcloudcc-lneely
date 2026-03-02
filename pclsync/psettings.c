@@ -117,11 +117,11 @@ void psync_settings_reset() {
   char *home, *defaultfs, *defaultcache;
   psync_settingid_t i;
   home = ppath_home();
-  defaultfs = psync_strcat(home, "/",
+  defaultfs = putil_strcat(home, "/",
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
   free(home);
   home = ppath_pcloud();
-  defaultcache = psync_strcat(home, "/",
+  defaultcache = putil_strcat(home, "/",
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
   free(home);
   for (i = 0; i < ARRAY_SIZE(settings); i++)
@@ -151,7 +151,7 @@ void psync_settings_reset() {
   settings[_PS(ignorepaths)].str = PSYNC_IGNORE_PATHS_DEFAULT;
   for (i = 0; i < ARRAY_SIZE(settings); i++) {
     if (settings[i].type == PSYNC_TSTRING) {
-      settings[i].str = psync_strdup(settings[i].str);
+      settings[i].str = putil_strdup(settings[i].str);
       if (settings[i].fix_callback)
         settings[i].fix_callback(&settings[i].str);
     } else if (settings[i].fix_callback) {
@@ -172,11 +172,11 @@ void psync_settings_init() {
   char *home, *defaultfs, *defaultcache;
   psync_settingid_t i;
   home = ppath_home();
-  defaultfs = psync_strcat(home, "/",
+  defaultfs = putil_strcat(home, "/",
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
   free(home);
   home = ppath_pcloud();
-  defaultcache = psync_strcat(home, "/",
+  defaultcache = putil_strcat(home, "/",
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
   free(home);
   settings[_PS(ignorepatterns)].str = PSYNC_IGNORE_PATTERNS_DEFAULT;
@@ -195,7 +195,7 @@ void psync_settings_init() {
   settings[_PS(ignorepaths)].str = PSYNC_IGNORE_PATHS_DEFAULT;
   for (i = 0; i < ARRAY_SIZE(settings); i++) {
     if (settings[i].type == PSYNC_TSTRING) {
-      settings[i].str = psync_strdup(settings[i].str);
+      settings[i].str = putil_strdup(settings[i].str);
       if (settings[i].fix_callback)
         settings[i].fix_callback(&settings[i].str);
     } else if (settings[i].fix_callback) {
@@ -214,7 +214,7 @@ void psync_settings_init() {
       if (!strcmp(name, settings[i].name)) {
         if (settings[i].type == PSYNC_TSTRING) {
           free(settings[i].str);
-          settings[i].str = psync_strdup(row[1]);
+          settings[i].str = putil_strdup(row[1]);
           if (settings[i].fix_callback)
             settings[i].fix_callback(&settings[i].str);
         } else if (settings[i].type == PSYNC_TNUMBER) {
@@ -333,7 +333,7 @@ int psync_setting_set_string(psync_settingid_t settingid, const char *value) {
   char *oldval, *newval;
   CHECK_SETTINGID_AND_TYPE(-1, PSYNC_TSTRING);
   oldval = settings[settingid].str;
-  newval = psync_strdup(value);
+  newval = putil_strdup(value);
   if (settings[settingid].fix_callback)
     settings[settingid].fix_callback(&newval);
   settings[settingid].str = newval;

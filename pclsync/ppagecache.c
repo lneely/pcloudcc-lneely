@@ -2384,7 +2384,7 @@ char *psync_http_construct_range_next_header(psync_request_t *request,
   }
   if (off < sizeof(PSYNC_CONSTRUCT_HEADER))
     return NULL;
-  return psync_strdup((char *)memcpy(
+  return putil_strdup((char *)memcpy(
       buff + off - sizeof(PSYNC_CONSTRUCT_HEADER) + 3, PSYNC_CONSTRUCT_HEADER,
       sizeof(PSYNC_CONSTRUCT_HEADER) - 1));
 }
@@ -2440,7 +2440,7 @@ retry:
     return;
   }
   hosts = papi_find_result2(urls->urls, "hosts", PARAM_ARRAY);
-  psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
+  putil_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
                  papi_find_result2(urls->urls, "dwltag", PARAM_STR)->str);
   sock = psync_http_connect_multihost_from_cache(hosts, &host);
   if (!sock) {
@@ -3527,7 +3527,7 @@ static void psync_pagecache_new_upload_to_cache(uint64_t taskid, uint64_t hash,
   fileidhex[sizeof(psync_fsfileid_t)] = 'd';
   fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
   tm = ptimer_time();
-  filename = psync_strcat(psync_setting_get_string(_PS(fscachepath)),
+  filename = putil_strcat(psync_setting_get_string(_PS(fscachepath)),
                           "/", fileidhex, NULL);
   fd = pfile_open(filename, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE) {
@@ -3613,10 +3613,10 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
   tm = ptimer_time();
   cachepath = psync_setting_get_string(_PS(fscachepath));
   filename =
-      psync_strcat(cachepath, "/", fileidhex, NULL);
+      putil_strcat(cachepath, "/", fileidhex, NULL);
   fileidhex[sizeof(psync_fsfileid_t)] = 'i';
   indexname =
-      psync_strcat(cachepath, "/", fileidhex, NULL);
+      putil_strcat(cachepath, "/", fileidhex, NULL);
   fd = pfile_open(indexname, O_RDONLY, 0);
   if (unlikely(fd == INVALID_HANDLE_VALUE)) {
     pdbg_logf(D_ERROR,
@@ -4109,7 +4109,7 @@ void ppagecache_init() {
   if (stat(cache_dir, &st)) {
     mkdir(cache_dir, PSYNC_DEFAULT_POSIX_FOLDER_MODE);
   }
-  cache_file = psync_strcat(cache_dir, "/",
+  cache_file = putil_strcat(cache_dir, "/",
                             PSYNC_DEFAULT_READ_CACHE_FILE, NULL);
   if (stat(cache_file, &st))
     psql_statement("DELETE FROM pagecache");
@@ -4192,7 +4192,7 @@ void ppagecache_reopen_read() {
   if (stat(cache_dir, &st)) {
     mkdir(cache_dir, PSYNC_DEFAULT_POSIX_FOLDER_MODE);
   }
-  cache_file = psync_strcat(cache_dir, "/",
+  cache_file = putil_strcat(cache_dir, "/",
                             PSYNC_DEFAULT_READ_CACHE_FILE, NULL);
   readcache = pfile_open(cache_file, O_RDWR, O_CREAT);
   free(cache_file);
@@ -4240,7 +4240,7 @@ int ppagecache_move(const char *path) {
   int newrdcache, ordcache;
   uint32_t i, cnt;
   pdbg_logf(D_NOTICE, "start");
-  rdpath = psync_strcat(path, "/",
+  rdpath = putil_strcat(path, "/",
                         PSYNC_DEFAULT_READ_CACHE_FILE, NULL);
   if (!stat(rdpath, &st)) {
     free(rdpath);
@@ -4251,7 +4251,7 @@ int ppagecache_move(const char *path) {
     free(rdpath);
     return pdbg_return_const(PERROR_CACHE_MOVE_NO_WRITE_ACCESS);
   }
-  opath = psync_strdup(psync_setting_get_string(_PS(fscachepath)));
+  opath = putil_strdup(psync_setting_get_string(_PS(fscachepath)));
   pthread_mutex_lock(&clean_cache_mutex);
   pthread_mutex_lock(&flush_cache_mutex);
   psql_start();

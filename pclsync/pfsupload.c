@@ -161,7 +161,7 @@ static int psync_process_task_mkdir(fsupload_task_t *task) {
     psync_sql_res *res;
     unsigned char *enckey;
     size_t enckeylen;
-    enckey = psync_base64_decode((const unsigned char *)task->text2,
+    enckey = putil_base64_decode((const unsigned char *)task->text2,
                                  strlen(task->text2), &enckeylen);
     if (pdbg_likely(enckey)) {
       res = psql_prepare(
@@ -402,7 +402,7 @@ static void set_key_for_fileid(psync_fileid_t fileid, uint64_t hash,
   unsigned char *enckey;
   size_t enckeylen;
   enckey =
-      psync_base64_decode((const unsigned char *)key, strlen(key), &enckeylen);
+      putil_base64_decode((const unsigned char *)key, strlen(key), &enckeylen);
   if (pdbg_likely(enckey)) {
     res = psql_prepare(
         "REPLACE INTO cryptofilekey (fileid, hash, enckey) VALUES (?, ?, ?)");
@@ -1181,9 +1181,9 @@ static void large_upload() {
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     cname = psync_setting_get_string(_PS(fscachepath));
-    filename = psync_strcat(cname, "/", fileidhex, NULL);
+    filename = putil_strcat(cname, "/", fileidhex, NULL);
     fileidhex[sizeof(psync_fsfileid_t)] = 'i';
-    indexname = psync_strcat(cname, "/", fileidhex, NULL);
+    indexname = putil_strcat(cname, "/", fileidhex, NULL);
     res = psql_query_rdlock("SELECT uploadid FROM fstaskupload WHERE "
                                  "fstaskid=? ORDER BY uploadid DESC LIMIT 1");
     psql_bind_uint(res, 1, taskid);
@@ -1269,7 +1269,7 @@ int psync_fsupload_in_current_small_uploads_batch_locked(uint64_t taskid) {
     psync_binhex(fileidhex, &task->id, sizeof(psync_fsfileid_t));
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
-    filename = psync_strcat(psync_setting_get_string(_PS(fscachepath)),
+    filename = putil_strcat(psync_setting_get_string(_PS(fscachepath)),
                             "/", fileidhex, NULL);
     stret = stat(filename, &st);
     if (stret)
@@ -1296,7 +1296,7 @@ static int psync_send_task_creat(psock_t *api, fsupload_task_t *task) {
     psync_binhex(fileidhex, &task->id, sizeof(psync_fsfileid_t));
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
-    filename = psync_strcat(psync_setting_get_string(_PS(fscachepath)),
+    filename = putil_strcat(psync_setting_get_string(_PS(fscachepath)),
                             "/", fileidhex, NULL);
     fd = pfile_open(filename, O_RDONLY, 0);
     free(filename);
@@ -1594,11 +1594,11 @@ static void change_folder_name(fsupload_task_t *task) {
     if (et > task->text1 && et[0] == '(' && atol(et + 1) < 20) {
       nn = malloc(sizeof(char) * (et - task->text1 + 7));
       memcpy(nn, task->text1, et - task->text1);
-      psync_slprintf(nn + (et - task->text1), 7, " (%d)", atoi(et + 1) + 1);
+      putil_slprintf(nn + (et - task->text1), 7, " (%d)", atoi(et + 1) + 1);
     }
   }
   if (!nn) {
-    nn = psync_strcat(task->text1, "(1)", NULL);
+    nn = putil_strcat(task->text1, "(1)", NULL);
   }
   res = psql_prepare("UPDATE fstask SET text1=? WHERE id=?");
   psql_bind_str(res, 1, nn);
@@ -1679,13 +1679,13 @@ static void psync_delete_write_cache_file(uint64_t taskid, int index) {
   fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
   cachepath = psync_setting_get_string(_PS(fscachepath));
   filename =
-      psync_strcat(cachepath, "/", fileidhex, NULL);
+      putil_strcat(cachepath, "/", fileidhex, NULL);
   pdbg_assertw(pfile_delete(filename) == 0);
   free(filename);
   if (index) {
     fileidhex[sizeof(psync_fsfileid_t)] = 'i';
     filename =
-        psync_strcat(cachepath, "/", fileidhex, NULL);
+        putil_strcat(cachepath, "/", fileidhex, NULL);
     pdbg_assertw(pfile_delete(filename) == 0);
     free(filename);
   }
@@ -2027,12 +2027,12 @@ static void clean_stuck_tasks() {
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     filename =
-        psync_strcat(cachepath, "/", fileidhex, NULL);
+        putil_strcat(cachepath, "/", fileidhex, NULL);
     pfile_delete(filename);
     free(filename);
     fileidhex[sizeof(psync_fsfileid_t)] = 'i';
     filename =
-        psync_strcat(cachepath, "/", fileidhex, NULL);
+        putil_strcat(cachepath, "/", fileidhex, NULL);
     pfile_delete(filename);
     free(filename);
     psql_start();

@@ -119,7 +119,7 @@ static void add_dir_scan(localnotify_dir *dir, const char *path) {
       if (de->d_name[0] != '.' ||
           (de->d_name[1] != 0 &&
            (de->d_name[1] != '.' || de->d_name[2] != 0))) {
-        psync_strlcpy(cpath + pl, de->d_name, namelen + 1);
+        putil_strlcpy(cpath + pl, de->d_name, namelen + 1);
         if (!lstat(cpath, &st) && S_ISDIR(st.st_mode))
           add_dir_scan(dir, cpath);
       }
@@ -222,7 +222,7 @@ static uint32_t process_notification(localnotify_dir *dir) {
       while (wch) {
         if (wch->watchid == ev.wd) {
           wch->path[wch->pathlen] = '/';
-          psync_strlcpy(wch->path + wch->pathlen + 1,
+          putil_strlcpy(wch->path + wch->pathlen + 1,
                         buff + off + offsetof(struct inotify_event, name),
                         wch->namelen + 1);
           if (!lstat(wch->path, &st) && S_ISDIR(st.st_mode))

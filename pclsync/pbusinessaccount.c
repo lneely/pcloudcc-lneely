@@ -73,14 +73,14 @@ static int handle_result(const binresult *bres, uint64_t result, char **err) {
   if (strlen(errorret) == 0)
     errorret = papi_find_result2(bres, "message", PARAM_STR)->str;
 
-  *err = psync_strndup(errorret, strlen(errorret));
+  *err = putil_strndup(errorret, strlen(errorret));
   pdbg_logf(D_WARNING, "command gettreepublink returned error code %u message %s",
         (unsigned)result, errorret);
   psync_process_api_error(result);
   if (psync_handle_api_result(result) == PSYNC_NET_TEMPFAIL)
     return -result;
   else {
-    *err = psync_strndup("Connection error.", 17);
+    *err = putil_strndup("Connection error.", 17);
     return -1;
   }
 }
@@ -365,7 +365,7 @@ void get_ba_member_email(uint64_t userid, char **email /*OUT*/,
       const char *resret =
           papi_find_result2(users->array[0], "email", PARAM_STR)->str;
       *length = strlen(resret);
-      *email = psync_strndup(resret, *length);
+      *email = putil_strndup(resret, *length);
       fname = papi_find_result2(users->array[0], "firstname", PARAM_STR)->str;
       lname = papi_find_result2(users->array[0], "lastname", PARAM_STR)->str;
     }
@@ -430,7 +430,7 @@ void get_ba_team_name(uint64_t teamid, char **name /*OUT*/,
     const char *teamret =
         papi_find_result2(teams->array[0], "name", PARAM_STR)->str;
     *length = strlen(teamret);
-    *name = psync_strndup(teamret, *length);
+    *name = putil_strndup(teamret, *length);
   }
   free(bres);
 

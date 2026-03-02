@@ -192,7 +192,7 @@ psync_folderid_t psyncer_db_folder_create(
     for (ptr = name; *ptr; ptr++)
       if (pfile_invalid_chars[(unsigned char)*ptr]) {
         if (!vname)
-          vname = psync_strdup(name);
+          vname = putil_strdup(name);
         vname[ptr - name] = '_';
       }
   if (vname)
@@ -307,7 +307,7 @@ static void psync_sync_newsyncedfolder(psync_syncid_t syncid) {
   folderid = psync_get_number(row[0]);
   synctype = psync_get_number(row[1]);
   localpath =
-      psync_strndup(psync_get_string(row[2]), strlen(psync_get_string(row[2])));
+      putil_strndup(psync_get_string(row[2]), strlen(psync_get_string(row[2])));
   psql_free(res);
   if (synctype & PSYNC_DOWNLOAD_ONLY) {
     psyncer_dl_folder_add(syncid, synctype, folderid, 0);
@@ -463,8 +463,8 @@ re:
       continue;
     }
 
-    localpath = psync_strdup(localpath);
-    remotepath = psync_strdup(remotepath);
+    localpath = putil_strdup(localpath);
+    remotepath = putil_strdup(remotepath);
     psql_free(res);
 
     folderid = pfolder_id_create(remotepath);

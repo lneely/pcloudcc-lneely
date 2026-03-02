@@ -159,8 +159,8 @@ static void do_move(void *ptr, ppath_stat *st) {
   const char **arr;
   char *oldpath, *newpath;
   arr = (const char **)ptr;
-  oldpath = psync_strcat(arr[0], st->name, NULL);
-  newpath = psync_strcat(arr[1], st->name, NULL);
+  oldpath = putil_strcat(arr[0], st->name, NULL);
+  newpath = putil_strcat(arr[1], st->name, NULL);
   pfile_rename(oldpath, newpath);
   free(newpath);
   free(oldpath);
@@ -717,7 +717,7 @@ static int task_download_file(download_task_t *dt) {
     if (!stat(dt->tmpname, &st) &&
         pfile_stat_size(&st) >= PSYNC_MIN_SIZE_FOR_CHECKSUMS) {
       tmpold =
-          psync_strcat(dt->localpath, "/", dt->filename,
+          putil_strcat(dt->localpath, "/", dt->filename,
                        "-old", PSYNC_APPEND_PARTIAL_FILES, NULL);
       if (pfile_rename_overwrite(dt->tmpname, tmpold)) {
         free(tmpold);
@@ -740,7 +740,7 @@ static int task_download_file(download_task_t *dt) {
 
   hosts = papi_find_result2(res, "hosts", PARAM_ARRAY);
   requestpath = papi_find_result2(res, "path", PARAM_STR)->str;
-  psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
+  putil_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
                  papi_find_result2(res, "dwltag", PARAM_STR)->str);
   buff = malloc(PSYNC_COPY_BUFFER_SIZE);
   http = NULL;
@@ -975,7 +975,7 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
     free(newfolder);
     return 0;
   }
-  newpath = psync_strcat(newfolder, "/", newname, NULL);
+  newpath = putil_strcat(newfolder, "/", newname, NULL);
   ret = 0;
   psync_stop_localscan();
   if (pfile_rename_overwrite(oldpath, newpath)) {
@@ -1198,8 +1198,8 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
   if (pdbg_unlikely(!localpath))
     return 0;
   localname =
-      psync_strcat(localpath, "/", filename, NULL);
-  tmpname = psync_strcat(localpath, "/", filename,
+      putil_strcat(localpath, "/", filename, NULL);
+  tmpname = putil_strcat(localpath, "/", filename,
                          PSYNC_APPEND_PARTIAL_FILES, NULL);
   len = strlen(filename);
   dt = (download_task_t *)malloc(offsetof(download_task_t, filename) +
@@ -1337,7 +1337,7 @@ static void task_del_folder_rec_do(const char *localpath,
   psql_bind_uint(res, 2, syncid);
   while ((vrow = psql_fetch(res))) {
     pupload_del_tasks(psync_get_number(vrow[0]));
-    nm = psync_strcat(localpath, "/",
+    nm = putil_strcat(localpath, "/",
                       psync_get_string(vrow[1]), NULL);
     pdbg_logf(D_NOTICE, "deleting %s", nm);
     pfile_delete(nm);
@@ -1354,7 +1354,7 @@ static void task_del_folder_rec_do(const char *localpath,
   psql_bind_uint(res, 1, localfolderid);
   psql_bind_uint(res, 2, syncid);
   while ((vrow = psql_fetch(res))) {
-    nm = psync_strcat(localpath, "/",
+    nm = putil_strcat(localpath, "/",
                       psync_get_string(vrow[1]), NULL);
     task_del_folder_rec_do(nm, psync_get_number(vrow[0]), syncid);
     free(nm);
@@ -1420,7 +1420,7 @@ static int download_task(uint64_t taskid, uint32_t type, psync_syncid_t syncid,
     for (ptr = name; *ptr; ptr++)
       if (pfile_invalid_chars[(unsigned char)*ptr]) {
         if (!vname)
-          vname = psync_strdup(name);
+          vname = putil_strdup(name);
         vname[ptr - name] = PSYNC_REPLACE_INV_CH_IN_FILENAMES;
       }
   if (vname) {

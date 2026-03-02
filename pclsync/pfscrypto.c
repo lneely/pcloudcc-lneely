@@ -1087,9 +1087,9 @@ static int psync_fs_crypto_do_finalize_log(psync_openfile_t *of, int fullsync) {
   psync_binhex(fileidhex, &fileid, sizeof(psync_fsfileid_t));
   fileidhex[sizeof(psync_fsfileid_t)] = 'l';
   fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
-  olog = psync_strcat(cachepath, "/", fileidhex, NULL);
+  olog = putil_strcat(cachepath, "/", fileidhex, NULL);
   fileidhex[sizeof(psync_fsfileid_t)] = 'f';
-  flog = psync_strcat(cachepath, "/", fileidhex, NULL);
+  flog = putil_strcat(cachepath, "/", fileidhex, NULL);
   if (pdbg_unlikely(pfile_rename_overwrite(olog, flog)) ||
       pdbg_unlikely((of->logfile = pfile_open(olog, O_RDWR,
                                                   O_CREAT | O_TRUNC)) ==
@@ -1156,7 +1156,7 @@ psync_fs_crypto_reset_log_to_off(psync_openfile_t *of, uint32_t off) {
     psync_binhex(fileidhex, &fileid, sizeof(psync_fsfileid_t));
     fileidhex[sizeof(psync_fsfileid_t)] = 'l';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
-    log = psync_strcat(cachepath, "/", fileidhex, NULL);
+    log = putil_strcat(cachepath, "/", fileidhex, NULL);
     if (pfile_delete(log))
       pdbg_logf(D_NOTICE, "could not delete old log file %s", log);
     of->logfile = pfile_open(log, O_RDWR, O_CREAT | O_TRUNC);
@@ -2083,7 +2083,7 @@ static void psync_fs_crypto_check_file(void *ptr, ppath_fast_stat *st) {
     return;
   ch = st->name[len - 1];
   if (ch == 'l' || ch == 'f') {
-    path = psync_strcat((const char *)ptr, "/", st->name,
+    path = putil_strcat((const char *)ptr, "/", st->name,
                         NULL);
     psync_fs_crypto_check_log(path, st->name);
     free(path);

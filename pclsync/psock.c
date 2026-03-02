@@ -461,7 +461,7 @@ psock_t *psock_connect(const char *host, int unsigned port, int ssl) {
   void *sslc;
   int sock;
   char sport[8];
-  psync_slprintf(sport, sizeof(sport), "%d", port);
+  putil_slprintf(sport, sizeof(sport), "%d", port);
 
   sock = connect_socket(host, sport);
   if (pdbg_unlikely(sock == INVALID_SOCKET)) {

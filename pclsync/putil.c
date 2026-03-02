@@ -14,7 +14,7 @@
 
 static char normalize_table[256];
 
-const char base64_table[] = {
+const char putil_base64_table[] = {
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
     'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
@@ -73,7 +73,7 @@ void putil_wipe(void *mem, size_t sz) {
     }
 }
 
-void time_format(time_t tm, unsigned long ns, char *result) {
+void putil_time_format(time_t tm, unsigned long ns, char *result) {
   static const char month_names[12][4] = {"Jan", "Feb", "Mar", "Apr",
                                           "May", "Jun", "Jul", "Aug",
                                           "Sep", "Oct", "Nov", "Dec"};
@@ -117,13 +117,13 @@ void time_format(time_t tm, unsigned long ns, char *result) {
   memcpy(result, " +0000", 7); // copies the null byte
 }
 
-char *psync_strdup(const char *str) {
+char *putil_strdup(const char *str) {
   size_t len;
   len = strlen(str) + 1;
   return (char *)memcpy(malloc(sizeof(char) * len), str, len);
 }
 
-char *psync_strnormalize_filename(const char *str) {
+char *putil_strnormalize_filename(const char *str) {
   size_t len, i;
   char *ptr;
   len = strlen(str) + 1;
@@ -133,14 +133,14 @@ char *psync_strnormalize_filename(const char *str) {
   return ptr;
 }
 
-char *psync_strndup(const char *str, size_t len) {
+char *putil_strndup(const char *str, size_t len) {
   char *ptr;
   ptr = (char *)memcpy(malloc(sizeof(char) * len + 1), str, len);
   ptr[len] = 0;
   return ptr;
 }
 
-char *psync_strcat(const char *str, ...) {
+char *putil_strcat(const char *str, ...) {
   size_t i, size, len;
   const char *strs[64];
   size_t lengths[64];
@@ -170,7 +170,7 @@ char *psync_strcat(const char *str, ...) {
   return ptr3;
 }
 
-int psync_slprintf(char *str, size_t size, const char *format, ...) {
+int putil_slprintf(char *str, size_t size, const char *format, ...) {
   va_list ap;
   int ret;
   va_start(ap, format);
@@ -181,7 +181,7 @@ int psync_slprintf(char *str, size_t size, const char *format, ...) {
   return ret;
 }
 
-unsigned char *psync_base32_encode(const unsigned char *str, size_t length,
+unsigned char *putil_base32_encode(const unsigned char *str, size_t length,
                                    size_t *ret_length) {
   static const unsigned char *table =
       (const unsigned char *)"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -220,7 +220,7 @@ unsigned char *psync_base32_encode(const unsigned char *str, size_t length,
   return result;
 }
 
-unsigned char *psync_base32_decode(const unsigned char *str, size_t length,
+unsigned char *putil_base32_decode(const unsigned char *str, size_t length,
                                    size_t *ret_length) {
   unsigned char *result, *p;
   uint32_t bits, buff;
@@ -252,7 +252,7 @@ unsigned char *psync_base32_decode(const unsigned char *str, size_t length,
   return result;
 }
 
-unsigned char *psync_base64_encode(const unsigned char *str, size_t length,
+unsigned char *putil_base64_encode(const unsigned char *str, size_t length,
                                    size_t *ret_length) {
   const unsigned char *current = str;
   unsigned char *p;
@@ -262,22 +262,22 @@ unsigned char *psync_base64_encode(const unsigned char *str, size_t length,
   p = result;
 
   while (length > 2) {
-    *p++ = base64_table[current[0] >> 2];
-    *p++ = base64_table[((current[0] & 0x03) << 4) + (current[1] >> 4)];
-    *p++ = base64_table[((current[1] & 0x0f) << 2) + (current[2] >> 6)];
-    *p++ = base64_table[current[2] & 0x3f];
+    *p++ = putil_base64_table[current[0] >> 2];
+    *p++ = putil_base64_table[((current[0] & 0x03) << 4) + (current[1] >> 4)];
+    *p++ = putil_base64_table[((current[1] & 0x0f) << 2) + (current[2] >> 6)];
+    *p++ = putil_base64_table[current[2] & 0x3f];
     current += 3;
     length -= 3;
   }
 
   if (length != 0) {
-    *p++ = base64_table[current[0] >> 2];
+    *p++ = putil_base64_table[current[0] >> 2];
     if (length > 1) {
-      *p++ = base64_table[((current[0] & 0x03) << 4) + (current[1] >> 4)];
-      *p++ = base64_table[(current[1] & 0x0f) << 2];
+      *p++ = putil_base64_table[((current[0] & 0x03) << 4) + (current[1] >> 4)];
+      *p++ = putil_base64_table[(current[1] & 0x0f) << 2];
       *p++ = '=';  /* Add padding */
     } else {
-      *p++ = base64_table[(current[0] & 0x03) << 4];
+      *p++ = putil_base64_table[(current[0] & 0x03) << 4];
       *p++ = '=';  /* Add padding */
       *p++ = '=';  /* Add padding */
     }
@@ -288,7 +288,7 @@ unsigned char *psync_base64_encode(const unsigned char *str, size_t length,
   return result;
 }
 
-unsigned char *psync_base64_decode(const unsigned char *str, size_t length,
+unsigned char *putil_base64_decode(const unsigned char *str, size_t length,
                                    size_t *ret_length) {
   const unsigned char *current = str;
   unsigned char *result;
@@ -328,7 +328,7 @@ unsigned char *psync_base64_decode(const unsigned char *str, size_t length,
   return result;
 }
 
-int psync_is_valid_utf8(const char *str) {
+int putil_is_valid_utf8(const char *str) {
   static const int8_t trailing[] = {
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
       0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -359,14 +359,14 @@ int psync_is_valid_utf8(const char *str) {
   return 1;
 }
 
-uint64_t psync_ato64(const char *str) {
+uint64_t putil_ato64(const char *str) {
   uint64_t n = 0;
   while (*str >= '0' && *str <= '9')
     n = n * 10 + (*str++) - '0';
   return n;
 }
 
-uint32_t psync_ato32(const char *str) {
+uint32_t putil_ato32(const char *str) {
   uint32_t n = 0;
   while (*str >= '0' && *str <= '9')
     n = n * 10 + (*str++) - '0';

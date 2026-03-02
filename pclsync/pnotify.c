@@ -80,12 +80,12 @@ static void psync_notifications_download_thumb(const binresult *thumb,
   filename = strrchr(path, '/');
   if (pdbg_unlikely(!filename++))
     return;
-  filepath = psync_strcat(thumbpath, "/", filename, NULL);
+  filepath = putil_strcat(thumbpath, "/", filename, NULL);
   if (!stat(filepath, &st)) {
     pdbg_logf(D_NOTICE, "skipping download of %s as it already exists", filename);
     goto err0;
   }
-  tmpfilepath = psync_strcat(filepath, ".part", NULL);
+  tmpfilepath = putil_strcat(filepath, ".part", NULL);
   pdbg_logf(D_NOTICE, "downloading thumbnail %s", filename);
   if (pdbg_unlikely((fd = pfile_open(tmpfilepath, O_WRONLY,
                                          O_CREAT | O_TRUNC)) ==
@@ -95,7 +95,7 @@ static void psync_notifications_download_thumb(const binresult *thumb,
       papi_find_result2(thumb, "hosts", PARAM_ARRAY), &host);
   if (pdbg_unlikely(!sock))
     goto err2;
-  psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
+  putil_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
                  papi_find_result2(thumb, "dwltag", PARAM_STR)->str);
   if (pdbg_unlikely(psync_http_request(sock, host, path, 0, 0, cookie)))
     goto err3;
@@ -187,7 +187,7 @@ void pnotify_set_callback(
   pthread_mutex_lock(&ntf_mutex);
   ts = ntf_thumb_size;
   if (thumbsize)
-    ntf_thumb_size = psync_strdup(thumbsize);
+    ntf_thumb_size = putil_strdup(thumbsize);
   else
     ntf_thumb_size = NULL;
   if (ts)
@@ -326,7 +326,7 @@ psync_notification_list_t *pnotify_get() {
         filename = strrchr(papi_find_result2(br, "path", PARAM_STR)->str, '/');
         if (filename++) {
           psync_notification_remove_from_list(&thumbs, filename);
-          filepath = psync_strcat(thumbpath, "/",
+          filepath = putil_strcat(thumbpath, "/",
                                   filename, NULL);
           if (!stat(filepath, &st)) {
             pntf->thumb = filepath;
@@ -355,7 +355,7 @@ psync_notification_list_t *pnotify_get() {
     nx = ptree_get_next_safe(thumbs);
     pdbg_logf(D_NOTICE, "deleting unused thumb %s",
           ptree_element(thumbs, psync_thumb_list_t, tree)->name);
-    filepath = psync_strcat(
+    filepath = putil_strcat(
         thumbpath, "/",
         ptree_element(thumbs, psync_thumb_list_t, tree)->name, NULL);
     pfile_delete(filepath);

@@ -92,7 +92,7 @@ int psync_rename_conflicted_file(const char *path) {
   num = 0;
   while (1) {
     if (num)
-      l = psync_slprintf(npath + dotidx, 32, " (conflicted %ld)", num);
+      l = putil_slprintf(npath + dotidx, 32, " (conflicted %ld)", num);
     else {
       l = 13;
       memcpy(npath + dotidx, " (conflicted)", l);

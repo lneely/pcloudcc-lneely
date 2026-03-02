@@ -138,12 +138,12 @@ static void delete_log_files(psync_openfile_t *of) {
   fileidhex[sizeof(psync_fsfileid_t)] = 'l';
   fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
   filename =
-      psync_strcat(cachepath, "/", fileidhex, NULL);
+      putil_strcat(cachepath, "/", fileidhex, NULL);
   pfile_delete(filename);
   free(filename);
   fileidhex[sizeof(psync_fsfileid_t)] = 'f';
   filename =
-      psync_strcat(cachepath, "/", fileidhex, NULL);
+      putil_strcat(cachepath, "/", fileidhex, NULL);
   pfile_delete(filename);
   free(filename);
 }
@@ -310,7 +310,7 @@ int psync_fs_rename_openfile_locked(psync_fsfileid_t fileid,
             psync_fstask_get_or_create_folder_tasks_locked(folderid);
       }
       free(fl->currentname);
-      fl->currentname = psync_strdup(name);
+      fl->currentname = putil_strdup(name);
       pthread_mutex_unlock(&fl->mutex);
       return 1;
     }
@@ -617,7 +617,7 @@ static int psync_creat_local_to_file_stat(psync_fstask_creat_t *cr,
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     cachepath = psync_setting_get_string(_PS(fscachepath));
     filename =
-        psync_strcat(cachepath, "/", fileidhex, NULL);
+        putil_strcat(cachepath, "/", fileidhex, NULL);
     stret = stat(filename, &st);
     if (stret)
       pdbg_logf(D_NOTICE, "could not stat file %s", filename);
@@ -629,7 +629,7 @@ static int psync_creat_local_to_file_stat(psync_fstask_creat_t *cr,
       osize=0;
     else{
       fileidhex[sizeof(psync_fsfileid_t)]='i';
-      filename=psync_strcat(cachepath, "/", fileidhex,
+      filename=putil_strcat(cachepath, "/", fileidhex,
     NULL); fd=pfile_open(filename, O_RDONLY, 0); free(filename); if
     (fd==INVALID_HANDLE_VALUE) return -EIO; stret=pfile_pread(fd, &osize,
     sizeof(osize), offsetof(index_header, copyfromoriginal));
@@ -1034,7 +1034,7 @@ psync_fs_create_file(psync_fsfileid_t fileid, psync_fsfileid_t remotefileid,
   pthread_mutex_init(&fl->mutex, NULL);
 #endif
   fl->currentfolder = folder;
-  fl->currentname = psync_strdup(name);
+  fl->currentname = putil_strdup(name);
   fl->fileid = fileid;
   fl->remotefileid = remotefileid;
   fl->hash = hash;
@@ -1137,7 +1137,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
   cachepath = psync_setting_get_string(_PS(fscachepath));
   if (of->datafile == INVALID_HANDLE_VALUE) {
     filename =
-        psync_strcat(cachepath, "/", fileidhex, NULL);
+        putil_strcat(cachepath, "/", fileidhex, NULL);
     of->datafile = pfile_open(filename, O_RDWR,
                                    O_CREAT | (trunc ? O_TRUNC : 0));
     free(filename);
@@ -1163,7 +1163,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
   if (!of->newfile && of->indexfile == INVALID_HANDLE_VALUE) {
     fileidhex[sizeof(psync_fsfileid_t)] = 'i';
     filename =
-        psync_strcat(cachepath, "/", fileidhex, NULL);
+        putil_strcat(cachepath, "/", fileidhex, NULL);
     of->indexfile = pfile_open(filename, O_RDWR,
                                     O_CREAT | (trunc ? O_TRUNC : 0));
     free(filename);
@@ -1183,7 +1183,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
     if (of->logfile == INVALID_HANDLE_VALUE) {
       fileidhex[sizeof(psync_fsfileid_t)] = 'l';
       filename =
-          psync_strcat(cachepath, "/", fileidhex, NULL);
+          putil_strcat(cachepath, "/", fileidhex, NULL);
       of->logfile = pfile_open(filename, O_RDWR, O_CREAT | O_TRUNC);
       free(filename);
       if (of->logfile == INVALID_HANDLE_VALUE) {
@@ -3065,7 +3065,7 @@ static int psync_fs_set_filetime_locked(psync_fsfileid_t fileid,
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     cachepath = psync_setting_get_string(_PS(fscachepath));
     filename =
-        psync_strcat(cachepath, "/", fileidhex, NULL);
+        putil_strcat(cachepath, "/", fileidhex, NULL);
     if (fl && fl->datafile != INVALID_HANDLE_VALUE) {
       pdbg_logf(D_NOTICE, "found open file for file id %ld", (long)fl->fileid);
       if (crtime)
@@ -3295,7 +3295,7 @@ static void psync_invalidate_os_cache_noret() {
   char *path;
   pthread_mutex_lock(&start_mutex);
   if (started == 1)
-    path = psync_strdup(psync_current_mountpoint);
+    path = putil_strdup(psync_current_mountpoint);
   else
     path = NULL;
   pthread_mutex_unlock(&start_mutex);
@@ -3367,9 +3367,9 @@ void psync_fs_refresh_folder(psync_folderid_t folderid) {
   pthread_mutex_lock(&start_mutex);
   if (started == 1) {
     if (pfile_invalidate_os_cache_needed())
-      fpath = psync_strcat(psync_current_mountpoint, path, NULL);
+      fpath = putil_strcat(psync_current_mountpoint, path, NULL);
     else
-      fpath = psync_strcat(psync_current_mountpoint, path, "/",
+      fpath = putil_strcat(psync_current_mountpoint, path, "/",
                            psync_fake_prefix, rndhex, NULL);
   } else
     fpath = NULL;
@@ -3396,7 +3396,7 @@ static char *psync_fuse_get_mountpoint() {
   int stat_result;
   int stat_errno;
 
-  mp = psync_strdup(psync_setting_get_string(_PS(fsroot)));
+  mp = putil_strdup(psync_setting_get_string(_PS(fsroot)));
 
   stat_result = stat(mp, &st);
   stat_errno = errno;
@@ -3436,7 +3436,7 @@ char *psync_fs_getmountpoint() {
   char *ret;
   pthread_mutex_lock(&start_mutex);
   if (started == 1)
-    ret = psync_strdup(psync_current_mountpoint);
+    ret = putil_strdup(psync_current_mountpoint);
   else
     ret = NULL;
   pthread_mutex_unlock(&start_mutex);
@@ -3451,7 +3451,7 @@ char *psync_fs_get_path_by_folderid(psync_folderid_t folderid) {
   char *mp, *path, *ret;
   pthread_mutex_lock(&start_mutex);
   if (started == 1)
-    mp = psync_strdup(psync_current_mountpoint);
+    mp = putil_strdup(psync_current_mountpoint);
   else
     mp = NULL;
   pthread_mutex_unlock(&start_mutex);
@@ -3463,7 +3463,7 @@ char *psync_fs_get_path_by_folderid(psync_folderid_t folderid) {
     free(mp);
     return NULL;
   }
-  ret = psync_strcat(mp, path, NULL);
+  ret = putil_strcat(mp, path, NULL);
   free(mp);
   free(path);
   return ret;
@@ -3473,7 +3473,7 @@ char *psync_fs_get_path_by_fileid(psync_fileid_t fileid) {
   char *mp, *path, *ret;
   pthread_mutex_lock(&start_mutex);
   if (started == 1)
-    mp = psync_strdup(psync_current_mountpoint);
+    mp = putil_strdup(psync_current_mountpoint);
   else
     mp = NULL;
   pthread_mutex_unlock(&start_mutex);
@@ -3484,7 +3484,7 @@ char *psync_fs_get_path_by_fileid(psync_fileid_t fileid) {
     free(mp);
     return NULL;
   }
-  ret = psync_strcat(mp, path, NULL);
+  ret = putil_strcat(mp, path, NULL);
   free(mp);
   free(path);
   return ret;
@@ -3620,7 +3620,7 @@ static void psync_fs_init_once() {
   pssl_rand_strong(rndbuff, sizeof(rndbuff));
   psync_binhex(rndhex, rndbuff, sizeof(rndbuff));
   rndhex[2 * sizeof(rndbuff)] = 0;
-  psync_fake_prefix = psync_strcat(".refresh", rndhex, NULL);
+  psync_fake_prefix = putil_strcat(".refresh", rndhex, NULL);
   psync_fake_prefix_len = strlen(psync_fake_prefix);
 #endif
   psync_fstask_init();

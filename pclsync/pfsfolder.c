@@ -62,7 +62,7 @@ static char *get_encname_for_folder(psync_fsfolderid_t folderid,
     cryptoerr = psync_crypto_to_error(enc);
     return NULL;
   }
-  name = psync_strndup(path, len);
+  name = putil_strndup(path, len);
   encname = pcryptofolder_fldencode_filename(enc, name);
   pcryptofolder_fldencoder_release(folderid, enc);
   free(name);
@@ -114,7 +114,7 @@ char *get_decname_for_folder(psync_fsfolderid_t folderid, const char *path,
     cryptoerr = psync_crypto_to_error(dec);
     return NULL;
   }
-  name = psync_strndup(path, len);
+  name = putil_strndup(path, len);
   decname = pcryptofolder_flddecode_filename(dec, name);
   pcryptofolder_flddecoder_release(folderid, dec);
   free(name);
@@ -213,7 +213,7 @@ psync_fspath_t *psync_fsfolder_resolve_path(const char *path) {
     row = psql_fetch_int(res);
     folder = psync_fstask_get_folder_tasks_rdlocked(cfolderid);
     if (folder) {
-      char *name = psync_strndup(ename, elen);
+      char *name = putil_strndup(ename, elen);
       if ((mk = psync_fstask_find_mkdir(folder, name, 0))) {
         if (mk->flags & PSYNC_FOLDER_FLAG_INVISIBLE) {
           free(name);
@@ -307,7 +307,7 @@ psync_fsfolderid_t psync_fsfolderid_by_path(const char *path,
     row = psql_fetch_int(res);
     folder = psync_fstask_get_folder_tasks_rdlocked(cfolderid);
     if (folder) {
-      char *name = psync_strndup(ename, elen);
+      char *name = putil_strndup(ename, elen);
       if ((mk = psync_fstask_find_mkdir(folder, name, 0))) {
         cfolderid = mk->folderid;
         flags = mk->flags;
@@ -393,7 +393,7 @@ psync_fsfolderid_t psync_fsfolderidperm_by_path(const char *path,
     row = psql_fetch_int(res);
     folder = psync_fstask_get_folder_tasks_rdlocked(cfolderid);
     if (folder) {
-      char *name = psync_strndup(ename, elen);
+      char *name = putil_strndup(ename, elen);
       if ((mk = psync_fstask_find_mkdir(folder, name, 0))) {
         cfolderid = mk->folderid;
         flags = mk->flags;

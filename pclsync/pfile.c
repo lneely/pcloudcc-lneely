@@ -419,7 +419,7 @@ int pfile_run_update(const char *path) {
     dup2(fd, STDERR_FILENO);
     close(fd);
     setsid();
-    ex = psync_strcat(PSYNC_RUN_CMD " \"", path, "\"", NULL);
+    ex = putil_strcat(PSYNC_RUN_CMD " \"", path, "\"", NULL);
     execl("/bin/sh", "/bin/sh", "-c", ex, NULL);
     pdbg_logf(D_ERROR, "exec of %s failed", ex);
     free(ex);
