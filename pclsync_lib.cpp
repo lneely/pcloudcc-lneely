@@ -473,6 +473,18 @@ int clib::pclsync_lib::finalize(const char *unused) {
   exit(0);
 }
 
+int clib::pclsync_lib::pause_sync(const char *unused) {
+  (void)unused;
+  psync_pause();
+  return 0;
+}
+
+int clib::pclsync_lib::resume_sync(const char *unused) {
+  (void)unused;
+  psync_resume();
+  return 0;
+}
+
 // path is the local and remote path delimited by '|'
 int clib::pclsync_lib::add_sync_folder(const char *combined_path) {
   if (combined_path == nullptr) {
@@ -588,6 +600,8 @@ int clib::pclsync_lib::init() {
   prpc_register(LISTSYNC, &list_sync_folders);
   prpc_register(ADDSYNC, &add_sync_folder);
   prpc_register(STOPSYNC, &remove_sync_folder);
+  prpc_register(SYNCPAUSE, &pause_sync);
+  prpc_register(SYNCRESUME, &resume_sync);
 
   return 0;
 }

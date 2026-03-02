@@ -57,8 +57,8 @@ static char* command_generator(const char* text, int state) {
     "help", "?",
     "crypto", "crypto start", "crypto stop", 
     "c", "c start", "c stop",
-    "sync", "sync ls", "sync add", "sync remove", "sync rm",
-    "s", "s ls", "s add", "s remove", "s rm",
+    "sync", "sync ls", "sync add", "sync remove", "sync rm", "sync pause", "sync resume",
+    "s", "s ls", "s add", "s remove", "s rm", "s pause", "s resume",
     "pending", "p",
     "finalize", "f",
     "quit", "q",
@@ -101,6 +101,8 @@ void setup_app(CLI::App *app) {
               << "    list(ls): List sync folders" << std::endl
               << "    add <localpath> <remotepath>: Add sync folder" << std::endl
               << "    remove(rm) <folderid>: Remove sync folder" << std::endl
+              << "    pause: Pause syncing (filesystem remains mounted)" << std::endl
+              << "    resume: Resume syncing" << std::endl
               << "  pending(p): Check for pending transfers" << std::endl
               << "  finalize(f): Kill daemon and quit" << std::endl
               << "  quit(q): Exit this program" << std::endl;
@@ -265,6 +267,40 @@ void setup_app(CLI::App *app) {
     }
     delete rpc;
     if(errm) { free(errm); }
+    return 0;
+  });
+
+  // sync pause
+  sync_cmd->add_subcommand("pause", "Pause syncing (filesystem remains mounted)")->callback([] {
+    char *errm = NULL;
+    size_t errmsz = 0;
+    RpcClient *rpc = new RpcClient();
+    if (int result = rpc->Call(SYNCPAUSE, "", &errm, &errmsz) != 0) {
+      std::cerr << "Sync pause failed: " << (errm ? errm : "no message") << std::endl;
+      if (errm) { free(errm); }
+      delete rpc;
+      return result;
+    }
+    delete rpc;
+    std::cout << "Sync paused." << std::endl;
+    if (errm) { free(errm); }
+    return 0;
+  });
+
+  // sync resume
+  sync_cmd->add_subcommand("resume", "Resume syncing")->callback([] {
+    char *errm = NULL;
+    size_t errmsz = 0;
+    RpcClient *rpc = new RpcClient();
+    if (int result = rpc->Call(SYNCRESUME, "", &errm, &errmsz) != 0) {
+      std::cerr << "Sync resume failed: " << (errm ? errm : "no message") << std::endl;
+      if (errm) { free(errm); }
+      delete rpc;
+      return result;
+    }
+    delete rpc;
+    std::cout << "Sync resumed." << std::endl;
+    if (errm) { free(errm); }
     return 0;
   });
 

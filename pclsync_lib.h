@@ -102,6 +102,8 @@ public:
   static int list_sync_folders(const char *path);
   static int add_sync_folder(const char *path);
   static int remove_sync_folder(const char *path);
+  static int pause_sync(const char *unused);
+  static int resume_sync(const char *unused);
 
   int logout();
   int unlink();
