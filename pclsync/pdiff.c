@@ -1315,7 +1315,7 @@ static void process_deletefolder(const binresult *entry) {
     psql_bind_uint(
         st2, 2, papi_find_result2(meta, "parentfolderid", PARAM_NUM)->num);
     psql_run(st2);
-    psync_fs_folder_deleted(folderid);
+    pfs_xattr_folder_deleted(folderid);
   }
   if (path)
     free(path);
@@ -1333,7 +1333,7 @@ static void check_for_deletedfileid(const binresult *meta) {
     res = psql_prepare("DELETE FROM file WHERE id=?");
     psql_bind_uint(res, 1, delfileid->num);
     psql_run_free(res);
-    psync_fs_file_deleted(delfileid->num);
+    pfs_xattr_file_deleted(delfileid->num);
   }
 }
 
@@ -1751,7 +1751,7 @@ static void process_deletefile(const binresult *entry) {
     }
     if (papi_find_result2(meta, "ismine", PARAM_BOOL)->num)
       used_quota -= papi_find_result2(meta, "size", PARAM_NUM)->num;
-    psync_fs_file_deleted(fileid);
+    pfs_xattr_file_deleted(fileid);
   }
   if (path)
     free(path);

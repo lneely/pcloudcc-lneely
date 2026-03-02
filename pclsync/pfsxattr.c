@@ -41,16 +41,16 @@
 #include "psql.h"
 #include "plibs.h"
 
-// needed by psync_fs_set_thread_name
+// needed by pfs_xattr_set_thread_name
 extern PSYNC_THREAD const char *psync_thread_name; 
 
 #if IS_DEBUG
-#define psync_fs_set_thread_name()                                             \
+#define pfs_xattr_set_thread_name()                                             \
   do {                                                                         \
     psync_thread_name = __FUNCTION__;                                          \
   } while (0)
 #else
-#define psync_fs_set_thread_name()                                             \
+#define pfs_xattr_set_thread_name()                                             \
   do {                                                                         \
   } while (0)
 #endif
@@ -90,15 +90,15 @@ static void delete_object_id(uint64_t oid) {
   psql_run_free(res);
 }
 
-void psync_fs_file_deleted(psync_fileid_t fileid) {
+void pfs_xattr_file_deleted(psync_fileid_t fileid) {
   delete_object_id(fileid_to_objid(fileid));
 }
 
-void psync_fs_folder_deleted(psync_folderid_t folderid) {
+void pfs_xattr_folder_deleted(psync_folderid_t folderid) {
   delete_object_id(folderid_to_objid(folderid));
 }
 
-void psync_fs_task_deleted(uint64_t taskid) {
+void pfs_xattr_task_deleted(uint64_t taskid) {
   delete_object_id(taskid_to_objid(taskid));
 }
 
@@ -111,20 +111,20 @@ static void update_object_id(uint64_t ooid, uint64_t noid) {
   psql_run_free(res);
 }
 
-void psync_fs_task_to_file(uint64_t taskid, psync_fileid_t fileid) {
+void pfs_xattr_task_to_file(uint64_t taskid, psync_fileid_t fileid) {
   update_object_id(taskid_to_objid(taskid), fileid_to_objid(fileid));
 }
 
-void psync_fs_task_to_folder(uint64_t taskid, psync_folderid_t folderid) {
+void pfs_xattr_task_to_folder(uint64_t taskid, psync_folderid_t folderid) {
   update_object_id(taskid_to_objid(taskid), folderid_to_objid(folderid));
 }
 
-void psync_fs_static_to_task(uint64_t statictaskid, uint64_t taskid) {
+void pfs_xattr_static_to_task(uint64_t statictaskid, uint64_t taskid) {
   update_object_id(static_taskid_to_objid(statictaskid),
                    taskid_to_objid(taskid));
 }
 
-void psync_fs_file_to_task(psync_fileid_t fileid, uint64_t taskid) {
+void pfs_xattr_file_to_task(psync_fileid_t fileid, uint64_t taskid) {
   update_object_id(fileid_to_objid(fileid), taskid_to_objid(taskid));
 }
 
@@ -248,12 +248,12 @@ static int64_t xattr_get_object_id_locked(const char *path) {
     }                                                                          \
   } while (0)
 
-int psync_fs_setxattr(const char *path, const char *name, const char *value,
+int pfs_xattr_set(const char *path, const char *name, const char *value,
                       size_t size, int flags PFS_XATTR_IGN) {
   psync_sql_res *res;
   int64_t oid;
   int ret;
-  psync_fs_set_thread_name();
+  pfs_xattr_set_thread_name();
   pdbg_logf(D_NOTICE, "setting attribute %s of %s", name, path);
   LOCK_AND_LOOKUP();
   if (flags & XATTR_CREATE) {
@@ -291,12 +291,12 @@ int psync_fs_setxattr(const char *path, const char *name, const char *value,
   return ret;
 }
 
-int psync_fs_getxattr(const char *path, const char *name, char *value,
+int pfs_xattr_get(const char *path, const char *name, char *value,
                       size_t size PFS_XATTR_IGN) {
   psync_sql_res *res;
   int64_t oid;
   int ret;
-  psync_fs_set_thread_name();
+  pfs_xattr_set_thread_name();
   LOCK_AND_LOOKUPRD();
   if (size && value) {
     psync_variant_row row;
@@ -341,13 +341,13 @@ int psync_fs_getxattr(const char *path, const char *name, char *value,
   return ret;
 }
 
-int psync_fs_listxattr(const char *path, char *list, size_t size) {
+int pfs_xattr_list(const char *path, char *list, size_t size) {
   psync_sql_res *res;
   int64_t oid;
   const char *str;
   size_t len;
   int ret;
-  psync_fs_set_thread_name();
+  pfs_xattr_set_thread_name();
   LOCK_AND_LOOKUPRD();
   if (size && list) {
     psync_variant_row row;
@@ -382,11 +382,11 @@ int psync_fs_listxattr(const char *path, char *list, size_t size) {
   return ret;
 }
 
-int psync_fs_removexattr(const char *path, const char *name) {
+int pfs_xattr_remove(const char *path, const char *name) {
   psync_sql_res *res;
   int64_t oid;
   uint32_t aff;
-  psync_fs_set_thread_name();
+  pfs_xattr_set_thread_name();
   LOCK_AND_LOOKUP();
   res = psql_prepare(
       "DELETE FROM fsxattr WHERE objectid=? AND name=?");

@@ -2159,7 +2159,7 @@ pfs_reopen_file_for_writing(psync_openfile_t *of) {
       return -EIO;
     }
     pfs_update_openfile_fileid_locked(of, cr->fileid);
-    psync_fs_file_to_task(of->remotefileid, cr->taskid);
+    pfs_xattr_file_to_task(of->remotefileid, cr->taskid);
     psql_unlock();
     of->newfile = 1;
     of->modified = 1;
@@ -2237,7 +2237,7 @@ pfs_reopen_static_file_for_writing(psync_openfile_t *of) {
     return -EIO;
   }
   pfs_update_openfile_fileid_locked(of, cr->fileid);
-  psync_fs_static_to_task(taskid, cr->taskid);
+  pfs_xattr_static_to_task(taskid, cr->taskid);
   cr = psync_fstask_find_creat(of->currentfolder, of->currentname, taskid);
   if (pdbg_likely(cr)) {
     ptree_del(&of->currentfolder->creats, &cr->tree);
@@ -3743,10 +3743,10 @@ static int pfs_do_start() {
   psync_oper.ftruncate = pfs_ftruncate;
   psync_oper.truncate = pfs_truncate;
 
-  psync_oper.setxattr = psync_fs_setxattr;
-  psync_oper.getxattr = psync_fs_getxattr;
-  psync_oper.listxattr = psync_fs_listxattr;
-  psync_oper.removexattr = psync_fs_removexattr;
+  psync_oper.setxattr = pfs_xattr_set;
+  psync_oper.getxattr = pfs_xattr_get;
+  psync_oper.listxattr = pfs_xattr_list;
+  psync_oper.removexattr = pfs_xattr_remove;
 
 #if defined(FUSE_HAS_CAN_UNLINK)
   psync_oper.can_unlink = pfs_can_unlink;

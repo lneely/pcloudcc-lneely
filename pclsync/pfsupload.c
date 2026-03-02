@@ -156,7 +156,7 @@ static int psync_process_task_mkdir(fsupload_task_t *task) {
   task->int2 = folderid;
   pfileops_create_fldr(meta);
   psync_fstask_folder_created(task->folderid, task->id, folderid, task->text1);
-  psync_fs_task_to_folder(task->id, folderid);
+  pfs_xattr_task_to_folder(task->id, folderid);
   if (task->text2 && papi_find_result2(task->res, "created", PARAM_BOOL)->num) {
     psync_sql_res *res;
     unsigned char *enckey;
@@ -455,7 +455,7 @@ static int save_meta(const binresult *meta, psync_folderid_t folderid,
     if (!deleted)
       ppagecache_creat(taskid, hash, 0);
     psync_fstask_file_created(folderid, taskid, name, fileid);
-    psync_fs_task_to_file(taskid, fileid);
+    pfs_xattr_task_to_file(taskid, fileid);
   } else {
     pfileops_update_file(meta);
     if (!deleted)
@@ -597,7 +597,7 @@ static void perm_fail_upload_task(uint64_t taskid) {
   sql = psql_prepare("DELETE FROM fstask WHERE id=?");
   psql_bind_uint(sql, 1, taskid);
   psql_run_free(sql);
-  psync_fs_task_deleted(taskid);
+  pfs_xattr_task_deleted(taskid);
   psql_commit();
   pstatus_upload_recalc_async();
 }
@@ -1357,7 +1357,7 @@ static int psync_process_task_creat(fsupload_task_t *task) {
   psync_fstask_file_created(task->folderid, task->id, task->text1, fileid);
   if (task->text2)
     set_key_for_fileid(fileid, hash, task->text2);
-  psync_fs_task_to_file(task->id, fileid);
+  pfs_xattr_task_to_file(task->id, fileid);
   task->int2 = fileid;
   pdbg_logf(D_NOTICE, "file %lu/%s uploaded", (unsigned long)task->folderid,
         task->text1);
