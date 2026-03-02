@@ -14,14 +14,6 @@ I aim to support as many distributions as possible. I maintain a package for [AU
 
 My code audits are best-effort, and I make security enhancements as I identify problems. However, I *do not* promise that this program is free of even older and well-known security vulnerabilities. Therefore, I recommend using this program only on a *trusted single-user* system. **Security-related code audits and contributions are most welcome!**
 
-## Pending Transfers
-
-Stopping the daemon will break pending background transfers!
-`pcloudcc` does not currently provide a command to check for pending
-transfers. You can currently check this by ensuring there is only one
-file named `cached` in `~/.pcloud/Cache`. Usually this is a large
-file.
-
 # See Also
 
 - [Contributing](./doc/CONTRIBUTING.md): Read this if you're interested in
