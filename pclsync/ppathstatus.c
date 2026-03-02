@@ -339,7 +339,7 @@ void ppathstatus_drive_fldr_changed(psync_folderid_t folderid) {
   folder_tasks_t *ft;
   int changed;
   psql_lock();
-  folder = psync_fstask_get_folder_tasks_rdlocked(folderid);
+  folder = pfs_task_get_folder_tasks_rdlocked(folderid);
   changed = folder && (folder->creats || folder->mkdirs);
   ft = get_folder_tasks(folderid, changed);
   if ((!changed && (!ft || ft->child_task_cnt)) ||
@@ -931,7 +931,7 @@ restart:
       if (off && is_slash(path[off - 1])) {
         poff = off + 1;
       } else {
-        folder = psync_fstask_get_folder_tasks_rdlocked(folderid);
+        folder = pfs_task_get_folder_tasks_rdlocked(folderid);
         if (folder) {
           if (unlikely(off - poff >= sizeof(buff)))
             return rdunlock_return(PSYNC_PATH_STATUS_IN_SYNC);
@@ -943,9 +943,9 @@ restart:
                                               path + poff, off - poff)))
               return rdunlock_return(PSYNC_PATH_STATUS_IN_SYNC);
           }
-          if (psync_fstask_find_mkdir(folder, buff, 0))
+          if (pfs_task_find_mkdir(folder, buff, 0))
             return rdunlock_return_in_prog();
-          if (psync_fstask_find_rmdir(folder, buff, 0))
+          if (pfs_task_find_rmdir(folder, buff, 0))
             return rdunlock_return(PSYNC_PATH_STATUS_NOT_FOUND);
         }
         comp_hash(path + poff, off - poff, hash, folderid, drv_hash_seed);
@@ -1016,7 +1016,7 @@ restart:
     }
   if (poff == path_len)
     return psync_path_status_drive_folder_locked(folderid);
-  folder = psync_fstask_get_folder_tasks_rdlocked(folderid);
+  folder = pfs_task_get_folder_tasks_rdlocked(folderid);
   name = path + poff;
   namelen = path_len - poff;
   if (folder) {
@@ -1027,9 +1027,9 @@ restart:
       name = buff;
       namelen = strlen(buff);
     }
-    if (psync_fstask_find_mkdir(folder, name, 0))
+    if (pfs_task_find_mkdir(folder, name, 0))
       return rdunlock_return_in_prog();
-    if (psync_fstask_find_creat(folder, name, 0))
+    if (pfs_task_find_creat(folder, name, 0))
       return rdunlock_return_in_prog();
   }
   // we do the hash with the unencrypted name
@@ -1050,12 +1050,12 @@ restart:
   }
   if (found) {
     if (flags & ENTRY_FLAG_FOLDER) {
-      if (folder && psync_fstask_find_rmdir(folder, name, 0))
+      if (folder && pfs_task_find_rmdir(folder, name, 0))
         return rdunlock_return(PSYNC_PATH_STATUS_NOT_FOUND);
       else
         return psync_path_status_drive_folder_locked(folderid);
     } else {
-      if (folder && psync_fstask_find_unlink(folder, name, 0))
+      if (folder && pfs_task_find_unlink(folder, name, 0))
         return rdunlock_return(PSYNC_PATH_STATUS_NOT_FOUND);
       else
         return rdunlock_return(PSYNC_PATH_STATUS_IN_SYNC);
@@ -1073,9 +1073,9 @@ restart:
   psql_bind_uint(res, 1, folderid);
   psql_bind_lstr(res, 2, name, namelen);
   row = psql_fetch_int(res);
-  if (!row || (folder && psync_fstask_find_rmdir(folder, path + poff, 0))) {
+  if (!row || (folder && pfs_task_find_rmdir(folder, path + poff, 0))) {
     psql_free(res);
-    if (folder && psync_fstask_find_unlink(folder, path + poff, 0))
+    if (folder && pfs_task_find_unlink(folder, path + poff, 0))
       return rdunlock_return(PSYNC_PATH_STATUS_NOT_FOUND);
     res = psql_query_nolock(
         "SELECT id FROM file WHERE parentfolderid=? AND name=?");

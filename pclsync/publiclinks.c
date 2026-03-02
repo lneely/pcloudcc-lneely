@@ -439,7 +439,7 @@ int64_t do_ptree_public_link(const char *linkname, const char *root,
 
   if (root) {
     ids = (char *)malloc(FOLDERID_ENTRY_SIZE);
-    id = psync_fsfolderid_by_path(root, 0);
+    id = pfs_fldr_id_by_path(root, 0);
     k = sprintf(ids, "%lld", (long long)id);
     init_param_str(t + pind++, "folderid", ids);
   }
@@ -448,7 +448,7 @@ int64_t do_ptree_public_link(const char *linkname, const char *root,
     ids1 = (char *)malloc(numfolders * FOLDERID_ENTRY_SIZE);
     idsp = ids1;
     for (i = 0; i < numfolders; ++i) {
-      id = psync_fsfolderid_by_path(folders[i], 0);
+      id = pfs_fldr_id_by_path(folders[i], 0);
       k = sprintf(idsp, "%lld", (long long)id);
       if (unlikely(k <= 0))
         break;
@@ -469,7 +469,7 @@ int64_t do_ptree_public_link(const char *linkname, const char *root,
     idsp = ids2;
     for (i = 0; i < numfiles; ++i) {
       psql_rdlock();
-      filep = psync_fsfolder_resolve_path(files[i]);
+      filep = pfs_fldr_resolve_path(files[i]);
       if (filep) {
         res = psql_query_nolock("select id from file where parentfolderid "
                                      "= ? and name = ? limit 1");

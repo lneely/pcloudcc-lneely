@@ -106,7 +106,7 @@ typedef struct {
   uint32_t refcnt;
 } psync_fstask_folder_t;
 
-static inline size_t psync_fstask_creat_local_offset(size_t namelen) {
+static inline size_t pfs_task_creat_local_offset(size_t namelen) {
   return (offsetof(psync_fstask_creat_t, name) + namelen +
           psync_alignof(psync_fstask_local_creat_t)) /
          psync_alignof(psync_fstask_local_creat_t) *
@@ -114,115 +114,115 @@ static inline size_t psync_fstask_creat_local_offset(size_t namelen) {
 }
 
 static inline psync_fstask_local_creat_t *
-psync_fstask_creat_len_get_local(psync_fstask_creat_t *cr, size_t namelen) {
+pfs_task_creat_len_get_local(psync_fstask_creat_t *cr, size_t namelen) {
   return (
       psync_fstask_local_creat_t *)(((char *)cr) +
-                                    psync_fstask_creat_local_offset(namelen));
+                                    pfs_task_creat_local_offset(namelen));
 }
 
 static inline psync_fstask_local_creat_t *
-psync_fstask_creat_get_local(psync_fstask_creat_t *cr) {
-  return psync_fstask_creat_len_get_local(cr, strlen(cr->name));
+pfs_task_creat_get_local(psync_fstask_creat_t *cr) {
+  return pfs_task_creat_len_get_local(cr, strlen(cr->name));
 }
 
-void psync_fstask_init();
+void pfs_task_init();
 
 psync_fstask_folder_t *
-psync_fstask_get_or_create_folder_tasks(psync_fsfolderid_t folderid);
+pfs_task_get_or_create_folder_tasks(psync_fsfolderid_t folderid);
 psync_fstask_folder_t *
-psync_fstask_get_folder_tasks(psync_fsfolderid_t folderid);
-void psync_fstask_release_folder_tasks(psync_fstask_folder_t *folder);
+pfs_task_get_folder_tasks(psync_fsfolderid_t folderid);
+void pfs_task_release_folder_tasks(psync_fstask_folder_t *folder);
 psync_fstask_folder_t *
-psync_fstask_get_ref_locked(psync_fstask_folder_t *folder);
+pfs_task_get_ref_locked(psync_fstask_folder_t *folder);
 psync_fstask_folder_t *
-psync_fstask_get_or_create_folder_tasks_locked(psync_fsfolderid_t folderid);
+pfs_task_get_or_create_folder_tasks_locked(psync_fsfolderid_t folderid);
 psync_fstask_folder_t *
-psync_fstask_get_folder_tasks_locked(psync_fsfolderid_t folderid);
+pfs_task_get_folder_tasks_locked(psync_fsfolderid_t folderid);
 psync_fstask_folder_t *
-psync_fstask_get_folder_tasks_rdlocked(psync_fsfolderid_t folderid);
-void psync_fstask_release_folder_tasks_locked(psync_fstask_folder_t *folder);
+pfs_task_get_folder_tasks_rdlocked(psync_fsfolderid_t folderid);
+void pfs_task_release_folder_tasks_locked(psync_fstask_folder_t *folder);
 
-void psync_fstask_folder_created(psync_folderid_t parentfolderid,
+void pfs_task_folder_created(psync_folderid_t parentfolderid,
                                  uint64_t taskid, psync_folderid_t folderid,
                                  const char *name);
-void psync_fstask_folder_deleted(psync_folderid_t parentfolderid,
+void pfs_task_folder_deleted(psync_folderid_t parentfolderid,
                                  uint64_t taskid, const char *name);
-void psync_fstask_file_created(psync_folderid_t parentfolderid, uint64_t taskid,
+void pfs_task_file_created(psync_folderid_t parentfolderid, uint64_t taskid,
                                const char *name, psync_fileid_t fileid);
-void psync_fstask_file_modified(psync_folderid_t parentfolderid,
+void pfs_task_file_modified(psync_folderid_t parentfolderid,
                                 uint64_t taskid, const char *name,
                                 psync_fileid_t fileid);
-void psync_fstask_file_deleted(psync_folderid_t parentfolderid, uint64_t taskid,
+void pfs_task_file_deleted(psync_folderid_t parentfolderid, uint64_t taskid,
                                const char *name);
-void psync_fstask_file_renamed(psync_folderid_t folderid, uint64_t taskid,
+void pfs_task_file_renamed(psync_folderid_t folderid, uint64_t taskid,
                                const char *name, uint64_t frtaskid);
-void psync_fstask_folder_renamed(psync_folderid_t parentfolderid,
+void pfs_task_folder_renamed(psync_folderid_t parentfolderid,
                                  uint64_t taskid, const char *name,
                                  uint64_t frtaskid);
 
-psync_fstask_mkdir_t *psync_fstask_find_mkdir(psync_fstask_folder_t *folder,
+psync_fstask_mkdir_t *pfs_task_find_mkdir(psync_fstask_folder_t *folder,
                                               const char *name,
                                               uint64_t taskid);
-psync_fstask_rmdir_t *psync_fstask_find_rmdir(psync_fstask_folder_t *folder,
+psync_fstask_rmdir_t *pfs_task_find_rmdir(psync_fstask_folder_t *folder,
                                               const char *name,
                                               uint64_t taskid);
-psync_fstask_creat_t *psync_fstask_find_creat(psync_fstask_folder_t *folder,
+psync_fstask_creat_t *pfs_task_find_creat(psync_fstask_folder_t *folder,
                                               const char *name,
                                               uint64_t taskid);
-psync_fstask_unlink_t *psync_fstask_find_unlink(psync_fstask_folder_t *folder,
+psync_fstask_unlink_t *pfs_task_find_unlink(psync_fstask_folder_t *folder,
                                                 const char *name,
                                                 uint64_t taskid);
 
 psync_fstask_mkdir_t *
-psync_fstask_find_mkdir_by_folderid(psync_fstask_folder_t *folder,
+pfs_task_find_mkdir_by_folderid(psync_fstask_folder_t *folder,
                                     psync_fsfolderid_t folderid);
 psync_fstask_creat_t *
-psync_fstask_find_creat_by_fileid(psync_fstask_folder_t *folder,
+pfs_task_find_creat_by_fileid(psync_fstask_folder_t *folder,
                                   psync_fsfileid_t fileid);
 
-int psync_fstask_mkdir(psync_fsfolderid_t folderid, const char *name,
+int pfs_task_mkdir(psync_fsfolderid_t folderid, const char *name,
                        uint32_t folderflags);
-int psync_fstask_can_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
+int pfs_task_can_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
                            const char *name);
-int psync_fstask_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
+int pfs_task_rmdir(psync_fsfolderid_t folderid, uint32_t parentflags,
                        const char *name);
-psync_fstask_creat_t *psync_fstask_add_creat(psync_fstask_folder_t *folder,
+psync_fstask_creat_t *pfs_task_add_creat(psync_fstask_folder_t *folder,
                                              const char *name,
                                              psync_fsfileid_t fileid,
                                              const char *encsymkey,
                                              size_t encsymkeylen);
-void psync_fstask_inject_creat(psync_fstask_folder_t *folder,
+void pfs_task_inject_creat(psync_fstask_folder_t *folder,
                                psync_fstask_creat_t *cr);
-void psync_fstask_inject_unlink(psync_fstask_folder_t *folder,
+void pfs_task_inject_unlink(psync_fstask_folder_t *folder,
                                 psync_fstask_unlink_t *un);
 psync_fstask_creat_t *
-psync_fstask_add_modified_file(psync_fstask_folder_t *folder, const char *name,
+pfs_task_add_modified_file(psync_fstask_folder_t *folder, const char *name,
                                psync_fsfileid_t fileid, uint64_t hash,
                                const char *encsymkey, size_t encsymkeylen);
-int psync_fstask_set_mtime(psync_fileid_t fileid, uint64_t oldtm,
+int pfs_task_set_mtime(psync_fileid_t fileid, uint64_t oldtm,
                            uint64_t newtm, int is_ctime);
 
-int psync_fstask_add_local_creat_static(psync_fsfolderid_t folderid,
+int pfs_task_add_local_creat_static(psync_fsfolderid_t folderid,
                                         const char *name, const void *data,
                                         size_t datalen);
 
-int psync_fstask_can_unlink(psync_fsfolderid_t folderid, const char *name);
-int psync_fstask_unlink(psync_fsfolderid_t folderid, const char *name);
-int psync_fstask_rename_file(psync_fsfileid_t fileid,
+int pfs_task_can_unlink(psync_fsfolderid_t folderid, const char *name);
+int pfs_task_unlink(psync_fsfolderid_t folderid, const char *name);
+int pfs_task_rename_file(psync_fsfileid_t fileid,
                              psync_fsfolderid_t parentfolderid,
                              const char *name, psync_fsfolderid_t to_folderid,
                              const char *new_name);
-int psync_fstask_rename_folder(psync_fsfolderid_t folderid,
+int pfs_task_rename_folder(psync_fsfolderid_t folderid,
                                psync_fsfolderid_t parentfolderid,
                                const char *name, psync_fsfolderid_t to_folderid,
                                const char *new_name, uint32_t targetflags);
 
-void psync_fstask_clean();
+void pfs_task_clean();
 
-void psync_fstask_add_banned_folders();
+void pfs_task_add_banned_folders();
 
 #if IS_DEBUG
-void psync_fstask_dump_state();
+void pfs_task_dump_state();
 #endif
 
 #endif

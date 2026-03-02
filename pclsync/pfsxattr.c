@@ -139,16 +139,16 @@ static int64_t xattr_get_object_id_locked(const char *path) {
   int checkfile, checkfolder;
   if (path[1] == 0 && path[0] == '/')
     return 0;
-  fspath = psync_fsfolder_resolve_path(path);
+  fspath = pfs_fldr_resolve_path(path);
   if (!fspath) {
     pdbg_logf(D_NOTICE, "path component of %s not found", path);
     return -1;
   }
   checkfile = 1;
   checkfolder = 1;
-  folder = psync_fstask_get_folder_tasks_rdlocked(fspath->folderid);
+  folder = pfs_task_get_folder_tasks_rdlocked(fspath->folderid);
   if (folder) {
-    mk = psync_fstask_find_mkdir(folder, fspath->name, 0);
+    mk = pfs_task_find_mkdir(folder, fspath->name, 0);
     if (mk) {
       free(fspath);
       pdbg_assertw(mk->folderid != 0);
@@ -157,7 +157,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
       else
         return taskid_to_objid(-mk->folderid);
     }
-    cr = psync_fstask_find_creat(folder, fspath->name, 0);
+    cr = pfs_task_find_creat(folder, fspath->name, 0);
     if (cr) {
       free(fspath);
       if (cr->fileid > 0)
@@ -185,8 +185,8 @@ static int64_t xattr_get_object_id_locked(const char *path) {
         return ret;
       }
     }
-    checkfolder = !psync_fstask_find_rmdir(folder, fspath->name, 0);
-    checkfile = !psync_fstask_find_unlink(folder, fspath->name, 0);
+    checkfolder = !pfs_task_find_rmdir(folder, fspath->name, 0);
+    checkfile = !pfs_task_find_unlink(folder, fspath->name, 0);
   }
   if (fspath->folderid < 0) {
     free(fspath);

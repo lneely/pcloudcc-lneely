@@ -47,18 +47,18 @@ typedef struct {
   uint16_t flags;
 } psync_fspath_t;
 
-psync_fspath_t *psync_fsfolder_resolve_path(const char *path);
-psync_fsfolderid_t psync_fsfolderid_by_path(const char *path, uint32_t *pflags);
-psync_fsfolderid_t psync_fsfolderidperm_by_path(const char *path,
+psync_fspath_t *pfs_fldr_resolve_path(const char *path);
+psync_fsfolderid_t pfs_fldr_id_by_path(const char *path, uint32_t *pflags);
+psync_fsfolderid_t pfs_fldr_idperm_by_path(const char *path,
                                                 uint32_t *pflags,
                                                 uint32_t *pPermissions);
-uint32_t psync_fsfolderflags_by_id(psync_fsfolderid_t folderid,
+uint32_t pfs_fldr_flags_by_id(psync_fsfolderid_t folderid,
                                    uint32_t *pperm);
-int psync_fsfolder_crypto_error();
-char *get_decname_for_folder(psync_fsfolderid_t folderid, const char *path,
+int pfs_fldr_crypto_error();
+char *pfs_fldr_get_decname(psync_fsfolderid_t folderid, const char *path,
                              size_t len);
 
-psync_fsfolderid_t psync_get_folderid(psync_fsfolderid_t parent_fid,
+psync_fsfolderid_t pfs_fldr_get_folderid(psync_fsfolderid_t parent_fid,
                                       const char *name);
 
 #endif

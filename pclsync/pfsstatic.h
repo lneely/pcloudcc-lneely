@@ -31,6 +31,6 @@
 #ifndef _PSYNC_FSSTATIC_H
 #define _PSYNC_FSSTATIC_H
 
-void psync_fsstatic_add_files();
+void pfs_stat_add_files();
 
 #endif
