@@ -105,6 +105,7 @@ public:
   static int pause_sync(const char *unused);
   static int resume_sync(const char *unused);
   static int receive_tfa_code(const char *code);
+  static int receive_auth(const char *pass);
 
   int logout();
   int unlink();

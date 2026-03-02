@@ -59,6 +59,8 @@ namespace clib = cc::clibrary;
 static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t tfa_mtx = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t tfa_cond = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t auth_mtx = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t auth_cond = PTHREAD_COND_INITIALIZER;
 
 static const std::string client_name = "pCloud CC v3.0.0";
 
@@ -164,7 +166,27 @@ clib::pclsync_lib &clib::pclsync_lib::get_lib() {
 }
 
 void clib::pclsync_lib::read_password() {
+  if (daemon_) {
+    syslog(LOG_NOTICE,
+           "pcloudcc: password required. "
+           "Provide with: echo 'auth PASSWORD' | pcloudcc -k");
+    pthread_mutex_lock(&auth_mtx);
+    while (password_.empty()) {
+      pthread_cond_wait(&auth_cond, &auth_mtx);
+    }
+    pthread_mutex_unlock(&auth_mtx);
+    return;
+  }
   read_from_stdin(password_);
+}
+
+int clib::pclsync_lib::receive_auth(const char *pass) {
+  pthread_mutex_lock(&auth_mtx);
+  get_lib().password_ = std::string(pass);
+  pthread_cond_signal(&auth_cond);
+  pthread_mutex_unlock(&auth_mtx);
+  std::cout << "Auth received." << std::endl;
+  return 0;
 }
 
 void clib::pclsync_lib::read_tfa_code(bool auto_sms)
@@ -654,6 +676,7 @@ int clib::pclsync_lib::init() {
   prpc_register(SYNCPAUSE, &pause_sync);
   prpc_register(SYNCRESUME, &resume_sync);
   prpc_register(SENDTFA, &receive_tfa_code);
+  prpc_register(SENDAUTH, &receive_auth);
 
   return 0;
 }

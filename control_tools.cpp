@@ -41,6 +41,7 @@
 
 #include "pclsync_lib.h"
 #include "pclsync/pshm.h"
+#include "pclsync/putil.h"
 #include "pclsync/pfoldersync.h"
 #include "pclsync/pcommands.h"
 
@@ -61,6 +62,7 @@ static char* command_generator(const char* text, int state) {
     "s", "s ls", "s add", "s remove", "s rm", "s pause", "s resume",
     "pending", "p",
     "tfa",
+    "auth",
     "finalize", "f",
     "quit", "q",
     nullptr
@@ -106,6 +108,7 @@ void setup_app(CLI::App *app) {
               << "    resume: Resume syncing" << std::endl
               << "  pending(p): Check for pending transfers" << std::endl
               << "  tfa <code>: Supply 2FA code to a running daemon" << std::endl
+              << "  auth <password>: Supply password to a running daemon" << std::endl
               << "  finalize(f): Kill daemon and quit" << std::endl
               << "  quit(q): Exit this program" << std::endl;
   });
@@ -169,6 +172,29 @@ void setup_app(CLI::App *app) {
     }
     delete rpc;
     std::cout << "2FA code sent." << std::endl;
+    if (errm) { free(errm); }
+    return 0;
+  });
+
+  // auth command
+  auto auth_cmd = app->add_subcommand("auth", "Supply password to a running daemon");
+  static std::string auth_pass_input;
+  auth_cmd->add_option("password", auth_pass_input, "Password")->required();
+  auth_cmd->callback([] {
+    char *errm = NULL;
+    size_t errm_size = 0;
+    RpcClient *rpc = new RpcClient();
+    int result = rpc->Call(SENDAUTH, auth_pass_input.c_str(), &errm, &errm_size);
+    putil_wipe(auth_pass_input.data(), auth_pass_input.size());
+    auth_pass_input.clear();
+    if (result != 0) {
+      std::cerr << "Failed to send auth: " << (errm ? errm : "no message") << std::endl;
+      if (errm) { free(errm); }
+      delete rpc;
+      return result;
+    }
+    delete rpc;
+    std::cout << "Auth sent." << std::endl;
     if (errm) { free(errm); }
     return 0;
   });

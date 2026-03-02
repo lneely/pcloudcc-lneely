@@ -8,5 +8,6 @@ enum command_ids_ {
   CHECKPENDING,
   SYNCPAUSE,
   SYNCRESUME,
-  SENDTFA
+  SENDTFA,
+  SENDAUTH
 };
