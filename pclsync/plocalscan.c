@@ -143,7 +143,7 @@ static void scanner_set_syncs_to_list(psync_list *lst,
 
   psync_list_init(lst);
   psync_list_init(lst_deviceid_full);
-  syncmp = psync_fs_getmountpoint();
+  syncmp = pfs_getmountpoint();
   res = psql_query_rdlock(
       "SELECT id, folderid, localpath, synctype, deviceid, inode FROM "
       "syncfolder WHERE synctype&" NTO_STR(PSYNC_UPLOAD_ONLY) "=" NTO_STR(

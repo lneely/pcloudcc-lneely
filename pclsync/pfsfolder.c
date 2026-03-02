@@ -74,7 +74,7 @@ static psync_fspath_t *ret_folder_data(psync_fsfolderid_t folderid,
                                        uint32_t flags, uint32_t shareid) {
   psync_fspath_t *ret;
   if (flags & PSYNC_FOLDER_FLAG_ENCRYPTED &&
-      strncmp(psync_fake_prefix, name, psync_fake_prefix_len)) {
+      strncmp(pfs_fake_prefix, name, pfs_fake_prefix_len)) {
     pcrypto_textenc_t enc;
     char *encname;
     size_t len;

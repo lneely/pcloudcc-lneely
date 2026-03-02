@@ -1118,13 +1118,13 @@ int psync_upload_file_as(const char *remote_path, const char *remote_filename,
 
 /* Filesystem functions.
  *
- * psync_fs_start() - starts the filesystem
- * psync_fs_isstarted() - returns 1 if the filesystem is started and 0 otherwise
- * psync_fs_stop() - stops the filesystem
- * psync_fs_getmountpoint() - returns current mountpoint of the filesystem, or
+ * pfs_start() - starts the filesystem
+ * pfs_isstarted() - returns 1 if the filesystem is started and 0 otherwise
+ * pfs_stop() - stops the filesystem
+ * pfs_getmountpoint() - returns current mountpoint of the filesystem, or
  * NULL if the filesystem is not mounted, you are supposed to free the returned
- * pointer psync_fs_register_start_callback() - registers a callback that will
- * be called once the drive is started psync_fs_get_path_by_folderid() - returns
+ * pointer pfs_register_start_callback() - registers a callback that will
+ * be called once the drive is started pfs_get_path_by_folderid() - returns
  * full path (including mountpoint) of a given folderid on the filesystem or
  *                            NULL if it is not mounted or folder could not be
  * found. You are supposed to free the returned pointer.
@@ -1132,7 +1132,7 @@ int psync_upload_file_as(const char *remote_path, const char *remote_filename,
  * fileid on the filesystem or NULL if it is not mounted or parent folder could
  * not be found. You are supposed to free the returned pointer.
  *
- * psync_fs_clean_read_cache() - cleans the filesystem read cache. This function
+ * pfs_clean_read_cache() - cleans the filesystem read cache. This function
  * does not fail. The general expectation is that the function takes some
  * moderate time to execute - maybe 0.5-2 seconds depending on the system and
  * it's load. In the unlikely case of cache flush or cache garbage collection
@@ -1141,9 +1141,9 @@ int psync_upload_file_as(const char *remote_path, const char *remote_filename,
  * filesystem operations will hang and wait for the process to finish, so please
  * design the UI accordingly.
  *
- * psync_fs_move_cache()      - cleans filesystem read cache and moves both read
+ * pfs_move_cache()      - cleans filesystem read cache and moves both read
  * cache and write queue to specified directory. The function has the same
- * overall complexity as psync_fs_clean_read_cache(). Returns 0 on success,
+ * overall complexity as pfs_clean_read_cache(). Returns 0 on success,
  * PERROR_CACHE_MOVE_NOT_EMPTY if the target directory already has a read cache
  * file in it, PERROR_CACHE_MOVE_NO_WRITE_ACCESS if request to open a file for
  * writing in the provided directory fails or PERROR_CACHE_MOVE_DRIVE_HAS_TASKS
@@ -1152,16 +1152,16 @@ int psync_upload_file_as(const char *remote_path, const char *remote_filename,
  *
  */
 
-int psync_fs_start();
-int psync_fs_isstarted();
-void psync_fs_stop();
-char *psync_fs_getmountpoint();
-void psync_fs_register_start_callback(psync_generic_callback_t callback);
-char *psync_fs_get_path_by_folderid(psync_folderid_t folderid);
-char *psync_fs_get_path_by_fileid(psync_fileid_t fileid);
+int pfs_start();
+int pfs_isstarted();
+void pfs_stop();
+char *pfs_getmountpoint();
+void pfs_register_start_callback(psync_generic_callback_t callback);
+char *pfs_get_path_by_folderid(psync_folderid_t folderid);
+char *pfs_get_path_by_fileid(psync_fileid_t fileid);
 
-void psync_fs_clean_read_cache();
-int psync_fs_move_cache(const char *path);
+void pfs_clean_read_cache();
+int pfs_move_cache(const char *path);
 
 /* psync_password_quality estimates password quality, returns one of:
  *   0 - weak

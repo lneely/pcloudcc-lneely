@@ -945,7 +945,7 @@ psync_syncid_t pfolder_add_sync(const char *localpath, psync_folderid_t folderid
     mbedtls_md = 5;
   if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md)))
     return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
-  syncmp = psync_fs_getmountpoint();
+  syncmp = pfs_getmountpoint();
   if (syncmp) {
     size_t len = strlen(syncmp);
     if (!memcmp(syncmp, localpath, len) &&

@@ -683,12 +683,12 @@ int pcryptofolder_unlock(const char *password) {
   return PSYNC_CRYPTO_START_SUCCESS;
 }
 
-static void psync_fs_refresh_crypto_folders() {
+static void pfs_refresh_crypto_folders() {
   psync_folderid_t *fids, *fid;
   fids = psync_crypto_folderids();
   fid = fids;
   while (*fid != PSYNC_CRYPTO_INVALID_FOLDERID) {
-    psync_fs_refresh_folder(*fid);
+    pfs_refresh_folder(*fid);
     fid++;
   }
   free(fids);
@@ -709,7 +709,7 @@ int pcryptofolder_lock() {
   pthread_rwlock_unlock(&crypto_lock);
   pdbg_logf(D_NOTICE, "stopped crypto");
   pcryptofolder_cache_clean();
-  psync_fs_refresh_crypto_folders();
+  pfs_refresh_crypto_folders();
   return PSYNC_CRYPTO_STOP_SUCCESS;
 }
 

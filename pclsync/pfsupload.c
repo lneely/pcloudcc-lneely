@@ -265,7 +265,7 @@ static int psync_send_task_creat_upload_small(psock_t *api,
     data = papi_prepare_alloc("uploadfile", params, size, size, &len);
   }
   if (pdbg_unlikely(pfile_read(fd, data + len, size) != size) ||
-      pdbg_unlikely(psync_fs_get_file_writeid(task->id) != task->int1)) {
+      pdbg_unlikely(pfs_get_file_writeid(task->id) != task->int1)) {
     free(data);
     return -1;
   }
@@ -429,7 +429,7 @@ static int save_meta(const binresult *meta, psync_folderid_t folderid,
   size = papi_find_result2(meta, "size", PARAM_NUM)->num;
   deleted = 0;
   psql_start();
-  if (psync_fs_update_openfile(
+  if (pfs_update_openfile(
           taskid, writeid, fileid, hash, size,
           papi_find_result2(meta, "created", PARAM_NUM)->num)) {
     sql = psql_query_nolock("SELECT status FROM fstask WHERE id=?");
@@ -492,7 +492,7 @@ static int save_meta(const binresult *meta, psync_folderid_t folderid,
   if (!psql_affected()) {
     pdbg_logf(D_BUG,
           "upload of %s cancelled due to writeid mismatch, writeid %lu, "
-          "psync_fs_update_openfile should have catched that",
+          "pfs_update_openfile should have catched that",
           name, (long unsigned)writeid);
     psql_rollback();
     return -1;
@@ -844,7 +844,7 @@ static int large_upload_creat(uint64_t taskid, psync_folderid_t folderid,
     psync_apipool_release(api);
     goto errs;
   }
-  if (psync_fs_get_file_writeid(taskid) != writeid) {
+  if (pfs_get_file_writeid(taskid) != writeid) {
     pdbg_logf(D_NOTICE, "%s changed while uploading as %lu/%s", filename,
           (unsigned long)folderid, name);
     psync_apipool_release(api);
@@ -1000,7 +1000,7 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
   }
   tree = NULL;
   if (pdbg_unlikely((fsize = pfile_size(fd)) == -1 ||
-                   psync_fs_load_interval_tree(fd, fsize, &tree) == -1)) {
+                   pfs_load_interval_tree(fd, fsize, &tree) == -1)) {
     psync_interval_tree_free(tree);
     pfile_close(fd);
     return -1;
@@ -1110,7 +1110,7 @@ int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
     }
   psync_interval_tree_free(tree);
   pupload_bytes_sub(asize);
-  if (psync_fs_get_file_writeid(taskid) != writeid) {
+  if (pfs_get_file_writeid(taskid) != writeid) {
     pdbg_logf(D_NOTICE, "%s changed while uploading as %lu/%s", filename,
           (unsigned long)folderid, name);
     psync_apipool_release(api);
@@ -1236,7 +1236,7 @@ static int psync_sent_task_creat_upload_large(fsupload_task_t *task) {
   res = psql_prepare(
       "UPDATE fstask SET status=2 WHERE id=? AND status=0");
   psql_bind_uint(res, 1, task->id);
-  // psync_fs_uploading_openfile(task->id);
+  // pfs_uploading_openfile(task->id);
   if (!large_upload_running) {
     large_upload_running = 1;
     prun_thread("large file fs upload", large_upload);
@@ -1345,7 +1345,7 @@ static int psync_process_task_creat(fsupload_task_t *task) {
   meta = papi_find_result2(task->res, "metadata", PARAM_ARRAY)->array[0];
   fileid = papi_find_result2(meta, "fileid", PARAM_NUM)->num;
   hash = papi_find_result2(meta, "hash", PARAM_NUM)->num;
-  if (psync_fs_update_openfile(
+  if (pfs_update_openfile(
           task->id, task->int1, fileid, hash,
           papi_find_result2(meta, "size", PARAM_NUM)->num,
           papi_find_result2(meta, "created", PARAM_NUM)->num)) {

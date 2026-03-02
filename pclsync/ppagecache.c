@@ -526,7 +526,7 @@ static void set_urls(psync_urls_t *urls, binresult *res) {
 }
 
 static void psync_pagecache_set_bad_encoder(psync_openfile_t *of) {
-  psync_fs_lock_file(of);
+  pfs_lock_file(of);
   if (likely(of->encoder == PSYNC_CRYPTO_LOADING_SECTOR_ENCODER)) {
     of->encoder = PSYNC_CRYPTO_FAILED_SECTOR_ENCODER;
     pthread_cond_broadcast(&enc_key_cond);
@@ -618,7 +618,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
         goto err4;
       pdbg_logf(D_BUG, "got key for fileid %lu", (unsigned long)request->fileid);
       free(ret);
-      psync_fs_lock_file(request->of);
+      pfs_lock_file(request->of);
       if (pdbg_likely(request->of->encoder ==
                      PSYNC_CRYPTO_LOADING_SECTOR_ENCODER)) {
         request->of->encoder = enc;
@@ -2171,7 +2171,7 @@ int ppagecache_read_mod_locked(psync_openfile_t *of, char *buf,
   rd = ppagecache_read_unmod_locked(of, buf, size, offset);
   if (rd < 0)
     return rd;
-  psync_fs_lock_file(of);
+  pfs_lock_file(of);
   fi = psync_interval_tree_first_interval_containing_or_after(
       of->writeintervals, offset);
   if (!fi || fi->from >= offset + size) {
@@ -2266,7 +2266,7 @@ static void psync_pagecache_send_error(psync_request_t *request, int err) {
   unlock_wait(request->ash);
   if (request->needkey)
     psync_pagecache_set_bad_encoder(request->of);
-  psync_fs_dec_of_refcnt_and_readers(request->of);
+  pfs_dec_of_refcnt_and_readers(request->of);
   psync_pagecache_free_request(request);
 }
 
@@ -2422,7 +2422,7 @@ retry:
       psync_pagecache_send_error(request, -EIO);
       return;
     }
-    psync_fs_lock_file(request->of);
+    pfs_lock_file(request->of);
     if (pdbg_likely(request->of->encoder ==
                    PSYNC_CRYPTO_LOADING_SECTOR_ENCODER)) {
       request->of->encoder = enc;
@@ -2435,7 +2435,7 @@ retry:
   }
   if (psync_list_isempty(&request->ranges)) {
     release_urls(urls);
-    psync_fs_dec_of_refcnt_and_readers(request->of);
+    pfs_dec_of_refcnt_and_readers(request->of);
     psync_pagecache_free_request(request);
     return;
   }
@@ -2571,7 +2571,7 @@ retry:
   psync_http_close(sock);
   pdbg_logf(D_NOTICE, "request from %s finished", host);
 ok1:
-  psync_fs_dec_of_refcnt_and_readers(request->of);
+  pfs_dec_of_refcnt_and_readers(request->of);
   psync_pagecache_free_request(request);
   release_urls(urls);
   return;
@@ -2950,7 +2950,7 @@ int ppagecache_read_unmod_locked(psync_openfile_t *of, char *buf,
     rq->fileid = fileid;
     rq->hash = hash;
     rq->needkey = 0;
-    psync_fs_inc_of_refcnt_and_readers(of);
+    pfs_inc_of_refcnt_and_readers(of);
     prun_thread1("read unmodified", psync_pagecache_read_unmodified_thread,
                       rq);
   } else
@@ -3199,7 +3199,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
     rq->fileid = fileid;
     rq->hash = hash;
     rq->needkey = needkey;
-    psync_fs_inc_of_refcnt_and_readers(of);
+    pfs_inc_of_refcnt_and_readers(of);
     prun_thread1("crypto read unmodified",
                       psync_pagecache_read_unmodified_thread, rq);
   } else
@@ -3207,7 +3207,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
   ret = 0;
   if (needkey) {
     pdbg_logf(D_NOTICE, "waiting for key to download");
-    psync_fs_lock_file(of);
+    pfs_lock_file(of);
     while (of->encoder == PSYNC_CRYPTO_LOADING_SECTOR_ENCODER)
       pthread_cond_wait(&enc_key_cond, &of->mutex);
     if (of->encoder == PSYNC_CRYPTO_FAILED_SECTOR_ENCODER) {
@@ -3232,7 +3232,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
             (unsigned long)ap->firstpageid,
             (unsigned long)ap->firstpageid + ap->size / PSYNC_CRYPTO_AUTH_SIZE,
             (int)offsets.treelevels);
-      psync_fs_lock_file(of);
+      pfs_lock_file(of);
       if (likely(of->hash == hash))
         psync_interval_tree_add(
             &of->authenticatedints, ap->firstpageid * PSYNC_FS_PAGE_SIZE,
@@ -3276,7 +3276,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
       } while (p);
       ap = dp[i].authpage;
       if (!ret) {
-        psync_fs_lock_file(of);
+        pfs_lock_file(of);
         if (likely(of->hash == hash))
           psync_interval_tree_add(
               &of->authenticatedints, ap->firstpageid * PSYNC_FS_PAGE_SIZE,
@@ -3427,14 +3427,14 @@ int ppagecache_readv_locked(psync_openfile_t *of,
     rq->fileid = fileid;
     rq->hash = hash;
     rq->needkey = needkey;
-    psync_fs_inc_of_refcnt_and_readers(of);
+    pfs_inc_of_refcnt_and_readers(of);
     prun_thread1("readv unmodified",
                       psync_pagecache_read_unmodified_thread, rq);
   }
   ret = 0;
   if (needkey) {
     pdbg_logf(D_NOTICE, "waiting for key to download");
-    psync_fs_lock_file(of);
+    pfs_lock_file(of);
     while (of->encoder == PSYNC_CRYPTO_LOADING_SECTOR_ENCODER)
       pthread_cond_wait(&enc_key_cond, &of->mutex);
     if (of->encoder == PSYNC_CRYPTO_FAILED_SECTOR_ENCODER) {
@@ -3630,7 +3630,7 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
   }
   tree = NULL;
   if (pdbg_unlikely((fs = pfile_size(fd)) == -1 ||
-                   psync_fs_load_interval_tree(fd, fs, &tree) == -1))
+                   pfs_load_interval_tree(fd, fs, &tree) == -1))
     goto err2;
   pfile_close(fd);
   fd = pfile_open(filename, O_RDONLY, 0);

@@ -417,7 +417,7 @@ int psync_fstask_mkdir(psync_fsfolderid_t folderid, const char *name,
                                                  &klen);
     if (psync_crypto_is_error(key)) {
       psync_fstask_release_folder_tasks_locked(folder);
-      return -psync_fs_crypto_err_to_errno(psync_crypto_to_error(key));
+      return -pfs_crypto_err_to_errno(psync_crypto_to_error(key));
     }
   } else
     key = NULL;
@@ -947,7 +947,7 @@ void psync_fstask_stop_and_delete_file(psync_fsfileid_t fileid) {
       "UPDATE fstask SET status=11 WHERE fileid=? AND status!=10");
   psql_bind_int(res, 1, fileid);
   psql_run_free(res);
-  psync_fs_mark_openfile_deleted(-fileid);
+  pfs_mark_openfile_deleted(-fileid);
 }
 
 int psync_fstask_can_unlink(psync_fsfolderid_t folderid, const char *name) {
@@ -1169,7 +1169,7 @@ int psync_fstask_rename_file(psync_fsfileid_t fileid,
     if (folder->folderid >= 0)
       ppathstatus_drive_fldr_changed(folder->folderid);
   }
-  psync_fs_rename_openfile_locked(fileid, to_folderid, new_name);
+  pfs_rename_openfile_locked(fileid, to_folderid, new_name);
   nlen++;
   rm = (psync_fstask_unlink_t *)malloc(
       offsetof(psync_fstask_unlink_t, name) + nlen);
@@ -1950,7 +1950,7 @@ static void psync_init_task_renfile_to(psync_variant_row row) {
       &folder->creats, offsetof(psync_fstask_creat_t, name), &cr->tree);
   folder->taskscnt += 2;
   psync_fstask_release_folder_tasks_locked(folder);
-  psync_fs_rename_openfile_locked(cr->fileid, folderid, name);
+  pfs_rename_openfile_locked(cr->fileid, folderid, name);
   if (folderid >= 0)
     ppathstatus_drive_fldr_changed(folderid);
 }

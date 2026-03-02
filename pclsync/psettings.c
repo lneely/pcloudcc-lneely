@@ -61,7 +61,7 @@ typedef struct {
 
 static void lower_patterns(void *ptr);
 
-static void fsroot_change() { psync_fs_remount(); }
+static void fsroot_change() { pfs_remount(); }
 
 #define PSYNC_SETTING_owneremail 16
 

@@ -235,7 +235,7 @@ void psync_start_sync(pstatus_change_callback_t status_callback,
   psync_localscan_init();
   pp2p_init();
   if (psync_setting_get_bool(_PS(autostartfs)))
-    psync_fs_start();
+    pfs_start();
   pdevmon_init();
 }
 
@@ -255,7 +255,7 @@ void psync_destroy() {
   if (pshm_cleanup() == -1) {
     pdbg_logf(D_ERROR, "failed to cleanup shm");
   }
-  psync_fs_stop();
+  pfs_stop();
   pstatus_wait_term();
   pstatus_send_status_update();
   ptask_stop_async();
@@ -350,7 +350,7 @@ void psync_logout(uint32_t auth_status, int doinvauth) {
   pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   pstatus_set(PSTATUS_TYPE_AUTH, auth_status);
 
-  psync_fs_pause_until_login();
+  pfs_pause_until_login();
   pdownload_stop_all();
   pupload_stop_all();
   ptask_stop_async();
@@ -358,8 +358,8 @@ void psync_logout(uint32_t auth_status, int doinvauth) {
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   psync_restart_localscan();
   ptimer_notify_exception();
-  if (psync_fs_need_per_folder_refresh()) {
-    psync_fs_refresh_folder(0);
+  if (pfs_need_per_folder_refresh()) {
+    pfs_refresh_folder(0);
   }
 }
 
@@ -492,8 +492,8 @@ void psync_unlink() {
   pthread_mutex_unlock(&psync_my_auth_mutex);
   pdbg_logf(D_NOTICE, "clearing database, finished");
 
-  psync_fs_pause_until_login();
-  psync_fs_clean_tasks();
+  pfs_pause_until_login();
+  pfs_clean_tasks();
   ppathstatus_init();
   psyncer_dl_queue_clear();
   psql_unlock();
@@ -508,8 +508,8 @@ void psync_unlink() {
   pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
   pstatus_set(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN);
   psync_resume_localscan();
-  if (psync_fs_need_per_folder_refresh()) {
-    psync_fs_refresh_folder(0);
+  if (pfs_need_per_folder_refresh()) {
+    pfs_refresh_folder(0);
   }
 }
 
@@ -2097,9 +2097,9 @@ int psync_setlanguage(const char *language, char **err) {
   return psync_run_command("setlanguage", params, err);
 }
 
-void psync_fs_clean_read_cache() { ppagecache_clean_read(); }
+void pfs_clean_read_cache() { ppagecache_clean_read(); }
 
-int psync_fs_move_cache(const char *path) {
+int pfs_move_cache(const char *path) {
   return ppagecache_move(path);
 }
 
@@ -2256,7 +2256,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
 
   pdbg_logf(D_NOTICE, "Check if folder is not on the Drive.");
 
-  syncmp = psync_fs_getmountpoint();
+  syncmp = pfs_getmountpoint();
 
   pdbg_logf(D_NOTICE, "Mount point: [%s].", syncmp);
   if (syncmp) {

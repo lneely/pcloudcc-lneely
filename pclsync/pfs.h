@@ -45,11 +45,11 @@
 #include "ptimer.h"
 #include "ptree.h"
 
-#define psync_fs_need_per_folder_refresh() psync_fs_need_per_folder_refresh_f()
-#define psync_fs_need_per_folder_refresh_const() 1
+#define pfs_need_per_folder_refresh() pfs_need_per_folder_refresh_f()
+#define pfs_need_per_folder_refresh_const() 1
 
-extern char *psync_fake_prefix;
-extern size_t psync_fake_prefix_len;
+extern char *pfs_fake_prefix;
+extern size_t pfs_fake_prefix_len;
 
 typedef struct {
   uint64_t frompage;
@@ -129,19 +129,19 @@ typedef struct {
 typedef struct {
   uint64_t offset;
   uint64_t length;
-} psync_fs_index_record;
+} pfs_index_record;
 
 typedef struct {
   int dummy[0];
-} psync_fs_index_header;
+} pfs_index_header;
 
 #if IS_DEBUG
-#define psync_fs_lock_file(of) psync_fs_do_lock_file(of, __FILE__, __LINE__)
+#define pfs_lock_file(of) pfs_do_lock_file(of, __FILE__, __LINE__)
 
 
 // FIXME: wtf... 
 extern PSYNC_THREAD const char *psync_thread_name; 
-static inline void psync_fs_do_lock_file(psync_openfile_t *of, const char *file,
+static inline void pfs_do_lock_file(psync_openfile_t *of, const char *file,
                                          unsigned long line) {
   if (unlikely(pthread_mutex_trylock(&of->mutex))) {
     struct timespec tm;
@@ -160,35 +160,35 @@ static inline void psync_fs_do_lock_file(psync_openfile_t *of, const char *file,
   of->lockline = line;
 }
 #else
-static inline void psync_fs_lock_file(psync_openfile_t *of) {
+static inline void pfs_lock_file(psync_openfile_t *of) {
   pthread_mutex_lock(&of->mutex);
 }
 #endif
 
-int psync_fs_crypto_err_to_errno(int cryptoerr);
-int psync_fs_update_openfile(uint64_t taskid, uint64_t writeid,
+int pfs_crypto_err_to_errno(int cryptoerr);
+int pfs_update_openfile(uint64_t taskid, uint64_t writeid,
                              psync_fileid_t newfileid, uint64_t hash,
                              uint64_t size, time_t ctime);
-// void psync_fs_uploading_openfile(uint64_t taskid);
-int psync_fs_rename_openfile_locked(psync_fsfileid_t fileid,
+// void pfs_uploading_openfile(uint64_t taskid);
+int pfs_rename_openfile_locked(psync_fsfileid_t fileid,
                                     psync_fsfolderid_t folderid,
                                     const char *name);
-void psync_fs_mark_openfile_deleted(uint64_t taskid);
-int64_t psync_fs_get_file_writeid(uint64_t taskid);
-int64_t psync_fs_load_interval_tree(int fd, uint64_t size,
+void pfs_mark_openfile_deleted(uint64_t taskid);
+int64_t pfs_get_file_writeid(uint64_t taskid);
+int64_t pfs_load_interval_tree(int fd, uint64_t size,
                                     psync_interval_tree_t **tree);
-int psync_fs_remount();
-void psync_fs_inc_of_refcnt_locked(psync_openfile_t *of);
-void psync_fs_inc_of_refcnt(psync_openfile_t *of);
-void psync_fs_dec_of_refcnt(psync_openfile_t *of);
-void psync_fs_inc_of_refcnt_and_readers(psync_openfile_t *of);
-void psync_fs_dec_of_refcnt_and_readers(psync_openfile_t *of);
+int pfs_remount();
+void pfs_inc_of_refcnt_locked(psync_openfile_t *of);
+void pfs_inc_of_refcnt(psync_openfile_t *of);
+void pfs_dec_of_refcnt(psync_openfile_t *of);
+void pfs_inc_of_refcnt_and_readers(psync_openfile_t *of);
+void pfs_dec_of_refcnt_and_readers(psync_openfile_t *of);
 
-void psync_fs_refresh();
-int psync_fs_need_per_folder_refresh_f();
-void psync_fs_refresh_folder(psync_folderid_t folderid);
+void pfs_refresh();
+int pfs_need_per_folder_refresh_f();
+void pfs_refresh_folder(psync_folderid_t folderid);
 
-void psync_fs_pause_until_login();
-void psync_fs_clean_tasks();
+void pfs_pause_until_login();
+void pfs_clean_tasks();
 
 #endif

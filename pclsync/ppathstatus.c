@@ -1426,7 +1426,7 @@ psync_path_status_t ppathstatus_get(const char *path) {
       return psync_path_status_drive(path + drive_path_len,
                                      len - drive_path_len);
   } else {
-    dp = psync_fs_getmountpoint();
+    dp = pfs_getmountpoint();
     if (dp) {
       // assign the len before the mutex, so we use it as a barrier
       drive_path_len = strlen(dp);

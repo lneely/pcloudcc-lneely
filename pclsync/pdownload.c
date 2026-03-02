@@ -114,7 +114,7 @@ static int task_mkdir(const char *path) {
   int err;
   while (1) {
     if (likely(!mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE))) { // don't change to likely_log, as it may
-                                      // overwrite psync_fs_err;
+                                      // overwrite pfs_err;
       psync_set_local_full(0);
       return 0;
     }

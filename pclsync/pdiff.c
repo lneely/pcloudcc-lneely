@@ -923,7 +923,7 @@ static void process_createfolder(const binresult *entry) {
 
   // Log remote folder creation (both synced and FUSE-only)
   {
-    char *folderpath = psync_fs_get_path_by_folderid(folderid);
+    char *folderpath = pfs_get_path_by_folderid(folderid);
     if (likely(folderpath)) {
       pdbg_write_fs_event("folder created %s", folderpath);
       free(folderpath);
@@ -1091,7 +1091,7 @@ static void process_modifyfolder(const binresult *entry) {
   }
 
   // Get old folder path before database update (for move detection)
-  char *oldfolderpath = psync_fs_get_path_by_folderid(folderid);
+  char *oldfolderpath = pfs_get_path_by_folderid(folderid);
   char *oldfolderpath_rel = pfolder_path(folderid, NULL);
 
   mtime = papi_find_result2(meta, "modified", PARAM_NUM)->num;
@@ -1111,7 +1111,7 @@ static void process_modifyfolder(const binresult *entry) {
     int is_move = (oldparentfolderid != parentfolderid ||
                    strcmp(name->str, oldname) != 0);
     if (is_move) {
-      char *newfolderpath = psync_fs_get_path_by_folderid(folderid);
+      char *newfolderpath = pfs_get_path_by_folderid(folderid);
       if (likely(oldfolderpath && newfolderpath)) {
         pdbg_write_fs_event("folder moved %s -> %s", oldfolderpath, newfolderpath);
       }
@@ -1278,7 +1278,7 @@ static void process_deletefolder(const binresult *entry) {
 
   // Get folder path BEFORE deletion from database
   path = pfolder_path(folderid, NULL);
-  char *fullpath = psync_fs_get_path_by_folderid(folderid);
+  char *fullpath = pfs_get_path_by_folderid(folderid);
 
   if (psyncer_dl_has_folder(folderid)) {
     psyncer_dl_queue_del(folderid);
@@ -1451,7 +1451,7 @@ static void process_createfile(const binresult *entry) {
 
   // Log all remote file creations (both synced and FUSE-only)
   {
-    char *filepath = psync_fs_get_path_by_fileid(fileid);
+    char *filepath = pfs_get_path_by_fileid(fileid);
     if (likely(filepath)) {
       pdbg_write_fs_event("file created %s", filepath);
       free(filepath);
@@ -1542,7 +1542,7 @@ static void process_modifyfile(const binresult *entry) {
   // Get old path before database update (for move detection)
   oldparentfolderid = psync_get_number(row[0]);
   oldname = psync_get_lstring(row[4], &oldnamelen);
-  char *oldfilepath = psync_fs_get_path_by_fileid(fileid);
+  char *oldfilepath = pfs_get_path_by_fileid(fileid);
   char *oldfilepath_rel = pfolder_file_path(fileid, NULL);
 
   if (!st)
@@ -1589,7 +1589,7 @@ static void process_modifyfile(const binresult *entry) {
     int is_content_change = (hash != psync_get_number(row[3]) || size != oldsize);
 
     if (is_move) {
-      char *newfilepath = psync_fs_get_path_by_fileid(fileid);
+      char *newfilepath = pfs_get_path_by_fileid(fileid);
       if (likely(oldfilepath && newfilepath)) {
         pdbg_write_fs_event("file moved %s -> %s", oldfilepath, newfilepath);
       }
@@ -1601,7 +1601,7 @@ static void process_modifyfile(const binresult *entry) {
       }
       free(newfilepath_rel);
     } else if (is_content_change) {
-      char *filepath = psync_fs_get_path_by_fileid(fileid);
+      char *filepath = pfs_get_path_by_fileid(fileid);
       if (likely(filepath)) {
         pdbg_write_fs_event("file modified %s", filepath);
         free(filepath);
@@ -1737,7 +1737,7 @@ static void process_deletefile(const binresult *entry) {
   }
   // Get path BEFORE deleting from database
   path = pfolder_file_path(fileid, NULL);
-  char *fullpath = psync_fs_get_path_by_fileid(fileid);
+  char *fullpath = pfs_get_path_by_fileid(fileid);
 
   psql_bind_uint(st, 1, fileid);
   psql_run(st);
@@ -2827,7 +2827,7 @@ static int cmp_folderid(const void *ptr1, const void *ptr2) {
 }
 
 static void psync_diff_refresh_fs_add_folder(psync_folderid_t folderid) {
-  if (psync_fs_need_per_folder_refresh()) {
+  if (pfs_need_per_folder_refresh()) {
     if (refresh_allocated == refresh_last) {
       if (refresh_allocated)
         refresh_allocated *= 2;
@@ -2851,7 +2851,7 @@ static void psync_diff_refresh_thread(void *ptr) {
   lastfolderid = (psync_folderid_t)-1;
   for (i = 0; i < fr->refresh_last; i++)
     if (fr->refresh_folders[i] != lastfolderid) {
-      psync_fs_refresh_folder(fr->refresh_folders[i]);
+      pfs_refresh_folder(fr->refresh_folders[i]);
       lastfolderid = fr->refresh_folders[i];
     }
   free(fr->refresh_folders);
@@ -2859,7 +2859,7 @@ static void psync_diff_refresh_thread(void *ptr) {
 }
 
 static void psync_diff_refresh_fs(const binresult *entries) {
-  if (psync_fs_need_per_folder_refresh()) {
+  if (pfs_need_per_folder_refresh()) {
     const binresult *meta;
     refresh_folders_ptr_t *ptr;
     psync_folderid_t folderid, lastfolderid;
@@ -3068,7 +3068,7 @@ restart:
     }
   } while (result);
 
-  psync_fs_refresh_folder(0);
+  pfs_refresh_folder(0);
   pdbg_logf(D_NOTICE, "initial sync finished");
   if (psync_diff_check_quota(sock)) {
     psock_close(sock);
