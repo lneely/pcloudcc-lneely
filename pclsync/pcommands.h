@@ -7,5 +7,6 @@ enum command_ids_ {
   STOPSYNC,
   CHECKPENDING,
   SYNCPAUSE,
-  SYNCRESUME
+  SYNCRESUME,
+  SENDTFA
 };

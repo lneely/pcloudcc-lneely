@@ -60,6 +60,7 @@ static char* command_generator(const char* text, int state) {
     "sync", "sync ls", "sync add", "sync remove", "sync rm", "sync pause", "sync resume",
     "s", "s ls", "s add", "s remove", "s rm", "s pause", "s resume",
     "pending", "p",
+    "tfa",
     "finalize", "f",
     "quit", "q",
     nullptr
@@ -104,6 +105,7 @@ void setup_app(CLI::App *app) {
               << "    pause: Pause syncing (filesystem remains mounted)" << std::endl
               << "    resume: Resume syncing" << std::endl
               << "  pending(p): Check for pending transfers" << std::endl
+              << "  tfa <code>: Supply 2FA code to a running daemon" << std::endl
               << "  finalize(f): Kill daemon and quit" << std::endl
               << "  quit(q): Exit this program" << std::endl;
   });
@@ -149,6 +151,26 @@ void setup_app(CLI::App *app) {
 
   app->add_subcommand("quit", "Quit the program")->alias("q")->callback([] {
     exit(0);
+  });
+
+  // tfa command
+  auto tfa_cmd = app->add_subcommand("tfa", "Supply 2FA code to a running daemon");
+  static std::string tfa_code_input;
+  tfa_cmd->add_option("code", tfa_code_input, "2FA code")->required();
+  tfa_cmd->callback([] {
+    char *errm = NULL;
+    size_t errm_size = 0;
+    RpcClient *rpc = new RpcClient();
+    if (int result = rpc->Call(SENDTFA, tfa_code_input.c_str(), &errm, &errm_size) != 0) {
+      std::cerr << "Failed to send 2FA code: " << (errm ? errm : "no message") << std::endl;
+      if (errm) { free(errm); }
+      delete rpc;
+      return result;
+    }
+    delete rpc;
+    std::cout << "2FA code sent." << std::endl;
+    if (errm) { free(errm); }
+    return 0;
   });
 
   // pending command
