@@ -143,7 +143,7 @@ static void scanner_set_syncs_to_list(psync_list *lst,
 
   psync_list_init(lst);
   psync_list_init(lst_deviceid_full);
-  syncmp = psync_fs_getmountpoint();
+  syncmp = pfs_getmountpoint();
   res = psql_query_rdlock(
       "SELECT id, folderid, localpath, synctype, deviceid, inode FROM "
       "syncfolder WHERE synctype&" NTO_STR(PSYNC_UPLOAD_ONLY) "=" NTO_STR(
@@ -438,7 +438,7 @@ static void add_new_element(const sync_folderlist *e, psync_folderid_t folderid,
     return;
   if (psync_is_name_to_ignore(e->name))
     return;
-  if (!psync_is_valid_utf8(e->name)) {
+  if (!putil_is_valid_utf8(e->name)) {
     pdbg_logf(D_WARNING, "ignoring %s with invalid UTF8 name %s",
           e->isfolder ? "folder" : "file", e->name);
     return;
@@ -569,7 +569,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
   psync_list_for_each_element(l, &disklist, sync_folderlist,
                               list) if (l->isfolder && l->localid &&
                                         l->deviceid == deviceid) {
-    subpath = psync_strcat(localpath, "/", l->name, NULL);
+    subpath = putil_strcat(localpath, "/", l->name, NULL);
     scanner_scan_folder(subpath, l->remoteid, l->localid, syncid, synctype,
                         deviceid);
     free(subpath);

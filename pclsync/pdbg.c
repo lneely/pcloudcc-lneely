@@ -88,7 +88,7 @@ char *psync_debug_path() {
     return sockpath;
 }
 
-char *psync_fs_event_log_path() {
+char *pfs_event_log_path() {
     const char *custom_path = getenv("PCLOUD_FS_EVENT_LOG");
     if (custom_path && custom_path[0] != '\0') {
         size_t len = strlen(custom_path) + 1;
@@ -148,7 +148,7 @@ int pdbg_printf(const char *file, const char *function, int unsigned line, int u
   /* Create empty fs event log file on first call if configured */
   if (unlikely(!fs_event_log_initialized)) {
     fs_event_log_initialized = 1;
-    char *path = psync_fs_event_log_path();
+    char *path = pfs_event_log_path();
     if (path) {
       /* Create empty file if it doesn't exist, or open existing */
       FILE *f = fopen(path, "a+");
@@ -160,7 +160,7 @@ int pdbg_printf(const char *file, const char *function, int unsigned line, int u
   }
 
   clock_gettime(CLOCK_REALTIME, &ts);
-  time_format(ts.tv_sec, ts.tv_nsec, dttime);
+  putil_time_format(ts.tv_sec, ts.tv_nsec, dttime);
   threadid = pthread_self();
   memcpy(&u, &threadid, sizeof(u));
   snprintf(format, sizeof(format), "%s %u %s %s: %s:%u (function %s): %s\n",
@@ -208,7 +208,7 @@ static void do_reopen_log() {
     fclose(fs_event_log);
     fs_event_log = NULL;
 
-    path = psync_fs_event_log_path();
+    path = pfs_event_log_path();
     if (path) {
       new_log = fopen(path, "a+");
       free(path);
@@ -235,7 +235,7 @@ void pdbg_write_fs_event(const char *fmt, ...) {
 
   /* Open fs event log if not already open */
   if (unlikely(!fs_event_log)) {
-    char *path = psync_fs_event_log_path();
+    char *path = pfs_event_log_path();
     if (!path) {
       /* FS event log not configured, skip */
       pthread_mutex_unlock(&log_mutex);
@@ -251,7 +251,7 @@ void pdbg_write_fs_event(const char *fmt, ...) {
 
   /* Get timestamp */
   clock_gettime(CLOCK_REALTIME, &ts);
-  time_format(ts.tv_sec, ts.tv_nsec, dttime);
+  putil_time_format(ts.tv_sec, ts.tv_nsec, dttime);
 
   /* Write timestamp followed by event message */
   fprintf(fs_event_log, "%s ", dttime);

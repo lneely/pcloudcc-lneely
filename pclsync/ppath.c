@@ -20,13 +20,13 @@ char *ppath_default_db() {
     return NULL;
   }
 
-  dbp = psync_strcat(pcdir, "/", PSYNC_DEFAULT_DB_NAME, NULL);
+  dbp = putil_strcat(pcdir, "/", PSYNC_DEFAULT_DB_NAME, NULL);
   free(pcdir);
 
   if (stat(dbp, &st)) {
     // Inline the old database path function here
     if ((home = ppath_home())) {
-      oldp = psync_strcat(home, "/", PSYNC_DEFAULT_POSIX_DBNAME, NULL);
+      oldp = putil_strcat(home, "/", PSYNC_DEFAULT_POSIX_DBNAME, NULL);
       free(home);
 
       if (oldp) {
@@ -69,7 +69,7 @@ char *ppath_home() {
       return NULL;
     dir = result->pw_dir;
   }
-  return psync_strdup(dir);
+  return putil_strdup(dir);
 }
 
 int ppath_ls(const char *path, ppath_ls_cb callback, void *ptr) {
@@ -100,7 +100,7 @@ int ppath_ls(const char *path, ppath_ls_cb callback, void *ptr) {
         (de->d_name[1] == 0 || (de->d_name[1] == '.' && de->d_name[2] == 0)))
       continue;
 
-    psync_strlcpy(cpath + pl, de->d_name, NAME_MAX + 1);
+    putil_strlcpy(cpath + pl, de->d_name, NAME_MAX + 1);
 
     if (pdbg_likely(!lstat(cpath, &pst.stat)) &&
         (S_ISREG(pst.stat.st_mode) || S_ISDIR(pst.stat.st_mode))) {
@@ -150,7 +150,7 @@ int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback, void *ptr) {
       callback(ptr, &pst);
     } else if (de->d_type == DT_UNKNOWN) {
       // Fall back to lstat for unknown file types
-      psync_strlcpy(cpath + pl, de->d_name, NAME_MAX + 1);
+      putil_strlcpy(cpath + pl, de->d_name, NAME_MAX + 1);
       if (!pdbg_unlikely(lstat(cpath, &st))) {
         pst.isfolder = S_ISDIR(st.st_mode);
         callback(ptr, &pst);
@@ -172,7 +172,7 @@ char *ppath_pcloud() {
     return NULL;
   }
 
-  path = psync_strcat(homedir, "/", PSYNC_DEFAULT_POSIX_DIR, NULL);
+  path = putil_strcat(homedir, "/", PSYNC_DEFAULT_POSIX_DIR, NULL);
   free(homedir);
   if (pdbg_unlikely(!path)) {
     return NULL;
@@ -192,7 +192,7 @@ char *ppath_private(char *name) {
   path = ppath_pcloud();
   if (!path)
     return NULL;
-  rpath = psync_strcat(path, "/", name, NULL);
+  rpath = putil_strcat(path, "/", name, NULL);
   if (stat(rpath, &st) && mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE)) {
     free(rpath);
     free(path);

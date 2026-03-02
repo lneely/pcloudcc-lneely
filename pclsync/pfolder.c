@@ -343,7 +343,7 @@ char *psync_join_string_list(const char *sep, psync_list *lst, size_t *retlen) {
     cnt++;
   }
   if (unlikely(!cnt))
-    return psync_strdup("");
+    return putil_strdup("");
   seplen = strlen(sep);
   ret = str = malloc(slen + cnt * seplen + 1);
   psync_list_for_each_element(e, lst, string_list, list) {
@@ -375,7 +375,7 @@ char *pfolder_path(psync_folderid_t folderid, size_t *retlen) {
   psync_free_string_list(&folderlist);
   if (!ret[0]) {
     free(ret);
-    ret = psync_strdup("/");
+    ret = putil_strdup("/");
     if (retlen)
       *retlen = 1;
   }
@@ -397,7 +397,7 @@ char *pfolder_path_sep(psync_folderid_t folderid, const char *sep,
   psync_free_string_list(&folderlist);
   if (!ret[0]) {
     free(ret);
-    ret = psync_strdup(sep);
+    ret = putil_strdup(sep);
     if (retlen)
       *retlen = 1;
   }
@@ -649,13 +649,13 @@ pfolder_list_t *pfolder_remote_folders(psync_folderid_t folderid,
           (psync_get_number(row[4]) & PSYNC_FOLDER_FLAG_ENCRYPTED) ? 1 : 0;
       if (parentencrypted && pcryptofolder_is_unlocked()) {
         tmp = (char *)psync_get_lstring(row[2], &namelen);
-        entry.name = get_decname_for_folder(folderid, tmp, namelen);
+        entry.name = pfs_fldr_get_decname(folderid, tmp, namelen);
         if (!entry.name) {
           pdbg_logf(
               D_BUG,
               "Can't decrypt folder name for folderid: %lu, parent folfderid: "
               "%lu, cryptoerr: %d, encrypted name: %s. Skippping ...",
-              entry.folder.folderid, folderid, psync_fsfolder_crypto_error(),
+              entry.folder.folderid, folderid, pfs_fldr_crypto_error(),
               tmp);
           continue;
         }
@@ -822,12 +822,12 @@ psync_folder_list_t *pfolder_sync_folders(char *syncTypes) {
   strlens = 0;
 
   if (strlen(syncTypes) > 0) {
-    psync_slprintf(sql, 1024,
+    putil_slprintf(sql, 1024,
                    "SELECT id, folderid, localpath, synctype FROM syncfolder "
                    "WHERE folderid IS NOT NULL AND synctype IN (%s)",
                    syncTypes);
   } else {
-    psync_slprintf(sql, 1024,
+    putil_slprintf(sql, 1024,
                    "SELECT id, folderid, localpath, synctype FROM syncfolder "
                    "WHERE folderid IS NOT NULL");
   }
@@ -851,7 +851,7 @@ psync_folder_list_t *pfolder_sync_folders(char *syncTypes) {
     folderid = psync_get_number(row[1]);
     str = pfolder_path(folderid, &l);
     if (unlikely(!str)) {
-      str = psync_strdup("/Invalid/Path");
+      str = putil_strdup("/Invalid/Path");
       l = strlen(str);
     }
     l++;
@@ -945,7 +945,7 @@ psync_syncid_t pfolder_add_sync(const char *localpath, psync_folderid_t folderid
     mbedtls_md = 5;
   if (pdbg_unlikely(!pfile_stat_mode_ok(&st, mbedtls_md)))
     return_isyncid(PERROR_LOCAL_FOLDER_ACC_DENIED);
-  syncmp = psync_fs_getmountpoint();
+  syncmp = pfs_getmountpoint();
   if (syncmp) {
     size_t len = strlen(syncmp);
     if (!memcmp(syncmp, localpath, len) &&

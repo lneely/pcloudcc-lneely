@@ -486,7 +486,7 @@ static void status_change(pstatus_t *status) {
         lib_setup_cripto();
       }
     }
-    psync_fs_start();
+    pfs_start();
   }
   if (clib::pclsync_lib::get_lib().status_callback_) {
     clib::pclsync_lib::get_lib().status_callback_(

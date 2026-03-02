@@ -704,7 +704,7 @@ char *psymkey_derive(const char *username,
   mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char *)passphrase, strlen(passphrase), usersha512,
     PSYNC_SHA512_DIGEST_LEN, 5000, sizeof(passwordbin), passwordbin);
   mbedtls_md_free(&ctx);
-  usercopy = psync_base64_encode(passwordbin, sizeof(passwordbin), &userlen);
+  usercopy = putil_base64_encode(passwordbin, sizeof(passwordbin), &userlen);
   return (char *)usercopy;
 }
 

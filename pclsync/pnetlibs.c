@@ -342,7 +342,7 @@ void psync_apipool_release_bad(psock_t *api) { psync_ret_api(api); }
 
 static void rm_all(void *vpath, ppath_stat *st) {
   char *path;
-  path = psync_strcat((char *)vpath, "/", st->name, NULL);
+  path = putil_strcat((char *)vpath, "/", st->name, NULL);
   if (pfile_stat_isfolder(&st->stat)) {
     ppath_ls(path, rm_all, path);
     rmdir(path);
@@ -355,7 +355,7 @@ static void rm_ign(void *vpath, ppath_stat *st) {
   char *path;
   int ign;
   ign = psync_is_name_to_ignore(st->name);
-  path = psync_strcat((char *)vpath, "/", st->name, NULL);
+  path = putil_strcat((char *)vpath, "/", st->name, NULL);
   if (pfile_stat_isfolder(&st->stat)) {
     if (ign)
       ppath_ls(path, rm_all, path);
@@ -984,9 +984,9 @@ cont:
       *ptr = 0;
       /*      pdbg_logf(D_NOTICE, "key=%s, value=%s", key, val);*/
       if (!memcmp(key, "content-length", 14))
-        clen = psync_ato64(val);
+        clen = putil_ato64(val);
       else if (!memcmp(key, "keep-alive", 10) && !memcmp(val, "timeout=", 8))
-        keepalive = psync_ato32(val + 8);
+        keepalive = putil_ato32(val + 8);
       key = ptr + 1;
       isval = 0;
     } else if (ch == ':' && !isval) {
@@ -1482,9 +1482,9 @@ cont:
       *ptr = 0;
       /*      pdbg_logf(D_NOTICE, "key=%s, value=%s", key, val);*/
       if (!memcmp(key, "content-length", 14))
-        clen = psync_ato64(val);
+        clen = putil_ato64(val);
       else if (!memcmp(key, "keep-alive", 10) && !memcmp(val, "timeout=", 8))
-        keepalive = psync_ato32(val + 8);
+        keepalive = putil_ato32(val + 8);
       key = ptr + 1;
       isval = 0;
     } else if (ch == ':' && !isval) {
@@ -1624,7 +1624,7 @@ static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
   }
   hosts = papi_find_result2(res, "hosts", PARAM_ARRAY);
   requestpath = papi_find_result2(res, "path", PARAM_STR)->str;
-  psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
+  putil_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
                  papi_find_result2(res, "dwltag", PARAM_STR)->str);
   http = NULL;
   for (i = 0; i < hosts->length; i++)
@@ -2682,13 +2682,13 @@ int psync_do_run_command_res(const char *cmd, size_t cmdlen,
   if (result) {
     pdbg_logf(D_WARNING, "command %s returned code %u", cmd, (unsigned)result);
     if (err)
-      *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
+      *err = putil_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     psync_process_api_error(result);
   }
   free(res);
   return (int)result;
 neterr:
   if (err)
-    *err = psync_strdup("Could not connect to the server.");
+    *err = putil_strdup("Could not connect to the server.");
   return -1;
 }

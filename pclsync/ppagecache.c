@@ -526,7 +526,7 @@ static void set_urls(psync_urls_t *urls, binresult *res) {
 }
 
 static void psync_pagecache_set_bad_encoder(psync_openfile_t *of) {
-  psync_fs_lock_file(of);
+  pfs_lock_file(of);
   if (likely(of->encoder == PSYNC_CRYPTO_LOADING_SECTOR_ENCODER)) {
     of->encoder = PSYNC_CRYPTO_FAILED_SECTOR_ENCODER;
     pthread_cond_broadcast(&enc_key_cond);
@@ -618,7 +618,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
         goto err4;
       pdbg_logf(D_BUG, "got key for fileid %lu", (unsigned long)request->fileid);
       free(ret);
-      psync_fs_lock_file(request->of);
+      pfs_lock_file(request->of);
       if (pdbg_likely(request->of->encoder ==
                      PSYNC_CRYPTO_LOADING_SECTOR_ENCODER)) {
         request->of->encoder = enc;
@@ -2171,7 +2171,7 @@ int ppagecache_read_mod_locked(psync_openfile_t *of, char *buf,
   rd = ppagecache_read_unmod_locked(of, buf, size, offset);
   if (rd < 0)
     return rd;
-  psync_fs_lock_file(of);
+  pfs_lock_file(of);
   fi = psync_interval_tree_first_interval_containing_or_after(
       of->writeintervals, offset);
   if (!fi || fi->from >= offset + size) {
@@ -2266,7 +2266,7 @@ static void psync_pagecache_send_error(psync_request_t *request, int err) {
   unlock_wait(request->ash);
   if (request->needkey)
     psync_pagecache_set_bad_encoder(request->of);
-  psync_fs_dec_of_refcnt_and_readers(request->of);
+  pfs_dec_of_refcnt_and_readers(request->of);
   psync_pagecache_free_request(request);
 }
 
@@ -2384,7 +2384,7 @@ char *psync_http_construct_range_next_header(psync_request_t *request,
   }
   if (off < sizeof(PSYNC_CONSTRUCT_HEADER))
     return NULL;
-  return psync_strdup((char *)memcpy(
+  return putil_strdup((char *)memcpy(
       buff + off - sizeof(PSYNC_CONSTRUCT_HEADER) + 3, PSYNC_CONSTRUCT_HEADER,
       sizeof(PSYNC_CONSTRUCT_HEADER) - 1));
 }
@@ -2422,7 +2422,7 @@ retry:
       psync_pagecache_send_error(request, -EIO);
       return;
     }
-    psync_fs_lock_file(request->of);
+    pfs_lock_file(request->of);
     if (pdbg_likely(request->of->encoder ==
                    PSYNC_CRYPTO_LOADING_SECTOR_ENCODER)) {
       request->of->encoder = enc;
@@ -2435,12 +2435,12 @@ retry:
   }
   if (psync_list_isempty(&request->ranges)) {
     release_urls(urls);
-    psync_fs_dec_of_refcnt_and_readers(request->of);
+    pfs_dec_of_refcnt_and_readers(request->of);
     psync_pagecache_free_request(request);
     return;
   }
   hosts = papi_find_result2(urls->urls, "hosts", PARAM_ARRAY);
-  psync_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
+  putil_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
                  papi_find_result2(urls->urls, "dwltag", PARAM_STR)->str);
   sock = psync_http_connect_multihost_from_cache(hosts, &host);
   if (!sock) {
@@ -2571,7 +2571,7 @@ retry:
   psync_http_close(sock);
   pdbg_logf(D_NOTICE, "request from %s finished", host);
 ok1:
-  psync_fs_dec_of_refcnt_and_readers(request->of);
+  pfs_dec_of_refcnt_and_readers(request->of);
   psync_pagecache_free_request(request);
   release_urls(urls);
   return;
@@ -2740,7 +2740,7 @@ static void psync_pagecache_read_unmodified_readahead(
     uint32_t asize, aoff;
     for (i = 0; i < pagecnt; i += PSYNC_CRYPTO_HASH_TREE_SECTORS) {
       for (l = 0; l < offsets->treelevels; l++) {
-        pfscrypto_get_auth_off(first_page_id + i, l, offsets,
+        pfs_crpt_get_auth_off(first_page_id + i, l, offsets,
                                             &aoffset, &asize, &aoff);
         pageid = aoffset / PSYNC_FS_PAGE_SIZE;
         check_or_request_page(fileid, hash, pageid, ranges);
@@ -2750,8 +2750,8 @@ static void psync_pagecache_read_unmodified_readahead(
       }
     }
     // this may include some auth sectors, but should do no harm
-    rto = pfscrypto_sector_id(first_page_id + pagecnt);
-    first_page_id = pfscrypto_sector_id(first_page_id);
+    rto = pfs_crpt_sector_id(first_page_id + pagecnt);
+    first_page_id = pfs_crpt_sector_id(first_page_id);
     pagecnt = rto - first_page_id;
   }
   pages_in_db = has_pages_in_db(hash, first_page_id, pagecnt, 1);
@@ -2950,7 +2950,7 @@ int ppagecache_read_unmod_locked(psync_openfile_t *of, char *buf,
     rq->fileid = fileid;
     rq->hash = hash;
     rq->needkey = 0;
-    psync_fs_inc_of_refcnt_and_readers(of);
+    pfs_inc_of_refcnt_and_readers(of);
     prun_thread1("read unmodified", psync_pagecache_read_unmodified_thread,
                       rq);
   } else
@@ -3097,7 +3097,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
     needkey = 0;
   pthread_mutex_unlock(&of->mutex);
   pdbg_assert(PSYNC_CRYPTO_SECTOR_SIZE == PSYNC_FS_PAGE_SIZE);
-  pfscrypto_offset_by_size(initialsize, &offsets);
+  pfs_crpt_offset_by_size(initialsize, &offsets);
   if (offset >= initialsize)
     return 0;
   if (offset + size > initialsize)
@@ -3121,7 +3121,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
       dp[i].authpage = ap;
       continue;
     }
-    pfscrypto_get_auth_off(first_page_id + i, 0, &offsets,
+    pfs_crpt_get_auth_off(first_page_id + i, 0, &offsets,
                                         &aoffset, &asize, &aoff);
     ap = malloc(sizeof(psync_crypto_auth_page));
     ap->waiter = NULL;
@@ -3141,7 +3141,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
       unsigned long l;
       lap = ap;
       for (l = 1; l <= offsets.treelevels; l++) {
-        pfscrypto_get_auth_off(first_page_id + i, l, &offsets,
+        pfs_crpt_get_auth_off(first_page_id + i, l, &offsets,
                                             &aoffset, &asize, &aoff);
         cap = malloc(sizeof(psync_crypto_auth_page));
         cap->waiter = NULL;
@@ -3181,7 +3181,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
     }
     dp[i].buff = pbuff;
     dp[i].pagesize = apsize;
-    apageid = pfscrypto_sector_id(first_page_id + i);
+    apageid = pfs_crpt_sector_id(first_page_id + i);
     rb = check_page_in_memory_by_hash(hash, apageid, pbuff, apsize, 0);
     if (rb == -1)
       rb = check_page_in_database_by_hash(hash, apageid, pbuff, apsize, 0);
@@ -3199,7 +3199,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
     rq->fileid = fileid;
     rq->hash = hash;
     rq->needkey = needkey;
-    psync_fs_inc_of_refcnt_and_readers(of);
+    pfs_inc_of_refcnt_and_readers(of);
     prun_thread1("crypto read unmodified",
                       psync_pagecache_read_unmodified_thread, rq);
   } else
@@ -3207,7 +3207,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
   ret = 0;
   if (needkey) {
     pdbg_logf(D_NOTICE, "waiting for key to download");
-    psync_fs_lock_file(of);
+    pfs_lock_file(of);
     while (of->encoder == PSYNC_CRYPTO_LOADING_SECTOR_ENCODER)
       pthread_cond_wait(&enc_key_cond, &of->mutex);
     if (of->encoder == PSYNC_CRYPTO_FAILED_SECTOR_ENCODER) {
@@ -3232,7 +3232,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
             (unsigned long)ap->firstpageid,
             (unsigned long)ap->firstpageid + ap->size / PSYNC_CRYPTO_AUTH_SIZE,
             (int)offsets.treelevels);
-      psync_fs_lock_file(of);
+      pfs_lock_file(of);
       if (likely(of->hash == hash))
         psync_interval_tree_add(
             &of->authenticatedints, ap->firstpageid * PSYNC_FS_PAGE_SIZE,
@@ -3276,7 +3276,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
       } while (p);
       ap = dp[i].authpage;
       if (!ret) {
-        psync_fs_lock_file(of);
+        pfs_lock_file(of);
         if (likely(of->hash == hash))
           psync_interval_tree_add(
               &of->authenticatedints, ap->firstpageid * PSYNC_FS_PAGE_SIZE,
@@ -3371,7 +3371,7 @@ int ppagecache_readv_locked(psync_openfile_t *of,
   psync_list_init(&waiting);
   for (i = 0; i < cnt; i++) {
     pdbg_assert(ranges[i].offset + ranges[i].size <= of->encrypted
-               ? pfscrypto_crypto_size(initialsize)
+               ? pfs_crpt_crypto_size(initialsize)
                : initialsize);
     poffset = offset_round_down_to_page(ranges[i].offset);
     pageoff = ranges[i].offset - poffset;
@@ -3427,14 +3427,14 @@ int ppagecache_readv_locked(psync_openfile_t *of,
     rq->fileid = fileid;
     rq->hash = hash;
     rq->needkey = needkey;
-    psync_fs_inc_of_refcnt_and_readers(of);
+    pfs_inc_of_refcnt_and_readers(of);
     prun_thread1("readv unmodified",
                       psync_pagecache_read_unmodified_thread, rq);
   }
   ret = 0;
   if (needkey) {
     pdbg_logf(D_NOTICE, "waiting for key to download");
-    psync_fs_lock_file(of);
+    pfs_lock_file(of);
     while (of->encoder == PSYNC_CRYPTO_LOADING_SECTOR_ENCODER)
       pthread_cond_wait(&enc_key_cond, &of->mutex);
     if (of->encoder == PSYNC_CRYPTO_FAILED_SECTOR_ENCODER) {
@@ -3527,7 +3527,7 @@ static void psync_pagecache_new_upload_to_cache(uint64_t taskid, uint64_t hash,
   fileidhex[sizeof(psync_fsfileid_t)] = 'd';
   fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
   tm = ptimer_time();
-  filename = psync_strcat(psync_setting_get_string(_PS(fscachepath)),
+  filename = putil_strcat(psync_setting_get_string(_PS(fscachepath)),
                           "/", fileidhex, NULL);
   fd = pfile_open(filename, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE) {
@@ -3613,10 +3613,10 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
   tm = ptimer_time();
   cachepath = psync_setting_get_string(_PS(fscachepath));
   filename =
-      psync_strcat(cachepath, "/", fileidhex, NULL);
+      putil_strcat(cachepath, "/", fileidhex, NULL);
   fileidhex[sizeof(psync_fsfileid_t)] = 'i';
   indexname =
-      psync_strcat(cachepath, "/", fileidhex, NULL);
+      putil_strcat(cachepath, "/", fileidhex, NULL);
   fd = pfile_open(indexname, O_RDONLY, 0);
   if (unlikely(fd == INVALID_HANDLE_VALUE)) {
     pdbg_logf(D_ERROR,
@@ -3630,7 +3630,7 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
   }
   tree = NULL;
   if (pdbg_unlikely((fs = pfile_size(fd)) == -1 ||
-                   psync_fs_load_interval_tree(fd, fs, &tree) == -1))
+                   pfs_load_interval_tree(fd, fs, &tree) == -1))
     goto err2;
   pfile_close(fd);
   fd = pfile_open(filename, O_RDONLY, 0);
@@ -3867,7 +3867,7 @@ static void psync_pagecache_upload_to_cache() {
     psql_run_free(res);
     psql_commit();
     if (wake)
-      psync_fsupload_wake();
+      pfs_upld_wake();
     psync_pagecache_check_free_space();
   }
 }
@@ -4109,7 +4109,7 @@ void ppagecache_init() {
   if (stat(cache_dir, &st)) {
     mkdir(cache_dir, PSYNC_DEFAULT_POSIX_FOLDER_MODE);
   }
-  cache_file = psync_strcat(cache_dir, "/",
+  cache_file = putil_strcat(cache_dir, "/",
                             PSYNC_DEFAULT_READ_CACHE_FILE, NULL);
   if (stat(cache_file, &st))
     psql_statement("DELETE FROM pagecache");
@@ -4192,7 +4192,7 @@ void ppagecache_reopen_read() {
   if (stat(cache_dir, &st)) {
     mkdir(cache_dir, PSYNC_DEFAULT_POSIX_FOLDER_MODE);
   }
-  cache_file = psync_strcat(cache_dir, "/",
+  cache_file = putil_strcat(cache_dir, "/",
                             PSYNC_DEFAULT_READ_CACHE_FILE, NULL);
   readcache = pfile_open(cache_file, O_RDWR, O_CREAT);
   free(cache_file);
@@ -4240,7 +4240,7 @@ int ppagecache_move(const char *path) {
   int newrdcache, ordcache;
   uint32_t i, cnt;
   pdbg_logf(D_NOTICE, "start");
-  rdpath = psync_strcat(path, "/",
+  rdpath = putil_strcat(path, "/",
                         PSYNC_DEFAULT_READ_CACHE_FILE, NULL);
   if (!stat(rdpath, &st)) {
     free(rdpath);
@@ -4251,7 +4251,7 @@ int ppagecache_move(const char *path) {
     free(rdpath);
     return pdbg_return_const(PERROR_CACHE_MOVE_NO_WRITE_ACCESS);
   }
-  opath = psync_strdup(psync_setting_get_string(_PS(fscachepath)));
+  opath = putil_strdup(psync_setting_get_string(_PS(fscachepath)));
   pthread_mutex_lock(&clean_cache_mutex);
   pthread_mutex_lock(&flush_cache_mutex);
   psql_start();

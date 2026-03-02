@@ -53,18 +53,18 @@ typedef struct {
 
 typedef pcrypto_sector_auth_t psync_crypto_auth_sector_t[PSYNC_CRYPTO_HASH_TREE_SECTORS];
 
-int pfscrypto_init_log(psync_openfile_t *of);
-int pfscrypto_read_new(psync_openfile_t *of, char *buf, uint64_t size, uint64_t offset);
-int pfscrypto_write_new(psync_openfile_t *of, const char *buf, uint64_t size, uint64_t offset);
-int pfscrypto_read_mod(psync_openfile_t *of, char *buf, uint64_t size, uint64_t offset);
-int pfscrypto_write_mod(psync_openfile_t *of, const char *buf, uint64_t size, uint64_t offset);
-int pfscrypto_truncate(psync_openfile_t *of, uint64_t size);
-int pfscrypto_flush(psync_openfile_t *of);
-psync_crypto_sectorid_t pfscrypto_sector_id(psync_crypto_sectorid_t sectorid);
-void pfscrypto_offset_by_size(uint64_t size, psync_crypto_offsets_t *offsets);
-uint64_t pfscrypto_plain_size(uint64_t cryptosize);
-uint64_t pfscrypto_crypto_size(uint64_t plainsize);
-void pfscrypto_get_auth_off(psync_crypto_sectorid_t sectorid, uint32_t level, psync_crypto_offsets_t *offsets, uint64_t *offset, uint32_t *size, uint32_t *authid);
-void pfscrypto_check_logs();
+int pfs_crpt_init_log(psync_openfile_t *of);
+int pfs_crpt_read_new(psync_openfile_t *of, char *buf, uint64_t size, uint64_t offset);
+int pfs_crpt_write_new(psync_openfile_t *of, const char *buf, uint64_t size, uint64_t offset);
+int pfs_crpt_read_mod(psync_openfile_t *of, char *buf, uint64_t size, uint64_t offset);
+int pfs_crpt_write_mod(psync_openfile_t *of, const char *buf, uint64_t size, uint64_t offset);
+int pfs_crpt_truncate(psync_openfile_t *of, uint64_t size);
+int pfs_crpt_flush(psync_openfile_t *of);
+psync_crypto_sectorid_t pfs_crpt_sector_id(psync_crypto_sectorid_t sectorid);
+void pfs_crpt_offset_by_size(uint64_t size, psync_crypto_offsets_t *offsets);
+uint64_t pfs_crpt_plain_size(uint64_t cryptosize);
+uint64_t pfs_crpt_crypto_size(uint64_t plainsize);
+void pfs_crpt_get_auth_off(psync_crypto_sectorid_t sectorid, uint32_t level, psync_crypto_offsets_t *offsets, uint64_t *offset, uint32_t *size, uint32_t *authid);
+void pfs_crpt_check_logs();
 
 #endif

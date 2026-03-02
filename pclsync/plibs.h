@@ -91,8 +91,8 @@ extern "C" {
                                           &(v))))
 #define psync_dup_string(v)                                                    \
   (likely((v).type == PSYNC_TSTRING)                                           \
-       ? psync_strndup((v).str, (v).length)                                    \
-       : psync_strdup(psql_expect_str(__FILE__, __FUNCTION__,        \
+       ? putil_strndup((v).str, (v).length)                                    \
+       : putil_strdup(psql_expect_str(__FILE__, __FUNCTION__,        \
                                                 __LINE__, &(v))))
 #define psync_get_lstring(v, l)                                                \
   psql_lstring_expected(__FILE__, __FUNCTION__, __LINE__, &(v), l)
@@ -165,7 +165,7 @@ static inline void psync_get_string_id(char *dst, const char *prefix, uint64_t i
   plen = strlen(prefix);
   dst = (char *)memcpy(dst, prefix, plen) + plen;
   do {
-    *dst++ = base64_table[id % 64];
+    *dst++ = putil_base64_table[id % 64];
     id /= 64;
   } while (id);
   *dst = 0;
@@ -177,12 +177,12 @@ static inline void psync_get_string_id2(char *dst, const char *prefix, uint64_t 
   plen = strlen(prefix);
   dst = (char *)memcpy(dst, prefix, plen) + plen;
   do {
-    *dst++ = base64_table[id1 % 64];
+    *dst++ = putil_base64_table[id1 % 64];
     id1 /= 64;
   } while (id1);
   *dst++ = '.';
   do {
-    *dst++ = base64_table[id2 % 64];
+    *dst++ = putil_base64_table[id2 % 64];
     id2 /= 64;
   } while (id2);
   *dst = 0;

@@ -218,7 +218,7 @@ void pstatus_upload_recalc() {
     fileidhex[sizeof(psync_fsfileid_t)] = 'd';
     fileidhex[sizeof(psync_fsfileid_t) + 1] = 0;
     filename =
-        psync_strcat(fscpath, "/", fileidhex, NULL);
+        putil_strcat(fscpath, "/", fileidhex, NULL);
     if (!stat(filename, &st)) {
       filestou++;
       bytestou += pfile_stat_size(&st);

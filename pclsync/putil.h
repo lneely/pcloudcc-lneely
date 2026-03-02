@@ -24,24 +24,24 @@ extern "C" {
     return PSYNC_INVALID_SYNCID;                       \
   } while (0)
 
-extern const char base64_table[];
+extern const char putil_base64_table[];
 
 void putil_wipe(void *mem, size_t sz);
-void time_format(time_t tm, unsigned long ns, char *result);
-char *psync_strdup(const char *str) PSYNC_MALLOC PSYNC_NONNULL(1);
-char *psync_strnormalize_filename(const char *str) PSYNC_MALLOC PSYNC_NONNULL(1);
-char *psync_strndup(const char *str, size_t len) PSYNC_MALLOC PSYNC_NONNULL(1);
-char *psync_strcat(const char *str, ...) PSYNC_MALLOC PSYNC_SENTINEL;
-int psync_slprintf(char *str, size_t size, const char *format, ...) PSYNC_NONNULL(1, 3);
-unsigned char *psync_base32_encode(const unsigned char *str, size_t length, size_t *ret_length);
-unsigned char *psync_base32_decode(const unsigned char *str, size_t length, size_t *ret_length);
-unsigned char *psync_base64_encode(const unsigned char *str, size_t length, size_t *ret_length);
-unsigned char *psync_base64_decode(const unsigned char *str, size_t length, size_t *ret_length);
-int psync_is_valid_utf8(const char *str);
-uint64_t psync_ato64(const char *str);
-uint32_t psync_ato32(const char *str);
+void putil_time_format(time_t tm, unsigned long ns, char *result);
+char *putil_strdup(const char *str) PSYNC_MALLOC PSYNC_NONNULL(1);
+char *putil_strnormalize_filename(const char *str) PSYNC_MALLOC PSYNC_NONNULL(1);
+char *putil_strndup(const char *str, size_t len) PSYNC_MALLOC PSYNC_NONNULL(1);
+char *putil_strcat(const char *str, ...) PSYNC_MALLOC PSYNC_SENTINEL;
+int putil_slprintf(char *str, size_t size, const char *format, ...) PSYNC_NONNULL(1, 3);
+unsigned char *putil_base32_encode(const unsigned char *str, size_t length, size_t *ret_length);
+unsigned char *putil_base32_decode(const unsigned char *str, size_t length, size_t *ret_length);
+unsigned char *putil_base64_encode(const unsigned char *str, size_t length, size_t *ret_length);
+unsigned char *putil_base64_decode(const unsigned char *str, size_t length, size_t *ret_length);
+int putil_is_valid_utf8(const char *str);
+uint64_t putil_ato64(const char *str);
+uint32_t putil_ato32(const char *str);
 
-static inline size_t psync_strlcpy(char *dst, const char *src, size_t size) {
+static inline size_t putil_strlcpy(char *dst, const char *src, size_t size) {
   size_t len;
   len = strlen(src);
   if (likely(len < size)) {

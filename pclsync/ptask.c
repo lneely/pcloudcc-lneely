@@ -457,7 +457,7 @@ static int handle_download(async_params_t *prms,
   s->process_data = download_process_headers;
   fda->localpath = dwl->localpath;
   fda->fd = INVALID_HANDLE_VALUE;
-  len = psync_slprintf(buff, sizeof(buff),
+  len = putil_slprintf(buff, sizeof(buff),
                        "act=dwl,strm=%" PRIu64 ",fileid=%" PRIu64 "\n",
                        (uint64_t)s->streamid, (uint64_t)dwl->fileid);
   if (data_send(prms, buff, len)) {
@@ -488,7 +488,7 @@ static int handle_download_nm(async_params_t *prms,
   memcpy(fda->osha1hex, dwl->sha1hex, PSYNC_SHA1_DIGEST_HEXLEN);
   fda->localpath = dwl->localpath;
   fda->fd = INVALID_HANDLE_VALUE;
-  len = psync_slprintf(
+  len = putil_slprintf(
       buff, sizeof(buff),
       "act=dwlnm,strm=%" PRIu64 ",fileid=%" PRIu64 ",sha1=%.40s\n",
       (uint64_t)s->streamid, (uint64_t)dwl->fileid, dwl->sha1hex);

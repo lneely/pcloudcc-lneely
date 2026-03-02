@@ -546,9 +546,9 @@ static const unsigned char pcloudicon[] = {
     0xf9, 0x7f, 0xb2, 0x54, 0x74, 0x86, 0x8e, 0x89, 0x9f, 0x4c, 0x00, 0x00,
     0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82};
 
-void psync_fsstatic_add_files() {
-  psync_fstask_add_local_creat_static(0, ".directory", rootdir,
+void pfs_stat_add_files() {
+  pfs_task_add_local_creat_static(0, ".directory", rootdir,
                                       strlen(rootdir));
-  psync_fstask_add_local_creat_static(0, ".pcloudicon.png", pcloudicon,
+  pfs_task_add_local_creat_static(0, ".pcloudicon.png", pcloudicon,
                                       ARRAY_SIZE(pcloudicon));
 }

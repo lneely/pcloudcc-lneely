@@ -112,7 +112,7 @@ static inline int psync_status_is_offline() {
 uint32_t psync_get_last_error() { return psync_error; }
 
 void psync_set_database_path(const char *databasepath) {
-  psync_database = psync_strdup(databasepath);
+  psync_database = putil_strdup(databasepath);
 }
 
 static void psync_stop_crypto_on_sleep() {
@@ -235,7 +235,7 @@ void psync_start_sync(pstatus_change_callback_t status_callback,
   psync_localscan_init();
   pp2p_init();
   if (psync_setting_get_bool(_PS(autostartfs)))
-    psync_fs_start();
+    pfs_start();
   pdevmon_init();
 }
 
@@ -255,7 +255,7 @@ void psync_destroy() {
   if (pshm_cleanup() == -1) {
     pdbg_logf(D_ERROR, "failed to cleanup shm");
   }
-  psync_fs_stop();
+  pfs_stop();
   pstatus_wait_term();
   pstatus_send_status_update();
   ptask_stop_async();
@@ -288,10 +288,10 @@ void psync_set_user_pass(const char *username, const char *password, int save) {
   } else {
     pthread_mutex_lock(&psync_my_auth_mutex);
     free(psync_my_user);
-    psync_my_user = psync_strdup(username);
+    psync_my_user = putil_strdup(username);
     free(psync_my_pass);
     if (password && password[0])
-      psync_my_pass = psync_strdup(password);
+      psync_my_pass = putil_strdup(password);
     pthread_mutex_unlock(&psync_my_auth_mutex);
   }
   pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
@@ -305,7 +305,7 @@ void psync_set_pass(const char *password, int save) {
   else {
     pthread_mutex_lock(&psync_my_auth_mutex);
     free(psync_my_pass);
-    psync_my_pass = psync_strdup(password);
+    psync_my_pass = putil_strdup(password);
     pthread_mutex_unlock(&psync_my_auth_mutex);
   }
   pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
@@ -316,7 +316,7 @@ void psync_set_auth(const char *auth, int save) {
   if (save)
     psync_set_string_value("auth", auth);
   else
-    psync_strlcpy(psync_my_auth, auth, sizeof(psync_my_auth));
+    putil_strlcpy(psync_my_auth, auth, sizeof(psync_my_auth));
   pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
 }
 
@@ -350,7 +350,7 @@ void psync_logout(uint32_t auth_status, int doinvauth) {
   pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
   pstatus_set(PSTATUS_TYPE_AUTH, auth_status);
 
-  psync_fs_pause_until_login();
+  pfs_pause_until_login();
   pdownload_stop_all();
   pupload_stop_all();
   ptask_stop_async();
@@ -358,8 +358,8 @@ void psync_logout(uint32_t auth_status, int doinvauth) {
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   psync_restart_localscan();
   ptimer_notify_exception();
-  if (psync_fs_need_per_folder_refresh()) {
-    psync_fs_refresh_folder(0);
+  if (pfs_need_per_folder_refresh()) {
+    pfs_refresh_folder(0);
   }
 }
 
@@ -380,7 +380,7 @@ apiservers_list_t *psync_get_apiservers(char **err) {
 
   if (unlikely(!api)) {
     pdbg_logf(D_WARNING, "Can't get api from the pool. No pool ?\n");
-    *err = psync_strndup("Can't get api from the pool.", 29);
+    *err = putil_strndup("Can't get api from the pool.", 29);
     return NULL;
   }
   bres = papi_send2(api, "getlocationapi", params);
@@ -389,13 +389,13 @@ apiservers_list_t *psync_get_apiservers(char **err) {
   else {
     psync_apipool_release_bad(api);
     pdbg_logf(D_WARNING, "Send command returned invalid result.\n");
-    *err = psync_strndup("Connection error.", 17);
+    *err = putil_strndup("Connection error.", 17);
     return NULL;
   }
   result = papi_find_result2(bres, "result", PARAM_NUM)->num;
   if (unlikely(result)) {
     errorret = papi_find_result2(bres, "error", PARAM_STR)->str;
-    *err = psync_strndup(errorret, strlen(errorret));
+    *err = putil_strndup(errorret, strlen(errorret));
     pdbg_logf(D_WARNING, "command getlocationapi returned error code %u",
           (unsigned)result);
     return NULL;
@@ -492,8 +492,8 @@ void psync_unlink() {
   pthread_mutex_unlock(&psync_my_auth_mutex);
   pdbg_logf(D_NOTICE, "clearing database, finished");
 
-  psync_fs_pause_until_login();
-  psync_fs_clean_tasks();
+  pfs_pause_until_login();
+  pfs_clean_tasks();
   ppathstatus_init();
   psyncer_dl_queue_clear();
   psql_unlock();
@@ -508,8 +508,8 @@ void psync_unlink() {
   pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_REQUIRED);
   pstatus_set(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN);
   psync_resume_localscan();
-  if (psync_fs_need_per_folder_refresh()) {
-    psync_fs_refresh_folder(0);
+  if (pfs_need_per_folder_refresh()) {
+    pfs_refresh_folder(0);
   }
 }
 
@@ -529,9 +529,9 @@ static void check_tfa_result(uint64_t result) {
 
 static char *binresult_to_str(const binresult *res) {
   if (!res)
-    return psync_strdup("field not found");
+    return putil_strdup("field not found");
   if (res->type == PARAM_STR)
-    return psync_strdup(res->str);
+    return putil_strdup(res->str);
   else if (res->type == PARAM_NUM) {
     char buff[32], *ptr;
     uint64_t n;
@@ -542,9 +542,9 @@ static char *binresult_to_str(const binresult *res) {
       *--ptr = '0' + n % 10;
       n /= 10;
     } while (n);
-    return psync_strdup(ptr);
+    return putil_strdup(ptr);
   } else {
-    return psync_strdup("bad field type");
+    return putil_strdup("bad field type");
   }
 }
 
@@ -905,7 +905,7 @@ static int do_run_command_get_res(const char *cmd, size_t cmdlen,
   if (result) {
     pdbg_logf(D_WARNING, "command %s returned code %u", cmd, (unsigned)result);
     if (err)
-      *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
+      *err = putil_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     psync_process_api_error(result);
   }
   if (result)
@@ -915,7 +915,7 @@ static int do_run_command_get_res(const char *cmd, size_t cmdlen,
   return (int)result;
 neterr:
   if (err)
-    *err = psync_strdup("Could not connect to the server.");
+    *err = putil_strdup("Could not connect to the server.");
   return -1;
 }
 
@@ -931,14 +931,14 @@ int psync_register(const char *email, const char *password, int termsaccepted,
     psync_set_apiserver(binapi, locationid);
   else {
     if (err)
-      *err = psync_strdup("Could not connect to the server.");
+      *err = putil_strdup("Could not connect to the server.");
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
     return -1;
   }
   sock = papi_connect(binapi, psync_setting_get_bool(_PS(usessl)));
   if (pdbg_unlikely(!sock)) {
     if (err)
-      *err = psync_strdup("Could not connect to the server.");
+      *err = putil_strdup("Could not connect to the server.");
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
     return -1;
   }
@@ -946,7 +946,7 @@ int psync_register(const char *email, const char *password, int termsaccepted,
   if (pdbg_unlikely(!res)) {
     psock_close(sock);
     if (err)
-      *err = psync_strdup("Could not connect to the server.");
+      *err = putil_strdup("Could not connect to the server.");
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
     return -1;
   }
@@ -954,7 +954,7 @@ int psync_register(const char *email, const char *password, int termsaccepted,
   if (result) {
     pdbg_logf(D_WARNING, "command register returned code %u", (unsigned)result);
     if (err)
-      *err = psync_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
+      *err = putil_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
   }
   psock_close(sock);
@@ -993,7 +993,7 @@ int psync_change_password(const char *currentpass, const char *newpass,
   free(device);
   if (ret)
     return ret;
-  psync_strlcpy(psync_my_auth, papi_find_result2(res, "auth", PARAM_STR)->str,
+  putil_strlcpy(psync_my_auth, papi_find_result2(res, "auth", PARAM_STR)->str,
                 sizeof(psync_my_auth));
   free(res);
   return 0;
@@ -1130,7 +1130,7 @@ char *psync_get_string_value(const char *valuename) {
   psql_bind_str(res, 1, valuename);
   row = psql_fetch_str(res);
   if (row)
-    ret = psync_strdup(row[0]);
+    ret = putil_strdup(row[0]);
   else
     ret = NULL;
   psql_free(res);
@@ -1495,7 +1495,7 @@ static void psync_del_all_except(void *ptr, ppath_fast_stat *st) {
   nmarr = (const char **)ptr;
   if (!strcmp(st->name, nmarr[1]) || pfile_stat_fast_isfolder(st))
     return;
-  fp = psync_strcat(nmarr[0], "/", st->name, NULL);
+  fp = putil_strcat(nmarr[0], "/", st->name, NULL);
   pdbg_logf(D_NOTICE, "deleting old update file %s", fp);
   if (pfile_delete(fp))
     pdbg_logf(D_WARNING, "could not delete %s", fp);
@@ -1516,7 +1516,7 @@ static char *psync_filename_from_res(const binresult *res) {
   nmarr[0] = path;
   nmarr[1] = nmd;
   ppath_ls_fast(path, psync_del_all_except, (void *)nmarr);
-  ret = psync_strcat(path, "/", nmd, NULL);
+  ret = putil_strcat(path, "/", nmd, NULL);
   free(nmd);
   free(path);
   return ret;
@@ -2097,15 +2097,15 @@ int psync_setlanguage(const char *language, char **err) {
   return psync_run_command("setlanguage", params, err);
 }
 
-void psync_fs_clean_read_cache() { ppagecache_clean_read(); }
+void pfs_clean_read_cache() { ppagecache_clean_read(); }
 
-int psync_fs_move_cache(const char *path) {
+int pfs_move_cache(const char *path) {
   return ppagecache_move(path);
 }
 
 char *psync_get_token() {
   if (psync_my_auth[0])
-    return psync_strdup(psync_my_auth);
+    return putil_strdup(psync_my_auth);
   else
     return NULL;
 }
@@ -2136,7 +2136,7 @@ int psync_get_promo(char **url, uint64_t *width, uint64_t *height) {
     return result;
   }
 
-  *url = psync_strdup(papi_find_result2(res, "url", PARAM_STR)->str);
+  *url = putil_strdup(papi_find_result2(res, "url", PARAM_STR)->str);
 
   if (!papi_find_result2(res, "width", PARAM_NUM)->num) {
     pdbg_logf(D_NOTICE, "Parameter width not found.");
@@ -2166,12 +2166,12 @@ int psync_get_promo(char **url, uint64_t *width, uint64_t *height) {
 psync_folderid_t psync_get_fsfolderid_by_path(const char *path,
                                               uint32_t *pflags,
                                               uint32_t *pPerm) {
-  return psync_fsfolderidperm_by_path(path, pflags, pPerm);
+  return pfs_fldr_idperm_by_path(path, pflags, pPerm);
 }
 
 uint32_t psync_get_fsfolderflags_by_id(psync_folderid_t folderid,
                                        uint32_t *pPerm) {
-  return psync_fsfolderflags_by_id(folderid, pPerm);
+  return pfs_fldr_flags_by_id(folderid, pPerm);
 }
 
 uint64_t psync_crypto_priv_key_flags() {
@@ -2241,13 +2241,13 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
     if (psyncer_str_has_prefix(srow[0], localPath)) {
       psql_free(sql);
 
-      *errMsg = psync_strdup("There is already an active sync or backup for a "
+      *errMsg = putil_strdup("There is already an active sync or backup for a "
                              "parent of this folder.");
       return PERROR_PARENT_OR_SUBFOLDER_ALREADY_SYNCING;
     } else if (!strcmp(srow[0], localPath)) {
       psql_free(sql);
 
-      *errMsg = psync_strdup(
+      *errMsg = putil_strdup(
           "There is already an active sync or backup for this folder.");
       return PERROR_FOLDER_ALREADY_SYNCING;
     }
@@ -2256,7 +2256,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
 
   pdbg_logf(D_NOTICE, "Check if folder is not on the Drive.");
 
-  syncmp = psync_fs_getmountpoint();
+  syncmp = pfs_getmountpoint();
 
   pdbg_logf(D_NOTICE, "Mount point: [%s].", syncmp);
   if (syncmp) {
@@ -2268,7 +2268,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
          localPath[len] == '\\')) {
       free(syncmp);
 
-      *errMsg = psync_strdup("Folder is located on pCloud drive.");
+      *errMsg = putil_strdup("Folder is located on pCloud drive.");
       return PERROR_LOCAL_IS_ON_PDRIVE;
     }
     free(syncmp);
@@ -2283,7 +2283,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
           localPath);
 
     if (psyncer_str_starts_with(folders.folders[i], localPath)) {
-      *errMsg = psync_strdup(
+      *errMsg = putil_strdup(
           "This folder is a child  of a folder in your ignore folders list.");
       return PERROR_PARENT_IS_IGNORED;
     }
@@ -2304,7 +2304,7 @@ psync_folderid_t create_bup_mach_folder(char **msgErr) {
 
   rootFolIdObj = NULL;
   tmpBuff = get_pc_name();
-  psync_strlcpy(bRootFoName, tmpBuff, 64);
+  putil_strlcpy(bRootFoName, tmpBuff, 64);
 
   free(tmpBuff);
 
@@ -2377,10 +2377,10 @@ int psync_create_backup(char *path, char **errMsg) {
 
   if (folders.cnt > 1) {
     oParCnt = 1;
-    optFolName = psync_strdup(folders.folders[folders.cnt - 2]);
+    optFolName = putil_strdup(folders.folders[folders.cnt - 2]);
   } else {
     oParCnt = 0;
-    optFolName = psync_strdup("");
+    optFolName = putil_strdup("");
   }
 
   eventParams reqPar = {4, // Number of parameters we are passing below.
@@ -2406,7 +2406,7 @@ int psync_create_backup(char *path, char **errMsg) {
     free(retData);
 
     if (syncFId < 0) {
-      *errMsg = psync_strdup("Error creating backup.");
+      *errMsg = putil_strdup("Error creating backup.");
       return syncFId;
     }
 
