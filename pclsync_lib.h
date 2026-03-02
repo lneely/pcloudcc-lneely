@@ -47,7 +47,7 @@ public:
   ~pclsync_lib();
   pclsync_lib();
 
-  bool trusted_device_;
+  bool trusted_device_ = true;
   bool crypto_on_;
   bool save_pass_;
   bool setup_crypto_;
@@ -87,7 +87,7 @@ public:
   static pclsync_lib &get_lib();
 
   // Console
-  void read_tfa_code();
+  void read_tfa_code(bool auto_sms = true);
   void read_password();
   void read_cryptopass();
 
@@ -104,6 +104,9 @@ public:
   static int remove_sync_folder(const char *path);
   static int pause_sync(const char *unused);
   static int resume_sync(const char *unused);
+  static int receive_tfa_code(const char *code);
+  static int receive_auth(const char *pass);
+  static int get_status(const char *unused);
 
   int logout();
   int unlink();

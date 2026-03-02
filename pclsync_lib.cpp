@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
@@ -56,6 +57,10 @@ namespace cc = console_client;
 namespace clib = cc::clibrary;
 
 static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t tfa_mtx = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t tfa_cond = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t auth_mtx = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t auth_cond = PTHREAD_COND_INITIALIZER;
 
 static const std::string client_name = "pCloud CC v3.0.0";
 
@@ -161,25 +166,79 @@ clib::pclsync_lib &clib::pclsync_lib::get_lib() {
 }
 
 void clib::pclsync_lib::read_password() {
+  if (daemon_) {
+    syslog(LOG_NOTICE,
+           "pcloudcc: password required. "
+           "Provide with: echo 'auth PASSWORD' | pcloudcc -k");
+    pthread_mutex_lock(&auth_mtx);
+    while (password_.empty()) {
+      pthread_cond_wait(&auth_cond, &auth_mtx);
+    }
+    pthread_mutex_unlock(&auth_mtx);
+    return;
+  }
   read_from_stdin(password_);
 }
 
-void clib::pclsync_lib::read_tfa_code()
+int clib::pclsync_lib::receive_auth(const char *pass) {
+  pthread_mutex_lock(&auth_mtx);
+  get_lib().password_ = std::string(pass);
+  pthread_cond_signal(&auth_cond);
+  pthread_mutex_unlock(&auth_mtx);
+  std::cout << "Auth received." << std::endl;
+  return 0;
+}
+
+void clib::pclsync_lib::read_tfa_code(bool auto_sms)
 {
   if (daemon_) {
-    std::cout << "Not able to read 2fa code when started as daemon." << std::endl;
-    exit(1);
+    if (auto_sms) {
+      char *country_code = nullptr;
+      char *phone_number = nullptr;
+      int result = psync_tfa_send_sms(&country_code, &phone_number);
+      if (result == 0) {
+        if (country_code && phone_number) {
+          syslog(LOG_NOTICE,
+                 "pcloudcc: 2FA required. SMS sent to +%s %s. "
+                 "Provide code with: echo 'tfa CODE' | pcloudcc -k",
+                 country_code, phone_number);
+          free(country_code);
+          free(phone_number);
+        } else {
+          syslog(LOG_NOTICE,
+                 "pcloudcc: 2FA required. SMS sent. "
+                 "Provide code with: echo 'tfa CODE' | pcloudcc -k");
+        }
+      } else {
+        syslog(LOG_WARNING,
+               "pcloudcc: 2FA required but SMS failed (error %d). "
+               "Provide code with: echo 'tfa CODE' | pcloudcc -k", result);
+      }
+    } else {
+      syslog(LOG_WARNING,
+             "pcloudcc: 2FA code was rejected. "
+             "Provide correct code with: echo 'tfa CODE' | pcloudcc -k");
+    }
+
+    // Block until code arrives via RPC (pcloudcc -k)
+    pthread_mutex_lock(&tfa_mtx);
+    while (tfa_code_.empty()) {
+      pthread_cond_wait(&tfa_cond, &tfa_mtx);
+    }
+    pthread_mutex_unlock(&tfa_mtx);
+    return;
   }
-  
+
+  // Interactive mode
   std::cout << "2FA required. Enter code from authenticator app, or type 'sms' to receive code via SMS: ";
   std::string input;
   std::getline(std::cin, input);
-  
+
   if (input == "sms" || input == "SMS") {
     char *country_code = nullptr;
     char *phone_number = nullptr;
     int result = psync_tfa_send_sms(&country_code, &phone_number);
-    
+
     if (result == 0) {
       if (country_code && phone_number) {
         std::cout << "SMS sent to +" << country_code << " " << phone_number << std::endl;
@@ -197,6 +256,15 @@ void clib::pclsync_lib::read_tfa_code()
   } else {
     tfa_code_ = input;
   }
+}
+
+int clib::pclsync_lib::receive_tfa_code(const char *code) {
+  pthread_mutex_lock(&tfa_mtx);
+  get_lib().tfa_code_ = std::string(code);
+  pthread_cond_signal(&tfa_cond);
+  pthread_mutex_unlock(&tfa_mtx);
+  std::cout << "2FA code received." << std::endl;
+  return 0;
 }
 
 void clib::pclsync_lib::read_cryptopass() {
@@ -379,10 +447,15 @@ static void status_change(pstatus_t *status) {
     if (clib::pclsync_lib::get_lib().get_tfa_code().empty()) {
       clib::pclsync_lib::get_lib().read_tfa_code();
     }
-
     psync_tfa_set_code(clib::pclsync_lib::get_lib().get_tfa_code().c_str(),
-                       clib::pclsync_lib::get_lib().get_trusted_device(), 
-                       0);
+                       1 /* trusted */, 0);
+    clib::pclsync_lib::get_lib().wipe_tfa_code();
+  } else if (status->status == PSTATUS_BAD_TFA_CODE) {
+    clib::pclsync_lib::get_lib().wipe_tfa_code();
+    clib::pclsync_lib::get_lib().read_tfa_code(false /* auto_sms */);
+    psync_tfa_set_code(clib::pclsync_lib::get_lib().get_tfa_code().c_str(),
+                       1 /* trusted */, 0);
+    clib::pclsync_lib::get_lib().wipe_tfa_code();
   } else if (status->status == PSTATUS_BAD_LOGIN_DATA) {
     if (!clib::pclsync_lib::get_lib().newuser_) {
       clib::pclsync_lib::get_lib().read_password();
@@ -464,6 +537,25 @@ int clib::pclsync_lib::check_pending(const char *unused) {
   }
   
   std::cout << "No pending transfers detected" << std::endl;
+  return 0;
+}
+
+int clib::pclsync_lib::get_status(const char *unused) {
+  (void)unused;
+
+  pstatus_t st;
+  psync_get_status(&st);
+
+  char buf[512];
+  snprintf(buf, sizeof(buf),
+           "Status:   %s\n"
+           "Download: %s\n"
+           "Upload:   %s",
+           status2string(st.status),
+           st.downloadstr ? st.downloadstr : "",
+           st.uploadstr   ? st.uploadstr   : "");
+
+  pshm_write(buf, strlen(buf) + 1);
   return 0;
 }
 
@@ -602,6 +694,9 @@ int clib::pclsync_lib::init() {
   prpc_register(STOPSYNC, &remove_sync_folder);
   prpc_register(SYNCPAUSE, &pause_sync);
   prpc_register(SYNCRESUME, &resume_sync);
+  prpc_register(SENDTFA, &receive_tfa_code);
+  prpc_register(SENDAUTH, &receive_auth);
+  prpc_register(GETSTATUS, &get_status);
 
   return 0;
 }
