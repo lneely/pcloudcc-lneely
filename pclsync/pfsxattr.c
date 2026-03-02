@@ -44,16 +44,10 @@
 // needed by pfs_xatr_set_thread_name
 extern PSYNC_THREAD const char *psync_thread_name; 
 
-#if IS_DEBUG
 #define pfs_xatr_set_thread_name()                                             \
   do {                                                                         \
-    psync_thread_name = __FUNCTION__;                                          \
+    if (IS_DEBUG) psync_thread_name = __FUNCTION__;                            \
   } while (0)
-#else
-#define pfs_xatr_set_thread_name()                                             \
-  do {                                                                         \
-  } while (0)
-#endif
 
 // Value get from standard xattr.h
 enum {

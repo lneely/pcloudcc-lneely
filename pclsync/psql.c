@@ -10,7 +10,40 @@
 #include "prun.h"
 #include "psettings.h"
 #include "psql.h"
+#include "psql_internal.h"
 #include "psys.h"
+
+// psql.h defines function-like macros (e.g. psql_lock() -> psql_do_lock())
+// that would interfere with this file's own function definitions.
+// Undefine them here so we can define the actual implementations.
+#undef psql_trylock
+#undef psql_lock
+#undef psql_rdlock
+#undef psql_statement
+#undef psql_start
+#undef psql_query_nocache
+#undef psql_query
+#undef psql_rdlock_nocache
+#undef psql_query_rdlock
+#undef psql_query_nolock_nocache
+#undef psql_query_nolock
+#undef psql_prepare_nocache
+#undef psql_prepare
+
+// Forward declarations for internal use within this translation unit.
+int psql_trylock(void);
+void psql_lock(void);
+void psql_rdlock(void);
+int psql_statement(const char *sql);
+int psql_start(void);
+psync_sql_res *psql_query_nocache(const char *sql);
+psync_sql_res *psql_query(const char *sql);
+psync_sql_res *psql_rdlock_nocache(const char *sql);
+psync_sql_res *psql_query_rdlock(const char *sql);
+psync_sql_res *psql_query_nolock_nocache(const char *sql);
+psync_sql_res *psql_query_nolock(const char *sql);
+psync_sql_res *psql_prepare_nocache(const char *sql);
+psync_sql_res *psql_prepare(const char *sql);
 
 #define SQL_NO_LOCK 0
 #define SQL_READ_LOCK 1
@@ -22,7 +55,7 @@
 #define PSYNC_TNULL 4
 #define PSYNC_TBOOL 5
 
-extern PSYNC_THREAD const char *psync_thread_name; 
+extern PSYNC_THREAD const char *psync_thread_name;
 
 const static char *psync_typenames[] = {"[invalid type]", "[number]", "[string]", "[float]", "[null]", "[bool]"};
 
@@ -37,35 +70,12 @@ typedef struct {
 int psync_do_run = 1;                   // FIXME: app state. papp.c?
 PSYNC_THREAD uint32_t psync_error = 0;  // FIXME: app state. papp.c?
 
-static psync_rwlock_t dblock;
-static sqlite3 *psync_db;
+psync_rwlock_t dblock;
+sqlite3 *psync_db;
 static pthread_mutex_t cpmutex;
-static int in_transaction = 0;
-static int transaction_failed = 0;
-static psync_list commitcbs;
-
-#if IS_DEBUG
-typedef struct {
-  psync_list list;
-  const char *file;
-  const char *thread;
-  struct timespec tm;
-  unsigned line;
-} rd_lock_data;
-
-static PSYNC_THREAD rd_lock_data *rdlock = NULL;
-static PSYNC_THREAD unsigned long rdlockctr = 0;
-static PSYNC_THREAD struct timespec rdlockstart;
-unsigned long lockctr = 0;
-static struct timespec lockstart;
-static const char *wrlockfile = "none";
-static const char *wrlockthread = "";
-static unsigned wrlockline = 0;
-static unsigned wrlocked = 0;
-static pthread_t wrlocker;
-static psync_list rdlocks = PSYNC_LIST_STATIC_INIT(rdlocks);
-static pthread_mutex_t rdmutex = PTHREAD_MUTEX_INITIALIZER;
-#endif
+int in_transaction = 0;
+int transaction_failed = 0;
+psync_list commitcbs;
 
 static void on_error(void *ptr, int code, const char *msg) {
   pdbg_logf(D_WARNING, "database warning %d: %s", code, msg);
@@ -74,9 +84,8 @@ static void on_error(void *ptr, int code, const char *msg) {
 static void psync_sql_free_cache(void *ptr) {
   psync_sql_res *res = (psync_sql_res *)ptr;
   sqlite3_finalize(res->stmt);
-#if IS_DEBUG
-  memset(res, 0xff, sizeof(psync_sql_res));
-#endif
+  if (IS_DEBUG)
+    memset(res, 0xff, sizeof(psync_sql_res));
   free(res);
 }
 
@@ -90,11 +99,12 @@ static void psync_sql_res_unlock(psync_sql_res *res) {
   case SQL_WRITE_LOCK:
     psql_unlock();
     break;
-#if IS_DEBUG
   default:
-    pdbg_logf(D_ERROR, "unknown value for locked %d", res->locked);
-    abort();
-#endif
+    if (IS_DEBUG) {
+      pdbg_logf(D_ERROR, "unknown value for locked %d", res->locked);
+      abort();
+    }
+    break;
   }
 }
 
@@ -140,162 +150,24 @@ static void commit(int success) {
   }
 }
 
-#if IS_DEBUG
+__attribute__((weak)) int psql_trylock() { return plocks_trywrlock(&dblock); }
+__attribute__((weak)) void psql_lock() { plocks_wrlock(&dblock); }
+__attribute__((weak)) void psql_unlock() { plocks_unlock(&dblock); }
+__attribute__((weak)) void psql_rdlock() { plocks_rdlock(&dblock); }
+__attribute__((weak)) void psql_rdunlock() { plocks_unlock(&dblock); }
 
-static void record_wrlock(const char *file, unsigned line) {
-  if (unlikely(rdlock)) {
-    pdbg_logf(D_BUG,
-          "trying to get write lock at %s:%u, but read lock is already taken "
-          "at %s:%u, aborting",
-          file, line, rdlock->file, rdlock->line);
-    sendpdbg_logf("trying to get write lock at %s:%u, but read lock is already "
-              "taken at %s:%u, aborting",
-              file, line, rdlock->file, rdlock->line);
-    abort();
-  }
-  sendpdbg_assert(!wrlocked);
-  pdbg_assert(!wrlocked);
-  wrlockfile = file;
-  wrlockline = line;
-  wrlockthread = psync_thread_name;
-  wrlocked = 1;
-  wrlocker = pthread_self();
+// psql_do_* weak stubs: release-mode forwarding wrappers.
+// Callers always use the psql_do_* names (via psql.h macro expansion).
+// debug/psql_debug.c provides strong overrides with lock tracking.
+__attribute__((weak)) int psql_do_trylock(const char *file, unsigned line) {
+  return psql_trylock();
 }
-
-static void record_wrunlock() {
-  sendpdbg_assert(pthread_equal(pthread_self(), wrlocker));
-  sendpdbg_assert(wrlocked);
-  pdbg_assert(pthread_equal(pthread_self(), wrlocker));
-  pdbg_assert(wrlocked);
-  wrlocked = 0;
+__attribute__((weak)) void psql_do_lock(const char *file, unsigned line) {
+  psql_lock();
 }
-
-static void record_rdlock(const char *file, unsigned line,
-                          struct timespec *tm) {
-  rd_lock_data *lock;
-  lock = malloc(sizeof(rd_lock_data));
-  lock->file = file;
-  lock->thread = psync_thread_name;
-  lock->line = line;
-  memcpy(&lock->tm, tm, sizeof(struct timespec));
-  pthread_mutex_lock(&rdmutex);
-  psync_list_add_tail(&rdlocks, &lock->list);
-  pthread_mutex_unlock(&rdmutex);
-  rdlock = lock;
+__attribute__((weak)) void psql_do_rdlock(const char *file, unsigned line) {
+  psql_rdlock();
 }
-
-static rd_lock_data *record_rdunlock() {
-  rd_lock_data *lock;
-  pdbg_assert(rdlock);
-  lock = rdlock;
-  rdlock = NULL;
-  pthread_mutex_lock(&rdmutex);
-  psync_list_del(&lock->list);
-  pthread_mutex_unlock(&rdmutex);
-  return lock;
-}
-
-void psql_dump_locks() {
-  rd_lock_data *lock;
-  char dttime[36];
-  if (wrlocked) {
-    putil_time_format(lockstart.tv_sec, lockstart.tv_nsec, dttime);
-    pdbg_logf(D_ERROR, "write lock taken by thread %s from %s:%u at %s",
-          wrlockthread, wrlockfile, wrlockline, dttime);
-    sendpdbg_logf("write lock taken by thread %s from %s:%u at %s", wrlockthread,
-              wrlockfile, wrlockline, dttime);
-  }
-  pthread_mutex_lock(&rdmutex);
-  psync_list_for_each_element(lock, &rdlocks, rd_lock_data, list) {
-    putil_time_format(lock->tm.tv_sec, lock->tm.tv_nsec, dttime);
-    pdbg_logf(D_ERROR, "read lock taken by thread %s from %s:%u at %s",
-          lock->thread, lock->file, lock->line, dttime);
-    sendpdbg_logf("read lock taken by thread %s from %s:%u at %s", lock->thread,
-              lock->file, lock->line, dttime);
-  }
-  pthread_mutex_unlock(&rdmutex);
-}
-
-int psql_do_trylock(const char *file, unsigned line) {
-  if (plocks_trywrlock(&dblock))
-    return -1;
-  if (++lockctr == 1) {
-    clock_gettime(CLOCK_REALTIME, &lockstart);
-    record_wrlock(file, line);
-  }
-  return 0;
-}
-
-void psql_do_lock(const char *file, unsigned line) {
-  if (plocks_trywrlock(&dblock)) {
-    struct timespec start, end;
-    unsigned long msec;
-    clock_gettime(CLOCK_REALTIME, &start);
-    memcpy(&end, &start, sizeof(end));
-    end.tv_sec += PSYNC_DEBUG_LOCK_TIMEOUT;
-    if (plocks_timedwrlock(&dblock, &end)) {
-      pdbg_logf(D_BUG, "sql write lock timed out called from %s:%u", file, line);
-      sendpdbg_logf("sql write lock timed out called from %s:%u", file, line);
-      psql_dump_locks();
-      abort();
-    }
-    clock_gettime(CLOCK_REALTIME, &end);
-    msec = (end.tv_sec - start.tv_sec) * 1000 + end.tv_nsec / 1000000 -
-           start.tv_nsec / 1000000;
-    if (msec >= 1000)
-      pdbg_logf(D_ERROR, "waited %lu milliseconds for database write lock", msec);
-    else if (msec >= 250)
-      pdbg_logf(D_WARNING, "waited %lu milliseconds for database write lock", msec);
-    else if (msec >= 5)
-      pdbg_logf(D_BUG, "waited %lu milliseconds for database write lock", msec);
-    pdbg_assert(lockctr == 0);
-    lockctr++;
-    memcpy(&lockstart, &end, sizeof(struct timespec));
-    record_wrlock(file, line);
-  } else if (++lockctr == 1) {
-    clock_gettime(CLOCK_REALTIME, &lockstart);
-    record_wrlock(file, line);
-  }
-}
-
-void psql_do_rdlock(const char *file, unsigned line) {
-  if (plocks_tryrdlock(&dblock)) {
-    struct timespec start, end;
-    unsigned long msec;
-    clock_gettime(CLOCK_REALTIME, &start);
-    memcpy(&end, &start, sizeof(end));
-    end.tv_sec += PSYNC_DEBUG_LOCK_TIMEOUT;
-    if (plocks_timedrdlock(&dblock, &end)) {
-      pdbg_logf(D_BUG, "sql read lock timed out, called from %s:%u", file, line);
-      sendpdbg_logf("sql read lock timed out, called from %s:%u", file, line);
-      psql_dump_locks();
-      abort();
-    }
-    clock_gettime(CLOCK_REALTIME, &end);
-    msec = (end.tv_sec - start.tv_sec) * 1000 + end.tv_nsec / 1000000 -
-           start.tv_nsec / 1000000;
-    if (msec >= 1000)
-      pdbg_logf(D_ERROR, "waited %lu milliseconds for database read lock", msec);
-    else if (msec >= 250)
-      pdbg_logf(D_WARNING, "waited %lu milliseconds for database read lock", msec);
-    else if (msec >= 5)
-      pdbg_logf(D_BUG, "waited %lu milliseconds for database read lock", msec);
-    rdlockctr++;
-    memcpy(&rdlockstart, &end, sizeof(struct timespec));
-    record_rdlock(file, line, &rdlockstart);
-  } else if (++rdlockctr == 1) {
-    clock_gettime(CLOCK_REALTIME, &rdlockstart);
-    record_rdlock(file, line, &rdlockstart);
-  }
-}
-
-#else
-
-int psql_trylock() { return plocks_trywrlock(&dblock); }
-void psql_lock() { plocks_wrlock(&dblock); }
-void psql_rdlock() { plocks_rdlock(&dblock); }
-
-#endif
 
 int psql_connect(const char *db) {
   static int initmutex = 1;
@@ -354,7 +226,7 @@ int psql_connect(const char *db) {
                 psync_db_upgrade[i], sqlite3_libversion());
           if (IS_DEBUG) {
             psync_error = PERROR_DATABASE_OPEN;
-            return -1;            
+            return -1;
           }
         }
     }
@@ -429,36 +301,6 @@ void psql_checkpt_unlock() {
   pthread_mutex_unlock(&cpmutex);
 }
 
-void psql_unlock() {
-#if IS_DEBUG
-  pdbg_assert(lockctr > 0);
-  if (--lockctr == 0) {
-    struct timespec end;
-    unsigned long msec;
-    clock_gettime(CLOCK_REALTIME, &end);
-    msec = (end.tv_sec - lockstart.tv_sec) * 1000 + end.tv_nsec / 1000000 -
-           lockstart.tv_nsec / 1000000;
-    if (msec >= 2000)
-      pdbg_logf(D_ERROR,
-            "held database write lock for %lu milliseconds taken from %s:%u",
-            msec, wrlockfile, wrlockline);
-    else if (msec >= 500)
-      pdbg_logf(D_WARNING,
-            "held database write lock for %lu milliseconds taken from %s:%u",
-            msec, wrlockfile, wrlockline);
-    else if (msec >= 10)
-      pdbg_logf(D_BUG,
-            "held database write lock for %lu milliseconds taken from %s:%u",
-            msec, wrlockfile, wrlockline);
-    record_wrunlock();
-    plocks_unlock(&dblock);
-  } else
-    plocks_unlock(&dblock);
-#else
-  plocks_unlock(&dblock);
-#endif
-}
-
 void psql_list_add(psync_list_builder_t *builder, psync_sql_res *res, psync_list_builder_sql_callback callback) {
   psync_variant_row row;
   while ((row = psql_fetch(res))) {
@@ -488,41 +330,6 @@ void psql_list_add(psync_list_builder_t *builder, psync_sql_res *res, psync_list
   psql_free(res);
 }
 
-void psql_rdunlock() {
-#if IS_DEBUG
-  if (unlikely(rdlockctr == 0)) {
-    psql_unlock();
-    return;
-  }
-  if (--rdlockctr == 0) {
-    struct timespec end;
-    unsigned long msec;
-    rd_lock_data *lock;
-    plocks_unlock(&dblock);
-    clock_gettime(CLOCK_REALTIME, &end);
-    lock = record_rdunlock();
-    msec = (end.tv_sec - rdlockstart.tv_sec) * 1000 + end.tv_nsec / 1000000 -
-           rdlockstart.tv_nsec / 1000000;
-    if (msec >= 2000)
-      pdbg_logf(D_ERROR,
-            "held database read lock for %lu milliseconds taken at %s:%u", msec,
-            lock->file, lock->line);
-    else if (msec >= 500)
-      pdbg_logf(D_WARNING,
-            "held database read lock for %lu milliseconds taken at %s:%u", msec,
-            lock->file, lock->line);
-    else if (msec >= 20)
-      pdbg_logf(D_BUG,
-            "held database read lock for %lu milliseconds taken at %s:%u", msec,
-            lock->file, lock->line);
-    free(lock);
-  } else
-    plocks_unlock(&dblock);
-#else
-  plocks_unlock(&dblock);
-#endif
-}
-
 int psql_waiting() {
   return plocks_num_waiters(&dblock) > 0;
 }
@@ -531,30 +338,12 @@ int psql_rdlocked() {
   return plocks_holding_rdlock(&dblock);
 }
 
-int psql_locked() { 
-  return plocks_holding_lock(&dblock); 
+int psql_locked() {
+  return plocks_holding_lock(&dblock);
 }
 
-int psql_tryupgradeLock() {
-#if IS_DEBUG
-  if (plocks_holding_wrlock(&dblock))
-    return 0;
-  pdbg_assert(plocks_holding_rdlock(&dblock));
-  if (plocks_towrlock(&dblock))
-    return -1;
-  else {
-    rd_lock_data *lock = record_rdunlock();
-    lockctr = rdlockctr;
-    rdlockctr = 0;
-    pdbg_assert(lockctr == 1);
-    lockstart = rdlockstart;
-    record_wrlock(lock->file, lock->line);
-    free(lock);
-    return 0;
-  }
-#else
+__attribute__((weak)) int psql_tryupgradeLock() {
   return plocks_towrlock(&dblock);
-#endif
 }
 
 int psql_sync() {
@@ -1009,12 +798,12 @@ psync_full_result_int *psql_fetchall_int(psync_sql_res *res) {
   return ret;
 }
 
-uint32_t psql_affected() { 
-  return sqlite3_changes(psync_db); 
+uint32_t psql_affected() {
+  return sqlite3_changes(psync_db);
 }
 
-uint64_t psql_insertid() { 
-  return sqlite3_last_insert_rowid(psync_db); 
+uint64_t psql_insertid() {
+  return sqlite3_last_insert_rowid(psync_db);
 }
 
 static const char *PSYNC_CONST get_type_name(uint32_t t) {
@@ -1072,83 +861,46 @@ void psql_try_free() {
   pcache_clean();
 }
 
-
-#if IS_DEBUG
-int psql_do_statement(const char *sql, const char *file, unsigned line) {
-  char *errmsg;
-  int code;
-  psql_do_lock(file, line);
-#else
-int psql_statement(const char *sql) {
+__attribute__((weak)) int psql_statement(const char *sql) {
   char *errmsg;
   int code;
   psql_lock();
-#endif
   code = sqlite3_exec(psync_db, sql, NULL, NULL, &errmsg);
   psql_unlock();
   if (likely(code == SQLITE_OK))
     return 0;
   else {
-#if IS_DEBUG
-    pdbg_logf(D_ERROR, "error running sql statement: %s: %s called from %s:%u", sql,
-          errmsg, file, line);
-#else
     pdbg_logf(D_ERROR, "error running sql statement: %s: %s", sql, errmsg);
-#endif
     sqlite3_free(errmsg);
     return -1;
   }
 }
 
-#if IS_DEBUG
-int psql_do_start_transaction(const char *file, unsigned line) {
-  psync_sql_res *res;
-  psql_do_lock(file, line);
-  res = psql_do_prepare("BEGIN", file, line);
-#else
-int psql_start() {
+__attribute__((weak)) int psql_start() {
   psync_sql_res *res;
   psql_lock();
   res = psql_prepare("BEGIN");
-#endif
   pdbg_assert(!in_transaction);
   if (unlikely(!res || psql_run_free(res)))
     return -1;
   in_transaction = 1;
   transaction_failed = 0;
   psync_list_init(&commitcbs);
-
-return 0;
+  return 0;
 }
 
-#if IS_DEBUG
-psync_sql_res *psql_do_query_nocache(const char *sql, const char *file,
-                                          unsigned line) {
-#else
-psync_sql_res *psql_query_nocache(const char *sql) {
-#endif
+__attribute__((weak)) psync_sql_res *psql_query_nocache(const char *sql) {
   sqlite3_stmt *stmt;
   psync_sql_res *res;
   int code, cnt;
-#if IS_DEBUG
-  psql_do_lock(file, line);
-#else
   psql_lock();
-#endif
   code = sqlite3_prepare_v2(psync_db, sql, -1, &stmt, NULL);
   if (unlikely(code != SQLITE_OK)) {
     psql_unlock();
-#if IS_DEBUG
-    pdbg_logf(D_ERROR, "error running sql statement: %s: %s called from %s:%u", sql,
-          sqlite3_errmsg(psync_db), file, line);
-    sendpdbg_logf("error running sql statement: %s: %s called from %s:%u", sql,
-              sqlite3_errmsg(psync_db), file, line);
-#else
     pdbg_logf(D_ERROR, "error running sql statement: %s: %s", sql,
           sqlite3_errmsg(psync_db));
     sendpdbg_logf("error running sql statement: %s: %s", sql,
               sqlite3_errmsg(psync_db));
-#endif
     return NULL;
   }
   cnt = sqlite3_column_count(stmt);
@@ -1161,61 +913,30 @@ psync_sql_res *psql_query_nocache(const char *sql) {
   return res;
 }
 
-#if IS_DEBUG
-psync_sql_res *psql_do_query(const char *sql, const char *file,
-                                  unsigned line) {
-#else
-psync_sql_res *psql_query(const char *sql) {
-#endif
+__attribute__((weak)) psync_sql_res *psql_query(const char *sql) {
   psync_sql_res *ret;
   ret = (psync_sql_res *)pcache_get(sql);
   if (ret) {
-    //    pdbg_logf(D_NOTICE, "got query %s from cache", sql);
     ret->locked = SQL_WRITE_LOCK;
     ret->sql = sql;
-#if IS_DEBUG
-    psql_do_lock(file, line);
-#else
     psql_lock();
-#endif
     return ret;
   } else
-#if IS_DEBUG
-    return psql_do_query_nocache(sql, file, line);
-#else
     return psql_query_nocache(sql);
-#endif
 }
 
-#if IS_DEBUG
-psync_sql_res *psql_do_query_rdlock_nocache(const char *sql,
-                                                 const char *file,
-                                                 unsigned line) {
-#else
-psync_sql_res *psql_rdlock_nocache(const char *sql) {
-#endif
+__attribute__((weak)) psync_sql_res *psql_rdlock_nocache(const char *sql) {
   sqlite3_stmt *stmt;
   psync_sql_res *res;
   int code, cnt;
-#if IS_DEBUG
-  psql_do_rdlock(file, line);
-#else
   psql_rdlock();
-#endif
   code = sqlite3_prepare_v2(psync_db, sql, -1, &stmt, NULL);
   if (unlikely(code != SQLITE_OK)) {
     psql_rdunlock();
-#if IS_DEBUG
-    pdbg_logf(D_ERROR, "error running sql statement: %s: %s called from %s:%u", sql,
-          sqlite3_errmsg(psync_db), file, line);
-    sendpdbg_logf("error running sql statement: %s: %s called from %s:%u", sql,
-              sqlite3_errmsg(psync_db), file, line);
-#else
     pdbg_logf(D_ERROR, "error running sql statement: %s: %s", sql,
           sqlite3_errmsg(psync_db));
     sendpdbg_logf("error running sql statement: %s: %s", sql,
               sqlite3_errmsg(psync_db));
-#endif
     return NULL;
   }
   cnt = sqlite3_column_count(stmt);
@@ -1228,52 +949,22 @@ psync_sql_res *psql_rdlock_nocache(const char *sql) {
   return res;
 }
 
-#if IS_DEBUG
-psync_sql_res *psql_do_query_rdlock(const char *sql, const char *file,
-                                         unsigned line) {
-#else
-psync_sql_res *psql_query_rdlock(const char *sql) {
-#endif
+__attribute__((weak)) psync_sql_res *psql_query_rdlock(const char *sql) {
   psync_sql_res *ret;
   ret = (psync_sql_res *)pcache_get(sql);
   if (ret) {
-    //    pdbg_logf(D_NOTICE, "got query %s from cache", sql);
     ret->locked = SQL_READ_LOCK;
     ret->sql = sql;
-#if IS_DEBUG
-    psql_do_rdlock(file, line);
-#else
     psql_rdlock();
-#endif
     return ret;
   } else
-#if IS_DEBUG
-    return psql_do_query_rdlock_nocache(sql, file, line);
-#else
     return psql_rdlock_nocache(sql);
-#endif
 }
 
-#if IS_DEBUG
-psync_sql_res *psql_do_query_nolock_nocache(const char *sql, const char *file, unsigned line) {
-#else
-psync_sql_res *psql_query_nolock_nocache(const char *sql) {
-#endif
+__attribute__((weak)) psync_sql_res *psql_query_nolock_nocache(const char *sql) {
   sqlite3_stmt *stmt;
   psync_sql_res *res;
   int code, cnt;
-#if IS_DEBUG
-  if (!psql_locked()) {
-    pdbg_logf(D_BUG,
-          "illegal use of psync_sql_query_nolock, can only be used while "
-          "holding lock, invoked from %s:%u, sql: %s",
-          file, line, sql);
-    sendpdbg_logf("illegal use of psync_sql_query_nolock, can only be used while "
-              "holding lock, invoked from %s:%u, sql: %s",
-              file, line, sql);
-    abort();
-  }
-#endif
   code = sqlite3_prepare_v2(psync_db, sql, -1, &stmt, NULL);
   if (unlikely(code != SQLITE_OK)) {
     pdbg_logf(D_ERROR, "error running sql statement: %s: %s", sql,
@@ -1292,44 +983,22 @@ psync_sql_res *psql_query_nolock_nocache(const char *sql) {
   return res;
 }
 
-#if IS_DEBUG
-psync_sql_res *psql_do_query_nolock(const char *sql, const char *file, unsigned line) {
-#else
-psync_sql_res *psql_query_nolock(const char *sql) {
-#endif
+__attribute__((weak)) psync_sql_res *psql_query_nolock(const char *sql) {
   psync_sql_res *ret;
-#if IS_DEBUG
-  if (!psql_locked()) {
-    pdbg_logf(D_BUG,
-          "illegal use of psync_sql_query_nolock, can only be used while "
-          "holding lock, invoked from %s:%u, sql: %s",
-          file, line, sql);
-    sendpdbg_logf("illegal use of psync_sql_query_nolock, can only be used while "
-              "holding lock, invoked from %s:%u, sql: %s",
-              file, line, sql);
-    abort();
-  }
-#endif
   ret = (psync_sql_res *)pcache_get(sql);
   if (ret) {
-    //    pdbg_logf(D_NOTICE, "got query %s from cache", sql);
     ret->locked = SQL_NO_LOCK;
     ret->sql = sql;
     return ret;
   } else
-#if IS_DEBUG
-    return psql_do_query_nolock_nocache(sql, file, line);
-#else
     return psql_query_nolock_nocache(sql);
-#endif
 }
 
 void psql_free(psync_sql_res *res) {
   int code = sqlite3_reset(res->stmt);
   psync_sql_res_unlock(res);
-#if IS_DEBUG
-  memset(res->row, 0xff, res->column_count * sizeof(psync_variant));
-#endif
+  if (IS_DEBUG)
+    memset(res->row, 0xff, res->column_count * sizeof(psync_variant));
   if (code == SQLITE_OK)
     pcache_add(res->sql, res, PSYNC_QUERY_CACHE_SEC, psync_sql_free_cache,
                     PSYNC_QUERY_MAX_CNT);
@@ -1340,71 +1009,90 @@ void psql_free(psync_sql_res *res) {
 void psql_free_nocache(psync_sql_res *res) {
   sqlite3_finalize(res->stmt);
   psync_sql_res_unlock(res);
-#if IS_DEBUG
-  memset(res, 0xff, sizeof(psync_sql_res));
-#endif
+  if (IS_DEBUG)
+    memset(res, 0xff, sizeof(psync_sql_res));
   free(res);
 }
 
-#if IS_DEBUG
-psync_sql_res *psql_do_prepare_nocache(const char *sql, const char *file, unsigned line) {
-#else
-psync_sql_res *psql_prepare_nocache(const char *sql) {
-#endif
+__attribute__((weak)) psync_sql_res *psql_prepare_nocache(const char *sql) {
   sqlite3_stmt *stmt;
   psync_sql_res *res;
   int code;
-#if IS_DEBUG
-  psql_do_lock(file, line);
-#else
   psql_lock();
-#endif
   code = sqlite3_prepare_v2(psync_db, sql, -1, &stmt, NULL);
   if (unlikely(code != SQLITE_OK)) {
     psql_unlock();
-#if IS_DEBUG
-    pdbg_logf(D_ERROR, "error running sql statement: %s: %s called from %s:%u", sql,
-          sqlite3_errmsg(psync_db), file, line);
-    sendpdbg_logf("error running sql statement: %s: %s called from %s:%u", sql,
-              sqlite3_errmsg(psync_db), file, line);
-#else
     pdbg_logf(D_ERROR, "error running sql statement: %s: %s", sql,
           sqlite3_errmsg(psync_db));
     sendpdbg_logf("error running sql statement: %s: %s", sql,
               sqlite3_errmsg(psync_db));
-#endif
     return NULL;
   }
   res = malloc(sizeof(psync_sql_res));
   res->stmt = stmt;
   res->sql = sql;
-#if IS_DEBUG
   res->column_count = 0;
-#endif
   res->locked = SQL_WRITE_LOCK;
   return res;
 }
 
-#if IS_DEBUG
-psync_sql_res *psql_do_prepare(const char *sql, const char *file, unsigned line) {
-#else
-psync_sql_res *psql_prepare(const char *sql) {
-#endif
+__attribute__((weak)) psync_sql_res *psql_prepare(const char *sql) {
   psync_sql_res *ret;
   ret = pcache_get(sql);
   if (ret) {
-    //    pdbg_logf(D_NOTICE, "got statement %s from cache", sql);
     ret->locked = SQL_WRITE_LOCK;
-#if IS_DEBUG
-    psql_do_lock(file, line);
-#else
     psql_lock();
-#endif
     return ret;
   } else
-#if IS_DEBUG
-    return psql_do_prepare_nocache(sql, file, line);
-#else
     return psql_prepare_nocache(sql);
-#endif
+}
+
+// psql_do_* weak stubs for query/statement/prepare variants.
+// In release builds these forward directly to the non-do implementations.
+// debug/psql_debug.c provides strong overrides with SQL tracing.
+__attribute__((weak)) int psql_do_statement(const char *sql, const char *file,
+                                            unsigned line) {
+  return psql_statement(sql);
+}
+__attribute__((weak)) int psql_do_start_transaction(const char *file,
+                                                    unsigned line) {
+  return psql_start();
+}
+__attribute__((weak)) psync_sql_res *psql_do_query_nocache(const char *sql,
+                                                           const char *file,
+                                                           unsigned line) {
+  return psql_query_nocache(sql);
+}
+__attribute__((weak)) psync_sql_res *psql_do_query(const char *sql,
+                                                   const char *file,
+                                                   unsigned line) {
+  return psql_query(sql);
+}
+__attribute__((weak)) psync_sql_res *
+psql_do_query_rdlock_nocache(const char *sql, const char *file, unsigned line) {
+  return psql_rdlock_nocache(sql);
+}
+__attribute__((weak)) psync_sql_res *psql_do_query_rdlock(const char *sql,
+                                                          const char *file,
+                                                          unsigned line) {
+  return psql_query_rdlock(sql);
+}
+__attribute__((weak)) psync_sql_res *
+psql_do_query_nolock_nocache(const char *sql, const char *file, unsigned line) {
+  return psql_query_nolock_nocache(sql);
+}
+__attribute__((weak)) psync_sql_res *psql_do_query_nolock(const char *sql,
+                                                          const char *file,
+                                                          unsigned line) {
+  return psql_query_nolock(sql);
+}
+__attribute__((weak)) psync_sql_res *psql_do_prepare_nocache(const char *sql,
+                                                             const char *file,
+                                                             unsigned line) {
+  return psql_prepare_nocache(sql);
+}
+__attribute__((weak)) psync_sql_res *psql_do_prepare(const char *sql,
+                                                     const char *file,
+                                                     unsigned line) {
+  return psql_prepare(sql);
 }

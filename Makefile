@@ -44,6 +44,9 @@ LIBOUT		:= libpcloudcc_lib.so
 ifeq ($(BUILD), debug)
     CFLAGS += -g -O0 -DDEBUG -Wall -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
     CXXFLAGS += -g -O0 -DDEBUG -Wall -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
+    DEBUGSRC := $(wildcard $(LIBDIR)/debug/*.c)
+    DEBUGOBJ := $(notdir $(DEBUGSRC:%.c=%.o))
+    COBJ += $(DEBUGOBJ)
 else ifeq ($(BUILD), release)
     CFLAGS += -O2 -DNDEBUG -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
     CXXFLAGS += -O2 -DNDEBUG -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
@@ -91,7 +94,10 @@ $(EXECOUT): $(CPPOBJ) $(if $(filter 0,$(STATIC)),$(LIBOUT),$(COBJ))
 $(CPPOBJ): %.o: $(SRCDIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(COBJ): %.o: $(LIBDIR)/%.c
+$(DEBUGOBJ): %.o: $(LIBDIR)/debug/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(filter-out $(DEBUGOBJ),$(COBJ)): %.o: $(LIBDIR)/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(LIBOUT): $(COBJ)

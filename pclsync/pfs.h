@@ -191,4 +191,8 @@ void pfs_refresh_folder(psync_folderid_t folderid);
 void pfs_pause_until_login();
 void pfs_clean_tasks();
 
+void pfs_debug_init_file_mutex(pthread_mutex_t *m);
+void pfs_debug_dump_internals();
+void pfs_debug_register_signal_handlers();
+
 #endif
