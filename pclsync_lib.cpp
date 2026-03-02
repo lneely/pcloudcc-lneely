@@ -540,6 +540,25 @@ int clib::pclsync_lib::check_pending(const char *unused) {
   return 0;
 }
 
+int clib::pclsync_lib::get_status(const char *unused) {
+  (void)unused;
+
+  pstatus_t st;
+  psync_get_status(&st);
+
+  char buf[512];
+  snprintf(buf, sizeof(buf),
+           "Status:   %s\n"
+           "Download: %s\n"
+           "Upload:   %s",
+           status2string(st.status),
+           st.downloadstr ? st.downloadstr : "",
+           st.uploadstr   ? st.uploadstr   : "");
+
+  pshm_write(buf, strlen(buf) + 1);
+  return 0;
+}
+
 int clib::pclsync_lib::finalize(const char *unused) {
   (void)unused;
   psync_destroy();
@@ -677,6 +696,7 @@ int clib::pclsync_lib::init() {
   prpc_register(SYNCRESUME, &resume_sync);
   prpc_register(SENDTFA, &receive_tfa_code);
   prpc_register(SENDAUTH, &receive_auth);
+  prpc_register(GETSTATUS, &get_status);
 
   return 0;
 }

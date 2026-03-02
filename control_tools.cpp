@@ -61,6 +61,7 @@ static char* command_generator(const char* text, int state) {
     "sync", "sync ls", "sync add", "sync remove", "sync rm", "sync pause", "sync resume",
     "s", "s ls", "s add", "s remove", "s rm", "s pause", "s resume",
     "pending", "p",
+    "status", "st",
     "tfa",
     "auth",
     "finalize", "f",
@@ -107,6 +108,7 @@ void setup_app(CLI::App *app) {
               << "    pause: Pause syncing (filesystem remains mounted)" << std::endl
               << "    resume: Resume syncing" << std::endl
               << "  pending(p): Check for pending transfers" << std::endl
+              << "  status(st): Show current sync state" << std::endl
               << "  tfa <code>: Supply 2FA code to a running daemon" << std::endl
               << "  auth <password>: Supply password to a running daemon" << std::endl
               << "  finalize(f): Kill daemon and quit" << std::endl
@@ -195,6 +197,32 @@ void setup_app(CLI::App *app) {
     }
     delete rpc;
     std::cout << "Auth sent." << std::endl;
+    if (errm) { free(errm); }
+    return 0;
+  });
+
+  // status command
+  app->add_subcommand("status", "Show current sync state")->alias("st")->callback([] {
+    char *errm = NULL;
+    size_t errm_size = 0;
+    RpcClient *rpc = new RpcClient();
+    if (int result = rpc->Call(GETSTATUS, "", &errm, &errm_size) != 0) {
+      std::cerr << "Status failed: " << (errm ? errm : "no message") << std::endl;
+      if (errm) { free(errm); }
+      delete rpc;
+      return result;
+    }
+    delete rpc;
+
+    char *status_str = nullptr;
+    if (pshm_read((void**)&status_str, nullptr) && status_str) {
+      std::cout << status_str << std::endl;
+      free(status_str);
+    } else {
+      std::cerr << "Failed to read status from daemon." << std::endl;
+      if (errm) { free(errm); }
+      return -1;
+    }
     if (errm) { free(errm); }
     return 0;
   });

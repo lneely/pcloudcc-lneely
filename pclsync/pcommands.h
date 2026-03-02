@@ -9,5 +9,6 @@ enum command_ids_ {
   SYNCPAUSE,
   SYNCRESUME,
   SENDTFA,
-  SENDAUTH
+  SENDAUTH,
+  GETSTATUS
 };
