@@ -49,8 +49,9 @@ typedef struct _psync_tree {
 #define ptree_for_each(a, l)                                              \
   for (a = ptree_get_first(l); a != NULL; a = ptree_get_next(a))
 #define ptree_for_each_element(a, l, t, n)                                \
-  for (a = ptree_element(ptree_get_first(l), t, n); &a->n != NULL;   \
-       a = ptree_element(ptree_get_next(&a->n), t, n))
+  for (a = (ptree_get_first(l) ? ptree_element(ptree_get_first(l), t, n) : NULL); \
+       a != NULL;                                                              \
+       a = (ptree_get_next(&a->n) ? ptree_element(ptree_get_next(&a->n), t, n) : NULL))
 
 #define ptree_for_each_element_call(l, t, n, c)                           \
   do {                                                                         \
