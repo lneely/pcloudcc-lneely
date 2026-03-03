@@ -95,7 +95,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
   int pCnt = params->paramCnt; // Number of optional parameters
   int mpCnt = 6;               // Number of mandatory params
   int tpCnt;                   // Total number of parameters
-  char *keyParams;
+  char *keyParams = NULL;
   char charBuff[30][258];
 
   sock = papi_connect(binapi, psync_setting_get_bool(0));
