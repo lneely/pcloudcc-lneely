@@ -220,11 +220,34 @@ int pfs_update_openfile(uint64_t taskid, uint64_t writeid,
             else
               break;
           } else {
-            pdbg_logf(D_BUG, "found already open file %lu, should not happen",
+            pdbg_logf(D_BUG, "found already open file %lu, re-inserting old fileid",
                   (unsigned long)newfileid);
-            break;
+            tr = openfiles;
+            d = -1;
+            while (tr) {
+              d = fileid - ptree_element(tr, psync_openfile_t, tree)->fileid;
+              if (d < 0) {
+                if (tr->left)
+                  tr = tr->left;
+                else
+                  break;
+              } else if (d > 0) {
+                if (tr->right)
+                  tr = tr->right;
+                else
+                  break;
+              } else
+                break;
+            }
+            if (d < 0)
+              ptree_add_before(&openfiles, tr, &fl->tree);
+            else
+              ptree_add_after(&openfiles, tr, &fl->tree);
+            ret = -1;
+            goto unlock_ret;
           }
         }
+        fl->fileid = newfileid;
         if (d < 0)
           ptree_add_before(&openfiles, tr, &fl->tree);
         else
@@ -243,6 +266,7 @@ int pfs_update_openfile(uint64_t taskid, uint64_t writeid,
         }
         ret = -1;
       }
+unlock_ret:
       pthread_mutex_unlock(&fl->mutex);
       psql_unlock();
       return ret;
