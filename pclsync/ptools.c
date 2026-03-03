@@ -258,30 +258,28 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
 
   // Add optional parameters to the structure
   for (i = reqParCnt; i < totalParCnt; i++) {
-    int j = 0;
+    int j = i - reqParCnt;
 
-    if (optionalParams->Params[i].paramtype == 0) {
+    if (optionalParams->Params[j].paramtype == 0) {
       localParams[i] = (binparam)PAPI_STR(optionalParams->Params[j].paramname,
                                        optionalParams->Params[j].str);
 
       continue;
     }
 
-    if (optionalParams->Params[i].paramtype == 1) {
+    if (optionalParams->Params[j].paramtype == 1) {
       localParams[i] = (binparam)PAPI_NUM(optionalParams->Params[j].paramname,
                                        optionalParams->Params[j].num);
 
       continue;
     }
 
-    if (optionalParams->Params[i].paramtype == 2) {
+    if (optionalParams->Params[j].paramtype == 2) {
       localParams[i] = (binparam)PAPI_BOOL(optionalParams->Params[j].paramname,
                                         optionalParams->Params[j].num);
 
       continue;
     }
-
-    j++;
   }
 
   for (i = 0; i < totalParCnt; i++) {
