@@ -160,7 +160,7 @@ psync_list_builder_t *psync_list_builder_create(size_t element_size, size_t offs
   return builder;
 }
 
-uint32_t *psync_list_bulder_push_num(psync_list_builder_t *builder) {
+uint32_t *psync_list_builder_push_num(psync_list_builder_t *builder) {
   if (!builder->last_numbers ||
       builder->last_numbers->used >=
           sizeof(builder->last_numbers->numbers) / sizeof(uint32_t)) {
@@ -172,7 +172,7 @@ uint32_t *psync_list_bulder_push_num(psync_list_builder_t *builder) {
   return &builder->last_numbers->numbers[builder->last_numbers->used++];
 }
 
-uint32_t psync_list_bulder_pop_num(psync_list_builder_t *builder) {
+uint32_t psync_list_builder_pop_num(psync_list_builder_t *builder) {
   uint32_t ret;
   ret = builder->last_numbers->numbers[builder->popoff++];
   if (builder->popoff >= builder->last_numbers->used) {
@@ -184,7 +184,7 @@ uint32_t psync_list_bulder_pop_num(psync_list_builder_t *builder) {
 }
 
 
-void *psync_list_bulder_add_element(psync_list_builder_t *builder) {
+void *psync_list_builder_add_element(psync_list_builder_t *builder) {
   if (!builder->last_elements ||
       builder->last_elements->used >= builder->elements_per_list) {
     builder->last_elements = (psync_list_element_list *)malloc(
@@ -196,7 +196,7 @@ void *psync_list_bulder_add_element(psync_list_builder_t *builder) {
   builder->current_element =
       builder->last_elements->elements +
       builder->last_elements->used * builder->element_size;
-  builder->cstrcnt = psync_list_bulder_push_num(builder);
+  builder->cstrcnt = psync_list_builder_push_num(builder);
   *builder->cstrcnt = 0;
   builder->last_elements->used++;
   builder->cnt++;
@@ -229,8 +229,8 @@ void psync_list_add_lstring_offset(psync_list_builder_t *builder, size_t offset,
   }
   memcpy(s, *str, length);
   *str = s;
-  *(psync_list_bulder_push_num(builder)) = offset;
-  *(psync_list_bulder_push_num(builder)) = length;
+  *(psync_list_builder_push_num(builder)) = offset;
+  *(psync_list_builder_push_num(builder)) = length;
   (*builder->cstrcnt)++;
 }
 
@@ -268,10 +268,10 @@ void *psync_list_builder_finalize(psync_list_builder_t *builder) {
     for (i = 0; i < el->used; i++) {
       memcpy(elem, el->elements + (i * builder->element_size),
              builder->element_size);
-      scnt = psync_list_bulder_pop_num(builder);
+      scnt = psync_list_builder_pop_num(builder);
       for (j = 0; j < scnt; j++) {
-        offset = psync_list_bulder_pop_num(builder);
-        length = psync_list_bulder_pop_num(builder);
+        offset = psync_list_builder_pop_num(builder);
+        length = psync_list_builder_pop_num(builder);
         pstr = (char **)(elem + offset);
         memcpy(str, *pstr, length);
         *pstr = str;

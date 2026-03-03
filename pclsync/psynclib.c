@@ -412,7 +412,7 @@ apiservers_list_t *psync_get_apiservers(char **err) {
 
   for (i = 0; i < locationscnt; ++i) {
     location = locations->array[i];
-    plocation = (apiserver_info_t *)psync_list_bulder_add_element(builder);
+    plocation = (apiserver_info_t *)psync_list_builder_add_element(builder);
     br = papi_find_result2(location, "label", PARAM_STR);
     plocation->label = br->str;
     psync_list_add_lstring_offset(builder, offsetof(apiserver_info_t, label),
@@ -606,7 +606,7 @@ int psync_tfa_send_nofification(plogged_device_list_t **devices_list) {
           sizeof(plogged_device_t), offsetof(plogged_device_list_t, devices));
       for (i = 0; i < cres->length; i++) {
         plogged_device_t *dev =
-            (plogged_device_t *)psync_list_bulder_add_element(builder);
+            (plogged_device_t *)psync_list_builder_add_element(builder);
         const binresult *str =
             papi_find_result2(cres->array[i], "name", PARAM_STR);
         dev->type = papi_find_result2(cres->array[i], "type", PARAM_NUM)->num;
