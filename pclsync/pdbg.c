@@ -35,29 +35,31 @@ static void pdbg_init_level(void) {
 
     const char *level_str = getenv("PCLOUD_LOG_LEVEL");
     if (!level_str || level_str[0] == '\0') {
-        pdbg_runtime_level = D_INFO; /* default to INFO */
+        __atomic_store_n(&pdbg_runtime_level, D_INFO, __ATOMIC_RELAXED);
         return;
     }
 
+    unsigned int level;
     /* Parse log level string (case-insensitive) */
     if (strcasecmp(level_str, "NONE") == 0) {
-        pdbg_runtime_level = D_NONE;
+        level = D_NONE;
     } else if (strcasecmp(level_str, "BUG") == 0 || strcasecmp(level_str, "DEBUG") == 0) {
-        pdbg_runtime_level = D_BUG;
+        level = D_BUG;
     } else if (strcasecmp(level_str, "CRITICAL") == 0) {
-        pdbg_runtime_level = D_CRITICAL;
+        level = D_CRITICAL;
     } else if (strcasecmp(level_str, "ERROR") == 0) {
-        pdbg_runtime_level = D_ERROR;
+        level = D_ERROR;
     } else if (strcasecmp(level_str, "WARNING") == 0 || strcasecmp(level_str, "WARN") == 0) {
-        pdbg_runtime_level = D_WARNING;
+        level = D_WARNING;
     } else if (strcasecmp(level_str, "INFO") == 0) {
-        pdbg_runtime_level = D_INFO;
+        level = D_INFO;
     } else if (strcasecmp(level_str, "NOTICE") == 0) {
-        pdbg_runtime_level = D_NOTICE;
+        level = D_NOTICE;
     } else {
         /* Invalid level, default to INFO */
-        pdbg_runtime_level = D_INFO;
+        level = D_INFO;
     }
+    __atomic_store_n(&pdbg_runtime_level, level, __ATOMIC_RELAXED);
 }
 
 char *psync_debug_path() {

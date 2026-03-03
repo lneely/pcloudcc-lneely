@@ -1,13 +1,13 @@
 #ifndef __PDBG_H
 #define __PDBG_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "pcompiler.h"
 #include "putil.h" // need for macros...
 #include "psynclib.h" // need for macros...
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
 #define D_NONE 0
@@ -36,7 +36,7 @@ extern unsigned int pdbg_runtime_level;
 
 #define pdbg_logf(level, ...)                                                      \
   do {                                                                         \
-    if (level <= pdbg_runtime_level)                                           \
+    if (level <= __atomic_load_n(&pdbg_runtime_level, __ATOMIC_RELAXED))      \
       pdbg_printf(__FILE__, __FUNCTION__, __LINE__, level, __VA_ARGS__);       \
   } while (0)
 #define pdbg_assert(cond)                                                           \
