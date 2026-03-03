@@ -66,6 +66,7 @@ static void rehash_cnt(unsigned char *hashbin, unsigned long cnt) {
 void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
                 int fast) {
   static unsigned char lastseed[PSYNC_LHASH_DIGEST_LEN];
+  static pthread_mutex_t lastseed_mutex = PTHREAD_MUTEX_INITIALIZER;
   psync_lhash_ctx hctx;
   struct timespec tm;
   struct stat st;
@@ -160,6 +161,7 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
   if (aelen)
     psync_lhash_update(&hctx, addent, aelen);
   pdbg_logf(D_NOTICE, "adding bulk data");
+  pthread_mutex_lock(&lastseed_mutex);
   for (i = 0; i < ARRAY_SIZE(lsc); i++) {
     memcpy(&lsc[i], lastseed, PSYNC_LHASH_DIGEST_LEN);
     for (j = 0; j < PSYNC_LHASH_DIGEST_LEN; j++)
@@ -176,6 +178,7 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
   }
   psync_lhash_final(seed, &hctx);
   memcpy(lastseed, seed, PSYNC_LHASH_DIGEST_LEN);
+  pthread_mutex_unlock(&lastseed_mutex);
 
   pdbg_logf(D_NOTICE, "storing in db");
   psync_sql_res *res;
