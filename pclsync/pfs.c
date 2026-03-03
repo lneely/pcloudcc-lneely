@@ -1765,17 +1765,8 @@ static void pfs_free_openfile(psync_openfile_t *of) {
 }
 
 static void pfs_get_both_locks(psync_openfile_t *of) {
-retry:
   psql_lock();
-  if (pthread_mutex_trylock(&of->mutex)) {
-    psql_unlock();
-    pfs_lock_file(of);
-    if (psql_trylock()) {
-      pthread_mutex_unlock(&of->mutex);
-      psys_sleep_milliseconds(1);
-      goto retry;
-    }
-  }
+  pfs_lock_file(of);
 }
 
 void pfs_dec_of_refcnt(psync_openfile_t *of) {
@@ -2431,7 +2422,8 @@ PSYNC_NOINLINE static int pfs_do_check_write_space(psync_openfile_t *of,
         (unsigned long)speed / 1024, (unsigned long)speed, (unsigned long)mult);
   pfs_throttle(size, speed);
   pdbg_logf(D_NOTICE, "continuing write");
-  pfs_lock_file(of);
+  if (pfs_lock_file(of))
+    return -EINTR;
   return 1;
 }
 
