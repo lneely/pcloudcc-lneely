@@ -3,6 +3,7 @@
 
 #include "psettings.h"
 #include "prun.h"
+#include "pdbg.h"
 
 // required by thread_entry
 extern PSYNC_THREAD const char *psync_thread_name; 
@@ -32,6 +33,7 @@ static void start_thread(const char *name, void *run, void *ptr) {
   thread_data *data;
   pthread_t thread;
   pthread_attr_t attr;
+  int ret;
   
   data = malloc(sizeof(thread_data));
   data->run = run;
@@ -41,8 +43,13 @@ static void start_thread(const char *name, void *run, void *ptr) {
   pthread_attr_init(&attr);
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
   pthread_attr_setstacksize(&attr, PSYNC_STACK_SIZE);
-  pthread_create(&thread, &attr, thread_entry, data);
+  ret = pthread_create(&thread, &attr, thread_entry, data);
   pthread_attr_destroy(&attr);
+  
+  if (ret) {
+    pdbg_logf(D_ERROR, "pthread_create failed for thread %s: %d", name, ret);
+    free(data);
+  }
 }
 
 void prun_thread(const char *name, thread0_run run) {
