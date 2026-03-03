@@ -1157,7 +1157,7 @@ plink_contents_t *do_show_link(const char *code, char **err /*OUT*/) {
                                         offsetof(plink_contents_t, entries));
     for (i = 0; i < concnt; ++i) {
       link = contents->array[i];
-      pcont = (link_cont_t *)psync_list_bulder_add_element(builder);
+      pcont = (link_cont_t *)psync_list_builder_add_element(builder);
       br = papi_find_result2(link, "name", PARAM_STR);
       pcont->name = br->str;
       psync_list_add_lstring_offset(builder, offsetof(link_cont_t, name),
@@ -1454,7 +1454,7 @@ preciever_list_t *do_list_email_with_access(unsigned long long linkid,
   }
   for (i = 0; i < lcnt; ++i) {
     reciever = list->array[i];
-    pcont = (reciever_info_t *)psync_list_bulder_add_element(builder);
+    pcont = (reciever_info_t *)psync_list_builder_add_element(builder);
     br = papi_find_result2(reciever, "email", PARAM_STR);
     if (br) {
       pcont->mail = br->str;
@@ -1575,7 +1575,7 @@ bookmarks_list_t *do_cache_bookmarks(char **err) {
 
   for (i = 0; i < lcnt; ++i) {
     bookmark = list->array[i];
-    pcont = (bookmark_info_t *)psync_list_bulder_add_element(builder);
+    pcont = (bookmark_info_t *)psync_list_builder_add_element(builder);
     br = papi_find_result2(bookmark, "link", PARAM_STR);
     pcont->link = br->str;
     psync_list_add_lstring_offset(builder, offsetof(bookmark_info_t, link),

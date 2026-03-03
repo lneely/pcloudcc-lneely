@@ -315,7 +315,7 @@ psync_notification_list_t *pnotify_get() {
     cnttotal = notifications->length;
     for (i = 0; i < cnttotal; i++) {
       ntf = notifications->array[i];
-      pntf = (psync_notification_t *)psync_list_bulder_add_element(builder);
+      pntf = (psync_notification_t *)psync_list_builder_add_element(builder);
       br = papi_find_result2(ntf, "notification", PARAM_STR);
       pntf->text = br->str;
       psync_list_add_lstring_offset(

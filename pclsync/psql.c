@@ -316,7 +316,7 @@ void psql_list_add(psync_list_builder_t *builder, psync_sql_res *res, psync_list
     builder->current_element =
         builder->last_elements->elements +
         builder->last_elements->used * builder->element_size;
-    builder->cstrcnt = psync_list_bulder_push_num(builder);
+    builder->cstrcnt = psync_list_builder_push_num(builder);
     *builder->cstrcnt = 0;
     while (callback(builder, builder->current_element, row)) {
       row = psql_fetch(res);
