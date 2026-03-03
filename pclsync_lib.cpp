@@ -442,6 +442,7 @@ static void status_change(pstatus_t *status) {
     psync_set_user_pass(clib::pclsync_lib::get_lib().get_username().c_str(),
                         clib::pclsync_lib::get_lib().get_password().c_str(),
                         (int)clib::pclsync_lib::get_lib().save_pass_);
+    clib::pclsync_lib::get_lib().wipe_password();
     std::cout << "logging in" << std::endl;
   } else if (status->status == PSTATUS_TFA_REQUIRED) {
     if (clib::pclsync_lib::get_lib().get_tfa_code().empty()) {

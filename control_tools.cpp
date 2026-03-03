@@ -485,7 +485,7 @@ int daemonize(bool do_commands) {
   }
 
   /* Open any logs here */
-  umask(0);
+  umask(0077);
   sid = setsid();
   if (sid < 0) {
     exit(EXIT_FAILURE);
