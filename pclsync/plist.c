@@ -246,9 +246,23 @@ void *psync_list_builder_finalize(psync_list_builder_t *builder) {
   psync_list_element_list *el;
   unsigned long i;
   uint32_t j, scnt, offset, length;
-  size_t sz;
-  sz = builder->elements_offset + builder->element_size * builder->cnt +
-       builder->stringalloc;
+  size_t sz, elem_total;
+  
+  if (builder->cnt > 0 && builder->element_size > SIZE_MAX / builder->cnt) {
+    pdbg_logf(D_ERROR, "Integer overflow in list builder: element_size=%zu cnt=%lu",
+              builder->element_size, (unsigned long)builder->cnt);
+    return NULL;
+  }
+  
+  elem_total = builder->element_size * builder->cnt;
+  
+  if (elem_total > SIZE_MAX - builder->elements_offset ||
+      elem_total + builder->elements_offset > SIZE_MAX - builder->stringalloc) {
+    pdbg_logf(D_ERROR, "Integer overflow in list builder size calculation");
+    return NULL;
+  }
+  
+  sz = builder->elements_offset + elem_total + builder->stringalloc;
   pdbg_logf(D_NOTICE, "allocating %lu bytes, %lu of which for strings",
         (unsigned long)sz, (unsigned long)builder->stringalloc);
   ret = malloc(sizeof(char) * sz);
