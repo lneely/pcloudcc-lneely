@@ -266,9 +266,9 @@ void ptimer_sleep_handler(psync_exception_callback func) {
 void ptimer_do_notify_exception() {
   struct exception_list *e;
   pthread_t threadid;
-  e = excepions;
   threadid = pthread_self();
   pthread_mutex_lock(&timer_ex_mutex);
+  e = excepions;
   while (e) {
     if (!pthread_equal(threadid, e->threadid))
       e->func();
