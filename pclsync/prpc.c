@@ -122,6 +122,7 @@ static void on_request(void *lpvParam) {
 cleanup:
   if (sockfd) {
     close(*sockfd);
+    free(sockfd);
   }
   if (response) {
     free(response);
@@ -265,10 +266,18 @@ void prpc_main_loop() {
       continue;
     }
 
+    int *cl_ptr = malloc(sizeof(int));
+    if (!cl_ptr) {
+      pdbg_logf(D_ERROR, "Failed to allocate memory for socket fd");
+      close(cl);
+      continue;
+    }
+    *cl_ptr = cl;
+
     // handle the request in a new thread
     prun_thread1("Pipe request handle routine",
                       on_request, // thread proc
-                      (void *)&cl                   // thread parameter
+                      (void *)cl_ptr                   // thread parameter
     );
   }
 
