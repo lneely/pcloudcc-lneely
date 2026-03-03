@@ -24,3 +24,5 @@ pcloudcc
 result
 .kateproject.build
 .direnv
+.kiro
+.claude
