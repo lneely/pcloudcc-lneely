@@ -3498,6 +3498,7 @@ static void pfs_do_stop(void) {
     if (mp) {
       if (stat(mp, &st_before) == 0) {
         fuse_unmount(mp, psync_fuse_channel);
+        psync_fuse_channel = NULL;
         clock_gettime(CLOCK_REALTIME, &ts);
 
         // Check if the mountpoint is still accessible
@@ -3739,7 +3740,8 @@ static int pfs_do_start() {
   if (pdbg_unlikely(!psync_fuse_channel)) {
     pdbg_logf(D_CRITICAL,
               "CRITICAL ERROR: fuse_mount() failed for mount point %s. "
-              "The FUSE filesystem cannot be started.", mp);
+              "The FUSE filesystem cannot be started. errno=%d (%s)", 
+              mp, errno, strerror(errno));
     goto err0;
   }
   psync_fuse = fuse_new(psync_fuse_channel, &args, &psync_oper,
