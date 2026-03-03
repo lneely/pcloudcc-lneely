@@ -2130,17 +2130,24 @@ pfs_reopen_file_for_writing(psync_openfile_t *of) {
   if (unlikely(of->encrypted &&
                of->encoder == PSYNC_CRYPTO_UNLOADED_SECTOR_ENCODER)) {
     pcrypto_sector_encdec_t enc;
+    psync_fsfileid_t remotefileid;
+    uint64_t hash;
+    // Save values before unlock
+    remotefileid = of->remotefileid;
+    hash = of->hash;
     // we should unlock of->mutex as it can deadlock with sqllock and taking
     // sqllock before network operation is not a good idea
     pthread_mutex_unlock(&of->mutex);
-    enc = pcryptofolder_filencoder_get(of->remotefileid, of->hash, 0);
+    enc = pcryptofolder_filencoder_get(remotefileid, hash, 0);
     if (unlikely(psync_crypto_is_error(enc)))
       return -pfs_crypto_err_to_errno(psync_crypto_to_error(enc));
     pfs_lock_file(of);
-    if (of->encoder == PSYNC_CRYPTO_UNLOADED_SECTOR_ENCODER)
+    // Check if state changed while unlocked
+    if (of->encoder == PSYNC_CRYPTO_UNLOADED_SECTOR_ENCODER &&
+        of->remotefileid == remotefileid && of->hash == hash)
       of->encoder = enc;
     else
-      pcryptofolder_filencoder_release(of->remotefileid, of->hash, enc);
+      pcryptofolder_filencoder_release(remotefileid, hash, enc);
     if (of->newfile || of->modified)
       return 1;
   }
