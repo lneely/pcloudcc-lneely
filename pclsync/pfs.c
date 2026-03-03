@@ -1389,8 +1389,10 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
 
     } else { /* cr->fileid==0 */
       psync_fstask_local_creat_t *lc;
+      int64_t fake_fileid;
       lc = pfs_task_creat_get_local(cr);
-      of = pfs_create_file(INT64_MAX - (UINT64_MAX - cr->taskid), 0,
+      fake_fileid = INT64_MIN + (int64_t)cr->taskid;
+      of = pfs_create_file(fake_fileid, 0,
                                 lc->datalen, 0, 1, 0,
                                 pfs_task_get_ref_locked(folder),
                                 fpath->name, PSYNC_CRYPTO_INVALID_ENCODER);
