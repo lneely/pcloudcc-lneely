@@ -1181,12 +1181,13 @@ void *psync_task_papi_result(psync_task_manager_t tm, int id) {
 }
 
 void psync_task_free(psync_task_manager_t tm) {
+  int refcnt, i;
+  pthread_mutex_lock(&tm->mutex);
   if (tm->refcnt == 1) {
+    pthread_mutex_unlock(&tm->mutex);
     psync_task_destroy(tm);
   }
   else {
-    int refcnt, i;
-    pthread_mutex_lock(&tm->mutex);
     tm->waitfor = PSYNC_WAIT_FREED;
     for (i = 0; i < tm->taskcnt; i++)
       if (tm->tasks[i].status == PSYNC_TASK_STATUS_READY) {
