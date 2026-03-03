@@ -6,8 +6,9 @@
 
 void *pmem_mmap(size_t size) {
 #if defined(MAP_ANONYMOUS)
-  return mmap(NULL, size, PROT_READ | PROT_WRITE,
-              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  void *ret = mmap(NULL, size, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  return (ret == MAP_FAILED) ? NULL : ret;
 #else
   return malloc(size);
 #endif
