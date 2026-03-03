@@ -86,6 +86,11 @@ static void on_request(void *lpvParam) {
     rqbufp = rqbufp + rc;
     if (readbytes > 12) {
       request = (rpc_message_t *)rqbuf;
+      if (request->length > POVERLAY_BUFSIZE) {
+        pdbg_logf(D_ERROR, "Request length %lu exceeds buffer size %d",
+                  (unsigned long)request->length, POVERLAY_BUFSIZE);
+        goto cleanup;
+      }
       if (request->length == (uint64_t)readbytes)
         break;
     }
