@@ -311,9 +311,11 @@ static int check_peer_pubkey(ssl_connection_t *conn) {
   mbedtls_sha256(buff + sizeof(buff) - i, i, sigbin, 0);
   psync_binhex(sighex, sigbin, 32);
   sighex[64] = 0;
+  int match = 0;
   for (i = 0; i < ARRAY_SIZE(psync_ssl_trusted_pk_sha256); i++)
-    if (!strcmp(sighex, psync_ssl_trusted_pk_sha256[i]))
-      return 0;
+    match |= (memcmp(sighex, psync_ssl_trusted_pk_sha256[i], 64) == 0);
+  if (match)
+    return 0;
   pdbg_logf(D_ERROR,
         "got sha256hex of public key %s that does not match any approved "
         "fingerprint",
