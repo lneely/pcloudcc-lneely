@@ -1782,12 +1782,15 @@ void pfs_dec_of_refcnt(psync_openfile_t *of) {
   uint32_t refcnt;
   pfs_get_both_locks(of);
   refcnt = --of->refcnt;
-  if (!refcnt)
+  if (!refcnt) {
     ptree_del(&openfiles, &of->tree);
-  psql_unlock();
-  pthread_mutex_unlock(&of->mutex);
-  if (!refcnt)
+    psql_unlock();
+    pthread_mutex_unlock(&of->mutex);
     pfs_free_openfile(of);
+  } else {
+    psql_unlock();
+    pthread_mutex_unlock(&of->mutex);
+  }
 }
 
 void pfs_inc_of_refcnt_and_readers(psync_openfile_t *of) {
