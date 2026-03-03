@@ -142,27 +142,27 @@ typedef struct {
 
 // FIXME: wtf... 
 extern PSYNC_THREAD const char *psync_thread_name; 
-static inline void pfs_do_lock_file(psync_openfile_t *of, const char *file,
+static inline int pfs_do_lock_file(psync_openfile_t *of, const char *file,
                                          unsigned long line) {
   if (unlikely(pthread_mutex_trylock(&of->mutex))) {
     struct timespec tm;
     clock_gettime(CLOCK_REALTIME, &tm);
     tm.tv_sec += 60;
     if (pthread_mutex_timedlock(&of->mutex, &tm)) {
-      pdbg_logf(D_BUG,
-            "could not lock mutex of file %s taken in %s:%lu by thread %s, "
-            "aborting",
+      pdbg_logf(D_ERROR,
+            "could not lock mutex of file %s taken in %s:%lu by thread %s",
             of->currentname, of->lockfile, of->lockline, of->lockthread);
-      abort();
+      return -1;
     }
   }
   of->lockfile = file;
   of->lockthread = psync_thread_name;
   of->lockline = line;
+  return 0;
 }
 #else
-static inline void pfs_lock_file(psync_openfile_t *of) {
-  pthread_mutex_lock(&of->mutex);
+static inline int pfs_lock_file(psync_openfile_t *of) {
+  return pthread_mutex_lock(&of->mutex);
 }
 #endif
 
