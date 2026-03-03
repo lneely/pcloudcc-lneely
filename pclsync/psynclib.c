@@ -343,8 +343,11 @@ void psync_logout(uint32_t auth_status, int doinvauth) {
   pcryptofolder_lock();
 
   pthread_mutex_lock(&psync_my_auth_mutex);
-  putil_wipe(psync_my_pass, sizeof(psync_my_pass));
-  free(psync_my_pass);
+  if (psync_my_pass) {
+    putil_wipe(psync_my_pass, strlen(psync_my_pass));
+    free(psync_my_pass);
+    psync_my_pass = NULL;
+  }
   pthread_mutex_unlock(&psync_my_auth_mutex);
 
   pstatus_set(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_CONNECTING);
