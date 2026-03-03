@@ -28,6 +28,8 @@
 */
 
 #include <stddef.h>
+
+#define MAX_API_RESPONSE_SIZE (256 * 1024 * 1024) // 256MB
 #include <stdio.h>
 #include <string.h>
 
@@ -393,6 +395,12 @@ binresult *papi_result(psock_t *sock) {
 
   if (pdbg_unlikely(psock_readall(sock, &ressize, sizeof(uint32_t)) !=
                    sizeof(uint32_t))) {
+    return NULL;
+  }
+
+  if (ressize > MAX_API_RESPONSE_SIZE) {
+    pdbg_logf(D_WARNING, "API response size %u exceeds limit %u, rejecting",
+              ressize, MAX_API_RESPONSE_SIZE);
     return NULL;
   }
 
