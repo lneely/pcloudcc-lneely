@@ -390,7 +390,8 @@ void setup_app(CLI::App *app) {
     const char *folderid = syncrm_fid.c_str();
 
     RpcClient *rpc = new RpcClient();
-    if(int result = rpc->Call(STOPSYNC, folderid, &errm, &errmsz) != 0) {
+    int result = rpc->Call(STOPSYNC, folderid, &errm, &errmsz);
+    if(result != 0) {
       std::cerr << "Remove Sync Folder failed: " << (errm ? errm : "no message") << std::endl;
       if (errm) { free(errm); }
       delete rpc;

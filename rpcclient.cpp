@@ -111,9 +111,28 @@ int RpcClient::readResponse(int fd, char **out, size_t *out_size) {
         return -1;
     }
 
-    ssize_t bytes_read = read(fd, msg, POVERLAY_BUFSIZE);
-    if (bytes_read <= 0) {
-        const char *error_msg = (bytes_read == 0) ? "Connection closed" : "Read error";
+    // Read header first to get message length
+    size_t header_size = offsetof(rpc_message_t, value);
+    ssize_t bytes_read = 0;
+    ssize_t total_read = 0;
+    
+    while (total_read < (ssize_t)header_size) {
+        bytes_read = read(fd, ((char*)msg) + total_read, header_size - total_read);
+        if (bytes_read <= 0) {
+            const char *error_msg = (bytes_read == 0) ? "Connection closed" : "Read error";
+            *out = strdup(error_msg);
+            *out_size = strlen(error_msg) + 1;
+            putil_wipe(msg, POVERLAY_BUFSIZE);
+            free(msg);
+            return -1;
+        }
+        total_read += bytes_read;
+    }
+
+    // Validate msg->length
+    size_t max_value_size = POVERLAY_BUFSIZE - header_size;
+    if (msg->length > max_value_size) {
+        const char *error_msg = "Message length exceeds buffer size";
         *out = strdup(error_msg);
         *out_size = strlen(error_msg) + 1;
         putil_wipe(msg, POVERLAY_BUFSIZE);
@@ -121,9 +140,30 @@ int RpcClient::readResponse(int fd, char **out, size_t *out_size) {
         return -1;
     }
 
-    *out = (char *)malloc(msg->length);
-    memcpy(*out, msg->value, msg->length);
-    *out_size = msg->length;
+    // Read the value payload
+    while (total_read < (ssize_t)(header_size + msg->length)) {
+        bytes_read = read(fd, ((char*)msg) + total_read, header_size + msg->length - total_read);
+        if (bytes_read < 0) {
+            const char *error_msg = "Read error";
+            *out = strdup(error_msg);
+            *out_size = strlen(error_msg) + 1;
+            putil_wipe(msg, POVERLAY_BUFSIZE);
+            free(msg);
+            return -1;
+        }
+        if (bytes_read == 0) {
+            // EOF before reading full message - daemon bug, but handle gracefully
+            break;
+        }
+        total_read += bytes_read;
+    }
+
+    // Use actual bytes read, not claimed length
+    size_t actual_length = total_read - header_size;
+
+    *out = (char *)malloc(actual_length);
+    memcpy(*out, msg->value, actual_length);
+    *out_size = actual_length;
 
     putil_wipe(msg, POVERLAY_BUFSIZE);
     free(msg); 

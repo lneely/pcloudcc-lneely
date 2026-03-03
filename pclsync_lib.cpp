@@ -613,7 +613,15 @@ int clib::pclsync_lib::add_sync_folder(const char *combined_path) {
 // path is the folderid to remove
 int clib::pclsync_lib::remove_sync_folder(const char *fid) {
   psync_folderid_t folderid;
-  folderid = static_cast<psync_folderid_t>(std::stoull(fid, nullptr, 10));
+  try {
+    folderid = static_cast<psync_folderid_t>(std::stoull(fid, nullptr, 10));
+  } catch (const std::invalid_argument &e) {
+    std::cerr << "Invalid folder ID: " << fid << std::endl;
+    return -1;
+  } catch (const std::out_of_range &e) {
+    std::cerr << "Folder ID out of range: " << fid << std::endl;
+    return -1;
+  }
   return psync_delete_sync_by_folderid(folderid);
 }
 
