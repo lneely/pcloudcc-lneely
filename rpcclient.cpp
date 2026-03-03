@@ -135,7 +135,7 @@ int RpcClient::GetState(pCloud_FileState *state, char *path) {
   size_t errm_size = 0;
   int rep = 0;
 
-  if ((rep = this->Call(4, path, &errm, &errm_size) == 0)) {
+  if ((rep = this->Call(4, path, &errm, &errm_size)) == 0) {
     pdbg_logf(D_NOTICE, "rpc_get_state responese rep[%d] path[%s]", rep, path);
     if (errm) {
       pdbg_logf(D_NOTICE, "The error is %s", errm);

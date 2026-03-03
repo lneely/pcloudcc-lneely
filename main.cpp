@@ -214,6 +214,7 @@ int main(int argc, char **argv) {
     return 1;
   } catch (...) {
     std::cerr << "Exception of unknown type!" << std::endl;
+    return 1;
   }
 
   if (daemon) {
