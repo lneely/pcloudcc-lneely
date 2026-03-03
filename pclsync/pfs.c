@@ -309,8 +309,13 @@ int pfs_rename_openfile_locked(psync_fsfileid_t fileid,
         fl->currentfolder =
             pfs_task_get_or_create_folder_tasks_locked(folderid);
       }
+      char *newname = putil_strdup(name);
+      if (!newname) {
+        pthread_mutex_unlock(&fl->mutex);
+        return -ENOMEM;
+      }
       free(fl->currentname);
-      fl->currentname = putil_strdup(name);
+      fl->currentname = newname;
       pthread_mutex_unlock(&fl->mutex);
       return 1;
     }
