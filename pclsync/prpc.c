@@ -160,16 +160,16 @@ static void respond_api(rpc_message_t *request, rpc_message_t *response, size_t 
   int cbidx; // callback index (based on message type)
   int cbret; // callback return value
 
-  cbidx = request->type - 20;
-  cbret = 0;
-
-  if (!handlers_running || (request->type >= ((uint32_t)calbacks_lower_band +
-                                               (uint32_t)handlers_size))) {
+  if (!handlers_running || request->type < (uint32_t)calbacks_lower_band ||
+      request->type >= ((uint32_t)calbacks_lower_band + (uint32_t)handlers_size)) {
     response->type = 13;
     snprintf(response->value, available_space, "Invalid type.");
     pdbg_logf(D_NOTICE, "Invalid request type: %u", request->type);
     return;
   }
+
+  cbidx = request->type - calbacks_lower_band;
+  cbret = 0;
 
   if (!handlers[cbidx]) {
     response->type = 13;
