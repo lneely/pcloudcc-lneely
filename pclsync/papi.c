@@ -460,6 +460,11 @@ again:
       reader->bytesread = 0;
       reader->bytestoread = reader->respsize;
       reader->data = (unsigned char *)malloc(reader->respsize);
+      if (!reader->data) {
+        reader->result = NULL;
+        papi_rdr_alloc(reader);
+        return ASYNC_RES_READY;
+      }
       goto again;
     } else {
       pdbg_assert(reader->state == 1);
