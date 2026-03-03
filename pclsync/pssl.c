@@ -621,6 +621,9 @@ static void trim_der_key(unsigned char *keydata, size_t *keylen) {
     }
     header_size = p - keydata;
     correct_len = header_size + len;
+    if (header_size > *keylen || correct_len > *keylen) {
+        return;
+    }
     trimmed = malloc(correct_len);
     if (!trimmed) return;
     memcpy(trimmed, keydata, correct_len);
