@@ -219,12 +219,12 @@ static void respond(rpc_message_t *request, rpc_message_t *response) {
 
   // truncate messages that exceed the buffer boundaries
   size_t value_length = strnlen(response->value, value_avail);
-  response->length = sizeof(rpc_message_t) + value_length + 1;
-  if (response->length > POVERLAY_BUFSIZE) {
-    response->length = POVERLAY_BUFSIZE;
-    response->value[value_avail - 1] = '\0';
+  if (value_length > POVERLAY_BUFSIZE - sizeof(rpc_message_t) - 1) {
+    value_length = POVERLAY_BUFSIZE - sizeof(rpc_message_t) - 1;
+    response->value[value_length] = '\0';
     pdbg_logf(D_WARNING, "Response message truncated to fit buffer");
   }
+  response->length = sizeof(rpc_message_t) + value_length + 1;
 }
 
 void prpc_main_loop() {
