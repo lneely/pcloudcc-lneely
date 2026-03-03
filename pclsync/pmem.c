@@ -5,13 +5,9 @@
 #include "pdbg.h"
 
 void *pmem_mmap(size_t size) {
-#if defined(MAP_ANONYMOUS)
   void *ret = mmap(NULL, size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   return (ret == MAP_FAILED) ? NULL : ret;
-#else
-  return malloc(size);
-#endif
 }
 
 PSYNC_NOINLINE static void *psync_mmap_anon_emergency(size_t size) {
@@ -41,12 +37,7 @@ void *pmem_mmap_safe(size_t size) {
 }
 
 int pmem_munmap(void *ptr, size_t size) {
-#if defined(MAP_ANONYMOUS)
   return munmap(ptr, size);
-#else
-  free(ptr);
-  return 0;
-#endif
 }
 
 
@@ -67,7 +58,5 @@ int pmem_munlock(void *ptr, size_t size) {
 }
 
 void pmem_reset(void *ptr, size_t size) {
-#if defined(MAP_ANONYMOUS) && defined(MADV_DONTNEED)
   madvise(ptr, size, MADV_DONTNEED);
-#endif
 }
