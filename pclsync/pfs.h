@@ -108,6 +108,7 @@ typedef struct {
   unsigned char encrypted;
   unsigned char throttle;
   unsigned char staticfile;
+  unsigned char canmodify;
 #if IS_DEBUG
   const char *lockfile;
   const char *lockthread;

@@ -1324,6 +1324,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
         of = pfs_create_file(fileid, 0, 0, 0, 1, writeid,
                                   pfs_task_get_ref_locked(folder),
                                   fpath->name, encoder);
+        of->canmodify = (fpath->permissions & PSYNC_PERM_MODIFY) != 0;
         pfs_task_release_folder_tasks_locked(folder);
         psql_unlock();
         pdbg_logf(D_NOTICE, "opening new file %ld %s", (long)fileid, fpath->name);
@@ -1378,6 +1379,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
       of = pfs_create_file(cr->fileid, fileid, size, hash, 1, writeid,
                                 pfs_task_get_ref_locked(folder),
                                 fpath->name, encoder);
+      of->canmodify = (fpath->permissions & PSYNC_PERM_MODIFY) != 0;
       pfs_task_release_folder_tasks_locked(folder);
       psql_unlock();
       free(fpath);
@@ -1401,6 +1403,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
                                 lc->datalen, 0, 1, 0,
                                 pfs_task_get_ref_locked(folder),
                                 fpath->name, PSYNC_CRYPTO_INVALID_ENCODER);
+      of->canmodify = (fpath->permissions & PSYNC_PERM_MODIFY) != 0;
       pfs_task_release_folder_tasks_locked(folder);
       psql_unlock();
       free(fpath);
@@ -1481,6 +1484,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
     of = pfs_create_file(cr->fileid, 0, 0, 0, 1, 0,
                               pfs_task_get_ref_locked(folder), fpath->name,
                               encoder);
+    of->canmodify = (fpath->permissions & PSYNC_PERM_MODIFY) != 0;
     pfs_task_release_folder_tasks_locked(folder);
     psql_unlock();
     of->newfile = 1;
@@ -1506,6 +1510,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
     of = pfs_create_file(fileid, fileid, size, hash, 0, 0,
                               pfs_task_get_ref_locked(folder), fpath->name,
                               encoder);
+    of->canmodify = (fpath->permissions & PSYNC_PERM_MODIFY) != 0;
     of->origctime = ctime;
     fi->fh = openfile_to_fh(of);
     ret = 0;
@@ -2452,6 +2457,10 @@ static int pfs_write(const char *path, const char *buf, size_t size,
   //  (unsigned long)offset);
   of = fh_to_openfile(fi->fh);
   pfs_lock_file(of);
+  if (!of->canmodify) {
+    pthread_mutex_unlock(&of->mutex);
+    return -EACCES;
+  }
   ret = pfs_check_write_space(of, size, offset);
   if (pdbg_unlikely(ret <= 0))
     return ret;
@@ -3238,6 +3247,10 @@ static int pfs_ftruncate(const char *path, fuse_off_t size,
   pdbg_logf(D_NOTICE, "ftruncate %s %lu", path, (unsigned long)size);
   of = fh_to_openfile(fi->fh);
   pfs_lock_file(of);
+  if (!of->canmodify) {
+    pthread_mutex_unlock(&of->mutex);
+    return -EACCES;
+  }
   ret = pfs_ftruncate_of_locked(of, size);
   pthread_mutex_unlock(&of->mutex);
   return pdbg_returnf(ret, " for ftruncate of %s to %lu", path,
