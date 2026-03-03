@@ -304,8 +304,9 @@ static int check_peer_pubkey(ssl_connection_t *conn) {
   }
   i = mbedtls_pk_write_pubkey_der((mbedtls_pk_context *)&cert->pk, buff,
                                   sizeof(buff));
-  if (i <= 0) {
-    pdbg_logf(D_WARNING, "pk_write_pubkey_der returned error %d", i);
+  if (i <= 0 || i > (int)sizeof(buff)) {
+    pdbg_logf(D_WARNING, "pk_write_pubkey_der returned %d (buffer size %zu)", 
+              i, sizeof(buff));
     return -1;
   }
   mbedtls_sha256(buff + sizeof(buff) - i, i, sigbin, 0);
