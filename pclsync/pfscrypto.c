@@ -44,9 +44,6 @@
 #include "psql.h"
 
 // this is only for debug, adds needless checks of tree for local files
-#if IS_DEBUG
-#define PSYNC_DO_LOCAL_FULL_TREE_CHECK 1
-#endif
 
 #define PSYNC_CRYPTO_LOG_DATA 1
 #define PSYNC_CRYPTO_LOG_INT 2
@@ -270,7 +267,6 @@ static psync_crypto_sectorid_t get_last_sectorid_by_size(uint64_t size) {
     return (size - 1) / PSYNC_CRYPTO_SECTOR_SIZE;
 }
 
-#if defined(PSYNC_DO_LOCAL_FULL_TREE_CHECK)
 static int
 pfs_crypto_do_local_tree_check(psync_openfile_t *of,
                                     psync_crypto_sectorid_t sectorid,
@@ -328,7 +324,6 @@ pfs_crypto_do_local_tree_check(psync_openfile_t *of,
   }
   return 0;
 }
-#endif
 
 static int pfs_crypto_wait_no_extender_locked(psync_openfile_t *of) {
   int ret;
@@ -421,10 +416,8 @@ static int pfs_crypto_read_newfile_full_sector_from_datafile(
   if (pdbg_unlikely(pcrypto_decode_sec(
           of->encoder, buff, ssize, (unsigned char *)buf, auth, sectorid)))
     return -EIO;
-#if defined(PSYNC_DO_LOCAL_FULL_TREE_CHECK)
-  else if (pfs_crypto_do_local_tree_check(of, sectorid, &offsets))
+  else if (IS_DEBUG && pfs_crypto_do_local_tree_check(of, sectorid, &offsets))
     return -EIO;
-#endif
   else
     return ssize;
 }
@@ -780,14 +773,14 @@ pfs_crypto_check_log_hash(int lfd,
   pcrc32c_fast_hash256_final(chash, &ctx);
   if (memcmp(chash, mr->hash, PSYNC_FAST_HASH256_LEN)) {
     pdbg_logf(D_WARNING, "calculated hash does not match");
-#if IS_DEBUG
-    psync_binhex(buff, chash, PSYNC_FAST_HASH256_LEN);
-    buff[PSYNC_FAST_HASH256_LEN * 2] = 0;
-    pdbg_logf(D_NOTICE, "calculated: %s", buff);
-    psync_binhex(buff, mr->hash, PSYNC_FAST_HASH256_LEN);
-    buff[PSYNC_FAST_HASH256_LEN * 2] = 0;
-    pdbg_logf(D_NOTICE, "expected:   %s", buff);
-#endif
+    if (IS_DEBUG) {
+      psync_binhex(buff, chash, PSYNC_FAST_HASH256_LEN);
+      buff[PSYNC_FAST_HASH256_LEN * 2] = 0;
+      pdbg_logf(D_NOTICE, "calculated: %s", buff);
+      psync_binhex(buff, mr->hash, PSYNC_FAST_HASH256_LEN);
+      buff[PSYNC_FAST_HASH256_LEN * 2] = 0;
+      pdbg_logf(D_NOTICE, "expected:   %s", buff);
+    }
     return -1;
   } else {
     pdbg_logf(D_NOTICE, "successfully checked log hash");

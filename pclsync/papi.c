@@ -629,9 +629,8 @@ const binresult *papi_find_result(const binresult *res, const char *name,
   if (D_CRITICAL <= DEBUG_LEVEL)
     pdbg_printf(file, function, line, D_CRITICAL, "could not find key %s",
                 name);
-#if IS_DEBUG
-  papi_dump(res, file, function, line);
-#endif
+  if (IS_DEBUG)
+    papi_dump(res, file, function, line);
   return empty_types[type];
 }
 

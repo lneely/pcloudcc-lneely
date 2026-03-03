@@ -53,33 +53,22 @@ typedef struct {
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+__attribute__((weak)) void psock_debug_log_wait_latency(const struct timespec *start) {}
+
 static int wait_readable(int sock, long sec, long usec) {
   fd_set rfds;
   struct timeval tv;
-#if IS_DEBUG
-  struct timespec start, end;
-  unsigned long msec;
-#endif
+  struct timespec start;
   int res;
   tv.tv_sec = sec;
   tv.tv_usec = usec;
   FD_ZERO(&rfds);
   FD_SET(sock, &rfds);
-#if IS_DEBUG
   clock_gettime(CLOCK_REALTIME, &start);
-#endif
   res = select(sock + 1, &rfds, NULL, NULL, &tv);
 
   if (res == 1) {
-#if IS_DEBUG
-    clock_gettime(CLOCK_REALTIME, &end);
-    msec = (end.tv_sec - start.tv_sec) * 1000 + end.tv_nsec / 1000000 -
-           start.tv_nsec / 1000000;
-    if (msec >= 30000)
-      pdbg_logf(D_WARNING, "got response from socket after %lu milliseconds", msec);
-    else if (msec >= 5000)
-      pdbg_logf(D_NOTICE, "got response from socket after %lu milliseconds", msec);
-#endif
+    psock_debug_log_wait_latency(&start);
     return 0;
   }
   if (res == 0) {

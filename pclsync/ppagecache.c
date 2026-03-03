@@ -2267,16 +2267,10 @@ static void psync_pagecache_send_error(psync_request_t *request, int err) {
   if (request->needkey)
     psync_pagecache_set_bad_encoder(request->of);
   pfs_dec_of_refcnt_and_readers(request->of);
+  if (IS_DEBUG)
+    pdbg_logf(D_NOTICE, "sending request error %d", err);
   psync_pagecache_free_request(request);
 }
-
-#if IS_DEBUG
-#define psync_pagecache_send_error(r, e)                                       \
-  do {                                                                         \
-    psync_pagecache_send_error(r, e);                                          \
-    pdbg_logf(D_NOTICE, "sending request error %d", e);                            \
-  } while (0)
-#endif
 
 static int psync_pagecache_read_range_from_sock(psync_request_t *request,
                                                 psync_request_range_t *range,
@@ -3226,22 +3220,22 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
     }
     if (ap->parent && !ret) {
 #ifdef P_NO_CHECKSUM_CHECK
-#if IS_DEBUG
-      pdbg_logf(D_NOTICE,
-            "NOT checking chain checksums for pages %lu-%lu tree level %d",
-            (unsigned long)ap->firstpageid,
-            (unsigned long)ap->firstpageid + ap->size / PSYNC_CRYPTO_AUTH_SIZE,
-            (int)offsets.treelevels);
-      pfs_lock_file(of);
-      if (likely(of->hash == hash))
-        psync_interval_tree_add(
-            &of->authenticatedints, ap->firstpageid * PSYNC_FS_PAGE_SIZE,
-            (ap->firstpageid + ap->size / PSYNC_CRYPTO_AUTH_SIZE) *
-                PSYNC_FS_PAGE_SIZE);
-      pthread_mutex_unlock(&of->mutex);
-#else
-      abort();
-#endif
+      if (IS_DEBUG) {
+        pdbg_logf(D_NOTICE,
+              "NOT checking chain checksums for pages %lu-%lu tree level %d",
+              (unsigned long)ap->firstpageid,
+              (unsigned long)ap->firstpageid + ap->size / PSYNC_CRYPTO_AUTH_SIZE,
+              (int)offsets.treelevels);
+        pfs_lock_file(of);
+        if (likely(of->hash == hash))
+          psync_interval_tree_add(
+              &of->authenticatedints, ap->firstpageid * PSYNC_FS_PAGE_SIZE,
+              (ap->firstpageid + ap->size / PSYNC_CRYPTO_AUTH_SIZE) *
+                  PSYNC_FS_PAGE_SIZE);
+        pthread_mutex_unlock(&of->mutex);
+      } else {
+        abort();
+      }
 #else
       pcrypto_sector_auth_t sa;
       psync_crypto_auth_page *p;

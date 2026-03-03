@@ -221,8 +221,7 @@ void pfs_task_clean();
 
 void pfs_task_add_banned_folders();
 
-#if IS_DEBUG
 void pfs_task_dump_state();
-#endif
+void pfstasks_debug_check_folder_consistency(psync_fstask_folder_t *folder);
 
 #endif

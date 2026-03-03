@@ -75,16 +75,10 @@ typedef off_t fuse_off_t;
 
 #include <sys/mount.h>
 
-#if IS_DEBUG
 #define pfs_set_thread_name()                                             \
   do {                                                                         \
-    psync_thread_name = __FUNCTION__;                                          \
+    if (IS_DEBUG) psync_thread_name = __FUNCTION__;                            \
   } while (0)
-#else
-#define pfs_set_thread_name()                                             \
-  do {                                                                         \
-  } while (0)
-#endif
 
 #define fh_to_openfile(x) ((psync_openfile_t *)((uintptr_t)x))
 #define openfile_to_fh(x) ((uintptr_t)x)
@@ -115,7 +109,13 @@ static gid_t mygid = 0;
 
 extern int errno;
 
-static psync_tree *openfiles = PSYNC_TREE_EMPTY;
+psync_tree *openfiles = PSYNC_TREE_EMPTY;
+
+__attribute__((weak)) void pfs_debug_init_file_mutex(pthread_mutex_t *m) {
+  pthread_mutex_init(m, NULL);
+}
+__attribute__((weak)) void pfs_debug_dump_internals() {}
+__attribute__((weak)) void pfs_debug_register_signal_handlers() {}
 
 static int pfs_ftruncate_of_locked(psync_openfile_t *of, fuse_off_t size);
 
@@ -1022,17 +1022,7 @@ pfs_create_file(psync_fsfileid_t fileid, psync_fsfileid_t remotefileid,
     ptree_add_before(&openfiles, tr, &fl->tree);
   else
     ptree_add_after(&openfiles, tr, &fl->tree);
-#if IS_DEBUG
-  {
-    pthread_mutexattr_t mattr;
-    pthread_mutexattr_init(&mattr);
-    pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_ERRORCHECK);
-    pthread_mutex_init(&fl->mutex, &mattr);
-    pthread_mutexattr_destroy(&mattr);
-  }
-#else
-  pthread_mutex_init(&fl->mutex, NULL);
-#endif
+  pfs_debug_init_file_mutex(&fl->mutex);
   fl->currentfolder = folder;
   fl->currentname = putil_strdup(name);
   fl->fileid = fileid;
@@ -3490,21 +3480,6 @@ char *pfs_get_path_by_fileid(psync_fileid_t fileid) {
   return ret;
 }
 
-#if IS_DEBUG
-
-static void pfs_dump_internals() {
-  psync_openfile_t *of;
-  pdbg_logf(D_NOTICE, "dumping internal state");
-  psql_rdlock();
-  ptree_for_each_element(of, openfiles, psync_openfile_t, tree)
-      pdbg_logf(D_NOTICE, "open file %s fileid %ld folderid %ld", of->currentname,
-            (long)of->fileid, (long)of->currentfolder->folderid);
-  pfs_task_dump_state();
-  psql_rdunlock();
-}
-
-#endif
-
 static void pfs_do_stop(void) {
   if (!__sync_bool_compare_and_swap(&shutdown_in_progress, 0, 1)) {
     // prevent multiple executions
@@ -3561,9 +3536,7 @@ static void pfs_do_stop(void) {
       pdbg_logf(D_NOTICE, "waited for fuse to exit");
     }
 
-#if IS_DEBUG
-    pfs_dump_internals();
-#endif
+    pfs_debug_dump_internals();
     free(mp);
   }
   pthread_mutex_unlock(&start_mutex);
@@ -3575,13 +3548,6 @@ static void psync_signal_handler(int sig) {
   pdbg_logf(D_NOTICE, "got signal %d", sig);
   exit(1); // invoke psync_do_stop via atexit()
 }
-
-#if IS_DEBUG
-static void psync_usr1_handler(int sig) {
-  //  pdbg_logf(D_NOTICE, "got signal %d", sig);
-  prun_thread("dump signal", pfs_dump_internals);
-}
-#endif
 
 static void psync_usr2_handler(int sig) {
   /* Signal handler must be signal-safe - just set flag, don't log here */
@@ -3607,9 +3573,7 @@ static void psync_setup_signals() {
   psync_set_signal(SIGTERM, psync_signal_handler);
   psync_set_signal(SIGINT, psync_signal_handler);
   psync_set_signal(SIGHUP, psync_signal_handler);
-#if IS_DEBUG
-  psync_set_signal(SIGUSR1, psync_usr1_handler);
-#endif
+  pfs_debug_register_signal_handlers();
   psync_set_signal(SIGUSR2, psync_usr2_handler);
 }
 
