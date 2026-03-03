@@ -451,7 +451,7 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
 
 int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
   int callRes;
-  char msgErr[1024];
+  char *errPtr = NULL;
   binresult *retData;
 
   pdbg_logf(D_NOTICE,
@@ -469,7 +469,7 @@ int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
 
   callRes =
       ptools_backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams1,
-                   &optionalParams, &retData, (char **)msgErr);
+                   &optionalParams, &retData, &errPtr);
 
   pdbg_logf(D_NOTICE, "cTime res: [%d]", callRes);
 
@@ -481,9 +481,12 @@ int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
 
   callRes =
       ptools_backend_call(apiserver, "setfilemtime", FOLDER_META, &requiredParams,
-                   &optionalParams, &retData, (char **)msgErr);
+                   &optionalParams, &retData, &errPtr);
 
   pdbg_logf(D_NOTICE, "mTime res: [%d]", callRes);
+
+  if (errPtr)
+    free(errPtr);
 
   return callRes;
 }
