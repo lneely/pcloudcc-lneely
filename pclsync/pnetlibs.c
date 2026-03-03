@@ -52,6 +52,8 @@
 #include "ptimer.h"
 #include "ptree.h"
 
+#define MAX_HTTP_CONTENT_LENGTH (1024ULL * 1024 * 1024) // 1GB
+
 // required by psync_send_debug
 extern PSYNC_THREAD const char *psync_thread_name; 
 
@@ -912,9 +914,15 @@ cont:
       }
       *ptr = 0;
       /*      pdbg_logf(D_NOTICE, "key=%s, value=%s", key, val);*/
-      if (!memcmp(key, "content-length", 14))
+      if (!memcmp(key, "content-length", 14)) {
         clen = putil_ato64(val);
-      else if (!memcmp(key, "keep-alive", 10) && !memcmp(val, "timeout=", 8))
+        if (clen > MAX_HTTP_CONTENT_LENGTH) {
+          pdbg_logf(D_WARNING, "Content-Length %llu exceeds limit %llu",
+                    (unsigned long long)clen,
+                    (unsigned long long)MAX_HTTP_CONTENT_LENGTH);
+          goto err1;
+        }
+      } else if (!memcmp(key, "keep-alive", 10) && !memcmp(val, "timeout=", 8))
         keepalive = putil_ato32(val + 8);
       key = ptr + 1;
       isval = 0;
@@ -1410,9 +1418,15 @@ cont:
       }
       *ptr = 0;
       /*      pdbg_logf(D_NOTICE, "key=%s, value=%s", key, val);*/
-      if (!memcmp(key, "content-length", 14))
+      if (!memcmp(key, "content-length", 14)) {
         clen = putil_ato64(val);
-      else if (!memcmp(key, "keep-alive", 10) && !memcmp(val, "timeout=", 8))
+        if (clen > MAX_HTTP_CONTENT_LENGTH) {
+          pdbg_logf(D_WARNING, "Content-Length %llu exceeds limit %llu",
+                    (unsigned long long)clen,
+                    (unsigned long long)MAX_HTTP_CONTENT_LENGTH);
+          goto err0;
+        }
+      } else if (!memcmp(key, "keep-alive", 10) && !memcmp(val, "timeout=", 8))
         keepalive = putil_ato32(val + 8);
       key = ptr + 1;
       isval = 0;
