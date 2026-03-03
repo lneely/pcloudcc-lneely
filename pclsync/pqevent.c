@@ -376,9 +376,9 @@ void pqevent_queue_sync_event_path(psync_eventtype_t eventid, psync_syncid_t syn
     llen = strlen(localpath) + 1;
     rlen = strlen(remotepath) + 1;
     if (eventid & PEVENT_TYPE_FOLDER)
-      slen = sizeof(psync_file_event_t);
-    else
       slen = sizeof(psync_folder_event_t);
+    else
+      slen = sizeof(psync_file_event_t);
     event =
         (event_list_t *)malloc(sizeof(event_list_t) + slen + llen + rlen);
     strct = (char *)(event + 1);
