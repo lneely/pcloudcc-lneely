@@ -139,7 +139,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
         strcat(keyParams, params->Params[i].paramname);
       }
 
-      sprintf(charBuff[i], "key%s", params->Params[i].paramname);
+      snprintf(charBuff[i], sizeof(charBuff[i]), "key%s", params->Params[i].paramname);
 
       if (params->Params[i].paramtype == 0) {
         paramsLocal[mpCnt + i] =
