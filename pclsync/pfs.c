@@ -787,7 +787,11 @@ static int pfs_getrootattr(struct FUSE_STAT *stbuf) {
     }                                                                          \
   } while (0)
 
+#if defined(FUSE_MAJOR_VERSION) && defined(FUSE_MINOR_VERSION) && (FUSE_MAJOR_VERSION > 3 || (FUSE_MAJOR_VERSION == 3 && FUSE_MINOR_VERSION >= 12))
+static int pfs_getattr(const char *path, struct FUSE_STAT *stbuf, struct fuse_file_info *fi) {
+#else
 static int pfs_getattr(const char *path, struct FUSE_STAT *stbuf) {
+#endif
   psync_sql_res *res;
   psync_variant_row row;
   psync_fspath_t *fpath;
@@ -3082,13 +3086,21 @@ static int pfs_statfs(const char *path, struct statvfs *stbuf) {
   return 0;
 }
 
+#if defined(FUSE_MAJOR_VERSION) && defined(FUSE_MINOR_VERSION) && (FUSE_MAJOR_VERSION > 3 || (FUSE_MAJOR_VERSION == 3 && FUSE_MINOR_VERSION >= 12))
+static int pfs_chmod(const char *path, mode_t mode, struct fuse_file_info *fi) {
+#else
 static int pfs_chmod(const char *path, mode_t mode) {
+#endif
   pfs_set_thread_name();
   pdbg_logf(D_NOTICE, "chmod %s %u", path, (unsigned)mode);
   return 0;
 }
 
+#if defined(FUSE_MAJOR_VERSION) && defined(FUSE_MINOR_VERSION) && (FUSE_MAJOR_VERSION > 3 || (FUSE_MAJOR_VERSION == 3 && FUSE_MINOR_VERSION >= 12))
+static int pfs_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi) {
+#else
 static int pfs_chown(const char *path, uid_t uid, gid_t gid) {
+#endif
   pfs_set_thread_name();
   pdbg_logf(D_NOTICE, "chown %s %u %u", path, (unsigned)uid, (unsigned)gid);
   return 0;
@@ -3254,7 +3266,11 @@ static int pfs_setcrtime(const char *path, const struct timespec *tv) {
 }
 #endif
 
+#if defined(FUSE_MAJOR_VERSION) && defined(FUSE_MINOR_VERSION) && (FUSE_MAJOR_VERSION > 3 || (FUSE_MAJOR_VERSION == 3 && FUSE_MINOR_VERSION >= 12))
+static int pfs_utimens(const char *path, const struct timespec tv[2], struct fuse_file_info *fi) {
+#else
 static int pfs_utimens(const char *path, const struct timespec tv[2]) {
+#endif
   pfs_set_thread_name();
   pdbg_logf(D_NOTICE, "utimens %s %lu", path, tv[1].tv_sec);
   return pfs_set_time(path, &tv[1], 0);
@@ -3598,8 +3614,7 @@ static void pfs_do_stop(void) {
     if (mp) {
       if (stat(mp, &st_before) == 0) {
 #if FUSE_USE_VERSION >= 30
-        struct fuse_session *se = fuse_get_session(psync_fuse);
-        fuse_session_unmount(se);
+        fuse_unmount(psync_fuse);
 #else
         fuse_unmount(mp, psync_fuse_channel);
         psync_fuse_channel = NULL;
@@ -3693,7 +3708,13 @@ static void psync_fuse_thread() {
   struct fuse_loop_config loop_config;
   loop_config.clone_fd = 1;
   loop_config.max_idle_threads = 10;
-  fr = fuse_loop_mt_31(psync_fuse, &loop_config);
+#if defined(FUSE_MAJOR_VERSION) && defined(FUSE_MINOR_VERSION) && (FUSE_MAJOR_VERSION > 3 || (FUSE_MAJOR_VERSION == 3 && FUSE_MINOR_VERSION >= 12))
+  /* FUSE 3.12+ uses fuse_loop_mt_312 or direct fuse_loop_mt */
+  extern int fuse_loop_mt_312(struct fuse *f, struct fuse_loop_config *config);
+  fr = fuse_loop_mt_312(psync_fuse, &loop_config);
+#else
+  fr = fuse_loop_mt_31(psync_fuse, loop_config.clone_fd);
+#endif
 #else
   fr = fuse_loop_mt(psync_fuse);
 #endif
@@ -3837,10 +3858,9 @@ static int pfs_do_start() {
     goto err0;
   }
   
-  struct fuse_session *se = fuse_get_session(psync_fuse);
-  if (fuse_session_mount(se, mp) != 0) {
+  if (fuse_mount(psync_fuse, mp) != 0) {
     pdbg_logf(D_CRITICAL,
-              "CRITICAL ERROR: fuse_session_mount() failed for mount point %s. "
+              "CRITICAL ERROR: fuse_mount() failed for mount point %s. "
               "The FUSE filesystem cannot be started. errno=%d (%s)", 
               mp, errno, strerror(errno));
     goto err1;
