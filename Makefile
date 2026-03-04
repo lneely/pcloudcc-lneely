@@ -5,8 +5,22 @@ AR		:= ar
 DIST_CFLAGS	:= $(CFLAGS)
 DIST_CXXFLAGS	:= $(CXXFLAGS)
 
+# Detect FUSE version
+FUSE_VERSION	:= $(shell ./detect_fuse.sh)
+ifeq ($(FUSE_VERSION),FUSE3)
+    FUSE_CFLAGS := $(shell pkg-config --cflags fuse3)
+    FUSE_LIBS := -lfuse3
+    FUSE_USE_VERSION := 30
+else ifeq ($(FUSE_VERSION),FUSE2)
+    FUSE_CFLAGS := $(shell pkg-config --cflags fuse)
+    FUSE_LIBS := -lfuse
+    FUSE_USE_VERSION := 26
+else
+    $(error FUSE library not found. Install libfuse-dev or libfuse3-dev)
+endif
+
 COMMONFLAGS	= -fsanitize=address
-CFLAGS		= -fPIC $(COMMONFLAGS) -I./pclsync -I/usr/include $(shell pkg-config --cflags fuse3 2>/dev/null) $(shell pkg-config --cflags $$(pkg-config --list-all | grep -o 'mbedtls[0-9.]*\s' | head -1) 2>/dev/null || pkg-config --cflags mbedtls 2>/dev/null || echo "-I/usr/local/include")
+CFLAGS		= -fPIC $(COMMONFLAGS) -I./pclsync -I/usr/include $(FUSE_CFLAGS) $(shell pkg-config --cflags $$(pkg-config --list-all | grep -o 'mbedtls[0-9.]*\s' | head -1) 2>/dev/null || pkg-config --cflags mbedtls 2>/dev/null || echo "-I/usr/local/include")
 ifneq (,$(filter clang%,$(CC)))
     CFLAGS += -Wthread-safety
 endif
@@ -20,7 +34,7 @@ LIBLDFLAGS	= $(COMMONFLAGS) -lreadline -lpthread -ludev -lsqlite3 -lz $(shell \
 	else \
 		pkg-config --libs mbedtls mbedx509 mbedcrypto 2>/dev/null || echo "-L/usr/local/lib -lmbedtls -lmbedx509 -lmbedcrypto"; \
 	fi)
-EXECLDFLAGS	= $(COMMONFLAGS) -lboost_program_options -lfuse3
+EXECLDFLAGS	= $(COMMONFLAGS) -lboost_program_options $(FUSE_LIBS)
 
 SCAN		:= 0
 SRCDIR 		:= .
@@ -42,14 +56,14 @@ LIBOUT		:= libpcloudcc_lib.so
 
 # Build type specific flags
 ifeq ($(BUILD), debug)
-    CFLAGS += -g -O0 -DDEBUG -Wall -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=30 -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
-    CXXFLAGS += -g -O0 -DDEBUG -Wall -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=26 -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
+    CFLAGS += -g -O0 -DDEBUG -Wall -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=$(FUSE_USE_VERSION) -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
+    CXXFLAGS += -g -O0 -DDEBUG -Wall -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=$(FUSE_USE_VERSION) -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
     DEBUGSRC := $(wildcard $(LIBDIR)/debug/*.c)
     DEBUGOBJ := $(notdir $(DEBUGSRC:%.c=%.o))
     COBJ += $(DEBUGOBJ)
 else ifeq ($(BUILD), release)
-    CFLAGS += -O2 -DNDEBUG -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=30 -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
-    CXXFLAGS += -O2 -DNDEBUG -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=30 -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
+    CFLAGS += -O2 -DNDEBUG -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=$(FUSE_USE_VERSION) -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
+    CXXFLAGS += -O2 -DNDEBUG -D_FILE_OFFSET_BITS=64 -DFUSE_USE_VERSION=$(FUSE_USE_VERSION) -D_GNU_SOURCE -DPSYNC_SSL_DEBUG_LEVEL=$(SSLDBGLVL)
     COMMONFLAGS := $(filter-out -fsanitize=address,$(COMMONFLAGS))
     LIBLDFLAGS := $(filter-out -fsanitize=address,$(LIBLDFLAGS))
     EXECLDFLAGS := $(filter-out -fsanitize=address,$(EXECLDFLAGS))
