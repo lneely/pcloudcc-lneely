@@ -266,14 +266,18 @@ static void status_change_thread(void *ptr) {
     }
     statuschanges = 0;
     uint32_t cur_status = __atomic_load_n(&psync_status.status, __ATOMIC_RELAXED);
+    uint32_t cur_filestodownload = __atomic_load_n(&psync_status.filestodownload, __ATOMIC_RELAXED);
+    uint32_t cur_filestoupload = __atomic_load_n(&psync_status.filestoupload, __ATOMIC_RELAXED);
+    uint8_t cur_localisfull = __atomic_load_n(&psync_status.localisfull, __ATOMIC_RELAXED);
+    uint8_t cur_remoteisfull = __atomic_load_n(&psync_status.remoteisfull, __ATOMIC_RELAXED);
     if (((status_old.filestodownload > 0) &&
-         (psync_status.filestodownload == 0)) ||
-        ((psync_status.filestodownload > 0) &&
+         (cur_filestodownload == 0)) ||
+        ((cur_filestodownload > 0) &&
          (status_old.filestodownload == 0)) ||
-        ((status_old.filestoupload > 0) && (psync_status.filestoupload == 0)) ||
-        ((psync_status.filestoupload > 0) && (status_old.filestoupload == 0)) ||
-        ((psync_status.localisfull != status_old.localisfull)) ||
-        ((psync_status.remoteisfull != status_old.remoteisfull)) ||
+        ((status_old.filestoupload > 0) && (cur_filestoupload == 0)) ||
+        ((cur_filestoupload > 0) && (status_old.filestoupload == 0)) ||
+        ((cur_localisfull != status_old.localisfull)) ||
+        ((cur_remoteisfull != status_old.remoteisfull)) ||
         ((cur_status != status_old.status) &&
          ((cur_status == PSTATUS_STOPPED) ||
           (cur_status == PSTATUS_PAUSED) ||
@@ -283,6 +287,10 @@ static void status_change_thread(void *ptr) {
           (status_old.status == PSTATUS_OFFLINE)))) {
       status_old = psync_status;
       status_old.status = cur_status;
+      status_old.filestodownload = cur_filestodownload;
+      status_old.filestoupload = cur_filestoupload;
+      status_old.localisfull = cur_localisfull;
+      status_old.remoteisfull = cur_remoteisfull;
     }
     pthread_mutex_unlock(&statusmutex);
     if (!psync_do_run)
