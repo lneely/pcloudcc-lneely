@@ -1997,13 +1997,13 @@ int psync_delete_all_links_file(psync_fileid_t fileid, char **err) {
 }
 
 void psync_cache_links_all() {
-  if (psync_current_time - links_last_refresh_time >=
+  if (__atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) - links_last_refresh_time >=
       PSYNC_LINKS_REFRESH_INTERVAL) {
-    links_last_refresh_time = psync_current_time;
+    links_last_refresh_time = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
     cache_links_all();
   } else
     pdbg_logf(D_WARNING, "refreshing link too early %ld",
-          (unsigned)psync_current_time - links_last_refresh_time);
+          (unsigned)__atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) - links_last_refresh_time);
 }
 
 preciever_list_t *psync_list_email_with_access(unsigned long long linkid,
