@@ -5,8 +5,19 @@ AR		:= ar
 DIST_CFLAGS	:= $(CFLAGS)
 DIST_CXXFLAGS	:= $(CXXFLAGS)
 
-# Detect FUSE version
-FUSE_VERSION	:= $(shell ./detect_fuse.sh)
+# Detect FUSE version (can be overridden with FORCE_FUSE=2 or FORCE_FUSE=3)
+ifdef FORCE_FUSE
+    ifeq ($(FORCE_FUSE),2)
+        FUSE_VERSION := FUSE2
+    else ifeq ($(FORCE_FUSE),3)
+        FUSE_VERSION := FUSE3
+    else
+        $(error FORCE_FUSE must be 2 or 3)
+    endif
+else
+    FUSE_VERSION := $(shell ./detect_fuse.sh)
+endif
+
 ifeq ($(FUSE_VERSION),FUSE3)
     FUSE_CFLAGS := $(shell pkg-config --cflags fuse3)
     FUSE_LIBS := -lfuse3

@@ -28,8 +28,6 @@
   DAMAGE.
 */
 
-#define FUSE_USE_VERSION 30
-
 #include <errno.h>
 #include <fuse.h>
 #include <pthread.h>
@@ -93,6 +91,9 @@ typedef off_t fuse_off_t;
 
 static int shutdown_in_progress = 0;
 static struct fuse *psync_fuse = NULL;
+#if FUSE_USE_VERSION < 30
+static struct fuse_chan *psync_fuse_channel = NULL;
+#endif
 static char *psync_current_mountpoint = NULL;
 static psync_generic_callback_t psync_start_callback = NULL;
 char *pfs_fake_prefix = NULL;
@@ -3598,7 +3599,8 @@ static void pfs_do_stop(void) {
         struct fuse_session *se = fuse_get_session(psync_fuse);
         fuse_session_unmount(se);
 #else
-        fuse_unmount(mp, fuse_get_session(psync_fuse));
+        fuse_unmount(mp, psync_fuse_channel);
+        psync_fuse_channel = NULL;
 #endif
         clock_gettime(CLOCK_REALTIME, &ts);
 
@@ -3881,6 +3883,7 @@ static int pfs_do_start() {
     fuse_unmount(mp, ch);
     goto err0;
   }
+  psync_fuse_channel = ch;
 #endif
   
   psync_current_mountpoint = mp;
