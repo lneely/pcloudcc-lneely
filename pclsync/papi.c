@@ -201,6 +201,7 @@ static ssize_t calc_ret_len(unsigned char **restrict data,
     int unsigned cnt;
     cnt = 0;
     ret = sizeof(binresult);
+    _NEED_DATA(1);
     while (**data != RPARAM_END) {
       r = calc_ret_len(data, datalen, strcnt);
       if (r == -1)
@@ -218,6 +219,7 @@ static ssize_t calc_ret_len(unsigned char **restrict data,
     int unsigned cnt;
     cnt = 0;
     ret = sizeof(binresult);
+    _NEED_DATA(1);
     while (**data != RPARAM_END) {
       r = calc_ret_len(data, datalen, strcnt);
       if (r == -1)
@@ -405,6 +407,10 @@ binresult *papi_result(psock_t *sock) {
   }
 
   data = (unsigned char *)malloc(ressize);
+  if (!data) {
+    pdbg_logf(D_ERROR, "Failed to allocate %u bytes for API response", ressize);
+    return NULL;
+  }
 
   if (pdbg_unlikely(psock_readall(sock, data, ressize) != ressize)) {
     free(data);
@@ -424,7 +430,16 @@ binresult *papi_result_thread(psock_t *sock) {
   if (pdbg_unlikely(psock_readall_thread(
                        sock, &ressize, sizeof(uint32_t)) != sizeof(uint32_t)))
     return NULL;
+  if (ressize > MAX_API_RESPONSE_SIZE) {
+    pdbg_logf(D_WARNING, "API response size %u exceeds limit %u, rejecting",
+              ressize, MAX_API_RESPONSE_SIZE);
+    return NULL;
+  }
   data = (unsigned char *)malloc(ressize);
+  if (!data) {
+    pdbg_logf(D_ERROR, "Failed to allocate %u bytes for API response", ressize);
+    return NULL;
+  }
   if (pdbg_unlikely(psock_readall_thread(sock, data, ressize) !=
                    ressize)) {
     free(data);
@@ -467,8 +482,17 @@ again:
       reader->state = 1;
       reader->bytesread = 0;
       reader->bytestoread = reader->respsize;
+      if (reader->respsize > MAX_API_RESPONSE_SIZE) {
+        pdbg_logf(D_WARNING, "API response size %u exceeds limit %u, rejecting",
+                  reader->respsize, MAX_API_RESPONSE_SIZE);
+        reader->result = NULL;
+        papi_rdr_alloc(reader);
+        return ASYNC_RES_READY;
+      }
       reader->data = (unsigned char *)malloc(reader->respsize);
       if (!reader->data) {
+        pdbg_logf(D_ERROR, "Failed to allocate %u bytes for API response",
+                  reader->respsize);
         reader->result = NULL;
         papi_rdr_alloc(reader);
         return ASYNC_RES_READY;
