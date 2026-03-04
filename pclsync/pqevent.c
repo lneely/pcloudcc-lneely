@@ -265,6 +265,7 @@ static void status_change_thread(void *ptr) {
       pthread_cond_wait(&statuscond, &statusmutex);
     }
     statuschanges = 0;
+    uint32_t cur_status = __atomic_load_n(&psync_status.status, __ATOMIC_RELAXED);
     if (((status_old.filestodownload > 0) &&
          (psync_status.filestodownload == 0)) ||
         ((psync_status.filestodownload > 0) &&
@@ -273,14 +274,16 @@ static void status_change_thread(void *ptr) {
         ((psync_status.filestoupload > 0) && (status_old.filestoupload == 0)) ||
         ((psync_status.localisfull != status_old.localisfull)) ||
         ((psync_status.remoteisfull != status_old.remoteisfull)) ||
-        ((psync_status.status != status_old.status) &&
-         ((psync_status.status == PSTATUS_STOPPED) ||
-          (psync_status.status == PSTATUS_PAUSED) ||
-          (psync_status.status == PSTATUS_OFFLINE) ||
+        ((cur_status != status_old.status) &&
+         ((cur_status == PSTATUS_STOPPED) ||
+          (cur_status == PSTATUS_PAUSED) ||
+          (cur_status == PSTATUS_OFFLINE) ||
           (status_old.status == PSTATUS_STOPPED) ||
           (status_old.status == PSTATUS_PAUSED) ||
-          (status_old.status == PSTATUS_OFFLINE))))
-    status_old = psync_status;
+          (status_old.status == PSTATUS_OFFLINE)))) {
+      status_old = psync_status;
+      status_old.status = cur_status;
+    }
     pthread_mutex_unlock(&statusmutex);
     if (!psync_do_run)
       break;
