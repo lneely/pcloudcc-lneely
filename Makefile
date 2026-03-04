@@ -19,11 +19,11 @@ else
 endif
 
 ifeq ($(FUSE_VERSION),FUSE3)
-    FUSE_CFLAGS := $(shell pkg-config --cflags fuse3)
+    FUSE_CFLAGS := $(shell pkg-config --cflags fuse3 2>/dev/null || echo "-I/usr/include/fuse3 -D_FILE_OFFSET_BITS=64")
     FUSE_LIBS := -lfuse3
     FUSE_USE_VERSION := 30
 else ifeq ($(FUSE_VERSION),FUSE2)
-    FUSE_CFLAGS := $(shell pkg-config --cflags fuse)
+    FUSE_CFLAGS := $(shell pkg-config --cflags fuse 2>/dev/null || echo "-I/usr/include/fuse -D_FILE_OFFSET_BITS=64")
     FUSE_LIBS := -lfuse
     FUSE_USE_VERSION := 26
 else
