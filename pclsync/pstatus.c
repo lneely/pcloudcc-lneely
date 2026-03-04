@@ -130,12 +130,12 @@ static uint32_t calc_status() {
     }
   }
 
-  if ((psync_status.filesdownloading || psync_status.filestodownload) &&
-      (psync_status.filesuploading || psync_status.filestoupload))
+  if ((psync_status.filesdownloading || __atomic_load_n(&psync_status.filestodownload, __ATOMIC_RELAXED)) &&
+      (psync_status.filesuploading || __atomic_load_n(&psync_status.filestoupload, __ATOMIC_RELAXED)))
     return PSTATUS_DOWNLOADINGANDUPLOADING;
-  else if (psync_status.filesdownloading || psync_status.filestodownload)
+  else if (psync_status.filesdownloading || __atomic_load_n(&psync_status.filestodownload, __ATOMIC_RELAXED))
     return PSTATUS_DOWNLOADING;
-  else if (psync_status.filesuploading || psync_status.filestoupload)
+  else if (psync_status.filesuploading || __atomic_load_n(&psync_status.filestoupload, __ATOMIC_RELAXED))
     return PSTATUS_UPLOADING;
   else
     return PSTATUS_READY;
@@ -174,14 +174,14 @@ void pstatus_download_recalc() {
                                "f WHERE t.type=? AND t.itemid=f.id");
   psql_bind_uint(res, 1, PSYNC_DOWNLOAD_FILE);
   if ((row = psql_fetch_int(res))) {
-    psync_status.filestodownload = row[0];
+    __atomic_store_n(&psync_status.filestodownload, row[0], __ATOMIC_RELAXED);
     psync_status.bytestodownload = row[1];
   } else {
-    psync_status.filestodownload = 0;
+    __atomic_store_n(&psync_status.filestodownload, 0, __ATOMIC_RELAXED);
     psync_status.bytestodownload = 0;
   }
   psql_free(res);
-  if (!psync_status.filestodownload) {
+  if (!__atomic_load_n(&psync_status.filestodownload, __ATOMIC_RELAXED)) {
     psync_status.downloadspeed = 0;
   }
   __atomic_store_n(&psync_status.status, calc_status(), __ATOMIC_RELAXED);
@@ -226,7 +226,7 @@ void pstatus_upload_recalc() {
     free(filename);
   }
   psql_free(res);
-  psync_status.filestoupload = filestou;
+  __atomic_store_n(&psync_status.filestoupload, filestou, __ATOMIC_RELAXED);
   psync_status.bytestoupload = bytestou;
   if (!filestou)
     psync_status.uploadspeed = 0;
@@ -253,10 +253,10 @@ void pstatus_set(uint32_t statusid, uint32_t status) {
   statuses[statusid] = status;
   if (status_waiters)
     pthread_cond_broadcast(&statuscond);
-  psync_status.remoteisfull =
-      (statuses[PSTATUS_TYPE_ACCFULL] == PSTATUS_ACCFULL_OVERQUOTA);
-  psync_status.localisfull =
-      (statuses[PSTATUS_TYPE_DISKFULL] == PSTATUS_DISKFULL_FULL);
+  __atomic_store_n(&psync_status.remoteisfull,
+      (statuses[PSTATUS_TYPE_ACCFULL] == PSTATUS_ACCFULL_OVERQUOTA), __ATOMIC_RELAXED);
+  __atomic_store_n(&psync_status.localisfull,
+      (statuses[PSTATUS_TYPE_DISKFULL] == PSTATUS_DISKFULL_FULL), __ATOMIC_RELAXED);
   pthread_mutex_unlock(&status_internal_mutex);
   status = calc_status();
   if (__atomic_load_n(&psync_status.status, __ATOMIC_RELAXED) != status) {
