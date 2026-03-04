@@ -36,6 +36,7 @@
 */
 
 #include <errno.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -108,7 +109,7 @@ static void on_request(void *lpvParam) {
   if (request) {
     respond(request, response);
 
-    ssize_t total_size = sizeof(uint32_t) + sizeof(uint64_t) + response->length;
+    ssize_t total_size = offsetof(rpc_message_t, value) + response->length;
     ssize_t bytes_written = write(*sockfd, response, total_size);
 
     if (bytes_written == -1) {
@@ -229,7 +230,7 @@ static void respond(rpc_message_t *request, rpc_message_t *response) {
     response->value[value_length] = '\0';
     pdbg_logf(D_WARNING, "Response message truncated to fit buffer");
   }
-  response->length = sizeof(rpc_message_t) + value_length + 1;
+  response->length = value_length + 1;
 }
 
 void prpc_main_loop() {
@@ -297,6 +298,11 @@ int prpc_register(int cmdid, prpc_handler h) {
   if (cmdid > (calbacks_lower_band + handlers_size)) {
     handlers_size = cmdid - calbacks_lower_band + 1;
     prpc_init();
+    if (!handlers) {
+      handlers = handlers_old;
+      handlers_size = handlers_size_old;
+      return -1;
+    }
     memcpy(handlers, handlers_old,
            handlers_size_old * sizeof(prpc_handler));
     free(handlers_old);
@@ -307,6 +313,10 @@ int prpc_register(int cmdid, prpc_handler h) {
 
 void prpc_init() {
   handlers = (prpc_handler *)malloc(sizeof(prpc_handler) * handlers_size);
+  if (!handlers) {
+    pdbg_logf(D_ERROR, "Failed to allocate handler table");
+    return;
+  }
   memset(handlers, 0, sizeof(prpc_handler) * handlers_size);
 }
 
