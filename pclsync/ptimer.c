@@ -73,7 +73,7 @@ static int timer_running = 0;
 PSYNC_NOINLINE static void timer_sleep_detected(time_t lt) {
   struct exception_list *e;
   pdbg_logf(D_NOTICE, "sleep detected, current_time=%lu, last_current_time=%lu",
-        (unsigned long)psync_current_time, (unsigned long)lt);
+        (unsigned long)__atomic_load_n(&psync_current_time, __ATOMIC_RELAXED), (unsigned long)lt);
   pthread_mutex_lock(&timer_ex_mutex);
   e = sleeplist;
   while (e) {
@@ -130,7 +130,7 @@ PSYNC_NOINLINE static void timer_process_timers(psync_list *timers) {
     if (!(timer->opts & PTIMER_STOP_AFTER_RUN)) {
       timer->opts = 0;
       psync_list_del(l1);
-      timer->runat = psync_current_time + timer->numsec;
+      timer->runat = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) + timer->numsec;
       psync_list_add_tail(
           &timerlists[timer->level][(timer->runat >>
                                      (timer->level * TIMER_ARRAY_SIZE_SHIFT)) %
@@ -145,26 +145,26 @@ PSYNC_NOINLINE static void timer_process_timers(psync_list *timers) {
 static void timer_thread() {
   psync_list timers;
   time_t lt;
-  lt = psync_current_time;
+  lt = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
   while (psync_do_run) {
     psync_list_init(&timers);
     psys_sleep_milliseconds(1000);
-    psync_current_time = psys_time_seconds();
+    __atomic_store_n(&psync_current_time, psys_time_seconds(), __ATOMIC_RELAXED);
     pthread_mutex_lock(&timer_mutex);
-    timer_prepare_timers(lt, psync_current_time, &timers);
+    timer_prepare_timers(lt, __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED), &timers);
     if (nextsecwaiters)
       pthread_cond_broadcast(&timer_cond);
     pthread_mutex_unlock(&timer_mutex);
     if (unlikely(!psync_list_isempty(&timers)))
       timer_process_timers(&timers);
-    if (unlikely(psync_current_time - lt >= 25))
+    if (unlikely(__atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) - lt >= 25))
       timer_sleep_detected(lt);
-    else if (pdbg_unlikely(psync_current_time == lt)) {
+    else if (pdbg_unlikely(__atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) == lt)) {
       if (!psync_do_run)
         break;
       psys_sleep_milliseconds(1000);
     }
-    lt = psync_current_time;
+    lt = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
   }
 }
 
@@ -173,14 +173,14 @@ void ptimer_init() {
   for (i = 0; i < TIMER_LEVELS; i++)
     for (j = 0; j < TIMER_ARRAY_SIZE; j++)
       psync_list_init(&timerlists[i][j]);
-  psync_current_time = psys_time_seconds();
+  __atomic_store_n(&psync_current_time, psys_time_seconds(), __ATOMIC_RELAXED);
   prun_thread("timer", timer_thread);
   timer_running = 1;
 }
 
 time_t ptimer_time() {
   if (timer_running)
-    return psync_current_time;
+    return __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
   else
     return psys_time_seconds();
 }
@@ -213,7 +213,7 @@ psync_timer_t ptimer_register(psync_timer_callback func, time_t numsec,
   timer->level = i;
   timer->opts = 0;
   pthread_mutex_lock(&timer_mutex);
-  timer->runat = psync_current_time + numsec;
+  timer->runat = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) + numsec;
   psync_list_add_tail(
       &timerlists[i][(timer->runat >> (i * TIMER_ARRAY_SIZE_SHIFT)) %
                      TIMER_ARRAY_SIZE],
@@ -280,11 +280,11 @@ void ptimer_do_notify_exception() {
 void ptimer_wait_next_sec() {
   time_t ctime;
   pthread_mutex_lock(&timer_mutex);
-  ctime = psync_current_time;
+  ctime = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
   do {
     nextsecwaiters++;
     pthread_cond_wait(&timer_cond, &timer_mutex);
     nextsecwaiters--;
-  } while (ctime == psync_current_time);
+  } while (ctime == __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED));
   pthread_mutex_unlock(&timer_mutex);
 }

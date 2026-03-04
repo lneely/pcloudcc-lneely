@@ -643,21 +643,21 @@ void psync_socket_close_download(psock_t *sock) {
  */
 
 void psync_account_downloaded_bytes(int unsigned bytes) {
-  if (current_download_sec == psync_current_time)
+  if (current_download_sec == __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED))
     download_bytes_this_sec += bytes;
   else {
     uint64_t sum;
     unsigned long i;
     download_bytes_sec[download_bytes_off].tm = current_download_sec;
     download_bytes_sec[download_bytes_off].bytes = download_bytes_this_sec;
-    current_download_sec = psync_current_time;
+    current_download_sec = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
     download_bytes_this_sec = bytes;
     download_bytes_off =
         (download_bytes_off + 1) % PSYNC_SPEED_CALC_AVERAGE_SEC;
     sum = 0;
     for (i = 0; i < PSYNC_SPEED_CALC_AVERAGE_SEC; i++)
       if (download_bytes_sec[i].tm >=
-          psync_current_time - PSYNC_SPEED_CALC_AVERAGE_SEC)
+          __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) - PSYNC_SPEED_CALC_AVERAGE_SEC)
         sum += download_bytes_sec[i].bytes;
     download_speed = sum / PSYNC_SPEED_CALC_AVERAGE_SEC;
     pstatus_download_set_speed(download_speed);
@@ -665,7 +665,7 @@ void psync_account_downloaded_bytes(int unsigned bytes) {
 }
 
 static unsigned long get_download_bytes_this_sec() {
-  if (current_download_sec == psync_current_time)
+  if (current_download_sec == __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED))
     return download_bytes_this_sec;
   else
     return 0;
@@ -739,7 +739,7 @@ int psync_socket_readall_download_thread(psock_t *sock, void *buff,
 }
 
 static void account_uploaded_bytes(int unsigned bytes) {
-  if (current_upload_sec == psync_current_time)
+  if (current_upload_sec == __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED))
     upload_bytes_this_sec += bytes;
   else {
     uint64_t sum;
@@ -747,12 +747,12 @@ static void account_uploaded_bytes(int unsigned bytes) {
     upload_bytes_sec[upload_bytes_off].tm = current_upload_sec;
     upload_bytes_sec[upload_bytes_off].bytes = upload_bytes_this_sec;
     upload_bytes_off = (upload_bytes_off + 1) % PSYNC_SPEED_CALC_AVERAGE_SEC;
-    current_upload_sec = psync_current_time;
+    current_upload_sec = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
     upload_bytes_this_sec = bytes;
     sum = 0;
     for (i = 0; i < PSYNC_SPEED_CALC_AVERAGE_SEC; i++)
       if (upload_bytes_sec[i].tm >=
-          psync_current_time - PSYNC_SPEED_CALC_AVERAGE_SEC)
+          __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) - PSYNC_SPEED_CALC_AVERAGE_SEC)
         sum += upload_bytes_sec[i].bytes;
     upload_speed = sum / PSYNC_SPEED_CALC_AVERAGE_SEC;
     pstatus_upload_set_speed(upload_speed);
@@ -760,7 +760,7 @@ static void account_uploaded_bytes(int unsigned bytes) {
 }
 
 static unsigned long get_upload_bytes_this_sec() {
-  if (current_upload_sec == psync_current_time)
+  if (current_upload_sec == __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED))
     return upload_bytes_this_sec;
   else
     return 0;

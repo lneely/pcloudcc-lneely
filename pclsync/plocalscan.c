@@ -562,7 +562,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
   psync_list_for_each_element_call(&dblist, sync_folderlist, list, free);
   if (localsleepperfolder) {
     psys_sleep_milliseconds(localsleepperfolder);
-    if (psync_current_time - starttime >=
+    if (__atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) - starttime >=
         PSYNC_LOCALSCAN_SLEEPSEC_PER_SCAN * 3 / 2)
       localsleepperfolder = 0;
   }
@@ -977,7 +977,7 @@ static void scanner_scan(int first) {
     if (localsleepperfolder < 1)
       localsleepperfolder = 1;
   }
-  starttime = psync_current_time;
+  starttime = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
   restartsleep = 1000;
 
 restart:
@@ -1162,7 +1162,7 @@ restart:
   for (i = 0; i < SCAN_LIST_CNT; i++)
     psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list, free);
   if (movedfolders) {
-    starttime = psync_current_time;
+    starttime = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
     restartsleep = 1000;
     goto restart;
   }
@@ -1172,9 +1172,9 @@ static int scanner_wait() {
   struct timespec tm;
   int ret;
   if (localnotify == 0)
-    tm.tv_sec = psync_current_time + PSYNC_LOCALSCAN_RESCAN_NOTIFY_SUPPORTED;
+    tm.tv_sec = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) + PSYNC_LOCALSCAN_RESCAN_NOTIFY_SUPPORTED;
   else
-    tm.tv_sec = psync_current_time + PSYNC_LOCALSCAN_RESCAN_INTERVAL;
+    tm.tv_sec = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) + PSYNC_LOCALSCAN_RESCAN_INTERVAL;
   tm.tv_nsec = 0;
   pthread_mutex_lock(&scan_mutex);
   if (!scan_wakes)
@@ -1199,13 +1199,13 @@ static void scanner_thread() {
   lastscan = 0;
   while (psync_do_run) {
     pstatus_wait_statuses_arr(requiredstatuses, ARRAY_SIZE(requiredstatuses));
-    if (lastscan + 5 >= psync_current_time) {
+    if (lastscan + 5 >= __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED)) {
       psys_sleep_milliseconds(2000);
       pthread_mutex_lock(&scan_mutex);
       scan_wakes = 0;
       pthread_mutex_unlock(&scan_mutex);
     }
-    lastscan = psync_current_time;
+    lastscan = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
     scanner_scan(w);
     w = scanner_wait();
   }
