@@ -431,10 +431,12 @@ static void status_change(pstatus_t *status) {
   char *err;
   err = (char *)malloc(1024);
 
+  uint32_t cur_status = __atomic_load_n(&status->status, __ATOMIC_RELAXED);
   std::cout << "Down: " << status->downloadstr << "| Up: " << status->uploadstr
-            << ", status is " << status2string(status->status) << std::endl;
+            << ", status is " << status2string(cur_status) << std::endl;
   *clib::pclsync_lib::get_lib().status_ = *status;
-  if (status->status == PSTATUS_LOGIN_REQUIRED) {
+  clib::pclsync_lib::get_lib().status_->status = cur_status;
+  if (cur_status == PSTATUS_LOGIN_REQUIRED) {
     if (clib::pclsync_lib::get_lib().get_password().empty()) {
       clib::pclsync_lib::get_lib().read_password();
     }
@@ -444,20 +446,20 @@ static void status_change(pstatus_t *status) {
                         (int)clib::pclsync_lib::get_lib().save_pass_);
     clib::pclsync_lib::get_lib().wipe_password();
     std::cout << "logging in" << std::endl;
-  } else if (status->status == PSTATUS_TFA_REQUIRED) {
+  } else if (cur_status == PSTATUS_TFA_REQUIRED) {
     if (clib::pclsync_lib::get_lib().get_tfa_code().empty()) {
       clib::pclsync_lib::get_lib().read_tfa_code();
     }
     psync_tfa_set_code(clib::pclsync_lib::get_lib().get_tfa_code().c_str(),
                        1 /* trusted */, 0);
     clib::pclsync_lib::get_lib().wipe_tfa_code();
-  } else if (status->status == PSTATUS_BAD_TFA_CODE) {
+  } else if (cur_status == PSTATUS_BAD_TFA_CODE) {
     clib::pclsync_lib::get_lib().wipe_tfa_code();
     clib::pclsync_lib::get_lib().read_tfa_code(false /* auto_sms */);
     psync_tfa_set_code(clib::pclsync_lib::get_lib().get_tfa_code().c_str(),
                        1 /* trusted */, 0);
     clib::pclsync_lib::get_lib().wipe_tfa_code();
-  } else if (status->status == PSTATUS_BAD_LOGIN_DATA) {
+  } else if (cur_status == PSTATUS_BAD_LOGIN_DATA) {
     if (!clib::pclsync_lib::get_lib().newuser_) {
       clib::pclsync_lib::get_lib().read_password();
       psync_set_user_pass(clib::pclsync_lib::get_lib().get_username().c_str(),
@@ -478,9 +480,9 @@ static void status_change(pstatus_t *status) {
       }
     }
   }
-  if (status->status == PSTATUS_READY || status->status == PSTATUS_UPLOADING ||
-      status->status == PSTATUS_DOWNLOADING ||
-      status->status == PSTATUS_DOWNLOADINGANDUPLOADING) {
+  if (cur_status == PSTATUS_READY || cur_status == PSTATUS_UPLOADING ||
+      cur_status == PSTATUS_DOWNLOADING ||
+      cur_status == PSTATUS_DOWNLOADINGANDUPLOADING) {
     if (!cryptocheck) {
       cryptocheck = 1;
       if (clib::pclsync_lib::get_lib().setup_crypto_) {
@@ -491,7 +493,7 @@ static void status_change(pstatus_t *status) {
   }
   if (clib::pclsync_lib::get_lib().status_callback_) {
     clib::pclsync_lib::get_lib().status_callback_(
-        (int)status->status, status2string(status->status));
+        (int)cur_status, status2string(cur_status));
   }
 
   if (err) {

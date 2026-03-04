@@ -164,7 +164,7 @@ void pstatus_init() {
   }
   pstatus_download_recalc();
   pstatus_upload_recalc();
-  psync_status.status = calc_status();
+  __atomic_store_n(&psync_status.status, calc_status(), __ATOMIC_RELAXED);
 }
 
 void pstatus_download_recalc() {
@@ -184,7 +184,7 @@ void pstatus_download_recalc() {
   if (!psync_status.filestodownload) {
     psync_status.downloadspeed = 0;
   }
-  psync_status.status = calc_status();
+  __atomic_store_n(&psync_status.status, calc_status(), __ATOMIC_RELAXED);
 }
 
 void pstatus_upload_recalc() {
@@ -230,7 +230,7 @@ void pstatus_upload_recalc() {
   psync_status.bytestoupload = bytestou;
   if (!filestou)
     psync_status.uploadspeed = 0;
-  psync_status.status = calc_status();
+  __atomic_store_n(&psync_status.status, calc_status(), __ATOMIC_RELAXED);
 }
 
 void pstatus_download_recalc_async() {
@@ -259,8 +259,8 @@ void pstatus_set(uint32_t statusid, uint32_t status) {
       (statuses[PSTATUS_TYPE_DISKFULL] == PSTATUS_DISKFULL_FULL);
   pthread_mutex_unlock(&status_internal_mutex);
   status = calc_status();
-  if (psync_status.status != status) {
-    psync_status.status = status;
+  if (__atomic_load_n(&psync_status.status, __ATOMIC_RELAXED) != status) {
+    __atomic_store_n(&psync_status.status, status, __ATOMIC_RELAXED);
     pstatus_send_status_update();
   }
 }
@@ -354,6 +354,6 @@ void pstatus_upload_set_speed(uint32_t speed) {
 }
 
 void pstatus_send_update() {
-  psync_status.status = calc_status();
+  __atomic_store_n(&psync_status.status, calc_status(), __ATOMIC_RELAXED);
   pstatus_send_status_update();
 }
