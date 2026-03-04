@@ -3311,7 +3311,7 @@ static void pfs_start_callback_timer(psync_timer_t timer, void *ptr) {
     prun_thread("fs start callback", callback);
 }
 
-static void *pfs_init(struct fuse_conn_info *conn) {
+static void *pfs_init(struct fuse_conn_info *conn, struct fuse_config *cfg) {
 #if defined(FUSE_CAP_ASYNC_READ)
   conn->want |= FUSE_CAP_ASYNC_READ;
 #endif
