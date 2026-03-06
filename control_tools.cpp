@@ -31,6 +31,7 @@
 #include <string>
 
 #include <fcntl.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -44,6 +45,7 @@
 #include "pclsync/putil.h"
 #include "pclsync/pfoldersync.h"
 #include "pclsync/pcommands.h"
+#include "pclsync/pfs.h"
 
 #include "rpcclient.h"
 #include "CLI11.hpp"
@@ -506,6 +508,9 @@ int daemonize(bool do_commands) {
 
   while (1) {
     sleep(10);
+    if (shutdown_requested) {
+      break;
+    }
   }
 }
 

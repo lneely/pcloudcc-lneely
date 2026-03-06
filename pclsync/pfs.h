@@ -33,6 +33,7 @@
 #define _PSYNC_FS_H
 
 #include <pthread.h>
+#include <signal.h>
 
 #include "pcrc32c.h"
 #include "pcrypto.h"
@@ -195,5 +196,7 @@ void pfs_clean_tasks();
 void pfs_debug_init_file_mutex(pthread_mutex_t *m);
 void pfs_debug_dump_internals();
 void pfs_debug_register_signal_handlers();
+
+extern volatile sig_atomic_t shutdown_requested;
 
 #endif
