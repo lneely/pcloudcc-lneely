@@ -90,6 +90,7 @@ typedef off_t fuse_off_t;
 #define PSYNC_FS_ERR_MOVE_ACROSS_CRYPTO EXDEV
 
 static int shutdown_in_progress = 0;
+volatile sig_atomic_t shutdown_requested = 0;
 static struct fuse_chan *psync_fuse_channel = NULL;
 static struct fuse *psync_fuse = NULL;
 static char *psync_current_mountpoint = NULL;
@@ -3592,8 +3593,7 @@ static void pfs_do_stop(void) {
 void pfs_stop() { pfs_do_stop(); }
 
 static void psync_signal_handler(int sig) {
-  pdbg_logf(D_NOTICE, "got signal %d", sig);
-  exit(1); // invoke psync_do_stop via atexit()
+  shutdown_requested = 1;
 }
 
 static void psync_usr2_handler(int sig) {
@@ -3651,7 +3651,21 @@ static void psync_fuse_thread() {
   }
   pthread_mutex_unlock(&start_mutex);
   pdbg_logf(D_NOTICE, "running fuse_loop_mt");
-  fr = fuse_loop_mt(psync_fuse);
+  
+  // Check shutdown flag periodically during FUSE loop
+  while (!shutdown_requested) {
+    fr = fuse_loop_mt(psync_fuse);
+    if (fr != 0 || shutdown_requested) {
+      break;
+    }
+  }
+  
+  if (shutdown_requested) {
+    pdbg_logf(D_NOTICE, "shutdown requested, exiting fuse loop");
+    pfs_do_stop();
+    exit(0);
+  }
+  
   pdbg_logf(D_NOTICE, "fuse_loop_mt exited with code %d, running fuse_destroy", fr);
   pthread_mutex_lock(&start_mutex);
   fuse_destroy(psync_fuse);
