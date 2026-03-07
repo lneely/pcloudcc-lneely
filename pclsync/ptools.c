@@ -44,11 +44,14 @@
 #include <sys/types.h>
 
 #include "papi.h"
+#include "pdbg.h"
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "psettings.h"
 #include "psql.h"
 #include "ptools.h"
+
+#define PTOOLS_MAX_PARAMS 30
 
 char *ptools_get_mac_addr() {
   char buffer[128];
@@ -93,10 +96,16 @@ int ptools_create_backend_event(const char *binapi, const char *category,
   binparam *paramsLocal;
   int i;
   int pCnt = params->paramCnt; // Number of optional parameters
+  if (pCnt > PTOOLS_MAX_PARAMS) {
+    pdbg_logf(D_WARNING,
+              "ptools_create_backend_event: paramCnt %d exceeds max %d, clamping",
+              pCnt, PTOOLS_MAX_PARAMS);
+    pCnt = PTOOLS_MAX_PARAMS;
+  }
   int mpCnt = 6;               // Number of mandatory params
   int tpCnt;                   // Total number of parameters
   char *keyParams = NULL;
-  char charBuff[30][258];
+  char charBuff[PTOOLS_MAX_PARAMS][258];
 
   sock = papi_connect(binapi, psync_setting_get_bool(0));
 
