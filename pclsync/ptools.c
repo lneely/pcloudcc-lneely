@@ -130,7 +130,30 @@ int ptools_create_backend_event(const char *binapi, const char *category,
     keyParams[0] = 0;
 
     for (i = 0; i < pCnt; i++) {
+      size_t namelen;
+      size_t used;
+      size_t needed;
+      int n;
       charBuff[i][0] = 0;
+
+      /* Reject paramnames > 254 bytes: "key" (3) + paramname + NUL must fit in 258 */
+      namelen = strlen(params->Params[i].paramname);
+      if (namelen > 254) {
+        pdbg_logf(D_WARNING,
+                  "ptools_create_backend_event: paramname[%d] too long (%zu bytes), skipping",
+                  i, namelen);
+        continue;
+      }
+
+      /* Length check before strcat: verify paramname fits in remaining keyParams space */
+      used = strlen(keyParams);
+      needed = namelen + (i > 0 ? 2 : 1); /* comma (if i>0) + name + NUL */
+      if (used + needed > (size_t)(258 * pCnt)) {
+        pdbg_logf(D_WARNING,
+                  "ptools_create_backend_event: keyParams buffer full, skipping param %d",
+                  i);
+        continue;
+      }
 
       if (i > 0) {
         strcat(keyParams, ",");
@@ -139,7 +162,15 @@ int ptools_create_backend_event(const char *binapi, const char *category,
         strcat(keyParams, params->Params[i].paramname);
       }
 
-      snprintf(charBuff[i], sizeof(charBuff[i]), "key%s", params->Params[i].paramname);
+      n = snprintf(charBuff[i], sizeof(charBuff[i]), "key%s", params->Params[i].paramname);
+      if (n < 0 || n >= (int)sizeof(charBuff[i])) {
+        /* Should not happen after the namelen > 254 check above, but guard anyway */
+        pdbg_logf(D_WARNING,
+                  "ptools_create_backend_event: snprintf truncated charBuff[%d], skipping",
+                  i);
+        charBuff[i][0] = 0;
+        continue;
+      }
 
       if (params->Params[i].paramtype == 0) {
         paramsLocal[mpCnt + i] =
