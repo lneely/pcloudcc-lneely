@@ -103,70 +103,56 @@ int RpcClient::writeRequest(int fd, int msgtype, const char *value, char **out, 
 }
 
 int RpcClient::readResponse(int fd, char **out, size_t *out_size) {
-    rpc_message_t *msg = (rpc_message_t *)malloc(POVERLAY_BUFSIZE);
-    if (msg == NULL) {
+    char buf[POVERLAY_BUFSIZE];
+    rpc_message_t *msg = (rpc_message_t *)buf;
+    size_t header_size = offsetof(rpc_message_t, value);
+    ssize_t total_read = 0;
+    ssize_t bytes_read;
+
+    // Loop to handle partial reads into fixed-size buffer
+    while (total_read < (ssize_t)POVERLAY_BUFSIZE) {
+        bytes_read = read(fd, buf + total_read, POVERLAY_BUFSIZE - total_read);
+        if (bytes_read < 0) {
+            if (errno == EINTR)
+                continue;
+            const char *error_msg = "Read error";
+            *out = strdup(error_msg);
+            *out_size = strlen(error_msg) + 1;
+            return POVERLAY_READ_SOCK_ERR;
+        }
+        if (bytes_read == 0)
+            break; // EOF
+        total_read += bytes_read;
+        // Stop once we have received the complete message
+        if (total_read >= (ssize_t)header_size &&
+            msg->length <= (uint64_t)total_read)
+            break;
+    }
+
+    // Validate msg->length <= bytes_read and msg->length <= POVERLAY_BUFSIZE
+    // before malloc/memcpy to prevent heap over-read
+    if ((uint64_t)total_read < header_size ||
+        msg->length < header_size ||
+        msg->length > (uint64_t)total_read ||
+        msg->length > POVERLAY_BUFSIZE) {
+        const char *error_msg = "Invalid response length";
+        *out = strdup(error_msg);
+        *out_size = strlen(error_msg) + 1;
+        return POVERLAY_READ_INVALID_RESPONSE;
+    }
+
+    size_t value_length = (size_t)msg->length - header_size;
+    *out = (char *)malloc(value_length + 1);
+    if (*out == NULL) {
         const char *error_msg = "Memory allocation failed";
         *out = strdup(error_msg);
         *out_size = strlen(error_msg) + 1;
         return -1;
     }
+    memcpy(*out, msg->value, value_length);
+    (*out)[value_length] = '\0';
+    *out_size = value_length;
 
-    // Read header first to get message length
-    size_t header_size = offsetof(rpc_message_t, value);
-    ssize_t bytes_read = 0;
-    ssize_t total_read = 0;
-    
-    while (total_read < (ssize_t)header_size) {
-        bytes_read = read(fd, ((char*)msg) + total_read, header_size - total_read);
-        if (bytes_read <= 0) {
-            const char *error_msg = (bytes_read == 0) ? "Connection closed" : "Read error";
-            *out = strdup(error_msg);
-            *out_size = strlen(error_msg) + 1;
-            putil_wipe(msg, POVERLAY_BUFSIZE);
-            free(msg);
-            return -1;
-        }
-        total_read += bytes_read;
-    }
-
-    // Validate msg->length
-    size_t max_value_size = POVERLAY_BUFSIZE - header_size;
-    if (msg->length > max_value_size) {
-        const char *error_msg = "Message length exceeds buffer size";
-        *out = strdup(error_msg);
-        *out_size = strlen(error_msg) + 1;
-        putil_wipe(msg, POVERLAY_BUFSIZE);
-        free(msg);
-        return -1;
-    }
-
-    // Read the value payload
-    while (total_read < (ssize_t)(header_size + msg->length)) {
-        bytes_read = read(fd, ((char*)msg) + total_read, header_size + msg->length - total_read);
-        if (bytes_read < 0) {
-            const char *error_msg = "Read error";
-            *out = strdup(error_msg);
-            *out_size = strlen(error_msg) + 1;
-            putil_wipe(msg, POVERLAY_BUFSIZE);
-            free(msg);
-            return -1;
-        }
-        if (bytes_read == 0) {
-            // EOF before reading full message - daemon bug, but handle gracefully
-            break;
-        }
-        total_read += bytes_read;
-    }
-
-    // Use actual bytes read, not claimed length
-    size_t actual_length = total_read - header_size;
-
-    *out = (char *)malloc(actual_length);
-    memcpy(*out, msg->value, actual_length);
-    *out_size = actual_length;
-
-    putil_wipe(msg, POVERLAY_BUFSIZE);
-    free(msg); 
     return 0;
 }
 
