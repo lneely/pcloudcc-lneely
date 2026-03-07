@@ -62,16 +62,60 @@ static void pdbg_init_level(void) {
     __atomic_store_n(&pdbg_runtime_level, level, __ATOMIC_RELAXED);
 }
 
+/* Returns 1 if path is safe to use as a log file, 0 otherwise.
+ * Safe means: absolute, no '..' components, and under HOME or /tmp. */
+static int pdbg_path_is_safe(const char *path) {
+    const char *home;
+    const char *p;
+
+    /* Must be an absolute path */
+    if (!path || path[0] != '/')
+        return 0;
+
+    /* Reject any '..' path component to prevent directory traversal */
+    p = path;
+    while (*p) {
+        while (*p == '/') p++;
+        if (p[0] == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\0'))
+            return 0;
+        while (*p && *p != '/') p++;
+    }
+
+    /* Must resolve within the user home directory */
+    home = getenv("HOME");
+    if (home && home[0] == '/') {
+        size_t hlen = strlen(home);
+        if (strncmp(path, home, hlen) == 0 &&
+            (path[hlen] == '/' || path[hlen] == '\0'))
+            return 1;
+    }
+
+    /* Or within /tmp */
+    if (strncmp(path, "/tmp/", 5) == 0)
+        return 1;
+
+    return 0;
+}
+
 char *psync_debug_path() {
     const char *custom_path = getenv("PCLOUD_LOG_PATH");
     if (custom_path && custom_path[0] != '\0') {
-        size_t len = strlen(custom_path) + 1;
-        char *path = (char *)malloc(len);
-        if (!path) {
-            return NULL;
+        if (!pdbg_path_is_safe(custom_path)) {
+            /* Invalid path: reject and fall through to default */
+            fprintf(stderr,
+                    "pdbg: PCLOUD_LOG_PATH '%s' rejected"
+                    " (must be absolute, under HOME or /tmp, no '..' components);"
+                    " using default log path\n",
+                    custom_path);
+        } else {
+            size_t len = strlen(custom_path) + 1;
+            char *path = (char *)malloc(len);
+            if (!path) {
+                return NULL;
+            }
+            snprintf(path, len, "%s", custom_path);
+            return path;
         }
-        snprintf(path, len, "%s", custom_path);
-        return path;
     }
 
     char *home = ppath_home();
@@ -83,10 +127,12 @@ char *psync_debug_path() {
     size_t len = strlen(home) + strlen(subdir) + 1;
     char *sockpath = (char *)malloc(len);
     if (!sockpath) {
+        free(home);
         return NULL;
     }
 
     snprintf(sockpath, len, "%s%s", home, subdir);
+    free(home);
     return sockpath;
 }
 
