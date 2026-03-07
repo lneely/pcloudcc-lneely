@@ -9,7 +9,10 @@
 extern PSYNC_THREAD const char *psync_thread_name; 
 
 typedef struct {
-  thread1_run run;
+  union {
+    thread0_run run0; /* used when ptr == NULL */
+    thread1_run run1; /* used when ptr != NULL */
+  } fn;
   void *ptr;
   const char *name;
 } thread_data;
@@ -17,45 +20,55 @@ typedef struct {
 static void *thread_entry(void *data) {
   thread_data *td = (thread_data *)data;
   psync_thread_name = td->name;
-  
+
   if (td->ptr) {
-    td->run(td->ptr);
+    td->fn.run1(td->ptr);
   } else {
-    ((thread0_run)td->run)();
+    td->fn.run0();
   }
-  
+
   free(data);
   return NULL;
 }
 
-// Common function for both thread types
-static void start_thread(const char *name, void *run, void *ptr) {
-  thread_data *data;
+static int start_thread_common(const char *name, thread_data *data) {
   pthread_t thread;
   pthread_attr_t attr;
   int ret;
-  
-  data = malloc(sizeof(thread_data));
-  data->run = run;
-  data->ptr = ptr;
-  data->name = name;
-  
+
   pthread_attr_init(&attr);
   pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
   pthread_attr_setstacksize(&attr, PSYNC_STACK_SIZE);
   ret = pthread_create(&thread, &attr, thread_entry, data);
   pthread_attr_destroy(&attr);
-  
+
   if (ret) {
     pdbg_logf(D_ERROR, "pthread_create failed for thread %s: %d", name, ret);
     free(data);
   }
+  return ret;
 }
 
 void prun_thread(const char *name, thread0_run run) {
-  start_thread(name, (thread1_run)run, NULL);
+  thread_data *data = malloc(sizeof(thread_data));
+  if (!data) {
+    pdbg_logf(D_ERROR, "malloc failed for thread %s", name);
+    return;
+  }
+  data->fn.run0 = run;
+  data->ptr = NULL;
+  data->name = name;
+  start_thread_common(name, data);
 }
 
 void prun_thread1(const char *name, thread1_run run, void *ptr) {
-  start_thread(name, run, ptr);
+  thread_data *data = malloc(sizeof(thread_data));
+  if (!data) {
+    pdbg_logf(D_ERROR, "malloc failed for thread %s", name);
+    return;
+  }
+  data->fn.run1 = run;
+  data->ptr = ptr;
+  data->name = name;
+  start_thread_common(name, data);
 }
