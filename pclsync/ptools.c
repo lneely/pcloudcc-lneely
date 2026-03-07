@@ -513,6 +513,12 @@ int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
 
   pdbg_logf(D_NOTICE, "cTime res: [%d]", callRes);
 
+  /* Free errPtr before reuse to avoid leak if first call allocated it */
+  if (errPtr) {
+    free(errPtr);
+    errPtr = NULL;
+  }
+
   eventParams requiredParams = {5,
                                 {PAPI_STR("auth", psync_my_auth),
                                  PAPI_NUM("fileid", fileid),
