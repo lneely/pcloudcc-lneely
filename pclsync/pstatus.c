@@ -222,7 +222,11 @@ void pstatus_upload_recalc() {
         putil_strcat(fscpath, "/", fileidhex, NULL);
     if (!stat(filename, &st)) {
       filestou++;
-      bytestou += pfile_stat_size(&st);
+      uint64_t fsize = pfile_stat_size(&st);
+      if (fsize > UINT64_MAX - bytestou)
+        bytestou = UINT64_MAX;
+      else
+        bytestou += fsize;
     }
     free(filename);
   }
