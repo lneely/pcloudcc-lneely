@@ -31,6 +31,7 @@
 
 #include <stdarg.h>
 #include <string.h>
+#include <time.h>
 
 #include "pfile.h"
 #include "pfstasks.h"
@@ -266,10 +267,13 @@ void pstatus_set(uint32_t statusid, uint32_t status) {
 }
 
 void pstatus_wait(uint32_t statusid, uint32_t status) {
+  struct timespec ts;
   pthread_mutex_lock(&status_internal_mutex);
   while ((statuses[statusid] & status) == 0 && psync_do_run) {
     status_waiters++;
-    pthread_cond_wait(&statuscond, &status_internal_mutex);
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 5;
+    pthread_cond_timedwait(&statuscond, &status_internal_mutex, &ts);
     status_waiters--;
   }
   pthread_mutex_unlock(&status_internal_mutex);
