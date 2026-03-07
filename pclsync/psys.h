@@ -13,8 +13,6 @@ gid_t *psys_get_gids();
 int psys_get_gids_cnt();
 
 void psys_init();
-void psys_debug_abort_on_sqllock(uint64_t millisec);
-void psys_debug_configure_core_dump();
 time_t psys_time_seconds();
 uint64_t psys_time_milliseconds();
 void psys_sleep_milliseconds(uint64_t millisec);

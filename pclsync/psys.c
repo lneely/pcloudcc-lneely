@@ -13,8 +13,29 @@ static gid_t psync_gid;
 static gid_t *psync_gids;
 static int psync_gids_cnt;
 
-__attribute__((weak)) void psys_debug_abort_on_sqllock(uint64_t millisec) {}
-__attribute__((weak)) void psys_debug_configure_core_dump() {}
+static void psys_debug_abort_on_sqllock(uint64_t millisec) {
+#ifdef DEBUG
+  if (psql_locked()) {
+    pdbg_logf(D_CRITICAL, "trying to sleep while holding sql lock, aborting");
+    psql_dump_locks();
+    abort();
+  }
+#else
+  (void)millisec;
+#endif
+}
+static void psys_debug_configure_core_dump() {
+#ifdef DEBUG
+  struct rlimit limit;
+  if (getrlimit(RLIMIT_CORE, &limit))
+    pdbg_logf(D_ERROR, "getrlimit failed errno=%d", errno);
+  else {
+    limit.rlim_cur = limit.rlim_max;
+    if (setrlimit(RLIMIT_CORE, &limit))
+      pdbg_logf(D_ERROR, "setrlimit failed errno=%d", errno);
+  }
+#endif
+}
 
 static void abort_on_sqllock(uint64_t millisec) {
   psys_debug_abort_on_sqllock(millisec);
