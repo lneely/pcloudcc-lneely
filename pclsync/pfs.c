@@ -3651,21 +3651,13 @@ static void psync_fuse_thread() {
   }
   pthread_mutex_unlock(&start_mutex);
   pdbg_logf(D_NOTICE, "running fuse_loop_mt");
-  
-  // Check shutdown flag periodically during FUSE loop
-  while (!shutdown_requested) {
-    fr = fuse_loop_mt(psync_fuse);
-    if (fr != 0 || shutdown_requested) {
-      break;
-    }
-  }
-  
+  fr = fuse_loop_mt(psync_fuse);
+
   if (shutdown_requested) {
     pdbg_logf(D_NOTICE, "shutdown requested, exiting fuse loop");
     pfs_do_stop();
-    exit(0);
   }
-  
+
   pdbg_logf(D_NOTICE, "fuse_loop_mt exited with code %d, running fuse_destroy", fr);
   pthread_mutex_lock(&start_mutex);
   fuse_destroy(psync_fuse);
