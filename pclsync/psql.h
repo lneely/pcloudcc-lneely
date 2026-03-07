@@ -53,39 +53,6 @@ int psql_reopen(const char *path);
 void psql_checkpt_lock();
 void psql_checkpt_unlock();
 
-#if IS_DEBUG
-
-#define psql_trylock() psql_do_trylock(__FILE__, __LINE__)
-#define psql_lock() psql_do_lock(__FILE__, __LINE__)
-#define psql_rdlock() psql_do_rdlock(__FILE__, __LINE__)
-#define psql_statement(sql) psql_do_statement(sql, __FILE__, __LINE__)
-#define psql_start() psql_do_start_transaction(__FILE__, __LINE__)
-#define psql_query_nocache(sql) psql_do_query_nocache(sql, __FILE__, __LINE__)
-#define psql_query(sql) psql_do_query(sql, __FILE__, __LINE__)
-#define psql_rdlock_nocache(sql) psql_do_query_rdlock_nocache(sql, __FILE__, __LINE__)
-#define psql_query_rdlock(sql) psql_do_query_rdlock(sql, __FILE__, __LINE__)
-#define psql_query_nolock_nocache(sql) psql_do_query_nolock_nocache(sql, __FILE__, __LINE__)
-#define psql_query_nolock(sql) psql_do_query_nolock(sql, __FILE__, __LINE__)
-#define psql_prepare_nocache(sql) psql_do_prepare_nocache(sql, __FILE__, __LINE__)
-#define psql_prepare(sql) psql_do_prepare(sql, __FILE__, __LINE__)
-void psql_dump_locks();
-
-int psql_do_trylock(const char *file, unsigned line);
-void psql_do_lock(const char *file, unsigned line);
-void psql_do_rdlock(const char *file, unsigned line);
-int psql_do_statement(const char *sql, const char *file, unsigned line) PSYNC_NONNULL(1);
-int psql_do_start_transaction(const char *file, unsigned line);
-psync_sql_res *psql_do_query_nocache(const char *sql, const char *file, unsigned line) PSYNC_NONNULL(1);
-psync_sql_res *psql_do_query(const char *sql, const char *file, unsigned line) PSYNC_NONNULL(1);
-psync_sql_res *psql_do_query_rdlock_nocache(const char *sql, const char *file, unsigned line) PSYNC_NONNULL(1);
-psync_sql_res *psql_do_query_rdlock(const char *sql, const char *file, unsigned line) PSYNC_NONNULL(1);
-psync_sql_res *psql_do_query_nolock_nocache(const char *sql, const char *file, unsigned line) PSYNC_NONNULL(1);
-psync_sql_res *psql_do_query_nolock(const char *sql, const char *file, unsigned line) PSYNC_NONNULL(1);
-psync_sql_res *psql_do_prepare_nocache(const char *sql, const char *file, unsigned line) PSYNC_NONNULL(1);
-psync_sql_res *psql_do_prepare(const char *sql, const char *file, unsigned line) PSYNC_NONNULL(1);
-
-#else
-
 int psql_trylock();
 void psql_lock();
 void psql_rdlock();
@@ -101,8 +68,7 @@ psync_sql_res *psql_query_nolock_nocache(const char *sql) PSYNC_NONNULL(1);
 psync_sql_res *psql_prepare(const char *sql) PSYNC_NONNULL(1);
 psync_sql_res *psql_prepare_nocache(const char *sql) PSYNC_NONNULL(1);
 
-#endif
-
+void psql_dump_locks();
 void psql_unlock();
 void psql_rdunlock();
 int psql_waiting();
