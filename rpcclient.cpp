@@ -161,21 +161,19 @@ int RpcClient::GetState(pCloud_FileState *state, char *path) {
   size_t errm_size = 0;
   int rep = 0;
 
-  if ((rep = this->Call(4, path, &errm, &errm_size)) == 0) {
-    pdbg_logf(D_NOTICE, "rpc_get_state responese rep[%d] path[%s]", rep, path);
-    if (errm) {
-      pdbg_logf(D_NOTICE, "The error is %s", errm);
-    }
-    if (rep == 10) {
-      *state = FileStateInSync;
-    } else if (rep == 12) {
-      *state = FileStateInProgress;
-    } else if (rep == 11) {
-      *state = FileStateNoSync;
-    } else {
-      *state = FileStateInvalid;
-    }
+  rep = this->Call(4, path, &errm, &errm_size);
+  pdbg_logf(D_NOTICE, "rpc_get_state responese rep[%d] path[%s]", rep, path);
+  if (errm) {
+    pdbg_logf(D_NOTICE, "The error is %s", errm);
+  }
+  if (rep == 10) {
+    *state = FileStateInSync;
+  } else if (rep == 12) {
+    *state = FileStateInProgress;
+  } else if (rep == 11) {
+    *state = FileStateNoSync;
   } else {
+    *state = FileStateInvalid;
     pdbg_logf(D_ERROR, "rpc_get_state ERROR rep[%d] path[%s]", rep, path);
   }
   if(errm) {
