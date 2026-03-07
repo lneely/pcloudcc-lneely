@@ -44,11 +44,14 @@
 #include <sys/types.h>
 
 #include "papi.h"
+#include "pdbg.h"
 #include "plibs.h"
 #include "pnetlibs.h"
 #include "psettings.h"
 #include "psql.h"
 #include "ptools.h"
+
+#define PTOOLS_MAX_PARAMS 30
 
 char *ptools_get_mac_addr() {
   char buffer[128];
@@ -93,10 +96,16 @@ int ptools_create_backend_event(const char *binapi, const char *category,
   binparam *paramsLocal;
   int i;
   int pCnt = params->paramCnt; // Number of optional parameters
+  if (pCnt > PTOOLS_MAX_PARAMS) {
+    pdbg_logf(D_WARNING,
+              "ptools_create_backend_event: paramCnt %d exceeds max %d, clamping",
+              pCnt, PTOOLS_MAX_PARAMS);
+    pCnt = PTOOLS_MAX_PARAMS;
+  }
   int mpCnt = 6;               // Number of mandatory params
   int tpCnt;                   // Total number of parameters
   char *keyParams = NULL;
-  char charBuff[30][258];
+  char charBuff[PTOOLS_MAX_PARAMS][258];
 
   sock = papi_connect(binapi, psync_setting_get_bool(0));
 
@@ -130,7 +139,30 @@ int ptools_create_backend_event(const char *binapi, const char *category,
     keyParams[0] = 0;
 
     for (i = 0; i < pCnt; i++) {
+      size_t namelen;
+      size_t used;
+      size_t needed;
+      int n;
       charBuff[i][0] = 0;
+
+      /* Reject paramnames > 254 bytes: "key" (3) + paramname + NUL must fit in 258 */
+      namelen = strlen(params->Params[i].paramname);
+      if (namelen > 254) {
+        pdbg_logf(D_WARNING,
+                  "ptools_create_backend_event: paramname[%d] too long (%zu bytes), skipping",
+                  i, namelen);
+        continue;
+      }
+
+      /* Length check before strcat: verify paramname fits in remaining keyParams space */
+      used = strlen(keyParams);
+      needed = namelen + (i > 0 ? 2 : 1); /* comma (if i>0) + name + NUL */
+      if (used + needed > (size_t)(258 * pCnt)) {
+        pdbg_logf(D_WARNING,
+                  "ptools_create_backend_event: keyParams buffer full, skipping param %d",
+                  i);
+        continue;
+      }
 
       if (i > 0) {
         strcat(keyParams, ",");
@@ -139,7 +171,15 @@ int ptools_create_backend_event(const char *binapi, const char *category,
         strcat(keyParams, params->Params[i].paramname);
       }
 
-      snprintf(charBuff[i], sizeof(charBuff[i]), "key%s", params->Params[i].paramname);
+      n = snprintf(charBuff[i], sizeof(charBuff[i]), "key%s", params->Params[i].paramname);
+      if (n < 0 || n >= (int)sizeof(charBuff[i])) {
+        /* Should not happen after the namelen > 254 check above, but guard anyway */
+        pdbg_logf(D_WARNING,
+                  "ptools_create_backend_event: snprintf truncated charBuff[%d], skipping",
+                  i);
+        charBuff[i][0] = 0;
+        continue;
+      }
 
       if (params->Params[i].paramtype == 0) {
         paramsLocal[mpCnt + i] =
