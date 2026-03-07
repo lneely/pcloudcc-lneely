@@ -624,7 +624,7 @@ int clib::pclsync_lib::remove_sync_folder(const char *fid) {
     std::cerr << "Folder ID out of range: " << fid << std::endl;
     return -1;
   }
-  return psync_delete_sync_by_folderid(folderid);
+  return pfolder_delete_sync_by_id(folderid);
 }
 
 // path is not used

@@ -726,7 +726,7 @@ char *get_backup_root_name();
 
 // Asynchronous delete of local sync in thred, if a local sync with the folder
 // id passed in fId parameter exists in the local DB
-int psync_delete_sync_by_folderid(psync_folderid_t fId);
+int pfolder_delete_sync_by_id(psync_folderid_t fId);
 
 // Called when stop device is exceuted in the web, will delete the localy stored
 // device id in order to create new one if backup is started again.
