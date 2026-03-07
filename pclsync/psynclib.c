@@ -2544,7 +2544,7 @@ void psync_async_ui_callback(void *ptr) {
   }
 }
 
-int psync_delete_sync_by_folderid(psync_folderid_t fId) {
+int pfolder_delete_sync_by_id(psync_folderid_t fId) {
   psync_sql_res *sqlRes;
   psync_uint_row row;
   psync_syncid_t syncId;

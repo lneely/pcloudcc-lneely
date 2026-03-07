@@ -1079,9 +1079,9 @@ static void process_modifyfolder(const binresult *entry) {
   if ((oldflags & PSYNC_FOLDER_FLAG_BACKUP_ROOT) != 0 &&
       (flags & PSYNC_FOLDER_FLAG_BACKUP_ROOT) == 0) {
     pdbg_logf(D_NOTICE, "Stop backup root");
-    psync_delete_sync_by_folderid(folderid);
+    pfolder_delete_sync_by_id(folderid);
     // prun_thread1("psync_async_backup_delete",
-    // psync_delete_sync_by_folderid, folderid);
+    // pfolder_delete_sync_by_id, folderid);
   }
 
   if ((oldflags & PSYNC_FOLDER_FLAG_BACKUP_DEVICE) != 0 &&
