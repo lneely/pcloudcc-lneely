@@ -6,6 +6,8 @@
 #include <string.h>
 #include <strings.h>
 #include <time.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "pdbg.h"
 #include "ppath.h"
@@ -185,9 +187,16 @@ int pdbg_printf(const char *file, const char *function, int unsigned line, int u
 
   if (unlikely(!log_file)) {
     char *path = psync_debug_path();
-    log_file = fopen(path, "a+");
+    int fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
+    if (fd == -1) {
+      free(path);
+      pthread_mutex_unlock(&log_mutex);
+      return 1;
+    }
+    log_file = fdopen(fd, "a");
     free(path);
     if (!log_file) {
+      close(fd);
       pthread_mutex_unlock(&log_mutex);
       return 1;
     }
@@ -199,9 +208,9 @@ int pdbg_printf(const char *file, const char *function, int unsigned line, int u
     char *path = pfs_event_log_path();
     if (path) {
       /* Create empty file if it doesn't exist, or open existing */
-      FILE *f = fopen(path, "a+");
-      if (f) {
-        fclose(f);
+      int fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
+      if (fd != -1) {
+        close(fd);
       }
       free(path);
     }
@@ -231,6 +240,7 @@ void pdbg_reopen_log() {
 static void do_reopen_log() {
   char *path;
   FILE *new_log;
+  int fd;
 
   /* Close existing log file if open */
   if (log_file) {
@@ -241,13 +251,18 @@ static void do_reopen_log() {
   /* Open new log file */
   path = psync_debug_path();
   if (path) {
-    new_log = fopen(path, "a+");
+    fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
     free(path);
-    if (new_log) {
-      log_file = new_log;
-      /* Log a message about the rotation */
-      fprintf(log_file, "Log file reopened for rotation\n");
-      fflush(log_file);
+    if (fd != -1) {
+      new_log = fdopen(fd, "a");
+      if (new_log) {
+        log_file = new_log;
+        /* Log a message about the rotation */
+        fprintf(log_file, "Log file reopened for rotation\n");
+        fflush(log_file);
+      } else {
+        close(fd);
+      }
     }
   }
 
@@ -258,10 +273,15 @@ static void do_reopen_log() {
 
     path = pfs_event_log_path();
     if (path) {
-      new_log = fopen(path, "a+");
+      fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
       free(path);
-      if (new_log) {
-        fs_event_log = new_log;
+      if (fd != -1) {
+        new_log = fdopen(fd, "a");
+        if (new_log) {
+          fs_event_log = new_log;
+        } else {
+          close(fd);
+        }
       }
     }
   }
@@ -289,9 +309,15 @@ void pdbg_write_fs_event(const char *fmt, ...) {
       pthread_mutex_unlock(&log_mutex);
       return;
     }
-    fs_event_log = fopen(path, "a+");
+    int fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
     free(path);
+    if (fd == -1) {
+      pthread_mutex_unlock(&log_mutex);
+      return;
+    }
+    fs_event_log = fdopen(fd, "a");
     if (!fs_event_log) {
+      close(fd);
       pthread_mutex_unlock(&log_mutex);
       return;
     }

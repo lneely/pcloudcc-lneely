@@ -26,3 +26,9 @@ result
 .direnv
 .kiro
 .claude
+tests/test_lock
+tests/test_pdbg_path
+tests/test_prun
+tests/test_ptools_errptr
+tests/test_ptools_params
+tests/test_read_response
