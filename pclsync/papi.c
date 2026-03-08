@@ -314,10 +314,18 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     cnt = 0;
     alloc = 128;
     arr = (binresult **)malloc(sizeof(binresult *) * alloc);
+    if (!arr)
+      return NULL;
     while (**indata != RPARAM_END) {
       if (cnt == alloc) {
+        binresult **tmp;
         alloc *= 2;
-        arr = (binresult **)realloc(arr, sizeof(binresult *) * alloc);
+        tmp = (binresult **)realloc(arr, sizeof(binresult *) * alloc);
+        if (!tmp) {
+          free(arr);
+          return NULL;
+        }
+        arr = tmp;
       }
       arr[cnt++] = do_parse_result(indata, odata, strings, nextstrid);
     }
@@ -339,11 +347,19 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     cnt = 0;
     alloc = 32;
     arr = (struct _hashpair *)malloc(sizeof(struct _hashpair) * alloc);
+    if (!arr)
+      return NULL;
     while (**indata != RPARAM_END) {
       if (cnt == alloc) {
+        struct _hashpair *tmp;
         alloc *= 2;
-        arr = (struct _hashpair *)realloc(arr, sizeof(struct _hashpair) *
+        tmp = (struct _hashpair *)realloc(arr, sizeof(struct _hashpair) *
                                                          alloc);
+        if (!tmp) {
+          free(arr);
+          return NULL;
+        }
+        arr = tmp;
       }
       key = do_parse_result(indata, odata, strings, nextstrid);
       arr[cnt].value = do_parse_result(indata, odata, strings, nextstrid);
@@ -383,7 +399,13 @@ static binresult *parse_result(unsigned char *data, size_t datalen) {
   if (retlen == -1)
     return NULL;
   datac = malloc(sizeof(unsigned char) * retlen);
+  if (!datac)
+    return NULL;
   strings = malloc(sizeof(binresult *) * strcnt);
+  if (!strings) {
+    free(datac);
+    return NULL;
+  }
   strcnt = 0;
   res = do_parse_result(&data, &datac, strings, &strcnt);
   free(strings);
@@ -535,6 +557,8 @@ unsigned char *papi_prepare(const char *command, size_t cmdlen,
   if (pdbg_unlikely(plen > 0xffff))
     return NULL;
   sdata = data = (unsigned char *)malloc(plen + 2 + additionalalloc);
+  if (!data)
+    return NULL;
   memcpy(data, &plen, 2);
   data += 2;
   if (datalen != -1) {
