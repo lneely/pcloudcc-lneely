@@ -48,6 +48,13 @@
 #include "pclsync/pfs.h"
 
 #include "rpcclient.h"
+
+// Forward declare pmem_free for cleaning up pshm_read() results
+extern "C" {
+  void pmem_free(int subsystem, void *ptr);
+}
+
+#define PMEM_SUBSYS_OTHER 0
 #include "CLI11.hpp"
 
 namespace cc = console_client;
@@ -138,13 +145,13 @@ void setup_app(CLI::App *app) {
           std::getline(std::cin, response);
           if (response != "y" && response != "Y") {
             std::cout << "Finalize cancelled" << std::endl;
-            free(pending);
+            pmem_free(PMEM_SUBSYS_OTHER, pending);
             if (errm) { free(errm); }
             delete rpc;
             return;
           }
         }
-        free(pending);
+        pmem_free(PMEM_SUBSYS_OTHER, pending);
       }
     }
     if (errm) { free(errm); errm = NULL; }
@@ -219,7 +226,7 @@ void setup_app(CLI::App *app) {
     char *status_str = nullptr;
     if (pshm_read((void**)&status_str, nullptr) && status_str) {
       std::cout << status_str << std::endl;
-      free(status_str);
+      pmem_free(PMEM_SUBSYS_OTHER, status_str);
     } else {
       std::cerr << "Failed to read status from daemon." << std::endl;
       if (errm) { free(errm); }
@@ -312,10 +319,10 @@ void setup_app(CLI::App *app) {
       } else {
         std::cerr << "No synchronized folders found." << std::endl;
       }
-      if(flist) { free(flist); }
+      if(flist) { pmem_free(PMEM_SUBSYS_OTHER, flist); }
     } else {
       std::cerr << "failed to read folder list from shm" << std::endl;
-      if(flist) { free(flist); }
+      if(flist) { pmem_free(PMEM_SUBSYS_OTHER, flist); }
       return -1;
     }
     if(errm) { free(errm); }
