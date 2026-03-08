@@ -146,10 +146,7 @@ typedef struct {
 extern PSYNC_THREAD const char *psync_thread_name; 
 static inline int pfs_do_lock_file(psync_openfile_t *of, const char *file,
                                          unsigned long line) {
-  if (!psql_locked()) {
-    pdbg_logf(D_ERROR, "lock ordering violation: pfs_lock_file called without psql_lock at %s:%lu", file, line);
-    abort();
-  }
+  pfs_debug_check_lock_order(file, line);
   if (unlikely(pthread_mutex_trylock(&of->mutex))) {
     struct timespec tm;
     clock_gettime(CLOCK_REALTIME, &tm);
@@ -201,6 +198,7 @@ void pfs_clean_tasks();
 void pfs_debug_init_file_mutex(pthread_mutex_t *m);
 void pfs_debug_dump_internals();
 void pfs_debug_register_signal_handlers();
+void pfs_debug_check_lock_order(const char *file, unsigned long line);
 
 extern volatile sig_atomic_t shutdown_requested;
 

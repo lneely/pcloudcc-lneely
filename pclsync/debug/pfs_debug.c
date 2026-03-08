@@ -45,3 +45,10 @@ void pfs_debug_register_signal_handlers() {
   sa.sa_flags = 0;
   sigaction(SIGUSR1, &sa, NULL);
 }
+
+void pfs_debug_check_lock_order(const char *file, unsigned long line) {
+  if (!psql_locked()) {
+    pdbg_logf(D_ERROR, "lock ordering violation: pfs_lock_file called without psql_lock at %s:%lu", file, line);
+    abort();
+  }
+}
