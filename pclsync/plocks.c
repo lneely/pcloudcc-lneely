@@ -31,6 +31,8 @@
 
 #include "plocks.h"
 #include "plibs.h"
+#include <errno.h>
+#include <time.h>
 
 #define PSYNC_RW_OPT_PREFER_READ 1U
 #define PSYNC_RW_OPT_RESERVED 2U
@@ -143,9 +145,17 @@ static psync_rwlock_lockcnt_t psync_rwlock_create_cnt(uint_halfptr_t rd,
 }
 
 void plocks_rdlock(psync_rwlock_t *rw) {
+  struct timespec ts;
+  int ret;
   if (psync_rwlock_check_rdrecursive_in(rw))
     return;
-  pthread_mutex_lock(&rw->mutex);
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += 30;
+  ret = pthread_mutex_timedlock(&rw->mutex, &ts);
+  if (ret == ETIMEDOUT) {
+    pdbg_logf(D_CRITICAL, "pthread_mutex_timedlock timeout on rdlock");
+    abort();
+  }
   while (rw->wcount || (rw->wwait && !(rw->opts & PSYNC_RW_OPT_RESERVED))) {
     rw->rwait++;
     pthread_cond_wait(&rw->rcond, &rw->mutex);
@@ -157,9 +167,17 @@ void plocks_rdlock(psync_rwlock_t *rw) {
 }
 
 int plocks_tryrdlock(psync_rwlock_t *rw) {
+  struct timespec ts;
+  int ret;
   if (psync_rwlock_check_rdrecursive_in(rw))
     return 0;
-  pthread_mutex_lock(&rw->mutex);
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += 30;
+  ret = pthread_mutex_timedlock(&rw->mutex, &ts);
+  if (ret == ETIMEDOUT) {
+    pdbg_logf(D_CRITICAL, "pthread_mutex_timedlock timeout on tryrdlock");
+    abort();
+  }
   if (rw->wcount || (rw->wwait && !(rw->opts & PSYNC_RW_OPT_RESERVED))) {
     pthread_mutex_unlock(&rw->mutex);
     return -1;
@@ -172,9 +190,17 @@ int plocks_tryrdlock(psync_rwlock_t *rw) {
 
 int plocks_timedrdlock(psync_rwlock_t *rw,
                              const struct timespec *abstime) {
+  struct timespec ts;
+  int ret;
   if (psync_rwlock_check_rdrecursive_in(rw))
     return 0;
-  pthread_mutex_lock(&rw->mutex);
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += 30;
+  ret = pthread_mutex_timedlock(&rw->mutex, &ts);
+  if (ret == ETIMEDOUT) {
+    pdbg_logf(D_CRITICAL, "pthread_mutex_timedlock timeout on timedrdlock");
+    abort();
+  }
   while (rw->wcount || (rw->wwait && !(rw->opts & PSYNC_RW_OPT_RESERVED))) {
     rw->rwait++;
     if (unlikely(pthread_cond_timedwait(&rw->rcond, &rw->mutex, abstime))) {
@@ -191,9 +217,17 @@ int plocks_timedrdlock(psync_rwlock_t *rw,
 }
 
 void plocks_rdlock_starvewr(psync_rwlock_t *rw) {
+  struct timespec ts;
+  int ret;
   if (psync_rwlock_check_rdrecursive_in(rw))
     return;
-  pthread_mutex_lock(&rw->mutex);
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += 30;
+  ret = pthread_mutex_timedlock(&rw->mutex, &ts);
+  if (ret == ETIMEDOUT) {
+    pdbg_logf(D_CRITICAL, "pthread_mutex_timedlock timeout on rdlock_starvewr");
+    abort();
+  }
   while (rw->wcount) {
     rw->rwait++;
     rw->opts |= PSYNC_RW_OPT_PREFER_READ;
@@ -207,9 +241,17 @@ void plocks_rdlock_starvewr(psync_rwlock_t *rw) {
 }
 
 void plocks_wrlock(psync_rwlock_t *rw) {
+  struct timespec ts;
+  int ret;
   if (psync_rwlock_check_wrrecursive_in(rw))
     return;
-  pthread_mutex_lock(&rw->mutex);
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += 30;
+  ret = pthread_mutex_timedlock(&rw->mutex, &ts);
+  if (ret == ETIMEDOUT) {
+    pdbg_logf(D_CRITICAL, "pthread_mutex_timedlock timeout on wrlock");
+    abort();
+  }
   while (rw->rcount || rw->wcount || (rw->opts & PSYNC_RW_OPT_RESERVED)) {
     rw->wwait++;
     pthread_cond_wait(&rw->wcond, &rw->mutex);
@@ -221,9 +263,17 @@ void plocks_wrlock(psync_rwlock_t *rw) {
 }
 
 int plocks_trywrlock(psync_rwlock_t *rw) {
+  struct timespec ts;
+  int ret;
   if (psync_rwlock_check_wrrecursive_in(rw))
     return 0;
-  pthread_mutex_lock(&rw->mutex);
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += 30;
+  ret = pthread_mutex_timedlock(&rw->mutex, &ts);
+  if (ret == ETIMEDOUT) {
+    pdbg_logf(D_CRITICAL, "pthread_mutex_timedlock timeout on trywrlock");
+    abort();
+  }
   if (rw->rcount || rw->wcount || (rw->opts & PSYNC_RW_OPT_RESERVED)) {
     pthread_mutex_unlock(&rw->mutex);
     return -1;
@@ -236,9 +286,17 @@ int plocks_trywrlock(psync_rwlock_t *rw) {
 
 int plocks_timedwrlock(psync_rwlock_t *rw,
                              const struct timespec *abstime) {
+  struct timespec ts;
+  int ret;
   if (psync_rwlock_check_wrrecursive_in(rw))
     return 0;
-  pthread_mutex_lock(&rw->mutex);
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += 30;
+  ret = pthread_mutex_timedlock(&rw->mutex, &ts);
+  if (ret == ETIMEDOUT) {
+    pdbg_logf(D_CRITICAL, "pthread_mutex_timedlock timeout on timedwrlock");
+    abort();
+  }
   while (rw->rcount || rw->wcount || (rw->opts & PSYNC_RW_OPT_RESERVED)) {
     rw->wwait++;
     if (unlikely(pthread_cond_timedwait(&rw->wcond, &rw->mutex, abstime))) {
@@ -256,6 +314,8 @@ int plocks_timedwrlock(psync_rwlock_t *rw,
 }
 
 void plocks_rslock(psync_rwlock_t *rw) {
+  struct timespec ts;
+  int ret;
   psync_rwlock_lockcnt_t cnt;
   cnt = psync_rwlock_get_count(rw);
   pdbg_assert(cnt.cnt[0] == 0);
@@ -267,7 +327,13 @@ void plocks_rslock(psync_rwlock_t *rw) {
     psync_rwlock_set_count(rw, cnt);
     return;
   }
-  pthread_mutex_lock(&rw->mutex);
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += 30;
+  ret = pthread_mutex_timedlock(&rw->mutex, &ts);
+  if (ret == ETIMEDOUT) {
+    pdbg_logf(D_CRITICAL, "pthread_mutex_timedlock timeout on rslock");
+    abort();
+  }
   while (rw->wcount || (rw->opts & PSYNC_RW_OPT_RESERVED)) {
     rw->wwait++;
     pthread_cond_wait(&rw->wcond, &rw->mutex);
@@ -284,12 +350,20 @@ void plocks_rslock(psync_rwlock_t *rw) {
 }
 
 int plocks_towrlock(psync_rwlock_t *rw) {
+  struct timespec ts;
+  int ret;
   psync_rwlock_lockcnt_t cnt;
   cnt = psync_rwlock_get_count(rw);
   if (cnt.cnt[1] && cnt.cnt[1] != PSYNC_WR_RESERVED)
     return 0;
   pdbg_assert(cnt.cnt[0]);
-  pthread_mutex_lock(&rw->mutex);
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += 30;
+  ret = pthread_mutex_timedlock(&rw->mutex, &ts);
+  if (ret == ETIMEDOUT) {
+    pdbg_logf(D_CRITICAL, "pthread_mutex_timedlock timeout on towrlock");
+    abort();
+  }
   pdbg_assert(rw->rcount);
   pdbg_assert(!rw->wcount);
   if (rw->opts & PSYNC_RW_OPT_RESERVED) {
@@ -318,9 +392,17 @@ int plocks_towrlock(psync_rwlock_t *rw) {
 }
 
 void plocks_unlock(psync_rwlock_t *rw) {
+  struct timespec ts;
+  int ret;
   if (psync_rwlock_check_recursive_out(rw))
     return;
-  pthread_mutex_lock(&rw->mutex);
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += 30;
+  ret = pthread_mutex_timedlock(&rw->mutex, &ts);
+  if (ret == ETIMEDOUT) {
+    pdbg_logf(D_CRITICAL, "pthread_mutex_timedlock timeout on unlock");
+    abort();
+  }
   pdbg_assert(!(rw->rcount && rw->wcount));
   if (rw->rcount) {
     if ((rw->opts & PSYNC_RW_OPT_RESERVED) &&
@@ -360,8 +442,16 @@ void plocks_unlock(psync_rwlock_t *rw) {
 }
 
 unsigned plocks_num_waiters(psync_rwlock_t *rw) {
+  struct timespec ts;
+  int ret_lock;
   unsigned ret;
-  pthread_mutex_lock(&rw->mutex);
+  clock_gettime(CLOCK_REALTIME, &ts);
+  ts.tv_sec += 30;
+  ret_lock = pthread_mutex_timedlock(&rw->mutex, &ts);
+  if (ret_lock == ETIMEDOUT) {
+    pdbg_logf(D_CRITICAL, "pthread_mutex_timedlock timeout on num_waiters");
+    abort();
+  }
   ret = rw->rwait + rw->wwait;
   pthread_mutex_unlock(&rw->mutex);
   return ret;
