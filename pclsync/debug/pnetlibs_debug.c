@@ -1,4 +1,5 @@
 // debug/pnetlibs_debug.c - debug implementations for pnetlibs debug helpers
+#include "../pmem.h"
 
 #include <stdio.h>
 
@@ -72,7 +73,7 @@ static void psync_apipool_dump_socket(psock_t *api) {
   }
   pdbg_logf(D_WARNING, "read result from released socket, dumping and aborting");
   print_tree(res, 0);
-  free(res);
+  pmem_free(PMEM_SUBSYS_API, res);
   abort();
 }
 
