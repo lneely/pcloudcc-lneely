@@ -33,6 +33,7 @@
 #include <string.h>
 
 #include "ppassword.h"
+#include "pmem.h"
 #include "pdbg.h"
 #include "ppassworddict.h"
 #include "putil.h"

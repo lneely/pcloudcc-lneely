@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include "pdbg.h"
+#include "pmem.h"
 #include "pshm.h"
 #include "ppath.h"
 

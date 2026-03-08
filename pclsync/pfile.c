@@ -54,6 +54,7 @@
 #include <sys/wait.h>
 
 #include "pdbg.h"
+#include "pmem.h"
 #include "pfile.h"
 #include "prun.h"
 #include "psettings.h"

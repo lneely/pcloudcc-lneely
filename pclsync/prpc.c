@@ -48,6 +48,7 @@
 #include <sys/un.h>
 
 #include "pdbg.h"
+#include "pmem.h"
 #include "ppath.h"
 #include "ppathstatus.h"
 #include "prpc.h"

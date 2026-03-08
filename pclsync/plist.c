@@ -33,6 +33,7 @@
 #include <string.h>
 
 #include "plist.h"
+#include "pmem.h"
 #include "pdbg.h"
 
 /* Fairly simple in-place merge sort with constant storage requirements.

@@ -1,4 +1,5 @@
 #include "pdbg.h"
+#include "pmem.h"
 #include "prun.h"
 #include "ptevent.h"
 #include <pthread.h>

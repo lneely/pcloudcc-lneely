@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "psettings.h"
+#include "pmem.h"
 #include "prun.h"
 #include "pdbg.h"
 

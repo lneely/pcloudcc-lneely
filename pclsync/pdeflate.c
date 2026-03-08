@@ -35,6 +35,7 @@
 #include <zlib.h>
 
 #include "pdeflate.h"
+#include "pmem.h"
 #include "pdbg.h"
 
 #define BUFFER_SIZE (4 * 1024)

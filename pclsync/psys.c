@@ -5,6 +5,7 @@
 #include <sys/resource.h>
 
 #include "pdbg.h"
+#include "pmem.h"
 #include "psql.h"
 #include "psys.h"
 
