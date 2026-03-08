@@ -138,6 +138,8 @@ typedef struct {
   int dummy[0];
 } pfs_index_header;
 
+void pfs_debug_check_lock_order(const char *file, unsigned long line);
+
 #if IS_DEBUG
 #define pfs_lock_file(of) pfs_do_lock_file(of, __FILE__, __LINE__)
 
@@ -198,7 +200,6 @@ void pfs_clean_tasks();
 void pfs_debug_init_file_mutex(pthread_mutex_t *m);
 void pfs_debug_dump_internals();
 void pfs_debug_register_signal_handlers();
-void pfs_debug_check_lock_order(const char *file, unsigned long line);
 
 extern volatile sig_atomic_t shutdown_requested;
 
