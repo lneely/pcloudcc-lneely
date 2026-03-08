@@ -3724,24 +3724,6 @@ static void psync_fuse_thread() {
   pthread_mutex_unlock(&start_mutex);
 }
 
-// Returns true if FUSE 3 is installed on the user's machine.
-// Returns false if FUSE version is less than 3.
-static char is_fuse3_installed_on_system() {
-  // Assuming that fusermount3 is only available on FUSE 3.
-  FILE *pipe = popen("which fusermount3", "r");
-
-  if (!pipe) {
-    return 0;
-  }
-
-  char output[1024];
-  memset(output, 0, sizeof(output));
-
-  int has_output = (fgets(output, sizeof(output), pipe) != NULL);
-  pclose(pipe);
-
-  return has_output && output[0] != '\0';
-}
 
 static int pfs_do_start() {
   char *mp;
