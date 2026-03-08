@@ -12,8 +12,15 @@
 #include "plibs.h"
 #include "pdbg.h"
 #include "prpc.h"
-#include "putil.h"
-#include "pmem.h"
+
+// Note: rpcclient.cpp is a C/C++ boundary layer that returns memory
+// to control_tools.cpp which uses free(). Do NOT include putil.h
+// to avoid strdup redefinition issues.
+
+// Forward declare pmem_free for cleaning up prpc_sockpath() result
+extern "C" {
+  void pmem_free(int subsystem, void *ptr);
+}
 
 
 #define POVERLAY_BUFSIZE 512
@@ -189,7 +196,7 @@ int RpcClient::Call(int id, const char *path, char **errm, size_t *errmsz) {
 
   char *sockpath = prpc_sockpath();
   sockfd = this->connectSocket(sockpath, errm, errmsz);
-  pmem_free(PMEM_SUBSYS_OTHER, sockpath);
+  pmem_free(0, sockpath); // PMEM_SUBSYS_OTHER = 0
   if (sockfd >= 0) {
     if ((result = this->writeRequest(sockfd, id, path, errm, errmsz)) == 0) {
       result = this->readResponse(sockfd, errm, errmsz);
