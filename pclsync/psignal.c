@@ -18,8 +18,23 @@ static void sighup_handler(int sig) {
   sighup_flag = 1;
 }
 
-void psignal_register(int signum) {
+void psignal_set_custom_handler(int sig, void (*handler)(int)) {
   struct sigaction sa;
+
+  if (sigaction(sig, NULL, &sa) != 0)
+    return;
+
+  if (sa.sa_handler == SIG_DFL) {
+    sa.sa_handler = handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    if (sigaction(sig, &sa, NULL) != 0) {
+      return;
+    }
+  }
+}
+
+void psignal_register(int signum) {
   void (*handler)(int) = NULL;
   
   if (signum == SIGINT) {
@@ -32,12 +47,7 @@ void psignal_register(int signum) {
     return;
   }
   
-  sa.sa_handler = handler;
-  sigemptyset(&sa.sa_mask);
-  sa.sa_flags = 0;
-  if (sigaction(signum, &sa, NULL) != 0) {
-    return;
-  }
+  psignal_set_custom_handler(signum, handler);
 }
 
 int psignal_check_pending(void) {

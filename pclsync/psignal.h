@@ -9,6 +9,7 @@ extern "C" {
 
 void psignal_register(int signum);
 int psignal_check_pending(void);
+void psignal_set_custom_handler(int sig, void (*handler)(int));
 
 #ifdef __cplusplus
 }
