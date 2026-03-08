@@ -1,6 +1,9 @@
 #include "psignal.h"
+#include <execinfo.h>
 #include <signal.h>
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 static volatile sig_atomic_t sigint_flag = 0;
 static volatile sig_atomic_t sigterm_flag = 0;
@@ -16,6 +19,40 @@ static void sigterm_handler(int sig) {
 
 static void sighup_handler(int sig) {
   sighup_flag = 1;
+}
+
+void panic(const char *msg) {
+  void *frames[64];
+  int nframes;
+  char **symbols;
+  
+  fprintf(stderr, "PANIC: %s\n", msg);
+  
+  nframes = backtrace(frames, 64);
+  symbols = backtrace_symbols(frames, nframes);
+  
+  if (symbols) {
+    fprintf(stderr, "Backtrace:\n");
+    for (int i = 0; i < nframes; i++) {
+      fprintf(stderr, "  %s\n", symbols[i]);
+    }
+    free(symbols);
+  }
+  
+  abort();
+}
+
+static void panic_handler(int sig) {
+  const char *msg;
+  if (sig == SIGSEGV)
+    msg = "Segmentation fault";
+  else if (sig == SIGABRT)
+    msg = "Abort";
+  else if (sig == SIGBUS)
+    msg = "Bus error";
+  else
+    msg = "Unknown signal";
+  panic(msg);
 }
 
 void psignal_set_custom_handler(int sig, void (*handler)(int)) {
@@ -43,6 +80,8 @@ void psignal_register(int signum) {
     handler = sigterm_handler;
   } else if (signum == SIGHUP) {
     handler = sighup_handler;
+  } else if (signum == SIGSEGV || signum == SIGABRT || signum == SIGBUS) {
+    handler = panic_handler;
   } else {
     return;
   }
