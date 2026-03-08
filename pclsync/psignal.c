@@ -39,6 +39,10 @@ void panic(const char *msg) {
     free(symbols);
   }
   
+  signal(SIGSEGV, SIG_DFL);
+  signal(SIGABRT, SIG_DFL);
+  signal(SIGBUS, SIG_DFL);
+  
   abort();
 }
 
