@@ -87,6 +87,10 @@ PSYNC_NOINLINE static void timer_sleep_detected(time_t lt) {
   ptimer_notify_exception();
 }
 
+static void free_timer(psync_timer_structure_t *elem) {
+  pmem_free(PMEM_SUBSYS_OTHER, elem);
+}
+
 static void timer_check_upper_levels(time_t tmdiv, unsigned long level,
                                      unsigned long sh) {
   psync_list *l1, *l2, *l;

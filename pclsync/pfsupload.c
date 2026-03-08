@@ -75,6 +75,10 @@ typedef struct {
   unsigned char status;
 } fsupload_task_t;
 
+static void free_fsupload_task(fsupload_task_t *elem) {
+  pmem_free(PMEM_SUBSYS_UPLOAD, elem);
+}
+
 static pthread_mutex_t upload_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t upload_cond = PTHREAD_COND_INITIALIZER;
 static uint64_t current_upload_taskid = 0;

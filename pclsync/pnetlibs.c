@@ -68,10 +68,19 @@ struct _psync_file_lock_t {
   char filename[];
 };
 
+static void free_range_list(psync_range_list_t *elem) {
+  pmem_free(PMEM_SUBSYS_OTHER, elem);
+}
+
+static void free_upload_range_list_net(psync_upload_range_list_t *elem) {
+  pmem_free(PMEM_SUBSYS_OTHER, elem);
+}
+
 typedef struct {
   unsigned char mbedtls_sha1[PSYNC_SHA1_DIGEST_LEN];
   uint32_t adler;
 } psync_block_checksum;
+
 
 typedef struct {
   uint64_t filesize;
@@ -81,16 +90,19 @@ typedef struct {
   psync_block_checksum blocks[];
 } psync_file_checksums;
 
+
 typedef struct {
   unsigned long elementcnt;
   uint32_t elements[];
 } psync_file_checksum_hash;
+
 
 typedef struct {
   uint64_t filesize;
   uint32_t blocksize;
   unsigned char _reserved[12];
 } psync_block_checksum_header;
+
 
 typedef struct {
   uint64_t off;
@@ -1050,6 +1062,7 @@ int psync_http_readall(psync_http_socket *http, void *buff, int num) {
     return num;
   }
 }
+
 
 typedef struct {
   psync_tree tree;

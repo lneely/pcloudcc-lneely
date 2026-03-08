@@ -561,6 +561,10 @@ static int rename_and_create_local(download_task_t *dt, unsigned char *checksum,
   return 0;
 }
 
+static void free_download_range_list(psync_range_list_t *elem) {
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, elem);
+}
+
 static int task_download_file(download_task_t *dt) {
   binparam params[] = {PAPI_STR("auth", psync_my_auth),
                        PAPI_NUM("fileid", dt->dwllist.fileid)};

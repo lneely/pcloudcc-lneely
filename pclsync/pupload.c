@@ -57,6 +57,7 @@
 
 extern const unsigned char pfile_invalid_chars[];
 
+
 typedef struct {
   psync_list list;
   psync_fileid_t localfileid;
@@ -68,10 +69,12 @@ typedef struct {
   unsigned char hash[PSYNC_HASH_DIGEST_HEXLEN];
 } upload_list_t;
 
+
 typedef struct {
   upload_list_t upllist;
   char filename[];
 } upload_task_t;
+
 
 typedef struct {
   psync_folderid_t folderid;
@@ -788,6 +791,10 @@ err0:
 err00:
   pdiff_unlock();
   return -1;
+}
+
+static void free_upload_range_list(psync_upload_range_list_t *elem) {
+  pmem_free(PMEM_SUBSYS_UPLOAD, elem);
 }
 
 static int upload_range(psock_t *api, psync_upload_range_list_t *r,

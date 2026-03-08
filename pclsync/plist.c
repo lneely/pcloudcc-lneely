@@ -44,6 +44,18 @@
  * iterating of the list to reach the half of it.
  */
 
+static void free_list_element(psync_list_element_list *elem) {
+  pmem_free(PMEM_SUBSYS_OTHER, elem);
+}
+
+static void free_list_string(psync_list_string_list *elem) {
+  pmem_free(PMEM_SUBSYS_OTHER, elem);
+}
+
+static void free_list_num(psync_list_num_list *elem) {
+  pmem_free(PMEM_SUBSYS_OTHER, elem);
+}
+
 void psync_list_sort(psync_list *l, psync_list_compare cmp) {
   psync_list *ls, *l1, *l2, **tail;
   unsigned long depth, cnt, i, l1len, l2len;

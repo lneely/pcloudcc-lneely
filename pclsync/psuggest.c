@@ -77,6 +77,10 @@ static uint32_t get_ext_id(const char *ext) {
   return n;
 }
 
+static void free_suggested_folder(suggested_folder *elem) {
+  pmem_free(PMEM_SUBSYS_OTHER, elem);
+}
+
 static uint32_t get_extid_type(uint32_t extid) {
   unsigned long lo, hi, mid;
   uint32_t n;

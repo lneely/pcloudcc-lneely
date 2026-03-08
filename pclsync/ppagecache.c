@@ -1866,6 +1866,14 @@ int ppagecache_flush() {
     return 0;
 }
 
+static void free_page_waiter(psync_page_waiter_t *elem) {
+  pmem_free(PMEM_SUBSYS_CACHE, elem);
+}
+
+static void free_crypto_auth_page(psync_crypto_auth_page *elem) {
+  pmem_free(PMEM_SUBSYS_CACHE, elem);
+}
+
 static void ppagecache_flush_timer(psync_timer_t timer, void *ptr) {
   if (!flushedbetweentimers &&
       (cache_pages_in_hash || cachepages_to_update_cnt))
