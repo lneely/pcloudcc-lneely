@@ -45,6 +45,7 @@
 #include "pfoldersync.h"
 #include "ptimer.h"
 #include "ptree.h"
+#include "psql.h"
 
 #define pfs_need_per_folder_refresh() pfs_need_per_folder_refresh_f()
 #define pfs_need_per_folder_refresh_const() 1
@@ -137,6 +138,8 @@ typedef struct {
   int dummy[0];
 } pfs_index_header;
 
+void pfs_debug_check_lock_order(const char *file, unsigned long line);
+
 #if IS_DEBUG
 #define pfs_lock_file(of) pfs_do_lock_file(of, __FILE__, __LINE__)
 
@@ -145,6 +148,7 @@ typedef struct {
 extern PSYNC_THREAD const char *psync_thread_name; 
 static inline int pfs_do_lock_file(psync_openfile_t *of, const char *file,
                                          unsigned long line) {
+  pfs_debug_check_lock_order(file, line);
   if (unlikely(pthread_mutex_trylock(&of->mutex))) {
     struct timespec tm;
     clock_gettime(CLOCK_REALTIME, &tm);

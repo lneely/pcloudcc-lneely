@@ -117,6 +117,7 @@ __attribute__((weak)) void pfs_debug_init_file_mutex(pthread_mutex_t *m) {
 }
 __attribute__((weak)) void pfs_debug_dump_internals() {}
 __attribute__((weak)) void pfs_debug_register_signal_handlers() {}
+__attribute__((weak)) void pfs_debug_check_lock_order(const char *file, unsigned long line) {}
 
 static int pfs_ftruncate_of_locked(psync_openfile_t *of, fuse_off_t size);
 
