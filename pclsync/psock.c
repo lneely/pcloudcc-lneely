@@ -32,6 +32,7 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <unistd.h>
 
 #include <netinet/tcp.h>
@@ -172,8 +173,20 @@ static struct addrinfo *addr_load(const char *host, const char *port) {
     psql_rdunlock();
     return NULL;
   }
-  ret = (struct addrinfo *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(struct addrinfo) * row[0] +
-                                        row[1]);
+  size_t struct_size, total_size;
+  if (row[0] != 0 && sizeof(struct addrinfo) > SIZE_MAX / row[0]) {
+    psql_free(res);
+    psql_rdunlock();
+    return NULL;
+  }
+  struct_size = sizeof(struct addrinfo) * row[0];
+  if (struct_size > SIZE_MAX - row[1]) {
+    psql_free(res);
+    psql_rdunlock();
+    return NULL;
+  }
+  total_size = struct_size + row[1];
+  ret = (struct addrinfo *)pmem_malloc(PMEM_SUBSYS_OTHER, total_size);
   data = (char *)(ret + row[0]);
   for (i = 0; i < row[0] - 1; i++)
     ret[i].ai_next = &ret[i + 1];
