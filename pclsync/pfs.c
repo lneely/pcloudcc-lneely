@@ -787,7 +787,7 @@ static int pfs_getrootattr(struct FUSE_STAT *stbuf) {
     }                                                                          \
   } while (0)
 
-#if defined(FUSE_MAJOR_VERSION) && defined(FUSE_MINOR_VERSION) && (FUSE_MAJOR_VERSION > 3 || (FUSE_MAJOR_VERSION == 3 && FUSE_MINOR_VERSION >= 12))
+#if FUSE_USE_VERSION >= 30
 static int pfs_getattr(const char *path, struct FUSE_STAT *stbuf, struct fuse_file_info *fi) {
 #else
 static int pfs_getattr(const char *path, struct FUSE_STAT *stbuf) {
@@ -3086,7 +3086,7 @@ static int pfs_statfs(const char *path, struct statvfs *stbuf) {
   return 0;
 }
 
-#if defined(FUSE_MAJOR_VERSION) && defined(FUSE_MINOR_VERSION) && (FUSE_MAJOR_VERSION > 3 || (FUSE_MAJOR_VERSION == 3 && FUSE_MINOR_VERSION >= 12))
+#if FUSE_USE_VERSION >= 30
 static int pfs_chmod(const char *path, mode_t mode, struct fuse_file_info *fi) {
 #else
 static int pfs_chmod(const char *path, mode_t mode) {
@@ -3096,7 +3096,7 @@ static int pfs_chmod(const char *path, mode_t mode) {
   return 0;
 }
 
-#if defined(FUSE_MAJOR_VERSION) && defined(FUSE_MINOR_VERSION) && (FUSE_MAJOR_VERSION > 3 || (FUSE_MAJOR_VERSION == 3 && FUSE_MINOR_VERSION >= 12))
+#if FUSE_USE_VERSION >= 30
 static int pfs_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi) {
 #else
 static int pfs_chown(const char *path, uid_t uid, gid_t gid) {
@@ -3266,7 +3266,7 @@ static int pfs_setcrtime(const char *path, const struct timespec *tv) {
 }
 #endif
 
-#if defined(FUSE_MAJOR_VERSION) && defined(FUSE_MINOR_VERSION) && (FUSE_MAJOR_VERSION > 3 || (FUSE_MAJOR_VERSION == 3 && FUSE_MINOR_VERSION >= 12))
+#if FUSE_USE_VERSION >= 30
 static int pfs_utimens(const char *path, const struct timespec tv[2], struct fuse_file_info *fi) {
 #else
 static int pfs_utimens(const char *path, const struct timespec tv[2]) {
@@ -3704,17 +3704,13 @@ static void psync_fuse_thread() {
   }
   pthread_mutex_unlock(&start_mutex);
   pdbg_logf(D_NOTICE, "running fuse_loop_mt");
-#if FUSE_USE_VERSION >= 30
+#if FUSE_USE_VERSION >= 32
   struct fuse_loop_config loop_config;
   loop_config.clone_fd = 1;
   loop_config.max_idle_threads = 10;
-#if defined(FUSE_MAJOR_VERSION) && defined(FUSE_MINOR_VERSION) && (FUSE_MAJOR_VERSION > 3 || (FUSE_MAJOR_VERSION == 3 && FUSE_MINOR_VERSION >= 12))
-  /* FUSE 3.12+ uses fuse_loop_mt_312 or direct fuse_loop_mt */
-  extern int fuse_loop_mt_312(struct fuse *f, struct fuse_loop_config *config);
-  fr = fuse_loop_mt_312(psync_fuse, &loop_config);
-#else
-  fr = fuse_loop_mt_31(psync_fuse, loop_config.clone_fd);
-#endif
+  fr = fuse_loop_mt(psync_fuse, &loop_config);
+#elif FUSE_USE_VERSION >= 30
+  fr = fuse_loop_mt_31(psync_fuse, 1);
 #else
   fr = fuse_loop_mt(psync_fuse);
 #endif
@@ -3741,14 +3737,10 @@ static char is_fuse3_installed_on_system() {
   char output[1024];
   memset(output, 0, sizeof(output));
 
-  if (fgets(output, sizeof(output), pipe) != NULL) {
-    return 0;
-  }
-
+  int has_output = (fgets(output, sizeof(output), pipe) != NULL);
   pclose(pipe);
-  size_t outlen = strlen(output);
 
-  return outlen > 0;
+  return has_output && output[0] != '\0';
 }
 
 static int pfs_do_start() {
