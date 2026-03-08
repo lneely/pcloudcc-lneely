@@ -136,3 +136,31 @@ void *pmem_realloc(pmem_subsystem_t subsystem, void *ptr, size_t size) {
 size_t pmem_get_stats(pmem_subsystem_t subsystem) {
   return __atomic_load_n(&subsystem_stats[subsystem], __ATOMIC_RELAXED);
 }
+
+void *pmem_malloc_array(pmem_subsystem_t subsystem, size_t nmemb, size_t size) {
+  pmem_header_t *hdr;
+  size_t alloc_size;
+  size_t total_size;
+  void *ptr;
+  
+  if (nmemb != 0 && size > SIZE_MAX / nmemb) {
+    return NULL;
+  }
+  
+  alloc_size = nmemb * size;
+  total_size = sizeof(pmem_header_t) + alloc_size;
+  
+  hdr = (pmem_header_t *)malloc(total_size);
+  if (!hdr) {
+    return NULL;
+  }
+  
+  hdr->size = alloc_size;
+  hdr->subsystem = subsystem;
+  __atomic_add_fetch(&subsystem_stats[subsystem], alloc_size, __ATOMIC_RELAXED);
+  
+  ptr = (void *)(hdr + 1);
+  memset(ptr, 0, alloc_size);
+  
+  return ptr;
+}

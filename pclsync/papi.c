@@ -314,10 +314,9 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     arr = NULL;
     cnt = 0;
     alloc = 128;
-    arr = (binresult **)pmem_malloc(PMEM_SUBSYS_API, alloc * sizeof(binresult *));
+    arr = (binresult **)pmem_malloc_array(PMEM_SUBSYS_API, alloc, sizeof(binresult *));
     if (!arr)
       return NULL;
-    memset(arr, 0, alloc * sizeof(binresult *));
     while (**indata != RPARAM_END) {
       if (cnt == alloc) {
         binresult **tmp;
@@ -348,10 +347,9 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     arr = NULL;
     cnt = 0;
     alloc = 32;
-    arr = (struct _hashpair *)pmem_malloc(PMEM_SUBSYS_API, alloc * sizeof(struct _hashpair));
+    arr = (struct _hashpair *)pmem_malloc_array(PMEM_SUBSYS_API, alloc, sizeof(struct _hashpair));
     if (!arr)
       return NULL;
-    memset(arr, 0, alloc * sizeof(struct _hashpair));
     while (**indata != RPARAM_END) {
       if (cnt == alloc) {
         struct _hashpair *tmp;
@@ -401,16 +399,14 @@ static binresult *parse_result(unsigned char *data, size_t datalen) {
   retlen = calc_ret_len(&datac, &datalenc, &strcnt);
   if (retlen == -1)
     return NULL;
-  datac = pmem_malloc(PMEM_SUBSYS_API, retlen * sizeof(unsigned char));
+  datac = pmem_malloc_array(PMEM_SUBSYS_API, retlen, sizeof(unsigned char));
   if (!datac)
     return NULL;
-  memset(datac, 0, retlen * sizeof(unsigned char));
-  strings = pmem_malloc(PMEM_SUBSYS_API, strcnt * sizeof(binresult *));
+  strings = pmem_malloc_array(PMEM_SUBSYS_API, strcnt, sizeof(binresult *));
   if (!strings) {
     pmem_free(PMEM_SUBSYS_API, datac);
     return NULL;
   }
-  memset(strings, 0, strcnt * sizeof(binresult *));
   strcnt = 0;
   res = do_parse_result(&data, &datac, strings, &strcnt);
   pmem_free(PMEM_SUBSYS_API, strings);

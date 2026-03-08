@@ -23,6 +23,7 @@ void *pmem_calloc_safe(size_t nmemb, size_t size);
 void *pmem_malloc(pmem_subsystem_t subsystem, size_t size);
 void pmem_free(pmem_subsystem_t subsystem, void *ptr);
 void *pmem_realloc(pmem_subsystem_t subsystem, void *ptr, size_t size);
+void *pmem_malloc_array(pmem_subsystem_t subsystem, size_t nmemb, size_t size);
 size_t pmem_get_stats(pmem_subsystem_t subsystem);
 
 #endif
