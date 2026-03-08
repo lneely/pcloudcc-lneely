@@ -1,0 +1,8 @@
+---
+Checks: 'bugprone-signal-handler,cert-sig30-c'
+WarningsAsErrors: ''
+HeaderFilterRegex: ''
+FormatStyle: none
+CheckOptions:
+  - key: bugprone-signal-handler.AsyncSafeFunctionSet
+    value: 'POSIX'
