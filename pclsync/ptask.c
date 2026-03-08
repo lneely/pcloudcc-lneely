@@ -273,7 +273,7 @@ static int download_send_error(stream_t *s, async_params_t *prms,
   pdbg_logf(D_NOTICE, "closing stream %u", (unsigned)s->streamid);
   ptree_del(&prms->streams, &s->tree);
   if (s->free)
-    s->free(PMEM_SUBSYS_OTHER, s, error);
+    s->free(s, error);
   pmem_free(PMEM_SUBSYS_OTHER, s);
   return 0;
 }
@@ -766,7 +766,7 @@ static void stream_destroy(stream_t *s) {
     s->cb(s->cbext, &ar);
   }
   if (s->free)
-    s->free(PMEM_SUBSYS_OTHER, s, PSYNC_ASYNC_ERROR_NET);
+    s->free(s, PSYNC_ASYNC_ERROR_NET);
   pmem_free(PMEM_SUBSYS_OTHER, s);
 }
 
