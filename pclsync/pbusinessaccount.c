@@ -104,18 +104,20 @@ int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
   if (unlikely(numparam == 1))
     return -3;
 
-  t = (binparam *)pmem_calloc_safe(numparam, sizeof(binparam));
+  t = (binparam *)pmem_malloc(PMEM_SUBSYS_API, numparam * sizeof(binparam));
   if (!t)
     return -1;
+  memset(t, 0, numparam * sizeof(binparam));
 
   init_param_str(t, "auth", psync_my_auth);
 
   if (nusershareid) {
-    ids1 = (char *)pmem_calloc_safe(nusershareid, FOLDERID_ENTRY_SIZE);
+    ids1 = (char *)pmem_malloc(PMEM_SUBSYS_API, nusershareid * FOLDERID_ENTRY_SIZE);
     if (!ids1) {
-      free(t);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
+    memset(ids1, 0, nusershareid * FOLDERID_ENTRY_SIZE);
     idsp = ids1;
     for (i = 0; i < nusershareid; ++i) {
       k = sprintf(idsp, "%lld", (long long)usershareids[i]);
@@ -131,13 +133,14 @@ int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
   }
 
   if (nteamshareid) {
-    ids2 = (char *)pmem_calloc_safe(nteamshareid, FOLDERID_ENTRY_SIZE);
+    ids2 = (char *)pmem_malloc(PMEM_SUBSYS_API, nteamshareid * FOLDERID_ENTRY_SIZE);
     if (!ids2) {
       if (nusershareid)
-        free(ids1);
-      free(t);
+        pmem_free(PMEM_SUBSYS_API, ids1);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
+    memset(ids2, 0, nteamshareid * FOLDERID_ENTRY_SIZE);
     idsp = ids2;
     for (i = 0; i < nteamshareid; ++i) {
       k = sprintf(idsp, "%lld", (long long)teamshareids[i]);
@@ -222,25 +225,28 @@ int do_psync_account_modifyshare(psync_shareid_t usrshrids[], uint32_t uperms[],
   if (unlikely(numparam == 1))
     return -3;
 
-  t = (binparam *)pmem_calloc_safe(numparam, sizeof(binparam));
+  t = (binparam *)pmem_malloc(PMEM_SUBSYS_API, numparam * sizeof(binparam));
   if (!t)
     return -1;
+  memset(t, 0, numparam * sizeof(binparam));
 
   init_param_str(t, "auth", psync_my_auth);
 
   if (nushid) {
-    ids1 = (char *)pmem_calloc_safe(nushid, FOLDERID_ENTRY_SIZE);
+    ids1 = (char *)pmem_malloc(PMEM_SUBSYS_API, nushid * FOLDERID_ENTRY_SIZE);
     if (!ids1) {
-      free(t);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
+    memset(ids1, 0, nushid * FOLDERID_ENTRY_SIZE);
     idsp = ids1;
-    perms1 = (char *)pmem_calloc_safe(nushid, FOLDERID_ENTRY_SIZE);
+    perms1 = (char *)pmem_malloc(PMEM_SUBSYS_API, nushid * FOLDERID_ENTRY_SIZE);
     if (!perms1) {
-      free(ids1);
-      free(t);
+      pmem_free(PMEM_SUBSYS_API, ids1);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
+    memset(perms1, 0, nushid * FOLDERID_ENTRY_SIZE);
     permsp = perms1;
     for (i = 0; i < nushid; ++i) {
       k = sprintf(idsp, "%lld", (long long)usrshrids[i]);
@@ -265,26 +271,28 @@ int do_psync_account_modifyshare(psync_shareid_t usrshrids[], uint32_t uperms[],
   }
 
   if (ntmshid) {
-    ids2 = (char *)pmem_calloc_safe(ntmshid, FOLDERID_ENTRY_SIZE);
+    ids2 = (char *)pmem_malloc(PMEM_SUBSYS_API, ntmshid * FOLDERID_ENTRY_SIZE);
     if (!ids2) {
       if (nushid) {
-        free(perms1);
-        free(ids1);
+        pmem_free(PMEM_SUBSYS_API, perms1);
+        pmem_free(PMEM_SUBSYS_API, ids1);
       }
-      free(t);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
+    memset(ids2, 0, ntmshid * FOLDERID_ENTRY_SIZE);
     idsp = ids2;
-    perms2 = (char *)pmem_calloc_safe(ntmshid, FOLDERID_ENTRY_SIZE);
+    perms2 = (char *)pmem_malloc(PMEM_SUBSYS_API, ntmshid * FOLDERID_ENTRY_SIZE);
     if (!perms2) {
-      free(ids2);
+      pmem_free(PMEM_SUBSYS_API, ids2);
       if (nushid) {
-        free(perms1);
-        free(ids1);
+        pmem_free(PMEM_SUBSYS_API, perms1);
+        pmem_free(PMEM_SUBSYS_API, ids1);
       }
-      free(t);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
+    memset(perms2, 0, ntmshid * FOLDERID_ENTRY_SIZE);
     permsp = perms2;
 
     for (i = 0; i < ntmshid; ++i) {

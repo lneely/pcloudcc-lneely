@@ -136,10 +136,11 @@ int ptools_create_backend_event(const char *binapi, const char *category,
   paramsLocal[5] = (binparam)PAPI_NUM(EPARAM_TIME, etime);
 
   if (pCnt > 0) {
-    keyParams = (char *)pmem_calloc_safe(pCnt, 258);
+    keyParams = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, pCnt * 258);
     if (!keyParams) {
       return -1;
     }
+    memset(keyParams, 0, pCnt * 258);
     keyParams[0] = 0;
 
     for (i = 0; i < pCnt; i++) {
@@ -375,7 +376,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
     if (strlen(payloadName) > 0) {
       payload = (binresult *)papi_find_result2(res, payloadName, PARAM_HASH);
 
-      *resData = (binresult *)pmem_calloc_safe(payload->length, sizeof(binresult));
+      *resData = (binresult *)pmem_malloc(PMEM_SUBSYS_OTHER, payload->length * sizeof(binresult));
       if (!*resData) {
         return -1;
       }
@@ -457,10 +458,11 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
   int intRes;
   int syncCnt = 0;
 
-  errMsg = (char *)pmem_calloc_safe(1024, sizeof(char));
+  errMsg = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, 1024 * sizeof(char));
   if (!errMsg) {
     return;
   }
+  memset(errMsg, 0, 1024 * sizeof(char));
   errMsg[0] = 0;
 
   time(&rawtime);
