@@ -50,6 +50,7 @@
 #include "pfs.h"
 #include "pfsxattr.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "pnetlibs.h"
 #include "pnotify.h"
 #include "ppathstatus.h"
@@ -164,13 +165,13 @@ static void do_send_eventdata(void *param);
 
 static void psync_notify_cache_change(psync_changetype_t event) {
   paccount_cache_callback_t callback;
-  psync_changetype_t *chtype = malloc(sizeof(psync_changetype_t));
+  psync_changetype_t *chtype = pmem_malloc(PMEM_SUBSYS_SYNC, sizeof(psync_changetype_t));
   *chtype = event;
   callback = psync_cache_callback;
   if (callback)
     prun_thread1("cache start callback", callback, chtype);
   else
-    free(chtype);
+    pmem_free(PMEM_SUBSYS_SYNC, chtype);
 }
 
 static binresult *get_userinfo_user_digest(psock_t *sock, const char *username,
@@ -214,7 +215,7 @@ static binresult *get_userinfo_user_pass(psock_t *sock, const char *username,
     return res;
 
   if (papi_find_result2(res, "result", PARAM_NUM)->num != 0) {
-    free(res);
+    pmem_free(PMEM_SUBSYS_SYNC, res);
     return NULL;
   }
 
@@ -223,13 +224,13 @@ static binresult *get_userinfo_user_pass(psock_t *sock, const char *username,
   pdbg_logf(D_NOTICE, "got digest %s", dig->str);
 
   ul = strlen(username);
-  uc = malloc(sizeof(unsigned char) * ul);
+  uc = pmem_malloc_array(PMEM_SUBSYS_SYNC, ul, sizeof(unsigned char));
 
   for (i = 0; i < ul; i++)
     uc[i] = tolower(username[i]);
 
   psync_sha1(uc, ul, sha1bin);
-  free(uc);
+  pmem_free(PMEM_SUBSYS_SYNC, uc);
   psync_binhex(sha1hex, sha1bin, PSYNC_SHA1_DIGEST_LEN);
   psync_sha1_init(&ctx);
   psync_sha1_update(&ctx, password, strlen(password));
@@ -242,7 +243,7 @@ static binresult *get_userinfo_user_pass(psock_t *sock, const char *username,
                                  dig->length, osversion, appversion, deviceid,
                                  devicestring);
 
-  free(res);
+  pmem_free(PMEM_SUBSYS_SYNC, res);
   return ret;
 }
 
@@ -253,10 +254,10 @@ static int check_active_subscribtion(const binresult *res) {
   if (sub) {
     status = putil_strdup(papi_find_result2(sub, "status", PARAM_STR)->str);
     if (!strcmp(status, "active")) {
-      free(status);
+      pmem_free(PMEM_SUBSYS_SYNC, status);
       return 1;
     }
-    free(status);
+    pmem_free(PMEM_SUBSYS_SYNC, status);
   }
 
   return 0;
@@ -278,14 +279,14 @@ static int check_user_relocated(uint64_t luserid, psock_t *sock) {
     pdbg_logf(D_NOTICE, "getolduserids returned error %lu %s",
           (unsigned long)result,
           papi_find_result2(res, "error", PARAM_STR)->str);
-    free(res);
+    pmem_free(PMEM_SUBSYS_SYNC, res);
     return 0;
   }
 
   userids = papi_find_result2(res, "userids", PARAM_ARRAY);
   cnt = userids->length;
   if (!cnt) {
-    free(res);
+    pmem_free(PMEM_SUBSYS_SYNC, res);
     return 0;
   }
 
@@ -315,7 +316,7 @@ static psock_t *get_connected_socket() {
   int saveauth, isbusiness, cryptosetup, digest, lid, isFirstLogin;
 
   digest = 1;
-  free(psync_my_2fa_token);
+  pmem_free(PMEM_SUBSYS_SYNC, psync_my_2fa_token);
   auth = user = pass = psync_my_2fa_token = NULL;
   psync_is_business = 0;
   deviceid = psql_cellstr("SELECT value FROM setting WHERE id='deviceid'");
@@ -340,9 +341,9 @@ static psock_t *get_connected_socket() {
   devicestring = pdevice_name();
 
   while (1) {
-    free(auth);
-    free(user);
-    free(pass);
+    pmem_free(PMEM_SUBSYS_SYNC, auth);
+    pmem_free(PMEM_SUBSYS_SYNC, user);
+    pmem_free(PMEM_SUBSYS_SYNC, pass);
     pstatus_wait(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN | PSTATUS_RUN_PAUSE);
 
     auth = psql_cellstr("SELECT value FROM setting WHERE id='auth'");
@@ -443,7 +444,7 @@ static psock_t *get_connected_socket() {
       res = papi_send2(sock, "userinfo", params);
     }
 
-    free(osversion);
+    pmem_free(PMEM_SUBSYS_SYNC, osversion);
 
     if (pdbg_unlikely(!res)) {
       psock_close(sock);
@@ -461,7 +462,7 @@ static psock_t *get_connected_socket() {
             papi_find_result2(res, "error", PARAM_STR)->str);
       // here we only handle statuses that need to access the result
       if (result == 2297) {
-        free(psync_my_2fa_token);
+        pmem_free(PMEM_SUBSYS_SYNC, psync_my_2fa_token);
         psync_my_2fa_token =
             putil_strdup(papi_find_result2(res, "token", PARAM_STR)->str);
         psync_my_2fa_has_devices =
@@ -472,18 +473,18 @@ static psock_t *get_connected_socket() {
         pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_TFAREQ);
         pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         psock_close(sock);
-        free(res);
+        pmem_free(PMEM_SUBSYS_SYNC, res);
         continue;
       }
 
       if (result == 2306) {
-        free(psync_my_verify_token);
+        pmem_free(PMEM_SUBSYS_SYNC, psync_my_verify_token);
         psync_my_verify_token =
             putil_strdup(papi_find_result2(res, "verifytoken", PARAM_STR)->str);
         pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_VERIFYREQ);
         pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         psock_close(sock);
-        free(res);
+        pmem_free(PMEM_SUBSYS_SYNC, res);
         continue;
       }
 
@@ -498,7 +499,7 @@ static psock_t *get_connected_socket() {
         }
 
         psock_close(sock);
-        free(res);
+        pmem_free(PMEM_SUBSYS_SYNC, res);
         continue;
       }
 
@@ -507,12 +508,12 @@ static psock_t *get_connected_socket() {
         pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_RELOCATING);
         pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         psock_close(sock);
-        free(res);
+        pmem_free(PMEM_SUBSYS_SYNC, res);
         continue;
       }
 
       psock_close(sock);
-      free(res);
+      pmem_free(PMEM_SUBSYS_SYNC, res);
 
       if (result == 2000 || result == 2012 || result == 2064 ||
           result == 2074 || result == 2092) {
@@ -531,7 +532,7 @@ static psock_t *get_connected_socket() {
             continue;
           } else {
             pstatus_set(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_BADLOGIN);
-            free(psync_my_pass);
+            pmem_free(PMEM_SUBSYS_SYNC, psync_my_pass);
             psync_my_pass = NULL;
           }
         } else {
@@ -581,7 +582,7 @@ static psock_t *get_connected_socket() {
         }
         psql_rollback();
         psock_close(sock);
-        free(res);
+        pmem_free(PMEM_SUBSYS_SYNC, res);
         pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
         continue;
       }
@@ -671,7 +672,7 @@ static psock_t *get_connected_socket() {
     if (pstatus_get(PSTATUS_TYPE_AUTH) != PSTATUS_AUTH_PROVIDED) {
       psql_rollback();
       psock_close(sock);
-      free(res);
+      pmem_free(PMEM_SUBSYS_SYNC, res);
       pstatus_wait(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED);
       continue;
     }
@@ -719,8 +720,8 @@ static psock_t *get_connected_socket() {
           strcmp(privatesha1,
                  papi_find_result2(res, "privatesha1", PARAM_STR)->str))
         psync_delete_cached_crypto_keys();
-      free(privatesha1);
-      free(publicsha1);
+      pmem_free(PMEM_SUBSYS_SYNC, privatesha1);
+      pmem_free(PMEM_SUBSYS_SYNC, publicsha1);
     } else
       psync_delete_cached_crypto_keys();
     psql_bind_str(q, 1, "cryptosubscription");
@@ -744,7 +745,7 @@ static psock_t *get_connected_socket() {
           "UPDATE setting SET value=? WHERE id='pass'");
       psql_bind_str(q, 1, psync_my_pass);
       psql_run_free(q);
-      free(psync_my_pass);
+      pmem_free(PMEM_SUBSYS_SYNC, psync_my_pass);
       psync_my_pass = NULL;
     }
     pthread_mutex_unlock(&psync_my_auth_mutex);
@@ -756,7 +757,7 @@ static psock_t *get_connected_socket() {
                              "binapi", PARAM_ARRAY);
     if (cres->length)
       psync_apipool_set_server(cres->array[0]->str);
-    free(res);
+    pmem_free(PMEM_SUBSYS_SYNC, res);
 
     // If the flag is up, send a first login event to track the number of
     // sucessful installs.
@@ -807,20 +808,20 @@ static psock_t *get_connected_socket() {
         pdbg_logf(D_WARNING,
               "account_info returned %lu, continuing without business info",
               (unsigned long)result);
-      free(res);
+      pmem_free(PMEM_SUBSYS_SYNC, res);
       psql_sync();
     }
 
-    free(chrUserid);
-    free(auth);
-    free(user);
-    free(pass);
-    free(psync_my_2fa_token);
+    pmem_free(PMEM_SUBSYS_SYNC, chrUserid);
+    pmem_free(PMEM_SUBSYS_SYNC, auth);
+    pmem_free(PMEM_SUBSYS_SYNC, user);
+    pmem_free(PMEM_SUBSYS_SYNC, pass);
+    pmem_free(PMEM_SUBSYS_SYNC, psync_my_2fa_token);
     psync_my_2fa_token = NULL;
     psync_my_2fa_code_type = 0;
     psync_my_2fa_code[0] = 0;
-    free(deviceid);
-    free(devicestring);
+    pmem_free(PMEM_SUBSYS_SYNC, deviceid);
+    pmem_free(PMEM_SUBSYS_SYNC, devicestring);
     psql_sync();
     return sock;
   }
@@ -926,12 +927,12 @@ static void process_createfolder(const binresult *entry) {
     char *folderpath = pfs_get_path_by_folderid(folderid);
     if (likely(folderpath)) {
       pdbg_write_fs_event("folder created %s", folderpath);
-      free(folderpath);
+      pmem_free(PMEM_SUBSYS_SYNC, folderpath);
     }
     folderpath = pfolder_path(folderid, NULL);
     if (likely(folderpath)) {
       pdbg_logf(D_NOTICE, "remote folder created %s", folderpath);
-      free(folderpath);
+      pmem_free(PMEM_SUBSYS_SYNC, folderpath);
     }
   }
 
@@ -1115,16 +1116,16 @@ static void process_modifyfolder(const binresult *entry) {
       if (likely(oldfolderpath && newfolderpath)) {
         pdbg_write_fs_event("folder moved %s -> %s", oldfolderpath, newfolderpath);
       }
-      free(newfolderpath);
+      pmem_free(PMEM_SUBSYS_SYNC, newfolderpath);
 
       char *newfolderpath_rel = pfolder_path(folderid, NULL);
       if (likely(oldfolderpath_rel && newfolderpath_rel)) {
         pdbg_logf(D_NOTICE, "remote folder moved %s -> %s", oldfolderpath_rel, newfolderpath_rel);
       }
-      free(newfolderpath_rel);
+      pmem_free(PMEM_SUBSYS_SYNC, newfolderpath_rel);
     }
-    free(oldfolderpath);
-    free(oldfolderpath_rel);
+    pmem_free(PMEM_SUBSYS_SYNC, oldfolderpath);
+    pmem_free(PMEM_SUBSYS_SYNC, oldfolderpath_rel);
   }
 
   if (oldparentfolderid != parentfolderid) {
@@ -1239,10 +1240,10 @@ static void process_modifyfolder(const binresult *entry) {
           syncid, psync_get_result_cell(fres2, i, 2), folderid, localfolderid);
       needdownload = 1;
     }
-    free(fres1);
-    free(fres2);
+    pmem_free(PMEM_SUBSYS_SYNC, fres1);
+    pmem_free(PMEM_SUBSYS_SYNC, fres2);
   }
-  free(oldname);
+  pmem_free(PMEM_SUBSYS_SYNC, oldname);
 }
 
 static void process_deletefolder(const binresult *entry) {
@@ -1294,7 +1295,7 @@ static void process_deletefolder(const binresult *entry) {
       if (psql_affected() == 1) {
         char *syncpath = pfolder_path(folderid, NULL);
         ptask_ldir_rm(row[0], folderid, row[1], syncpath);
-        free(syncpath);
+        pmem_free(PMEM_SUBSYS_SYNC, syncpath);
         needdownload = 1;
       }
     }
@@ -1318,9 +1319,9 @@ static void process_deletefolder(const binresult *entry) {
     pfs_xatr_folder_deleted(folderid);
   }
   if (path)
-    free(path);
+    pmem_free(PMEM_SUBSYS_SYNC, path);
   if (fullpath)
-    free(fullpath);
+    pmem_free(PMEM_SUBSYS_SYNC, fullpath);
 }
 
 static void check_for_deletedfileid(const binresult *meta) {
@@ -1454,12 +1455,12 @@ static void process_createfile(const binresult *entry) {
     char *filepath = pfs_get_path_by_fileid(fileid);
     if (likely(filepath)) {
       pdbg_write_fs_event("file created %s", filepath);
-      free(filepath);
+      pmem_free(PMEM_SUBSYS_SYNC, filepath);
     }
     filepath = pfolder_file_path(fileid, NULL);
     if (likely(filepath)) {
       pdbg_logf(D_NOTICE, "remote file created %s", filepath);
-      free(filepath);
+      pmem_free(PMEM_SUBSYS_SYNC, filepath);
     }
   }
 
@@ -1593,27 +1594,27 @@ static void process_modifyfile(const binresult *entry) {
       if (likely(oldfilepath && newfilepath)) {
         pdbg_write_fs_event("file moved %s -> %s", oldfilepath, newfilepath);
       }
-      free(newfilepath);
+      pmem_free(PMEM_SUBSYS_SYNC, newfilepath);
 
       char *newfilepath_rel = pfolder_file_path(fileid, NULL);
       if (likely(oldfilepath_rel && newfilepath_rel)) {
         pdbg_logf(D_NOTICE, "remote file moved %s -> %s", oldfilepath_rel, newfilepath_rel);
       }
-      free(newfilepath_rel);
+      pmem_free(PMEM_SUBSYS_SYNC, newfilepath_rel);
     } else if (is_content_change) {
       char *filepath = pfs_get_path_by_fileid(fileid);
       if (likely(filepath)) {
         pdbg_write_fs_event("file modified %s", filepath);
-        free(filepath);
+        pmem_free(PMEM_SUBSYS_SYNC, filepath);
       }
       filepath = pfolder_file_path(fileid, NULL);
       if (likely(filepath)) {
         pdbg_logf(D_NOTICE, "remote file modified %s", filepath);
-        free(filepath);
+        pmem_free(PMEM_SUBSYS_SYNC, filepath);
       }
     }
-    free(oldfilepath);
-    free(oldfilepath_rel);
+    pmem_free(PMEM_SUBSYS_SYNC, oldfilepath);
+    pmem_free(PMEM_SUBSYS_SYNC, oldfilepath_rel);
   }
   oldsync = psyncer_dl_has_folder(oldparentfolderid);
   if (oldparentfolderid == parentfolderid)
@@ -1628,9 +1629,9 @@ static void process_modifyfile(const binresult *entry) {
       pdownload_tasks_delete(fileid, 0, 1);
       path = pfolder_file_path(fileid, NULL);
       ptask_lfile_rm(fileid, path);
-      free(path);
-      free(oldfilepath);
-      free(oldfilepath_rel);
+      pmem_free(PMEM_SUBSYS_SYNC, path);
+      pmem_free(PMEM_SUBSYS_SYNC, oldfilepath);
+      pmem_free(PMEM_SUBSYS_SYNC, oldfilepath_rel);
       needdownload = 1;
       return;
     }
@@ -1698,11 +1699,11 @@ static void process_modifyfile(const binresult *entry) {
                                           fileid, path);
       pdownload_tasks_delete(
           fileid, psync_get_result_cell(fres1, i, 0), 1);
-      free(path);
+      pmem_free(PMEM_SUBSYS_SYNC, path);
       needdownload = 1;
     }
-    free(fres1);
-    free(fres2);
+    pmem_free(PMEM_SUBSYS_SYNC, fres1);
+    pmem_free(PMEM_SUBSYS_SYNC, fres2);
   }
 }
 
@@ -1731,7 +1732,7 @@ static void process_deletefile(const binresult *entry) {
     path = pfolder_file_path(fileid, NULL);
     if (likely(path)) {
       ptask_lfile_rm(fileid, path);
-      free(path);
+      pmem_free(PMEM_SUBSYS_SYNC, path);
       needdownload = 1;
     }
   }
@@ -1754,9 +1755,9 @@ static void process_deletefile(const binresult *entry) {
     pfs_xatr_file_deleted(fileid);
   }
   if (path)
-    free(path);
+    pmem_free(PMEM_SUBSYS_SYNC, path);
   if (fullpath)
-    free(fullpath);
+    pmem_free(PMEM_SUBSYS_SYNC, fullpath);
 }
 
 static void start_download() {
@@ -1980,7 +1981,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     if ((row = psql_fetch(res))) {
       cstr = psync_get_lstring(row[0], &sharenamelen);
       stringslen += ++sharenamelen;
-      sharename = (char *)malloc(sharenamelen);
+      sharename = (char *)pmem_malloc(PMEM_SUBSYS_SYNC, sharenamelen);
       memcpy(sharename, cstr, sharenamelen);
       freesharename = 1;
       ctime = psync_get_number(row[1]);
@@ -1993,14 +1994,14 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
       return;
     }
   }
-  e = (psync_share_event_t *)malloc(sizeof(psync_share_event_t) +
+  e = (psync_share_event_t *)pmem_malloc(PMEM_SUBSYS_SYNC, sizeof(psync_share_event_t) +
                                           stringslen);
   str = (char *)(e + 1);
   memset(e, 0, sizeof(psync_share_event_t));
   e->folderid = papi_find_result2(share, "folderid", PARAM_NUM)->num;
   fill_str(e->sharename, sharename, sharenamelen);
   if (freesharename)
-    free(sharename);
+    pmem_free(PMEM_SUBSYS_SYNC, sharename);
 
   fill_str(e->message, message, messagelen);
   if ((br = papi_check_result2(share, "userid", PARAM_NUM)))
@@ -2037,7 +2038,7 @@ static void send_share_notify(psync_eventtype_t eventid, const binresult *share,
     }
   }
   if (isba) {
-    notify_paramst *params = malloc(sizeof(notify_paramst));
+    notify_paramst *params = pmem_malloc(PMEM_SUBSYS_SYNC, sizeof(notify_paramst));
     params->eventid = eventid;
     params->event_data = e;
     params->touserid = touserid;
@@ -2060,14 +2061,14 @@ static void do_send_eventdata(void *param) {
 
   get_ba_member_email(data->fromuserid, &email, &emaillen);
   fill_str(data->event_data->fromemail, email, emaillen);
-  free(email);
+  pmem_free(PMEM_SUBSYS_SYNC, email);
 
   if (data->touserid)
     get_ba_member_email(data->touserid, &email, &emaillen);
   else
     get_ba_team_name(data->teamid, &email, &emaillen);
   fill_str(data->event_data->toemail, email, emaillen);
-  free(email);
+  pmem_free(PMEM_SUBSYS_SYNC, email);
 
   if (email) {
     pdiff_lock();
@@ -2075,7 +2076,7 @@ static void do_send_eventdata(void *param) {
     pdiff_unlock();
   }
 
-  free(param);
+  pmem_free(PMEM_SUBSYS_SYNC, param);
 }
 
 static void process_requestsharein(const binresult *entry) {
@@ -2391,7 +2392,7 @@ static void process_establishbshareout(const binresult *entry) {
 
   psql_run_free(q);
   if (email)
-    free(email);
+    pmem_free(PMEM_SUBSYS_SYNC, email);
 }
 
 static void delete_share_request(const binresult *share) {
@@ -2854,8 +2855,8 @@ static void psync_diff_refresh_thread(void *ptr) {
       pfs_refresh_folder(fr->refresh_folders[i]);
       lastfolderid = fr->refresh_folders[i];
     }
-  free(fr->refresh_folders);
-  free(fr);
+  pmem_free(PMEM_SUBSYS_SYNC, fr->refresh_folders);
+  pmem_free(PMEM_SUBSYS_SYNC, fr);
 }
 
 static void psync_diff_refresh_fs(const binresult *entries) {
@@ -2880,7 +2881,7 @@ static void psync_diff_refresh_fs(const binresult *entries) {
     }
     if (!refresh_last)
       return;
-    ptr = malloc(sizeof(refresh_folders_ptr_t));
+    ptr = pmem_malloc(PMEM_SUBSYS_SYNC, sizeof(refresh_folders_ptr_t));
     ptr->refresh_folders = refresh_folders;
     ptr->refresh_last = refresh_last;
     prun_thread1("fs folder refresh", psync_diff_refresh_thread, ptr);
@@ -2909,7 +2910,7 @@ static void psync_run_analyze_if_needed() {
     else
       tablecnt = 0;
     psql_free(res);
-    tablenames = malloc(sizeof(char *) * tablecnt);
+    tablenames = pmem_malloc_array(PMEM_SUBSYS_SYNC, tablecnt, sizeof(char *));
     res = psql_query_rdlock(
         "SELECT name FROM sqlite_master WHERE type='table' LIMIT ?");
     psql_bind_uint(res, 1, tablecnt);
@@ -2927,13 +2928,13 @@ static void psync_run_analyze_if_needed() {
       --tablecnt;
       pdbg_logf(D_NOTICE, "running ANALYZE on %s", tablenames[tablecnt]);
       sql = putil_strcat("ANALYZE ", tablenames[tablecnt], ";", NULL);
-      free(tablenames[tablecnt]);
+      pmem_free(PMEM_SUBSYS_SYNC, tablenames[tablecnt]);
       psql_statement(sql);
-      free(sql);
+      pmem_free(PMEM_SUBSYS_SYNC, sql);
       pdbg_logf(D_NOTICE, "table done");
       psys_sleep_milliseconds(5);
     }
-    free(tablenames);
+    pmem_free(PMEM_SUBSYS_SYNC, tablenames);
     res = psql_prepare(
         "REPLACE INTO setting (id, value) VALUES (?, ?)");
     psql_bind_str(res, 1, "lastanalyze");
@@ -2972,7 +2973,7 @@ static int psync_diff_check_quota(psock_t *sock) {
                          "binapi", PARAM_ARRAY);
   if (uq->length)
     psync_apipool_set_server(uq->array[0]->str);
-  free(res);
+  pmem_free(PMEM_SUBSYS_SYNC, res);
   return 0;
 }
 
@@ -2984,7 +2985,7 @@ static void psync_diff_adapter_hash(void *out) {
   pcrc32c_fast_hash256_update(&ctx, list->interfaces,
                             list->interfacecnt * sizeof(psock_iface_t));
   pcrc32c_fast_hash256_final(out, &ctx);
-  free(list);
+  pmem_free(PMEM_SUBSYS_SYNC, list);
 }
 
 static void psync_diff_adapter_timer(psync_timer_t timer, void *ptr) {
@@ -3062,7 +3063,7 @@ restart:
     }
     result = entries->length;
     if (should_free_res) {
-      free(res);
+      pmem_free(PMEM_SUBSYS_SYNC, res);
       should_free_res = 0;
       res = NULL;
     }
@@ -3208,7 +3209,7 @@ restart:
     }
 
     if (should_free_res) {
-      free(res);
+      pmem_free(PMEM_SUBSYS_SYNC, res);
       should_free_res = 0;
       res = NULL;
     }
@@ -3216,7 +3217,7 @@ restart:
 
 cleanup:
   if (should_free_res && res) {
-    free(res);
+    pmem_free(PMEM_SUBSYS_SYNC, res);
   }
   psock_close(sock);
   close(exceptionsock);
