@@ -45,6 +45,7 @@
 #include "pfoldersync.h"
 #include "ptimer.h"
 #include "ptree.h"
+#include "psql.h"
 
 #define pfs_need_per_folder_refresh() pfs_need_per_folder_refresh_f()
 #define pfs_need_per_folder_refresh_const() 1
