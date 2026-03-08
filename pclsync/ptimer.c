@@ -141,7 +141,7 @@ PSYNC_NOINLINE static void timer_process_timers(psync_list *timers) {
     }
   }
   pthread_mutex_unlock(&timer_mutex);
-  psync_list_for_each_element_call(timers, psync_timer_structure_t, list, free);
+  psync_list_for_each_element_call(timers, psync_timer_structure_t, list, free_timer);
 }
 
 static void timer_thread() {

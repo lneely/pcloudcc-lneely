@@ -3398,8 +3398,8 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
   if (!ret)
     ret = size;
 ret0:
-  psync_list_for_each_element_call(&waiting, psync_page_waiter_t, listwaiter, free);
-  psync_list_for_each_element_call(&auth_pages, psync_crypto_auth_page, list, free);
+  psync_list_for_each_element_call(&waiting, psync_page_waiter_t, listwaiter, free_page_waiter);
+  psync_list_for_each_element_call(&auth_pages, psync_crypto_auth_page, list, free_crypto_auth_page);
   for (i = 0; i < pagecnt; i++)
     if (dp[i].freebuff)
       pmem_free(PMEM_SUBSYS_CACHE, dp[i].buff);

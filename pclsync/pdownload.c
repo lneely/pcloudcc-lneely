@@ -863,7 +863,7 @@ static int task_download_file(download_task_t *dt) {
   //  fileid);
   pdbg_logf(D_NOTICE, "file downloaded %s", dt->localname);
   pdbg_write_fs_event("file downloaded %s", dt->localname);
-  psync_list_for_each_element_call(&ranges, psync_range_list_t, list, free);
+  psync_list_for_each_element_call(&ranges, psync_range_list_t, list, free_download_range_list);
   if (tmpold) {
     pfile_delete(tmpold);
     pmem_free(PMEM_SUBSYS_DOWNLOAD, tmpold);
@@ -878,7 +878,7 @@ err2:
 err1:
   pfile_close(fd);
 err0:
-  psync_list_for_each_element_call(&ranges, psync_range_list_t, list, free);
+  psync_list_for_each_element_call(&ranges, psync_range_list_t, list, free_download_range_list);
   if (tmpold) {
     pfile_delete(tmpold);
     pmem_free(PMEM_SUBSYS_DOWNLOAD, tmpold);

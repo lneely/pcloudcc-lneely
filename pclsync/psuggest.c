@@ -265,7 +265,7 @@ psuggested_folders_t *psuggest_scan_folder(const char *path) {
     pdbg_logf(D_NOTICE, "suggesting %s (%s, %s)", ret->entries[i].localpath,
           ret->entries[i].name, ret->entries[i].description);
   }
-  psync_list_for_each_element_call(&suggestions, suggested_folder, list, free);
+  psync_list_for_each_element_call(&suggestions, suggested_folder, list, free_suggested_folder);
   free_folder(f);
   return ret;
 }

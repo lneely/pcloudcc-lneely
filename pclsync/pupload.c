@@ -1027,7 +1027,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
   if (unlikely(fd == INVALID_HANDLE_VALUE)) {
     pdbg_logf(D_WARNING, "could not open local file %s", localpath);
     psync_apipool_release(api);
-    psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free);
+    psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free_upload_range_list);
     return -1;
   }
   if (likely(uploadoffset < fsize)) {
@@ -1240,7 +1240,7 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
     respwait++;
     uploadoffset += le->len;
   }
-  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free);
+  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free_upload_range_list);
   if (pfile_size(fd) != fsize) {
     pdbg_logf(D_NOTICE, "file %s changed filesize while uploading, restarting task",
           localpath);
@@ -1260,13 +1260,13 @@ static int upload_big_file(const char *localpath, const unsigned char *hashhex,
   }
 err1:
   pfile_close(fd);
-  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free);
+  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free_upload_range_list);
 err0:
   psync_apipool_release_bad(api);
   return -1;
 errp:
   pfile_close(fd);
-  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free);
+  psync_list_for_each_element_call(&rlist, psync_upload_range_list_t, list, free_upload_range_list);
   psync_apipool_release_bad(api);
   return 0;
 }

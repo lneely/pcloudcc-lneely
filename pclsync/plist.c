@@ -296,9 +296,9 @@ void *psync_list_builder_finalize(psync_list_builder_t *builder) {
     }
   }
 
-  psync_list_for_each_element_call(&builder->element_list, psync_list_element_list, list, free);
-  psync_list_for_each_element_call(&builder->string_list, psync_list_string_list, list, free);
-  psync_list_for_each_element_call(&builder->number_list, psync_list_num_list, list, free);
+  psync_list_for_each_element_call(&builder->element_list, psync_list_element_list, list, free_list_element);
+  psync_list_for_each_element_call(&builder->string_list, psync_list_string_list, list, free_list_string);
+  psync_list_for_each_element_call(&builder->number_list, psync_list_num_list, list, free_list_num);
   pmem_free(PMEM_SUBSYS_OTHER, builder);
   return ret;
 }

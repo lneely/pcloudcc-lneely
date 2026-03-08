@@ -305,6 +305,14 @@ static void scanner_local_entry_to_list(void *ptr, ppath_stat *st) {
   psync_list_add_tail(lst, &e->list);
 }
 
+static void free_sync_folderlist(sync_folderlist *elem) {
+  pmem_free(PMEM_SUBSYS_SYNC, elem);
+}
+
+static void free_sync_list(sync_list *elem) {
+  pmem_free(PMEM_SUBSYS_SYNC, elem);
+}
+
 static int scanner_local_folder_to_list(const char *localpath,
                                         psync_list *lst) {
   psync_list_init(lst);
@@ -560,7 +568,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
     add_deleted_element(fdb, folderid, localfolderid, syncid, synctype);
     ldb = ldb->next;
   }
-  psync_list_for_each_element_call(&dblist, sync_folderlist, list, free);
+  psync_list_for_each_element_call(&dblist, sync_folderlist, list, free_sync_folderlist);
   if (localsleepperfolder) {
     psys_sleep_milliseconds(localsleepperfolder);
     if (__atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) - starttime >=
@@ -576,7 +584,7 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
     pmem_free(PMEM_SUBSYS_SYNC, subpath);
   }
 
-  psync_list_for_each_element_call(&disklist, sync_folderlist, list, free);
+  psync_list_for_each_element_call(&disklist, sync_folderlist, list, free_sync_folderlist);
 }
 
 static int compare_sizeinodemtime(const psync_list *l1, const psync_list *l2) {
@@ -1038,8 +1046,8 @@ restart:
       break;
     }
   }
-  psync_list_for_each_element_call(&slist, sync_list, list, free);
-  psync_list_for_each_element_call(&slist_full_deviceid, sync_list, list, free);
+  psync_list_for_each_element_call(&slist, sync_list, list, free_sync_list);
+  psync_list_for_each_element_call(&slist_full_deviceid, sync_list, list, free_sync_list);
   w = 0;
 
   do {
@@ -1047,7 +1055,7 @@ restart:
     if (unlikely(restart_scan)) {
       pthread_mutex_unlock(&scan_mutex);
       for (i = 0; i < SCAN_LIST_CNT; i++)
-        psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list, free);
+        psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list, free_sync_folderlist);
       psys_sleep_milliseconds(restartsleep);
       if (restartsleep < 16000)
         restartsleep *= 2;
@@ -1073,9 +1081,9 @@ restart:
         w++;
         check_for_query_cnt();
       }
-      psync_list_for_each_element_call(&scan_lists[SCAN_LIST_RENFOLDERSROM], sync_folderlist, list, free);
+      psync_list_for_each_element_call(&scan_lists[SCAN_LIST_RENFOLDERSROM], sync_folderlist, list, free_sync_folderlist);
       psync_list_init(&scan_lists[SCAN_LIST_RENFOLDERSROM]);
-      psync_list_for_each_element_call(&scan_lists[SCAN_LIST_RENFOLDERSTO], sync_folderlist, list, free);
+      psync_list_for_each_element_call(&scan_lists[SCAN_LIST_RENFOLDERSTO], sync_folderlist, list, free_sync_folderlist);
       psync_list_init(&scan_lists[SCAN_LIST_RENFOLDERSTO]);
       psync_list_for_each_element(fl, &scan_lists[SCAN_LIST_NEWFOLDERS],
                                   sync_folderlist, list) {
@@ -1093,7 +1101,7 @@ restart:
       }
       psync_list_for_each_element_call(&newtmp, sync_folderlist, list,
                                        scan_created_folder);
-      psync_list_for_each_element_call(&newtmp, sync_folderlist, list, free);
+      psync_list_for_each_element_call(&newtmp, sync_folderlist, list, free_sync_folderlist);
     }
     if (changes) {
       i++;
@@ -1105,7 +1113,7 @@ restart:
   if (unlikely(restart_scan)) {
     pthread_mutex_unlock(&scan_mutex);
     for (i = 0; i < SCAN_LIST_CNT; i++)
-      psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list, free);
+      psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list, free_sync_folderlist);
     psys_sleep_milliseconds(restartsleep);
     if (restartsleep < 16000)
       restartsleep *= 2;
@@ -1161,7 +1169,7 @@ restart:
     pstatus_upload_recalc_async();
   }
   for (i = 0; i < SCAN_LIST_CNT; i++)
-    psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list, free);
+    psync_list_for_each_element_call(&scan_lists[i], sync_folderlist, list, free_sync_folderlist);
   if (movedfolders) {
     starttime = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
     restartsleep = 1000;

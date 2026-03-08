@@ -2117,7 +2117,7 @@ static void pfs_upld_check_tasks() {
   psql_lock();
   current_upload_batch = NULL;
   psql_unlock();
-  psync_list_for_each_element_call(&tasks, fsupload_task_t, list, free);
+  psync_list_for_each_element_call(&tasks, fsupload_task_t, list, free_fsupload_task);
 }
 
 static void pfs_upld_thread() {

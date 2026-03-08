@@ -2128,7 +2128,7 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
           range->off + range->len != blockactions[i].off))) {
       range = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_range_list_t));
       if (!range) {
-        psync_list_for_each_element_call(ranges, psync_range_list_t, list, free);
+        psync_list_for_each_element_call(ranges, psync_range_list_t, list, free_range_list);
         pmem_free(PMEM_SUBSYS_OTHER, blockactions);
         pmem_free(PMEM_SUBSYS_OTHER, checksums);
         return PSYNC_NET_TEMPFAIL;
@@ -2227,7 +2227,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
           if (!ur) {
             pmem_free(PMEM_SUBSYS_OTHER, buff);
             pfile_close(fd);
-            psync_list_for_each_element_call(nr, psync_upload_range_list_t, list, free);
+            psync_list_for_each_element_call(nr, psync_upload_range_list_t, list, free_upload_range_list_net);
             return -1;
           }
           ur->uploadoffset = off + buffoff + outbyteoff;
@@ -2336,7 +2336,7 @@ static void merge_list_to_element(psync_upload_range_list_t *le,
     } else {
       n = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_upload_range_list_t));
       if (!n) {
-        psync_list_for_each_element_call(rlist, psync_upload_range_list_t, list, free);
+        psync_list_for_each_element_call(rlist, psync_upload_range_list_t, list, free_upload_range_list_net);
         return;
       }
       n->uploadoffset = n->off = ur->uploadoffset + ur->len;
