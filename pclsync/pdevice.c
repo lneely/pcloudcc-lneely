@@ -36,6 +36,7 @@
 #include <unistd.h>
 
 #include "pdevice.h"
+#include "pmem.h"
 #include "psettings.h"
 #include "putil.h"
 
