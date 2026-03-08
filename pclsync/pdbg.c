@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "pdbg.h"
+#include "pmem.h"
 #include "ppath.h"
 #include "putil.h"
 
