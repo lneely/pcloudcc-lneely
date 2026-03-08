@@ -4,6 +4,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum {
   PMEM_SUBSYS_API,
   PMEM_SUBSYS_CACHE,
@@ -25,5 +29,9 @@ void pmem_free(pmem_subsystem_t subsystem, void *ptr);
 void *pmem_realloc(pmem_subsystem_t subsystem, void *ptr, size_t size);
 void *pmem_malloc_array(pmem_subsystem_t subsystem, size_t nmemb, size_t size);
 size_t pmem_get_stats(pmem_subsystem_t subsystem);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

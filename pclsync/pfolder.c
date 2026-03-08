@@ -223,8 +223,12 @@ errnet:
   return PSYNC_INVALID_FOLDERID;
 }
 
+static void free_string_list_element(string_list *elem) {
+  pmem_free(PMEM_SUBSYS_OTHER, elem);
+}
+
 static void psync_free_string_list(psync_list *lst) {
-  psync_list_for_each_element_call(lst, string_list, list, free);
+  psync_list_for_each_element_call(lst, string_list, list, free_string_list_element);
 }
 
 static string_list *str_to_list_element(const char *str, size_t len) {
