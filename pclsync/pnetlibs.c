@@ -1735,7 +1735,7 @@ static psync_block_checksum
 **psync_net_get_sorted_checksums(psync_file_checksums *checksums){
   psync_block_checksum **ret;
   uint32_t i;
-  ret=pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_block_checksum *) * checksums->blockcnt);
+  ret=pmem_malloc_array(PMEM_SUBSYS_OTHER, checksums->blockcnt, sizeof(psync_block_checksum *));
   if (!ret)
     return NULL;
   for (i=0; i<checksums->blockcnt; i++)
@@ -2093,12 +2093,11 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
     return PSYNC_NET_TEMPFAIL;
   }
   hash = psync_net_create_hash(checksums);
-  blockactions = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_block_action) * checksums->blockcnt);
+  blockactions = pmem_malloc_array(PMEM_SUBSYS_OTHER, checksums->blockcnt, sizeof(psync_block_action));
   if (!blockactions) {
     pmem_free(PMEM_SUBSYS_OTHER, checksums);
     return PSYNC_NET_TEMPFAIL;
   }
-  memset(blockactions, 0, sizeof(psync_block_action) * checksums->blockcnt);
   for (i = 0; i < filecnt; i++)
     psync_net_check_file_for_blocks(files[i], checksums, hash, blockactions, i);
   pmem_free(PMEM_SUBSYS_OTHER, hash);
