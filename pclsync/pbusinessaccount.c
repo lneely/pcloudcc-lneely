@@ -32,6 +32,7 @@
 #include "pnetlibs.h"
 #include "psys.h"
 #include "psql.h"
+#include "pmem.h"
 
 #include <stdio.h>
 
@@ -103,12 +104,18 @@ int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
   if (unlikely(numparam == 1))
     return -3;
 
-  t = (binparam *)malloc(numparam * sizeof(binparam));
+  t = (binparam *)pmem_calloc_safe(numparam, sizeof(binparam));
+  if (!t)
+    return -1;
 
   init_param_str(t, "auth", psync_my_auth);
 
   if (nusershareid) {
-    ids1 = (char *)malloc(nusershareid * FOLDERID_ENTRY_SIZE);
+    ids1 = (char *)pmem_calloc_safe(nusershareid, FOLDERID_ENTRY_SIZE);
+    if (!ids1) {
+      free(t);
+      return -1;
+    }
     idsp = ids1;
     for (i = 0; i < nusershareid; ++i) {
       k = sprintf(idsp, "%lld", (long long)usershareids[i]);
@@ -124,7 +131,13 @@ int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
   }
 
   if (nteamshareid) {
-    ids2 = (char *)malloc(nteamshareid * FOLDERID_ENTRY_SIZE);
+    ids2 = (char *)pmem_calloc_safe(nteamshareid, FOLDERID_ENTRY_SIZE);
+    if (!ids2) {
+      if (nusershareid)
+        free(ids1);
+      free(t);
+      return -1;
+    }
     idsp = ids2;
     for (i = 0; i < nteamshareid; ++i) {
       k = sprintf(idsp, "%lld", (long long)teamshareids[i]);
@@ -209,14 +222,25 @@ int do_psync_account_modifyshare(psync_shareid_t usrshrids[], uint32_t uperms[],
   if (unlikely(numparam == 1))
     return -3;
 
-  t = (binparam *)malloc(numparam * sizeof(binparam));
+  t = (binparam *)pmem_calloc_safe(numparam, sizeof(binparam));
+  if (!t)
+    return -1;
 
   init_param_str(t, "auth", psync_my_auth);
 
   if (nushid) {
-    ids1 = (char *)malloc(nushid * FOLDERID_ENTRY_SIZE);
+    ids1 = (char *)pmem_calloc_safe(nushid, FOLDERID_ENTRY_SIZE);
+    if (!ids1) {
+      free(t);
+      return -1;
+    }
     idsp = ids1;
-    perms1 = (char *)malloc(nushid * FOLDERID_ENTRY_SIZE);
+    perms1 = (char *)pmem_calloc_safe(nushid, FOLDERID_ENTRY_SIZE);
+    if (!perms1) {
+      free(ids1);
+      free(t);
+      return -1;
+    }
     permsp = perms1;
     for (i = 0; i < nushid; ++i) {
       k = sprintf(idsp, "%lld", (long long)usrshrids[i]);
@@ -241,9 +265,26 @@ int do_psync_account_modifyshare(psync_shareid_t usrshrids[], uint32_t uperms[],
   }
 
   if (ntmshid) {
-    ids2 = (char *)malloc(ntmshid * FOLDERID_ENTRY_SIZE);
+    ids2 = (char *)pmem_calloc_safe(ntmshid, FOLDERID_ENTRY_SIZE);
+    if (!ids2) {
+      if (nushid) {
+        free(perms1);
+        free(ids1);
+      }
+      free(t);
+      return -1;
+    }
     idsp = ids2;
-    perms2 = (char *)malloc(ntmshid * FOLDERID_ENTRY_SIZE);
+    perms2 = (char *)pmem_calloc_safe(ntmshid, FOLDERID_ENTRY_SIZE);
+    if (!perms2) {
+      free(ids2);
+      if (nushid) {
+        free(perms1);
+        free(ids1);
+      }
+      free(t);
+      return -1;
+    }
     permsp = perms2;
 
     for (i = 0; i < ntmshid; ++i) {
