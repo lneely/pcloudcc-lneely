@@ -58,7 +58,7 @@ struct _psync_deflate_t {
 psync_deflate_t *pdeflate_init(int level) {
   psync_deflate_t *def;
   int ret;
-  def = malloc(sizeof(psync_deflate_t));
+  def = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_deflate_t));
   memset(&def->stream, 0, sizeof(def->stream));
   def->flushbuff = NULL;
   def->bufferstartoff = 0;
@@ -74,7 +74,7 @@ psync_deflate_t *pdeflate_init(int level) {
   if (pdbg_likely(ret == Z_OK))
     return def;
   else {
-    free(def);
+    pmem_free(PMEM_SUBSYS_OTHER, def);
     return NULL;
   }
 }
@@ -84,8 +84,8 @@ void pdeflate_destroy(psync_deflate_t *def) {
     deflateEnd(&def->stream);
   else
     inflateEnd(&def->stream);
-  free(def->flushbuff);
-  free(def);
+  pmem_free(PMEM_SUBSYS_OTHER, def->flushbuff);
+  pmem_free(PMEM_SUBSYS_OTHER, def);
 }
 
 static int psync_deflate_set_out_buff(psync_deflate_t *def) {
@@ -140,7 +140,7 @@ static int psync_deflate_finish_flush_add_buffer(psync_deflate_t *def,
   uint32_t alloced, used, current;
   int ret;
   alloced = 4096;
-  buff = malloc(sizeof(unsigned char) * alloced);
+  buff = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(unsigned char) * alloced);
   current = alloced;
   used = 0;
   def->flags &= ~FLAG_MORE_DATA;
@@ -153,7 +153,7 @@ static int psync_deflate_finish_flush_add_buffer(psync_deflate_t *def,
       if (ret != Z_BUF_ERROR)
         return ret;
       if (used == 0) {
-        free(buff);
+        pmem_free(PMEM_SUBSYS_OTHER, buff);
         return Z_OK;
       }
       def->flushbuff = buff;
@@ -215,7 +215,7 @@ int pdeflate_read(psync_deflate_t *def, void *data, int len) {
       memcpy(data, def->flushbuff + def->flushbuffoff, len);
       def->flushbuffoff += len;
       if (def->flushbuffoff == def->flushbufflen) {
-        free(def->flushbuff);
+        pmem_free(PMEM_SUBSYS_OTHER, def->flushbuff);
         def->flushbuff = NULL;
       }
       return len;

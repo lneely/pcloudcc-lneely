@@ -273,7 +273,7 @@ static void psync_file_preread_thread(void *ptr) {
     pr->count -= rd;
   }
   pfile_close(pr->fd);
-  free(pr);
+  pmem_free(PMEM_SUBSYS_OTHER, pr);
 }
 
 int pfile_preread(int fd, uint64_t offset, size_t count) {
@@ -282,7 +282,7 @@ int pfile_preread(int fd, uint64_t offset, size_t count) {
   cfd = pfile_dup(fd);
   if (cfd == INVALID_HANDLE_VALUE)
     return -1;
-  pr = malloc(sizeof(psync_file_preread_t));
+  pr = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_file_preread_t));
   pr->offset = offset;
   pr->count = count;
   pr->fd = cfd;
@@ -422,7 +422,7 @@ int pfile_run_update(const char *path) {
     ex = putil_strcat(PSYNC_RUN_CMD " \"", path, "\"", NULL);
     execl("/bin/sh", "/bin/sh", "-c", ex, NULL);
     pdbg_logf(D_ERROR, "exec of %s failed", ex);
-    free(ex);
+    pmem_free(PMEM_SUBSYS_OTHER, ex);
     exit(1);
   }
 }

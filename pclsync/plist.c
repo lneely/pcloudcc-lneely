@@ -142,7 +142,7 @@ void psync_list_extract_repeating(psync_list *l1, psync_list *l2, psync_list *ex
 
 psync_list_builder_t *psync_list_builder_create(size_t element_size, size_t offset) {
   psync_list_builder_t *builder;
-  builder = malloc(sizeof(psync_list_builder_t));
+  builder = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_list_builder_t));
   builder->element_size = element_size;
   builder->elements_offset = offset;
   if (element_size <= 200)
@@ -164,7 +164,7 @@ uint32_t *psync_list_builder_push_num(psync_list_builder_t *builder) {
   if (!builder->last_numbers ||
       builder->last_numbers->used >=
           sizeof(builder->last_numbers->numbers) / sizeof(uint32_t)) {
-    psync_list_num_list *l = malloc(sizeof(psync_list_num_list));
+    psync_list_num_list *l = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_list_num_list));
     l->used = 0;
     builder->last_numbers = l;
     psync_list_add_tail(&builder->number_list, &l->list);
@@ -187,7 +187,7 @@ uint32_t psync_list_builder_pop_num(psync_list_builder_t *builder) {
 void *psync_list_builder_add_element(psync_list_builder_t *builder) {
   if (!builder->last_elements ||
       builder->last_elements->used >= builder->elements_per_list) {
-    builder->last_elements = (psync_list_element_list *)malloc(
+    builder->last_elements = (psync_list_element_list *)pmem_malloc(PMEM_SUBSYS_OTHER, 
         offsetof(psync_list_element_list, elements) +
         builder->element_size * builder->elements_per_list);
     psync_list_add_tail(&builder->element_list, &builder->last_elements->list);
@@ -210,13 +210,13 @@ void psync_list_add_lstring_offset(psync_list_builder_t *builder, size_t offset,
   str = (char **)(builder->current_element + offset);
   builder->stringalloc += length;
   if (unlikely(length > 2000)) {
-    l = (psync_list_string_list *)malloc(sizeof(psync_list_string_list) +
+    l = (psync_list_string_list *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_list_string_list) +
                                                length);
     s = (char *)(l + 1);
     psync_list_add_tail(&builder->string_list, &l->list);
   } else if (!builder->last_strings || builder->last_strings->next + length >
                                            builder->last_strings->end) {
-    l = (psync_list_string_list *)malloc(sizeof(psync_list_string_list) +
+    l = (psync_list_string_list *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_list_string_list) +
                                                4000);
     s = (char *)(l + 1);
     l->next = s + length;
@@ -265,7 +265,7 @@ void *psync_list_builder_finalize(psync_list_builder_t *builder) {
   sz = builder->elements_offset + elem_total + builder->stringalloc;
   pdbg_logf(D_NOTICE, "allocating %lu bytes, %lu of which for strings",
         (unsigned long)sz, (unsigned long)builder->stringalloc);
-  ret = malloc(sizeof(char) * sz);
+  ret = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(char) * sz);
   if (builder->elements_offset <= sizeof(builder->cnt))
     memcpy(ret, &builder->cnt, builder->elements_offset);
   else
@@ -298,7 +298,7 @@ void *psync_list_builder_finalize(psync_list_builder_t *builder) {
   psync_list_for_each_element_call(&builder->element_list, psync_list_element_list, list, free);
   psync_list_for_each_element_call(&builder->string_list, psync_list_string_list, list, free);
   psync_list_for_each_element_call(&builder->number_list, psync_list_num_list, list, free);
-  free(builder);
+  pmem_free(PMEM_SUBSYS_OTHER, builder);
   return ret;
 }
 

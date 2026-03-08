@@ -32,6 +32,7 @@
 #include "pcache.h"
 #include "pcompiler.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "prun.h"
 #include "psys.h"
 #include "ptimer.h"
@@ -200,7 +201,7 @@ psync_timer_t ptimer_register(psync_timer_callback func, time_t numsec,
   psync_timer_t timer;
   uint32_t i;
   time_t n;
-  timer = malloc(sizeof(psync_timer_structure_t));
+  timer = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_timer_structure_t));
   timer->call = func;
   timer->param = param;
   n = TIMER_ARRAY_SIZE;
@@ -241,7 +242,7 @@ int ptimer_stop(psync_timer_t timer) {
   }
   pthread_mutex_unlock(&timer_mutex);
   if (needfree) {
-    free(timer);
+    pmem_free(PMEM_SUBSYS_OTHER, timer);
     return 0;
   } else
     return 1;
@@ -249,7 +250,7 @@ int ptimer_stop(psync_timer_t timer) {
 
 void ptimer_exception_handler(psync_exception_callback func) {
   struct exception_list *t;
-  t = malloc(sizeof(struct exception_list));
+  t = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(struct exception_list));
   t->next = NULL;
   t->func = func;
   t->threadid = pthread_self();
@@ -261,7 +262,7 @@ void ptimer_exception_handler(psync_exception_callback func) {
 
 void ptimer_sleep_handler(psync_exception_callback func) {
   struct exception_list *t;
-  t = malloc(sizeof(struct exception_list));
+  t = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(struct exception_list));
   t->next = NULL;
   t->func = func;
   t->threadid = pthread_self();

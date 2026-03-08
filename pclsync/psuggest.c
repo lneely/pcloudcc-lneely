@@ -34,6 +34,7 @@
 
 #include "pfile.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "plist.h"
 #include "ppath.h"
 #include "pscanexts.h"
@@ -116,7 +117,7 @@ static void dir_scan(void *ptr, ppath_fast_stat *st) {
     size_t l, o;
     l = strlen(st->name);
     o = f->pathlen;
-    nf = (scan_folder *)malloc(sizeof(scan_folder) + o + l + 2);
+    nf = (scan_folder *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(scan_folder) + o + l + 2);
     psync_list_init(&nf->subfolders);
     path = (char *)(nf + 1);
     memcpy(path, f->path, o);
@@ -163,7 +164,7 @@ static void suggest_folders(scan_folder *f, psync_list *suggestions) {
   if (sum >= PSYNC_SCANNER_MIN_FILES &&
       sum >= (f->filecnt[0] + sum) * PSYNC_SCANNER_PERCENT / 100) {
     //    pdbg_logf(D_NOTICE, "suggesting %s sum %u", f->path, sum);
-    s = malloc(sizeof(suggested_folder));
+    s = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(suggested_folder));
     s->folder = f;
     s->filecnt = sum;
     psync_list_add_tail(suggestions, &s->list);
@@ -185,7 +186,7 @@ static int sort_comp_tuple_rev(const void *p1, const void *p2) {
 static void free_folder(scan_folder *f) {
   psync_list_for_each_element_call(&f->subfolders, scan_folder, nextfolder,
                                    free_folder);
-  free(f);
+  pmem_free(PMEM_SUBSYS_OTHER, f);
 }
 
 psuggested_folders_t *psuggest_scan_folder(const char *path) {
@@ -200,7 +201,7 @@ psuggested_folders_t *psuggest_scan_folder(const char *path) {
   size_t descslen[PSYNC_SCANNER_MAX_SUGGESTIONS];
   char buff[256];
   uint32_t scnt[PSYNC_SCAN_TYPES_CNT][2];
-  f = malloc(sizeof(scan_folder));
+  f = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(scan_folder));
   psync_list_init(&f->nextfolder);
   psync_list_init(&f->subfolders);
   f->path = path;
@@ -234,12 +235,12 @@ psuggested_folders_t *psuggest_scan_folder(const char *path) {
     ln += s->folder->pathlen + off + 2;
     sf[cnt] = s;
     descslen[cnt] = off + 1;
-    descs[cnt] = malloc(descslen[cnt]);
+    descs[cnt] = pmem_malloc(PMEM_SUBSYS_OTHER, descslen[cnt]);
     memcpy(descs[cnt], buff, descslen[cnt]);
     if (++cnt >= PSYNC_SCANNER_MAX_SUGGESTIONS)
       break;
   }
-  ret = malloc(offsetof(psuggested_folders_t, entries) +
+  ret = pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(psuggested_folders_t, entries) +
                      sizeof(psuggested_folder_t) * cnt + ln);
   str = ((char *)ret) + offsetof(psuggested_folders_t, entries) +
         sizeof(psuggested_folder_t) * cnt;
@@ -260,7 +261,7 @@ psuggested_folders_t *psuggest_scan_folder(const char *path) {
     ret->entries[i].description = str;
     memcpy(str, descs[i], descslen[i]);
     str += descslen[i];
-    free(descs[i]);
+    pmem_free(PMEM_SUBSYS_OTHER, descs[i]);
     pdbg_logf(D_NOTICE, "suggesting %s (%s, %s)", ret->entries[i].localpath,
           ret->entries[i].name, ret->entries[i].description);
   }

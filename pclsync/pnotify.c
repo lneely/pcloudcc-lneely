@@ -31,6 +31,7 @@
 
 #include "pfile.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "pnetlibs.h"
 #include "pnotify.h"
 #include "ppath.h"
@@ -60,7 +61,7 @@ const char *pnotify_get_thumb_size() { return ntf_thumb_size; }
 void pnotify_notify(binresult *res) {
   pthread_mutex_lock(&ntf_mutex);
   if (ntf_result)
-    free(ntf_result);
+    pmem_free(PMEM_SUBSYS_OTHER, ntf_result);
   ntf_result = res;
   pthread_cond_signal(&ntf_cond);
   pthread_mutex_unlock(&ntf_mutex);
@@ -101,7 +102,7 @@ static void psync_notifications_download_thumb(const binresult *thumb,
     goto err3;
   if (pdbg_unlikely(psync_http_next_request(sock)))
     goto err3;
-  buff = (char *)malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, PSYNC_COPY_BUFFER_SIZE);
   while (1) {
     rd = psync_http_request_readall(sock, buff, PSYNC_COPY_BUFFER_SIZE);
     if (rd <= 0)
@@ -109,7 +110,7 @@ static void psync_notifications_download_thumb(const binresult *thumb,
     if (pfile_write(fd, buff, rd) != rd)
       break;
   }
-  free(buff);
+  pmem_free(PMEM_SUBSYS_OTHER, buff);
 err3:
   psync_http_close(sock);
 err2:
@@ -119,9 +120,9 @@ err1:
     pdbg_logf(D_NOTICE, "downloaded thumbnail %s", filename);
   else
     pdbg_logf(D_WARNING, "downloading of thumbnail %s failed", filename);
-  free(tmpfilepath);
+  pmem_free(PMEM_SUBSYS_OTHER, tmpfilepath);
 err0:
-  free(filepath);
+  pmem_free(PMEM_SUBSYS_OTHER, filepath);
 }
 
 static void psync_notifications_set_current_list(binresult *res,
@@ -145,13 +146,13 @@ static void psync_notifications_set_current_list(binresult *res,
   ores = ntf_processed_result;
   if (ntf_processing == 2) {
     ntf_processed_result = NULL;
-    free(res);
+    pmem_free(PMEM_SUBSYS_OTHER, res);
   } else
     ntf_processed_result = res;
   ntf_processing = 0;
   cb = ntf_callback;
   pthread_mutex_unlock(&ntf_mutex);
-  free(ores);
+  pmem_free(PMEM_SUBSYS_OTHER, ores);
   if (cb) {
     pdbg_logf(D_NOTICE, "calling notification callback, cnt=%u, newcnt=%u",
           (unsigned)cnttotal, (unsigned)cntnew);
@@ -178,7 +179,7 @@ static void psync_notifications_thread() {
     pthread_mutex_unlock(&ntf_mutex);
     psync_notifications_set_current_list(res, thumbpath);
   }
-  free(thumbpath);
+  pmem_free(PMEM_SUBSYS_OTHER, thumbpath);
 }
 
 void pnotify_set_callback(
@@ -258,7 +259,7 @@ static void psync_notifications_thumb_dir_list(void *ptr,
   } else
     addto = tree;
   len = strlen(st->name) + 1;
-  tl = (psync_thumb_list_t *)malloc(offsetof(psync_thumb_list_t, name) +
+  tl = (psync_thumb_list_t *)pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(psync_thumb_list_t, name) +
                                           len);
   memcpy(tl->name, st->name, len);
   *addto = &tl->tree;
@@ -336,7 +337,7 @@ psync_notification_list_t *pnotify_get() {
             pdbg_logf(D_WARNING,
                   "could not stat thumb %s which is supposed to be downloaded",
                   filename);
-          free(filepath);
+          pmem_free(PMEM_SUBSYS_OTHER, filepath);
         }
       }
       pntf->mtime = papi_find_result2(ntf, "mtime", PARAM_NUM)->num;
@@ -359,11 +360,11 @@ psync_notification_list_t *pnotify_get() {
         thumbpath, "/",
         ptree_element(thumbs, psync_thumb_list_t, tree)->name, NULL);
     pfile_delete(filepath);
-    free(filepath);
-    free(ptree_element(thumbs, psync_thumb_list_t, tree));
+    pmem_free(PMEM_SUBSYS_OTHER, filepath);
+    pmem_free(PMEM_SUBSYS_OTHER, ptree_element(thumbs, psync_thumb_list_t, tree));
     thumbs = nx;
   }
-  free(thumbpath);
+  pmem_free(PMEM_SUBSYS_OTHER, thumbpath);
   res = (psync_notification_list_t *)psync_list_builder_finalize(builder);
   res->newnotificationcnt = cntnew;
   return res;
@@ -382,14 +383,14 @@ void pnotify_clean() {
   thumbpath = ppath_private(PSYNC_DEFAULT_NTF_THUMB_DIR);
   if (thumbpath) {
     ppath_ls(thumbpath, psync_notifications_del_thumb, NULL);
-    free(thumbpath);
+    pmem_free(PMEM_SUBSYS_OTHER, thumbpath);
   }
   if (ntf_processed_result) {
-    free(ntf_processed_result);
+    pmem_free(PMEM_SUBSYS_OTHER, ntf_processed_result);
     ntf_processed_result = NULL;
   }
   if (ntf_result) {
-    free(ntf_result);
+    pmem_free(PMEM_SUBSYS_OTHER, ntf_result);
     ntf_result = NULL;
   }
   if (ntf_processing == 1)

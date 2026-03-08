@@ -59,7 +59,7 @@ void psys_init() {
   psync_uid = getuid();
   psync_gid = getgid();
   psync_gids_cnt = getgroups(0, NULL);
-  psync_gids = malloc(sizeof(gid_t) * psync_gids_cnt);
+  psync_gids = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(gid_t) * psync_gids_cnt);
   if (pdbg_unlikely(getgroups(psync_gids_cnt, psync_gids) != psync_gids_cnt))
     psync_gids_cnt = 0;
   pdbg_logf(D_NOTICE, "detected page size %ld", sysconf(_SC_PAGESIZE));

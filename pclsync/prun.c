@@ -27,7 +27,7 @@ static void *thread_entry(void *data) {
     td->fn.run0();
   }
 
-  free(data);
+  pmem_free(PMEM_SUBSYS_OTHER, data);
   return NULL;
 }
 
@@ -44,13 +44,13 @@ static int start_thread_common(const char *name, thread_data *data) {
 
   if (ret) {
     pdbg_logf(D_ERROR, "pthread_create failed for thread %s: %d", name, ret);
-    free(data);
+    pmem_free(PMEM_SUBSYS_OTHER, data);
   }
   return ret;
 }
 
 void prun_thread(const char *name, thread0_run run) {
-  thread_data *data = malloc(sizeof(thread_data));
+  thread_data *data = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(thread_data));
   if (!data) {
     pdbg_logf(D_ERROR, "malloc failed for thread %s", name);
     return;
@@ -62,7 +62,7 @@ void prun_thread(const char *name, thread0_run run) {
 }
 
 void prun_thread1(const char *name, thread1_run run, void *ptr) {
-  thread_data *data = malloc(sizeof(thread_data));
+  thread_data *data = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(thread_data));
   if (!data) {
     pdbg_logf(D_ERROR, "malloc failed for thread %s", name);
     return;

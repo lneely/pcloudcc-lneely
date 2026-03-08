@@ -83,7 +83,7 @@ void *pmem_malloc(pmem_subsystem_t subsystem, size_t size) {
   pmem_header_t *hdr;
   size_t total_size = sizeof(pmem_header_t) + size;
   
-  hdr = (pmem_header_t *)malloc(total_size);
+  hdr = (pmem_header_t *)pmem_malloc(PMEM_SUBSYS_OTHER, total_size);
   if (!hdr) {
     return NULL;
   }
@@ -104,7 +104,7 @@ void pmem_free(pmem_subsystem_t subsystem, void *ptr) {
   
   hdr = ((pmem_header_t *)ptr) - 1;
   __atomic_sub_fetch(&subsystem_stats[hdr->subsystem], hdr->size, __ATOMIC_RELAXED);
-  free(hdr);
+  pmem_free(PMEM_SUBSYS_OTHER, hdr);
 }
 
 void *pmem_realloc(pmem_subsystem_t subsystem, void *ptr, size_t size) {
@@ -150,7 +150,7 @@ void *pmem_malloc_array(pmem_subsystem_t subsystem, size_t nmemb, size_t size) {
   alloc_size = nmemb * size;
   total_size = sizeof(pmem_header_t) + alloc_size;
   
-  hdr = (pmem_header_t *)malloc(total_size);
+  hdr = (pmem_header_t *)pmem_malloc(PMEM_SUBSYS_OTHER, total_size);
   if (!hdr) {
     return NULL;
   }

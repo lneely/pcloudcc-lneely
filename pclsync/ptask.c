@@ -38,6 +38,7 @@
 #include "pdownload.h"
 #include "pfile.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "pnetlibs.h"
 #include "ppathstatus.h"
 #include "prun.h"
@@ -272,8 +273,8 @@ static int download_send_error(stream_t *s, async_params_t *prms,
   pdbg_logf(D_NOTICE, "closing stream %u", (unsigned)s->streamid);
   ptree_del(&prms->streams, &s->tree);
   if (s->free)
-    s->free(s, error);
-  free(s);
+    s->pmem_free(PMEM_SUBSYS_OTHER, s, error);
+  pmem_free(PMEM_SUBSYS_OTHER, s);
   return 0;
 }
 
@@ -618,7 +619,7 @@ static void proc_async_transfer(void *ptr) {
   pdeflate_destroy(prms->dec);
   ptree_for_each_element_call_safe(prms->streams, stream_t, tree,
                                         stream_destroy);
-  free(prms);
+  pmem_free(PMEM_SUBSYS_OTHER, prms);
 }
 
 static int proc_start_async_transfer() {
@@ -655,11 +656,11 @@ static int proc_start_async_transfer() {
           (int)papi_find_result2(res, "result", PARAM_NUM)->num,
           papi_find_result2(res, "error", PARAM_STR)->str);
     psync_process_api_error(papi_find_result2(res, "result", PARAM_NUM)->num);
-    free(res);
+    pmem_free(PMEM_SUBSYS_OTHER, res);
     psync_apipool_release(api);
     goto err0;
   }
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair)) {
     pdbg_logf(D_NOTICE, "socketpair() failed");
     goto err1;
@@ -674,7 +675,7 @@ static int proc_start_async_transfer() {
     pdbg_logf(D_NOTICE, "pdeflate_init() failed");
     goto err3;
   }
-  tparams = malloc(sizeof(async_params_t));
+  tparams = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(async_params_t));
   memset(tparams, 0, sizeof(async_params_t));
   tparams->enc = enc;
   tparams->dec = dec;
@@ -742,7 +743,7 @@ static int sock_writeall(int sock, const void *buff, size_t len) {
 static stream_t *stream_create(async_params_t *prms, size_t addsize) {
   psync_tree *parent;
   stream_t *ret;
-  ret = (stream_t *)malloc(sizeof(stream_t) + addsize);
+  ret = (stream_t *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(stream_t) + addsize);
   ret->streamid = ++prms->laststreamid;
   ret->flags = 0;
   ret->free = NULL;
@@ -765,8 +766,8 @@ static void stream_destroy(stream_t *s) {
     s->cb(s->cbext, &ar);
   }
   if (s->free)
-    s->free(s, PSYNC_ASYNC_ERROR_NET);
-  free(s);
+    s->pmem_free(PMEM_SUBSYS_OTHER, s, PSYNC_ASYNC_ERROR_NET);
+  pmem_free(PMEM_SUBSYS_OTHER, s);
 }
 
 static int stream_process_data(async_params_t *prms) {
@@ -849,7 +850,7 @@ static void psync_task_destroy(psync_task_manager_t tm) {
   for (i = 0; i < tm->taskcnt; i++)
     pthread_cond_destroy(&tm->tasks[i].cond);
   pthread_mutex_destroy(&tm->mutex);
-  free(tm);
+  pmem_free(PMEM_SUBSYS_OTHER, tm);
 }
 
 static void psync_task_dec_refcnt(psync_task_manager_t tm) {
@@ -1113,8 +1114,8 @@ void ptask_cfldr_save_fldrkey(void *ptr) {
   psql_bind_uint(res, 1, t->id);
   psql_bind_blob(res, 2, (const char *)t->key->data, t->key->datalen);
   psql_run_free(res);
-  free(t->key);
-  free(t);
+  pmem_free(PMEM_SUBSYS_OTHER, t->key);
+  pmem_free(PMEM_SUBSYS_OTHER, t);
 }
 
 void ptask_cfldr_save_filekey(void *ptr) {
@@ -1127,8 +1128,8 @@ void ptask_cfldr_save_filekey(void *ptr) {
   psql_bind_uint(res, 2, t->hash);
   psql_bind_blob(res, 3, (const char *)t->key->data, t->key->datalen);
   psql_run_free(res);
-  free(t->key);
-  free(t);
+  pmem_free(PMEM_SUBSYS_OTHER, t->key);
+  pmem_free(PMEM_SUBSYS_OTHER, t);
 }
 
 // from plibs.c
@@ -1137,7 +1138,7 @@ psync_task_manager_t psync_task_run_tasks(psync_task_callback_t const *callbacks
   psync_task_manager_t ret;
   struct psync_task_t_ *t;
   int i;
-  ret = (psync_task_manager_t)malloc(
+  ret = (psync_task_manager_t)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(struct psync_task_manager_t_, tasks) +
       sizeof(struct psync_task_t_) * cnt);
   pthread_mutex_init(&ret->mutex, NULL);

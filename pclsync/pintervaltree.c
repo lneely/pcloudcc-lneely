@@ -34,7 +34,7 @@
 
 static psync_interval_tree_t *psync_interval_tree_new(uint64_t from,
                                                       uint64_t to) {
-  psync_interval_tree_t *tree = malloc(sizeof(psync_interval_tree_t));
+  psync_interval_tree_t *tree = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_interval_tree_t));
   tree->from = from;
   tree->to = to;
   return psync_interval_tree_element(
@@ -42,7 +42,7 @@ static psync_interval_tree_t *psync_interval_tree_new(uint64_t from,
 }
 
 static psync_interval_tree_t *psync_interval_new(uint64_t from, uint64_t to) {
-  psync_interval_tree_t *tree = malloc(sizeof(psync_interval_tree_t));
+  psync_interval_tree_t *tree = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_interval_tree_t));
   tree->from = from;
   tree->to = to;
   return tree;
@@ -58,10 +58,10 @@ psync_interval_tree_consume_intervals(psync_interval_tree_t *tree,
     psync_interval_tree_del(&tree, next);
     if (next->to >= e->to) {
       e->to = next->to;
-      free(next);
+      pmem_free(PMEM_SUBSYS_OTHER, next);
       break;
     }
-    free(next);
+    pmem_free(PMEM_SUBSYS_OTHER, next);
   }
   return tree;
 }
@@ -159,7 +159,7 @@ psync_interval_tree_get_cut_end(psync_interval_tree_t *tree, uint64_t end) {
     prev = psync_interval_tree_get_prev(last);
     tree = psync_interval_tree_element(
         ptree_get_del(&tree->tree, &last->tree));
-    free(last);
+    pmem_free(PMEM_SUBSYS_OTHER, last);
     last = prev;
   }
   return tree;

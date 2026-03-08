@@ -36,6 +36,7 @@
 #include "pfoldersync.h"
 #include "pfstasks.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "plist.h"
 #include "ppathstatus.h"
 #include "psql.h"
@@ -280,7 +281,7 @@ static folder_tasks_t *get_folder_tasks(psync_folderid_t folderid, int create) {
     }
   }
   if (create) {
-    ft = malloc(sizeof(folder_tasks_t));
+    ft = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(folder_tasks_t));
     *atr = &ft->tree;
     ptree_added_at(&folder_tasks, tr, &ft->tree);
     ft->folderid = folderid;
@@ -297,7 +298,7 @@ static folder_tasks_t *get_folder_tasks(psync_folderid_t folderid, int create) {
 static void free_folder_tasks(folder_tasks_t *ft) {
   pdbg_logf(D_NOTICE, "marking folderid %lu as clean", (unsigned long)ft->folderid);
   ptree_del(&folder_tasks, &ft->tree);
-  free(ft);
+  pmem_free(PMEM_SUBSYS_OTHER, ft);
 }
 
 static psync_folderid_t get_parent_folder(psync_folderid_t folderid) {
@@ -408,7 +409,7 @@ static void folder_moved(psync_folderid_t folderid,
 static void folder_moved_commit(void *ptr) {
   folder_moved_params_t *mp = (folder_moved_params_t *)ptr;
   folder_moved(mp->folderid, mp->old_parent_folderid, mp->new_parent_folderid);
-  free(mp);
+  pmem_free(PMEM_SUBSYS_OTHER, mp);
 }
 
 void ppathstatus_fldr_moved(psync_folderid_t folderid,
@@ -420,7 +421,7 @@ void ppathstatus_fldr_moved(psync_folderid_t folderid,
   ppathstatus_del_from_parent_cache(folderid);
   if (!get_folder_tasks(folderid, 0))
     return;
-  mp = malloc(sizeof(folder_moved_params_t));
+  mp = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(folder_moved_params_t));
   mp->folderid = folderid;
   mp->old_parent_folderid = old_parent_folderid;
   mp->new_parent_folderid = new_parent_folderid;
@@ -447,7 +448,7 @@ void ppathstatus_fldr_deleted(psync_folderid_t folderid) {
 
 static void sync_data_free(sync_data_t *sd) {
   ptree_for_each_element_call_safe(sd->folder_tasks, folder_tasks_t, tree, free);
-  free(sd);
+  pmem_free(PMEM_SUBSYS_OTHER, sd);
 }
 
 static sync_data_t *get_sync_data(psync_syncid_t syncid, int create) {
@@ -479,7 +480,7 @@ static sync_data_t *get_sync_data(psync_syncid_t syncid, int create) {
     return NULL;
   } else {
     size_t i;
-    sd = malloc(sizeof(sync_data_t));
+    sd = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(sync_data_t));
     sd->syncid = syncid;
     *atr = &sd->tree;
     ptree_added_at(&sync_data, tr, &sd->tree);
@@ -525,7 +526,7 @@ get_sync_folder_tasks(sync_data_t *sd, psync_folderid_t folderid, int create) {
     }
   }
   if (create) {
-    ft = malloc(sizeof(folder_tasks_t));
+    ft = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(folder_tasks_t));
     *atr = &ft->tree;
     ptree_added_at(&sd->folder_tasks, tr, &ft->tree);
     ft->folderid = folderid;
@@ -656,7 +657,7 @@ static void free_sync_folder_tasks(sync_data_t *sd, folder_tasks_t *ft) {
   pdbg_logf(D_NOTICE, "marking folderid %lu from syncid %u as clean",
         (unsigned long)ft->folderid, (unsigned)sd->syncid);
   ptree_del(&sd->folder_tasks, &ft->tree);
-  free(ft);
+  pmem_free(PMEM_SUBSYS_OTHER, ft);
 }
 
 void ppathstatus_syncfldr_task_completed(
@@ -751,7 +752,7 @@ static void sync_folder_moved_commit(void *ptr) {
   sync_folder_moved_params_t *mp = (sync_folder_moved_params_t *)ptr;
   sync_folder_moved(mp->folderid, mp->old_syncid, mp->old_parent_folderid,
                     mp->new_syncid, mp->new_parent_folderid);
-  free(mp);
+  pmem_free(PMEM_SUBSYS_OTHER, mp);
 }
 
 void ppathstatus_syncfldr_moved(psync_folderid_t folderid,
@@ -769,7 +770,7 @@ void ppathstatus_syncfldr_moved(psync_folderid_t folderid,
   sync_del_from_parent_cache(sd, folderid);
   if (!get_folder_tasks(folderid, 0))
     return;
-  mp = malloc(sizeof(sync_folder_moved_params_t));
+  mp = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(sync_folder_moved_params_t));
   mp->folderid = folderid;
   mp->old_parent_folderid = old_parent_folderid;
   mp->new_parent_folderid = new_parent_folderid;
@@ -894,7 +895,7 @@ static int move_encname_to_buff(psync_folderid_t folderid, char *buff,
   if (unlikely(len >= sizeof(buff)))
     return -1;
   memcpy(buff, encname, len + 1);
-  free(encname);
+  pmem_free(PMEM_SUBSYS_OTHER, encname);
   return 0;
 }
 
@@ -1436,7 +1437,7 @@ psync_path_status_t ppathstatus_get(const char *path) {
         dp = NULL;
       }
       psql_unlock();
-      free(dp);
+      pmem_free(PMEM_SUBSYS_OTHER, dp);
       if (len >= drive_path_len && !memcmp(drive_path, path, drive_path_len) &&
           valid_last_char(path[drive_path_len]))
         return psync_path_status_drive(path + drive_path_len,

@@ -38,6 +38,7 @@
 #include "pfile.h"
 #include "pfoldersync.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "plocalnotify.h"
 #include "plocalscan.h"
 #include "ppathstatus.h"
@@ -61,7 +62,7 @@ static psync_tree *synced_down_folders = PSYNC_TREE_EMPTY;
 static pthread_mutex_t sync_down_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static psync_tree *psync_new_sd_folder(psync_folderid_t folderid) {
-  synced_down_folder *f = malloc(sizeof(synced_down_folder));
+  synced_down_folder *f = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(synced_down_folder));
   f->folderid = folderid;
   return &f->tree;
 }
@@ -117,7 +118,7 @@ void psyncer_dl_queue_del(psync_folderid_t folderid) {
       f = ptree_element(f->tree.right, synced_down_folder, tree);
     else {
       ptree_del(&synced_down_folders, &f->tree);
-      free(f);
+      pmem_free(PMEM_SUBSYS_OTHER, f);
       break;
     }
   }
@@ -208,7 +209,7 @@ psync_folderid_t psyncer_db_folder_create(
   if (psql_affected() > 0) {
     lfolderid = psql_insertid();
     psql_free(res);
-    free(vname);
+    pmem_free(PMEM_SUBSYS_OTHER, vname);
     return lfolderid;
   }
   psql_free(res);
@@ -238,7 +239,7 @@ psync_folderid_t psyncer_db_folder_create(
     psql_run_free(res);
   }
   psyncer_folder_inc_tasks(lfolderid);
-  free(vname);
+  pmem_free(PMEM_SUBSYS_OTHER, vname);
   return lfolderid;
 }
 
@@ -338,16 +339,16 @@ static void psync_sync_newsyncedfolder(psync_syncid_t syncid) {
     }
   } else
     psql_rollback();
-  free(localpath);
+  pmem_free(PMEM_SUBSYS_OTHER, localpath);
 }
 
 static void psync_do_sync_thread(void *ptr) {
   psync_sync_newsyncedfolder(*((psync_syncid_t *)ptr));
-  free(ptr);
+  pmem_free(PMEM_SUBSYS_OTHER, ptr);
 }
 
 void psyncer_create(psync_syncid_t syncid) {
-  psync_syncid_t *psid = malloc(sizeof(psync_syncid_t));
+  psync_syncid_t *psid = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_syncid_t));
   *psid = syncid;
   prun_thread1("syncer", psync_do_sync_thread, psid);
 }
@@ -470,8 +471,8 @@ re:
     folderid = pfolder_id_create(remotepath);
     if (unlikely(folderid == PSYNC_INVALID_FOLDERID)) {
       pdbg_logf(D_WARNING, "could not get folderid/create folder %s", remotepath);
-      free(localpath);
-      free(remotepath);
+      pmem_free(PMEM_SUBSYS_OTHER, localpath);
+      pmem_free(PMEM_SUBSYS_OTHER, remotepath);
       if (psync_error != PERROR_OFFLINE) {
         delete_delayed_sync(id);
         goto re;
@@ -486,8 +487,8 @@ re:
     psql_free(stmt);
     if (!urow) {
       psql_commit();
-      free(localpath);
-      free(remotepath);
+      pmem_free(PMEM_SUBSYS_OTHER, localpath);
+      pmem_free(PMEM_SUBSYS_OTHER, remotepath);
       goto re;
     }
     stmt = psql_prepare(
@@ -504,8 +505,8 @@ re:
     else
       syncid = -1;
     psql_free(stmt);
-    free(localpath);
-    free(remotepath);
+    pmem_free(PMEM_SUBSYS_OTHER, localpath);
+    pmem_free(PMEM_SUBSYS_OTHER, remotepath);
     if (!psql_commit() && syncid != -1) {
       ppathstatus_reload_syncs();
       psyncer_create(syncid);

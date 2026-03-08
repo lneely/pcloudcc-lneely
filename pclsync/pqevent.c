@@ -31,6 +31,7 @@
 
 #include "pfoldersync.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "plist.h"
 #include "pqevent.h"
 #include "prun.h"
@@ -322,9 +323,9 @@ static void proc_send_event(void *ptr) {
     callback(event->event, event->data);
 
     if (event->freedata)
-      free(event->data.ptr);
+      pmem_free(PMEM_SUBSYS_OTHER, event->data.ptr);
 
-    free(event);
+    pmem_free(PMEM_SUBSYS_OTHER, event);
   }
 }
 
@@ -372,7 +373,7 @@ void pqevent_queue_sync_event_id(psync_eventtype_t eventid, psync_syncid_t synci
     if (pdbg_unlikely(!remotepath))
       return;
     pqevent_queue_sync_event_path(eventid, syncid, localpath, remoteid, remotepath);
-    free(remotepath);
+    pmem_free(PMEM_SUBSYS_OTHER, remotepath);
   }
 }
 
@@ -391,7 +392,7 @@ void pqevent_queue_sync_event_path(psync_eventtype_t eventid, psync_syncid_t syn
     else
       slen = sizeof(psync_file_event_t);
     event =
-        (event_list_t *)malloc(sizeof(event_list_t) + slen + llen + rlen);
+        (event_list_t *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(event_list_t) + slen + llen + rlen);
     strct = (char *)(event + 1);
     lcopy = strct + slen;
     rcopy = lcopy + llen;
@@ -428,7 +429,7 @@ void pqevent_queue_eventid(psync_eventtype_t eventid) {
   if (eventthreadrunning) {
     event_list_t *event;
 
-    event = malloc(sizeof(event_list_t));
+    event = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(event_list_t));
     event->data.ptr = NULL;
     event->event = eventid;
     event->freedata = 0;
@@ -444,7 +445,7 @@ void pqevent_queue_event(psync_eventtype_t eventid, void *eventdata) {
   if (eventthreadrunning) {
     event_list_t *event;
 
-    event = malloc(sizeof(event_list_t));
+    event = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(event_list_t));
     event->data.ptr = eventdata;
     event->event = eventid;
     event->freedata = 1;
@@ -454,5 +455,5 @@ void pqevent_queue_event(psync_eventtype_t eventid, void *eventdata) {
     pthread_cond_signal(&eventcond);
     pthread_mutex_unlock(&eventmutex);
   } else
-    free(eventdata);
+    pmem_free(PMEM_SUBSYS_OTHER, eventdata);
 }

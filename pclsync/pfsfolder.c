@@ -38,6 +38,7 @@
 #include "pfsfolder.h"
 #include "pfstasks.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "psys.h"
 #include "pdbg.h"
 #include "psql.h"
@@ -65,7 +66,7 @@ static char *get_encname_for_folder(psync_fsfolderid_t folderid,
   name = putil_strndup(path, len);
   encname = pcryptofolder_fldencode_filename(enc, name);
   pcryptofolder_fldencoder_release(folderid, enc);
-  free(name);
+  pmem_free(PMEM_SUBSYS_OTHER, name);
   return encname;
 }
 
@@ -86,16 +87,16 @@ static psync_fspath_t *ret_folder_data(psync_fsfolderid_t folderid,
     encname = pcryptofolder_fldencode_filename(enc, name);
     pcryptofolder_fldencoder_release(folderid, enc);
     len = strlen(encname);
-    ret = (psync_fspath_t *)malloc(sizeof(psync_fspath_t) + len + 1);
+    ret = (psync_fspath_t *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_fspath_t) + len + 1);
     memcpy(ret + 1, encname, len + 1);
-    free(encname);
+    pmem_free(PMEM_SUBSYS_OTHER, encname);
     ret->folderid = folderid;
     ret->name = (char *)(ret + 1);
     ret->shareid = shareid;
     ret->permissions = permissions;
     ret->flags = flags;
   } else {
-    ret = malloc(sizeof(psync_fspath_t));
+    ret = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_fspath_t));
     ret->folderid = folderid;
     ret->name = name;
     ret->shareid = shareid;
@@ -117,7 +118,7 @@ char *pfs_fldr_get_decname(psync_fsfolderid_t folderid, const char *path,
   name = putil_strndup(path, len);
   decname = pcryptofolder_flddecode_filename(dec, name);
   pcryptofolder_flddecoder_release(folderid, dec);
-  free(name);
+  pmem_free(PMEM_SUBSYS_OTHER, name);
   return decname;
 }
 
@@ -216,7 +217,7 @@ psync_fspath_t *pfs_fldr_resolve_path(const char *path) {
       char *name = putil_strndup(ename, elen);
       if ((mk = pfs_task_find_mkdir(folder, name, 0))) {
         if (mk->flags & PSYNC_FOLDER_FLAG_INVISIBLE) {
-          free(name);
+          pmem_free(PMEM_SUBSYS_OTHER, name);
           break;
         }
         cfolderid = mk->folderid;
@@ -230,7 +231,7 @@ psync_fspath_t *pfs_fldr_resolve_path(const char *path) {
         check_userid(row[3], row[0], &shareid);
       } else
         hasit = 0;
-      free(name);
+      pmem_free(PMEM_SUBSYS_OTHER, name);
     } else {
       if (row) {
         cfolderid = row[0];
@@ -242,7 +243,7 @@ psync_fspath_t *pfs_fldr_resolve_path(const char *path) {
         hasit = 0;
     }
     if (ename != path)
-      free(ename);
+      pmem_free(PMEM_SUBSYS_OTHER, ename);
     if (!hasit)
       break;
     path += len;
@@ -318,7 +319,7 @@ psync_fsfolderid_t pfs_fldr_id_by_path(const char *path,
         hasit = 1;
       } else
         hasit = 0;
-      free(name);
+      pmem_free(PMEM_SUBSYS_OTHER, name);
     } else {
       if (row) {
         cfolderid = row[0];
@@ -328,7 +329,7 @@ psync_fsfolderid_t pfs_fldr_id_by_path(const char *path,
         hasit = 0;
     }
     if (ename != path)
-      free(ename);
+      pmem_free(PMEM_SUBSYS_OTHER, ename);
     if (!hasit)
       break;
     path += len;
@@ -405,7 +406,7 @@ psync_fsfolderid_t pfs_fldr_idperm_by_path(const char *path,
         hasit = 1;
       } else
         hasit = 0;
-      free(name);
+      pmem_free(PMEM_SUBSYS_OTHER, name);
     } else {
       if (row) {
         cfolderid = row[0];
@@ -416,7 +417,7 @@ psync_fsfolderid_t pfs_fldr_idperm_by_path(const char *path,
         hasit = 0;
     }
     if (ename != path)
-      free(ename);
+      pmem_free(PMEM_SUBSYS_OTHER, ename);
     if (!hasit)
       break;
     path += len;
