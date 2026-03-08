@@ -366,7 +366,7 @@ int handle_api_errors(sync_err_struct *err_struct) {
 
     event_data = pmem_malloc(PMEM_SUBSYS_UPLOAD, sizeof(event_data_struct));
     event_data->eventid = PEVENT_SYNC_RENAME_F;
-    event_data->str1 = strdup(err_struct->newName);
+    event_data->str1 = putil_strdup(err_struct->newName);
     event_data->str2 = folder;
     event_data->uint1 = err_struct->folderid;
     event_data->uint2 = err_struct->newparentfolderid;
@@ -422,7 +422,7 @@ static int task_renameremotefolder(psync_folderid_t folderid,
 
     pdiff_wake();
   } else {
-    err_struct.newName = strdup(newname);
+    err_struct.newName = putil_strdup(newname);
     err_struct.err = result;
     err_struct.err_msg =
         (char *)papi_find_result2(res, "error", PARAM_STR)->str;

@@ -3692,7 +3692,7 @@ static int pfs_do_start() {
   // Add user-specified FUSE options from environment variable
   const char *fuse_opts_env = getenv("PCLOUD_FUSE_OPTS");
   if (fuse_opts_env && fuse_opts_env[0] != '\0') {
-    char *fuse_opts = strdup(fuse_opts_env);
+    char *fuse_opts = putil_strdup(fuse_opts_env);
     if (fuse_opts) {
       char *saveptr = NULL;
       char *token = strtok_r(fuse_opts, ",", &saveptr);

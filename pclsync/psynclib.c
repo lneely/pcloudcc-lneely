@@ -2353,7 +2353,7 @@ int psync_create_backup(char *path, char **errMsg) {
   int res = 0, oParCnt = 0;
 
   if (path[0] == 0) {
-    *errMsg = strdup(PSYNC_BACKUP_PATH_EMPTY_MSG);
+    *errMsg = putil_strdup(PSYNC_BACKUP_PATH_EMPTY_MSG);
 
     return PSYNC_BACKUP_PATH_EMPTY_ERR;
   }

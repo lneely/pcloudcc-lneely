@@ -582,7 +582,7 @@ char *ptools_sfldr_by_syncid(uint64_t syncId) {
     return NULL;
   }
 
-  retName = strdup(syncName);
+  retName = putil_strdup(syncName);
 
   psql_free(res);
 
@@ -601,5 +601,5 @@ char *ptools_fldr_name_by_path(char *path) {
     path++;
   }
 
-  return strdup(folder);
+  return putil_strdup(folder);
 }

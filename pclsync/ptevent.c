@@ -46,8 +46,8 @@ void ptevent_process(event_data_struct *data) {
     event_data->eventid = data->eventid;
     event_data->uint1 = data->uint1;
     event_data->uint2 = data->uint2;
-    event_data->str1 = data->str1 ? strdup(data->str1) : NULL;
-    event_data->str2 = data->str2 ? strdup(data->str2) : NULL;
+    event_data->str1 = data->str1 ? putil_strdup(data->str1) : NULL;
+    event_data->str2 = data->str2 ? putil_strdup(data->str2) : NULL;
 
     prun_thread1("Data Event", proc_send_data_event, event_data);
   } else {
