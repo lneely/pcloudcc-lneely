@@ -6,6 +6,7 @@
 #include <sys/utsname.h>
 
 #include "plibs.h"
+#include "pmem.h"
 #include "ppath.h"
 #include "prand.h"
 #include "psettings.h"
@@ -133,7 +134,7 @@ void prand_seed(unsigned char *seed, const void *addent, size_t aelen,
     psync_lhash_update(&hctx, home, strlen(home));
     if (pdbg_likely(!stat(home, &st)))
       psync_lhash_update(&hctx, &st, sizeof(st));
-    free(home);
+    pmem_free(PMEM_SUBSYS_OTHER, home);
   }
   if (!fast) {
     pdbg_logf(D_NOTICE, "getting seed from database");
