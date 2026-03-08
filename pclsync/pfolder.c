@@ -32,6 +32,7 @@
 #include <pthread.h>
 #include <stddef.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "papi.h"
@@ -335,7 +336,7 @@ err:
 }
 
 char *psync_join_string_list(const char *sep, psync_list *lst, size_t *retlen) {
-  size_t slen, seplen, cnt;
+  size_t slen, seplen, cnt, total_size;
   string_list *e;
   char *ret, *str;
   slen = cnt = 0;
@@ -346,7 +347,11 @@ char *psync_join_string_list(const char *sep, psync_list *lst, size_t *retlen) {
   if (unlikely(!cnt))
     return putil_strdup("");
   seplen = strlen(sep);
-  ret = str = pmem_malloc(PMEM_SUBSYS_OTHER, slen + cnt * seplen + 1);
+  if (cnt != 0 && seplen > SIZE_MAX / cnt) {
+    return NULL;
+  }
+  total_size = slen + cnt * seplen + 1;
+  ret = str = pmem_malloc(PMEM_SUBSYS_OTHER, total_size);
   psync_list_for_each_element(e, lst, string_list, list) {
     memcpy(str, e->str, e->len);
     str += e->len;
@@ -747,7 +752,7 @@ pentry_t *pfolder_stat(const char *remotepath) {
   if (len == 0)
     folderid = 0;
   else {
-    cremotepath = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(char) * (len + 1));
+    cremotepath = pmem_malloc_array(PMEM_SUBSYS_OTHER, len + 1, sizeof(char));
     memcpy(cremotepath, remotepath, len + 1);
     cremotepath[len] = 0;
     folderid = pfolder_id(cremotepath);
