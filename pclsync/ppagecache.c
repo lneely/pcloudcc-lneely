@@ -3236,7 +3236,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
     } else
       pbuff = buf + i * PSYNC_FS_PAGE_SIZE - pageoff;
     if (!pbuff) {
-      pbuff = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(char) * apsize);
+      pbuff = pmem_malloc_array(PMEM_SUBSYS_CACHE, apsize, sizeof(char));
       if (!pbuff) {
         for (j = 0; j < i; j++)
           if (dp[j].freebuff)
