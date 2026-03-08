@@ -143,9 +143,12 @@ int RpcClient::readResponse(int fd, char **out, size_t *out_size) {
         msg->length < header_size ||
         msg->length > (uint64_t)total_read ||
         msg->length > POVERLAY_BUFSIZE) {
-        const char *error_msg = "Invalid response length";
-        *out = strdup(error_msg);
-        *out_size = strlen(error_msg) + 1;
+        char error_buf[256];
+        snprintf(error_buf, sizeof(error_buf), 
+                 "Invalid response length: total_read=%zd header_size=%zu msg->length=%lu BUFSIZE=%d",
+                 total_read, header_size, (unsigned long)msg->length, POVERLAY_BUFSIZE);
+        *out = strdup(error_buf);
+        *out_size = strlen(error_buf) + 1;
         return POVERLAY_READ_INVALID_RESPONSE;
     }
 

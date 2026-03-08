@@ -231,7 +231,7 @@ static void respond(rpc_message_t *request, rpc_message_t *response) {
     response->value[value_length] = '\0';
     pdbg_logf(D_WARNING, "Response message truncated to fit buffer");
   }
-  response->length = value_length + 1;
+  response->length = offsetof(rpc_message_t, value) + value_length + 1;
 }
 
 void prpc_main_loop() {
