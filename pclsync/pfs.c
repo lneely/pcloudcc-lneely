@@ -91,6 +91,7 @@ typedef off_t fuse_off_t;
 #define PSYNC_FS_ERR_MOVE_ACROSS_CRYPTO EXDEV
 
 static int shutdown_in_progress = 0;
+volatile sig_atomic_t shutdown_requested = 0;
 static struct fuse *psync_fuse = NULL;
 #if FUSE_USE_VERSION < 30
 static struct fuse_chan *psync_fuse_channel = NULL;
