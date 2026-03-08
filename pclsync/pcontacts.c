@@ -31,6 +31,7 @@
 #include "papi.h"
 #include "pfileops.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "pnetlibs.h"
 #include "psql.h"
 
@@ -70,7 +71,7 @@ int do_call_contactlist(result_visitor vis, void *param) {
   contacts = papi_find_result2(bres, "contacts", PARAM_ARRAY);
 
   if (!contacts->length) {
-    free(bres);
+    pmem_free(PMEM_SUBSYS_API, bres);
     pdbg_logf(D_WARNING, "Account_users returned empty result!\n");
     return -2;
   } else {
@@ -81,7 +82,7 @@ int do_call_contactlist(result_visitor vis, void *param) {
     psql_commit();
   }
 
-  free(bres);
+  pmem_free(PMEM_SUBSYS_API, bres);
   return 0;
 }
 
@@ -362,7 +363,7 @@ void cache_shares() {
     pdbg_logf(D_WARNING, "command listshares returned error code %u message %s",
           (unsigned)result, errorret);
     psync_process_api_error(result);
-    free(bres);
+    pmem_free(PMEM_SUBSYS_API, bres);
     return;
   }
 
@@ -407,5 +408,5 @@ void cache_shares() {
 
   psql_commit();
 
-  free(bres);
+  pmem_free(PMEM_SUBSYS_API, bres);
 }

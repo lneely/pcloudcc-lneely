@@ -34,6 +34,7 @@
 
 #include "pcache.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "plist.h"
 #include "psys.h"
 #include "ptimer.h"
@@ -80,8 +81,8 @@ static void cache_timer(psync_timer_t timer, void *ptr) {
   pthread_mutex_lock(&cachelocks[hash_to_lock(he->hash)]);
   psync_list_del(&he->list);
   pthread_mutex_unlock(&cachelocks[hash_to_lock(he->hash)]);
-  he->free(he->value);
-  free(he);
+  pmem_free(PMEM_SUBSYS_OTHER, he->value);
+  pmem_free(PMEM_SUBSYS_OTHER, he);
   ptimer_stop(timer);
 }
 
@@ -125,7 +126,7 @@ void *pcache_get(const char *key) {
     psync_list_del(&he->list);
     pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
     val = he->value;
-    free(he);
+    pmem_free(PMEM_SUBSYS_OTHER, he);
     return val;
   }
   pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
@@ -158,7 +159,7 @@ void pcache_add(const char *key, void *ptr, time_t freeafter,
   uint32_t h;
   h = compute_hash(key, &l);
   l++;
-  he = (cache_entry_t *)malloc(offsetof(cache_entry_t, key) + l);
+  he = (cache_entry_t *)pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(cache_entry_t, key) + l);
   he->value = ptr;
   he->free = freefunc;
   he->hash = h;
@@ -172,7 +173,7 @@ void pcache_add(const char *key, void *ptr, time_t freeafter,
                                                    !strcmp(key, he2->key) &&
                                                    ++l == maxkeys)) {
       pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
-      free(he);
+      pmem_free(PMEM_SUBSYS_OTHER, he);
       freefunc(ptr);
       //        pdbg_logf(D_NOTICE, "not adding key %s to cache as there already %u
       //        elements present", key, (unsigned int)maxkeys);
@@ -211,8 +212,8 @@ restart:
       continue;
     psync_list_del(&he->list);
     pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
-    he->free(he->value);
-    free(he);
+    pmem_free(PMEM_SUBSYS_OTHER, he->value);
+    pmem_free(PMEM_SUBSYS_OTHER, he);
     goto restart;
   }
   pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
@@ -228,8 +229,8 @@ void pcache_clean() {
       he = psync_list_element(l1, cache_entry_t, list);
       if (!ptimer_stop(he->timer)) {
         psync_list_del(l1);
-        he->free(he->value);
-        free(he);
+        pmem_free(PMEM_SUBSYS_OTHER, he->value);
+        pmem_free(PMEM_SUBSYS_OTHER, he);
       }
     }
     pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);
@@ -255,8 +256,8 @@ void pcache_clean_oneof(const char **prefixes, size_t cnt) {
         continue;
       if (!ptimer_stop(he->timer)) {
         psync_list_del(l1);
-        he->free(he->value);
-        free(he);
+        pmem_free(PMEM_SUBSYS_OTHER, he->value);
+        pmem_free(PMEM_SUBSYS_OTHER, he);
       }
     }
     pthread_mutex_unlock(&cachelocks[hash_to_lock(h)]);

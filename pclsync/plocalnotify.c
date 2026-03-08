@@ -42,6 +42,7 @@
 
 #include "pfoldersync.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "plist.h"
 #include "plocalnotify.h"
 #include "plocalscan.h"
@@ -99,7 +100,7 @@ static void add_dir_scan(localnotify_dir *dir, const char *path) {
     namelen = 255;
   if (namelen < sizeof(de->d_name) - 1)
     namelen = sizeof(de->d_name) - 1;
-  wch = (localnotify_watch *)malloc(offsetof(localnotify_watch, path) +
+  wch = (localnotify_watch *)pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(localnotify_watch, path) +
                                           pl + 1 + namelen + 1);
   wch->next = dir->watches[wid % WATCH_HASH];
   dir->watches[wid % WATCH_HASH] = wch;
@@ -109,8 +110,8 @@ static void add_dir_scan(localnotify_dir *dir, const char *path) {
   memcpy(wch->path, path, pl + 1);
   if (pdbg_likely(dh = opendir(path))) {
     entrylen = offsetof(struct dirent, d_name) + namelen + 1;
-    cpath = (char *)malloc(pl + namelen + 2);
-    entry = (struct dirent *)malloc(entrylen);
+    cpath = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, pl + namelen + 2);
+    entry = (struct dirent *)pmem_malloc(PMEM_SUBSYS_OTHER, entrylen);
     memcpy(cpath, path, pl);
     if (!pl || cpath[pl - 1] != '/')
       cpath[pl++] = '/';
@@ -124,8 +125,8 @@ static void add_dir_scan(localnotify_dir *dir, const char *path) {
           add_dir_scan(dir, cpath);
       }
     }
-    free(entry);
-    free(cpath);
+    pmem_free(PMEM_SUBSYS_OTHER, entry);
+    pmem_free(PMEM_SUBSYS_OTHER, cpath);
     closedir(dh);
   }
 }
@@ -143,7 +144,7 @@ static void add_syncid(psync_syncid_t syncid) {
     str = psync_get_lstring(row[0], &len);
     len++;
     dir =
-        (localnotify_dir *)malloc(offsetof(localnotify_dir, path) + len);
+        (localnotify_dir *)pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(localnotify_dir, path) + len);
     memcpy(dir->path, str, len);
     psql_free(res);
   } else {
@@ -167,7 +168,7 @@ static void add_syncid(psync_syncid_t syncid) {
 err2:
   close(dir->inotifyfd);
 err:
-  free(dir);
+  pmem_free(PMEM_SUBSYS_OTHER, dir);
 }
 
 static void del_syncid(psync_syncid_t syncid) {
@@ -182,13 +183,13 @@ static void del_syncid(psync_syncid_t syncid) {
       while (wch) {
         next = wch->next;
         inotify_rm_watch(dir->inotifyfd, wch->watchid);
-        free(wch);
+        pmem_free(PMEM_SUBSYS_OTHER, wch);
         wch = next;
       }
     }
     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, dir->inotifyfd, NULL);
     close(dir->inotifyfd);
-    free(dir);
+    pmem_free(PMEM_SUBSYS_OTHER, dir);
     return;
   }
 }
@@ -239,7 +240,7 @@ static uint32_t process_notification(localnotify_dir *dir) {
         if (wch->watchid == ev.wd) {
           *pwch = wch->next;
           inotify_rm_watch(dir->inotifyfd, wch->watchid);
-          free(wch);
+          pmem_free(PMEM_SUBSYS_OTHER, wch);
           break;
         } else {
           pwch = &wch->next;

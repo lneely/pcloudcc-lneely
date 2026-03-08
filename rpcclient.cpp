@@ -12,7 +12,15 @@
 #include "plibs.h"
 #include "pdbg.h"
 #include "prpc.h"
-#include "putil.h"
+
+// Note: rpcclient.cpp is a C/C++ boundary layer that returns memory
+// to control_tools.cpp which uses free(). Do NOT include putil.h
+// to avoid strdup redefinition issues.
+
+// Forward declare pmem_free for cleaning up prpc_sockpath() result
+extern "C" {
+  void pmem_free(int subsystem, void *ptr);
+}
 
 
 #define POVERLAY_BUFSIZE 512
@@ -135,9 +143,12 @@ int RpcClient::readResponse(int fd, char **out, size_t *out_size) {
         msg->length < header_size ||
         msg->length > (uint64_t)total_read ||
         msg->length > POVERLAY_BUFSIZE) {
-        const char *error_msg = "Invalid response length";
-        *out = strdup(error_msg);
-        *out_size = strlen(error_msg) + 1;
+        char error_buf[256];
+        snprintf(error_buf, sizeof(error_buf), 
+                 "Invalid response length: total_read=%zd header_size=%zu msg->length=%lu BUFSIZE=%d",
+                 total_read, header_size, (unsigned long)msg->length, POVERLAY_BUFSIZE);
+        *out = strdup(error_buf);
+        *out_size = strlen(error_buf) + 1;
         return POVERLAY_READ_INVALID_RESPONSE;
     }
 
@@ -188,7 +199,7 @@ int RpcClient::Call(int id, const char *path, char **errm, size_t *errmsz) {
 
   char *sockpath = prpc_sockpath();
   sockfd = this->connectSocket(sockpath, errm, errmsz);
-  free(sockpath);
+  pmem_free(0, sockpath); // PMEM_SUBSYS_OTHER = 0
   if (sockfd >= 0) {
     if ((result = this->writeRequest(sockfd, id, path, errm, errmsz)) == 0) {
       result = this->readResponse(sockfd, errm, errmsz);

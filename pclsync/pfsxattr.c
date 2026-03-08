@@ -40,6 +40,7 @@
 #include "pfstasks.h"
 #include "psql.h"
 #include "plibs.h"
+#include "pmem.h"
 
 // needed by pfs_xatr_set_thread_name
 extern PSYNC_THREAD const char *psync_thread_name; 
@@ -144,7 +145,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
   if (folder) {
     mk = pfs_task_find_mkdir(folder, fspath->name, 0);
     if (mk) {
-      free(fspath);
+      pmem_free(PMEM_SUBSYS_OTHER, fspath);
       pdbg_assertw(mk->folderid != 0);
       if (mk->folderid > 0)
         return folderid_to_objid(mk->folderid);
@@ -153,7 +154,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
     }
     cr = pfs_task_find_creat(folder, fspath->name, 0);
     if (cr) {
-      free(fspath);
+      pmem_free(PMEM_SUBSYS_OTHER, fspath);
       if (cr->fileid > 0)
         return fileid_to_objid(cr->fileid);
       else if (cr->fileid == 0)
@@ -183,7 +184,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
     checkfile = !pfs_task_find_unlink(folder, fspath->name, 0);
   }
   if (fspath->folderid < 0) {
-    free(fspath);
+    pmem_free(PMEM_SUBSYS_OTHER, fspath);
     pdbg_logf(D_NOTICE, "path %s not found in temporary folder", path);
     return -1;
   }
@@ -198,7 +199,7 @@ static int64_t xattr_get_object_id_locked(const char *path) {
       ret = -1;
     psql_free(res);
     if (ret != -1) {
-      free(fspath);
+      pmem_free(PMEM_SUBSYS_OTHER, fspath);
       return ret;
     }
   }
@@ -213,11 +214,11 @@ static int64_t xattr_get_object_id_locked(const char *path) {
       ret = -1;
     psql_free(res);
     if (ret != -1) {
-      free(fspath);
+      pmem_free(PMEM_SUBSYS_OTHER, fspath);
       return ret;
     }
   }
-  free(fspath);
+  pmem_free(PMEM_SUBSYS_OTHER, fspath);
   pdbg_logf(D_NOTICE, "path %s not found", path);
   return -1;
 }

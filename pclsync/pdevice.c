@@ -36,6 +36,7 @@
 #include <unistd.h>
 
 #include "pdevice.h"
+#include "pmem.h"
 #include "psettings.h"
 #include "putil.h"
 
@@ -61,7 +62,7 @@ char *pdevice_id() {
         path =
             putil_strcat("/sys/class/power_supply/", de->d_name, "/type", NULL);
         fd = open(path, O_RDONLY);
-        free(path);
+        pmem_free(PMEM_SUBSYS_OTHER, path);
         if (fd == -1)
           continue;
         if (read(fd, buf, 7) == 7 && !memcmp(buf, "Battery", 7)) {
@@ -81,7 +82,7 @@ char *pdevice_id() {
 char *pdevice_name() {
   char *osname = pdevice_get_os();
   char *ret = putil_strcat(osname, ", ", psync_software_name, NULL);
-  free(osname);
+  pmem_free(PMEM_SUBSYS_OTHER, osname);
   return ret;
 }
 

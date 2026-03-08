@@ -314,16 +314,16 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     arr = NULL;
     cnt = 0;
     alloc = 128;
-    arr = (binresult **)pmem_calloc_safe(alloc, sizeof(binresult *));
+    arr = (binresult **)pmem_malloc_array(PMEM_SUBSYS_API, alloc, sizeof(binresult *));
     if (!arr)
       return NULL;
     while (**indata != RPARAM_END) {
       if (cnt == alloc) {
         binresult **tmp;
         alloc *= 2;
-        tmp = (binresult **)realloc(arr, sizeof(binresult *) * alloc);
+        tmp = (binresult **)pmem_realloc(PMEM_SUBSYS_API, arr, sizeof(binresult *) * alloc);
         if (!tmp) {
-          free(arr);
+          pmem_free(PMEM_SUBSYS_API, arr);
           return NULL;
         }
         arr = tmp;
@@ -335,7 +335,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     ret->array = (struct _binresult **)*odata;
     *odata += sizeof(struct _binresult *) * cnt;
     memcpy(ret->array, arr, sizeof(struct _binresult *) * cnt);
-    free(arr);
+    pmem_free(PMEM_SUBSYS_API, arr);
     return ret;
   } else if (type == RPARAM_HASH) {
     struct _hashpair *arr;
@@ -347,17 +347,17 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     arr = NULL;
     cnt = 0;
     alloc = 32;
-    arr = (struct _hashpair *)pmem_calloc_safe(alloc, sizeof(struct _hashpair));
+    arr = (struct _hashpair *)pmem_malloc_array(PMEM_SUBSYS_API, alloc, sizeof(struct _hashpair));
     if (!arr)
       return NULL;
     while (**indata != RPARAM_END) {
       if (cnt == alloc) {
         struct _hashpair *tmp;
         alloc *= 2;
-        tmp = (struct _hashpair *)realloc(arr, sizeof(struct _hashpair) *
+        tmp = (struct _hashpair *)pmem_realloc(PMEM_SUBSYS_API, arr, sizeof(struct _hashpair) *
                                                          alloc);
         if (!tmp) {
-          free(arr);
+          pmem_free(PMEM_SUBSYS_API, arr);
           return NULL;
         }
         arr = tmp;
@@ -374,7 +374,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     ret->hash = (struct _hashpair *)*odata;
     *odata += sizeof(struct _hashpair) * cnt;
     memcpy(ret->hash, arr, sizeof(struct _hashpair) * cnt);
-    free(arr);
+    pmem_free(PMEM_SUBSYS_API, arr);
     return ret;
   } else if (type == RPARAM_DATA) {
     ret = (binresult *)(*odata);
@@ -399,17 +399,17 @@ static binresult *parse_result(unsigned char *data, size_t datalen) {
   retlen = calc_ret_len(&datac, &datalenc, &strcnt);
   if (retlen == -1)
     return NULL;
-  datac = pmem_calloc_safe(retlen, sizeof(unsigned char));
+  datac = pmem_malloc_array(PMEM_SUBSYS_API, retlen, sizeof(unsigned char));
   if (!datac)
     return NULL;
-  strings = pmem_calloc_safe(strcnt, sizeof(binresult *));
+  strings = pmem_malloc_array(PMEM_SUBSYS_API, strcnt, sizeof(binresult *));
   if (!strings) {
-    free(datac);
+    pmem_free(PMEM_SUBSYS_API, datac);
     return NULL;
   }
   strcnt = 0;
   res = do_parse_result(&data, &datac, strings, &strcnt);
-  free(strings);
+  pmem_free(PMEM_SUBSYS_API, strings);
   return res;
 }
 
@@ -429,19 +429,19 @@ binresult *papi_result(psock_t *sock) {
     return NULL;
   }
 
-  data = (unsigned char *)malloc(ressize);
+  data = (unsigned char *)pmem_malloc(PMEM_SUBSYS_API, ressize);
   if (!data) {
     pdbg_logf(D_ERROR, "Failed to allocate %u bytes for API response", ressize);
     return NULL;
   }
 
   if (pdbg_unlikely(psock_readall(sock, data, ressize) != ressize)) {
-    free(data);
+    pmem_free(PMEM_SUBSYS_API, data);
     return NULL;
   }
 
   res = parse_result(data, ressize);
-  free(data);
+  pmem_free(PMEM_SUBSYS_API, data);
 
   return res;
 }
@@ -458,18 +458,18 @@ binresult *papi_result_thread(psock_t *sock) {
               ressize, MAX_API_RESPONSE_SIZE);
     return NULL;
   }
-  data = (unsigned char *)malloc(ressize);
+  data = (unsigned char *)pmem_malloc(PMEM_SUBSYS_API, ressize);
   if (!data) {
     pdbg_logf(D_ERROR, "Failed to allocate %u bytes for API response", ressize);
     return NULL;
   }
   if (pdbg_unlikely(psock_readall_thread(sock, data, ressize) !=
                    ressize)) {
-    free(data);
+    pmem_free(PMEM_SUBSYS_API, data);
     return NULL;
   }
   res = parse_result(data, ressize);
-  free(data);
+  pmem_free(PMEM_SUBSYS_API, data);
   return res;
 }
 
@@ -482,7 +482,7 @@ void papi_rdr_alloc(async_result_reader *reader) {
 
 void papi_rdr_free(async_result_reader *reader) {
   if (reader->state == 1)
-    free(reader->data);
+    pmem_free(PMEM_SUBSYS_API, reader->data);
 }
 
 int papi_result_async(psock_t *sock, async_result_reader *reader) {
@@ -494,7 +494,7 @@ again:
     return ASYNC_RES_NEEDMORE;
   else if (rd == PSYNC_SOCKET_ERROR || rd == 0) {
     if (reader->state == 1)
-      free(reader->data);
+      pmem_free(PMEM_SUBSYS_API, reader->data);
     papi_rdr_alloc(reader);
     reader->result = NULL;
     return ASYNC_RES_READY;
@@ -512,7 +512,7 @@ again:
         papi_rdr_alloc(reader);
         return ASYNC_RES_READY;
       }
-      reader->data = (unsigned char *)malloc(reader->respsize);
+      reader->data = (unsigned char *)pmem_malloc(PMEM_SUBSYS_API, reader->respsize);
       if (!reader->data) {
         pdbg_logf(D_ERROR, "Failed to allocate %u bytes for API response",
                   reader->respsize);
@@ -524,7 +524,7 @@ again:
     } else {
       pdbg_assert(reader->state == 1);
       reader->result = parse_result(reader->data, reader->respsize);
-      free(reader->data);
+      pmem_free(PMEM_SUBSYS_API, reader->data);
       papi_rdr_alloc(reader);
       return ASYNC_RES_READY;
     }
@@ -557,7 +557,7 @@ unsigned char *papi_prepare(const char *command, size_t cmdlen,
   }
   if (pdbg_unlikely(plen > 0xffff))
     return NULL;
-  sdata = data = (unsigned char *)malloc(plen + 2 + additionalalloc);
+  sdata = data = (unsigned char *)pmem_malloc(PMEM_SUBSYS_API, plen + 2 + additionalalloc);
   if (!data)
     return NULL;
   memcpy(data, &plen, 2);
@@ -606,16 +606,16 @@ binresult *papi_send(psock_t *sock, const char *command,
 
   if (readres & 2) {
     if (pdbg_unlikely(psock_writeall_thread(sock, sdata, plen) != plen)) {
-      free(sdata);
+      pmem_free(PMEM_SUBSYS_API, sdata);
       return NULL;
     }
   } else {
     if (pdbg_unlikely(psock_writeall(sock, sdata, plen) != plen)) {
-      free(sdata);
+      pmem_free(PMEM_SUBSYS_API, sdata);
       return NULL;
     }
   }
-  free(sdata);
+  pmem_free(PMEM_SUBSYS_API, sdata);
   if (readres & 1) {
     return papi_result(sock);
   } else {

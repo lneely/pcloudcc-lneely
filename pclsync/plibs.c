@@ -38,6 +38,7 @@
 #include "pdbg.h"
 #include "pfile.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "ptimer.h"
 #include "putil.h"
 
@@ -87,7 +88,7 @@ int psync_rename_conflicted_file(const char *path) {
     dotidx--;
   if (!dotidx)
     dotidx = plen;
-  npath = (char *)malloc(plen + 32);
+  npath = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, plen + 32);
   memcpy(npath, path, dotidx);
   num = 0;
   while (1) {
@@ -101,7 +102,7 @@ int psync_rename_conflicted_file(const char *path) {
     if (stat(npath, &st)) {
       pdbg_logf(D_NOTICE, "renaming conflict %s to %s", path, npath);
       l = pfile_rename(path, npath);
-      free(npath);
+      pmem_free(PMEM_SUBSYS_OTHER, npath);
       return l;
     }
     num++;
@@ -112,12 +113,12 @@ static void run_after_sec(psync_timer_t timer, void *ptr) {
   struct run_after_ptr *fp = (struct run_after_ptr *)ptr;
   ptimer_stop(timer);
   fp->run(fp->ptr);
-  free(fp);
+  pmem_free(PMEM_SUBSYS_OTHER, fp);
 }
 
 void psync_run_after_sec(psync_run_after_t run, void *ptr, uint32_t seconds) {
   struct run_after_ptr *fp;
-  fp = malloc(sizeof(struct run_after_ptr));
+  fp = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(struct run_after_ptr));
   fp->run = run;
   fp->ptr = ptr;
   ptimer_register(run_after_sec, seconds, fp);
@@ -125,7 +126,7 @@ void psync_run_after_sec(psync_run_after_t run, void *ptr, uint32_t seconds) {
 
 static void proc_free_after(psync_timer_t timer, void *ptr) {
   ptimer_stop(timer);
-  free(ptr);
+  pmem_free(PMEM_SUBSYS_OTHER, ptr);
 }
 
 void psync_free_after_sec(void *ptr, uint32_t seconds) {

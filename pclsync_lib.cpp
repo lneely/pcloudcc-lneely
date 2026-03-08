@@ -41,6 +41,7 @@
 
 #include "pclsync/pcryptofolder.h"
 #include "pclsync/pfoldersync.h"
+#include "pclsync/pmem.h"
 #include "pclsync/prpc.h"
 #include "pclsync/psynclib.h"
 #include "pclsync/pshm.h"
@@ -203,8 +204,8 @@ void clib::pclsync_lib::read_tfa_code(bool auto_sms)
                  "pcloudcc: 2FA required. SMS sent to +%s %s. "
                  "Provide code with: echo 'tfa CODE' | pcloudcc -k",
                  country_code, phone_number);
-          free(country_code);
-          free(phone_number);
+          pmem_free(PMEM_SUBSYS_OTHER, country_code);
+          pmem_free(PMEM_SUBSYS_OTHER, phone_number);
         } else {
           syslog(LOG_NOTICE,
                  "pcloudcc: 2FA required. SMS sent. "
@@ -243,8 +244,8 @@ void clib::pclsync_lib::read_tfa_code(bool auto_sms)
     if (result == 0) {
       if (country_code && phone_number) {
         std::cout << "SMS sent to +" << country_code << " " << phone_number << std::endl;
-        free(country_code);
-        free(phone_number);
+        pmem_free(PMEM_SUBSYS_OTHER, country_code);
+        pmem_free(PMEM_SUBSYS_OTHER, phone_number);
       } else {
         std::cout << "SMS sent successfully" << std::endl;
       }
@@ -430,7 +431,7 @@ static void status_change(pstatus_t *status) {
   static int cryptocheck = 0;
 
   char *err;
-  err = (char *)malloc(1024);
+  err = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, 1024);
 
   uint32_t cur_status = __atomic_load_n(&status->status, __ATOMIC_RELAXED);
   std::cout << "Down: " << status->downloadstr << "| Up: " << status->uploadstr
@@ -498,7 +499,7 @@ static void status_change(pstatus_t *status) {
   }
 
   if (err) {
-    free(err);
+    pmem_free(PMEM_SUBSYS_OTHER, err);
   }
 }
 
@@ -646,7 +647,7 @@ int clib::pclsync_lib::list_sync_folders(const char *unused) {
   pshm_write(folders, folderssz);
   pthread_mutex_unlock(&mtx);
 
-  free(folders);
+  pmem_free(PMEM_SUBSYS_OTHER, folders);
 
   return 0;
 }
@@ -695,10 +696,10 @@ int clib::pclsync_lib::init() {
       std::cout << "logged in with user " << username_old << ", not "
                 << username_ << ", unlinking" << std::endl;
       psync_unlink();
-      free(username_old);
+      pmem_free(PMEM_SUBSYS_OTHER, username_old);
       return 2;
     }
-    free(username_old);
+    pmem_free(PMEM_SUBSYS_OTHER, username_old);
   }
 
   prpc_register(STARTCRYPTO, &start_crypto);

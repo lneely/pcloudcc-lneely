@@ -124,7 +124,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
     tpCnt = mpCnt; // Manadatory parameters only.
   }
 
-  paramsLocal = (binparam *)malloc(
+  paramsLocal = (binparam *)pmem_malloc(PMEM_SUBSYS_API, 
       (tpCnt) * sizeof(binparam)); // Allocate size for all parameters.
 
   // Set the mandatory pramaters.
@@ -136,7 +136,7 @@ int ptools_create_backend_event(const char *binapi, const char *category,
   paramsLocal[5] = (binparam)PAPI_NUM(EPARAM_TIME, etime);
 
   if (pCnt > 0) {
-    keyParams = (char *)pmem_calloc_safe(pCnt, 258);
+    keyParams = (char *)pmem_malloc_array(PMEM_SUBSYS_OTHER, pCnt, 258);
     if (!keyParams) {
       return -1;
     }
@@ -226,8 +226,8 @@ int ptools_create_backend_event(const char *binapi, const char *category,
   res = papi_send(sock, EVENT_WS, strlen(EVENT_WS), paramsLocal, tpCnt,
                         -1, 1);
 
-  free(keyParams);
-  free(paramsLocal);
+  pmem_free(PMEM_SUBSYS_API, keyParams);
+  pmem_free(PMEM_SUBSYS_API, paramsLocal);
 
   if (pdbg_unlikely(!res)) {
     psock_close(sock);
@@ -269,11 +269,11 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
   uint64_t result;
 
   if (totalParCnt > 0) {
-    localParams = (binparam *)malloc(
+    localParams = (binparam *)pmem_malloc(PMEM_SUBSYS_API, 
         (totalParCnt) *
         sizeof(binparam)); // Allocate size for all required parameters.
   } else {
-    localParams = (binparam *)malloc(sizeof(binparam));
+    localParams = (binparam *)pmem_malloc(PMEM_SUBSYS_API, sizeof(binparam));
   }
 
   // Add required parameters to the structure
@@ -349,7 +349,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
   res = papi_send(sock, wsPath, strlen(wsPath), localParams, totalParCnt,
                         -1, 1);
 
-  free(localParams);
+  pmem_free(PMEM_SUBSYS_API, localParams);
 
   if (pdbg_unlikely(!res)) {
     psock_close(sock);
@@ -375,7 +375,7 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
     if (strlen(payloadName) > 0) {
       payload = (binresult *)papi_find_result2(res, payloadName, PARAM_HASH);
 
-      *resData = (binresult *)pmem_calloc_safe(payload->length, sizeof(binresult));
+      *resData = (binresult *)pmem_malloc_array(PMEM_SUBSYS_OTHER, payload->length, sizeof(binresult));
       if (!*resData) {
         return -1;
       }
@@ -457,7 +457,7 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
   int intRes;
   int syncCnt = 0;
 
-  errMsg = (char *)pmem_calloc_safe(1024, sizeof(char));
+  errMsg = (char *)pmem_malloc_array(PMEM_SUBSYS_OTHER, 1024, sizeof(char));
   if (!errMsg) {
     return;
   }
@@ -474,7 +474,7 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
 
     if (syncCnt < 1) {
       pdbg_logf(D_NOTICE, "No syncs, skip the event.");
-      free(errMsg);
+      pmem_free(PMEM_SUBSYS_API, errMsg);
       return;
     }
 
@@ -496,7 +496,7 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
     psql_run_free(sql);
   }
 
-  free(errMsg);
+  pmem_free(PMEM_SUBSYS_API, errMsg);
 }
 
 int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
@@ -525,7 +525,7 @@ int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
 
   /* Free errPtr before reuse to avoid leak if first call allocated it */
   if (errPtr) {
-    free(errPtr);
+    pmem_free(PMEM_SUBSYS_API, errPtr);
     errPtr = NULL;
   }
 
@@ -542,7 +542,7 @@ int ptools_set_backend_file_dates(uint64_t fileid, time_t ctime, time_t mtime) {
   pdbg_logf(D_NOTICE, "mTime res: [%d]", callRes);
 
   if (errPtr)
-    free(errPtr);
+    pmem_free(PMEM_SUBSYS_API, errPtr);
 
   return callRes;
 }
@@ -582,7 +582,7 @@ char *ptools_sfldr_by_syncid(uint64_t syncId) {
     return NULL;
   }
 
-  retName = strdup(syncName);
+  retName = putil_strdup(syncName);
 
   psql_free(res);
 
@@ -601,5 +601,5 @@ char *ptools_fldr_name_by_path(char *path) {
     path++;
   }
 
-  return strdup(folder);
+  return putil_strdup(folder);
 }

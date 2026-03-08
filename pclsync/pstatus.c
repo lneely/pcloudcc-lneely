@@ -36,6 +36,7 @@
 #include "pfile.h"
 #include "pfstasks.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "prunthrottled.h"
 #include "psettings.h"
 #include "psql.h"
@@ -228,7 +229,7 @@ void pstatus_upload_recalc() {
       else
         bytestou += fsize;
     }
-    free(filename);
+    pmem_free(PMEM_SUBSYS_OTHER, filename);
   }
   psql_free(res);
   __atomic_store_n(&psync_status.filestoupload, filestou, __ATOMIC_RELAXED);

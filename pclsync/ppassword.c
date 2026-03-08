@@ -33,6 +33,7 @@
 #include <string.h>
 
 #include "ppassword.h"
+#include "pmem.h"
 #include "pdbg.h"
 #include "ppassworddict.h"
 #include "putil.h"
@@ -320,8 +321,8 @@ uint64_t ppassword_score(const char *cpassword) {
   }
   if (!plen)
     return score;
-  lpwd = malloc(sizeof(unsigned char) * plen);
-  ldpwd = malloc(sizeof(unsigned char) * plen);
+  lpwd = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(unsigned char) * plen);
+  ldpwd = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(unsigned char) * plen);
   for (nlen = 0; nlen < plen; nlen++) {
     lpwd[nlen] = tolower(password[nlen]);
     if (lpwd[nlen] == '0')
@@ -348,8 +349,8 @@ uint64_t ppassword_score(const char *cpassword) {
   num = score_variants(password, lpwd, ldpwd, plen);
   putil_wipe(lpwd, plen);
   putil_wipe(ldpwd, plen);
-  free(lpwd);
-  free(ldpwd);
+  pmem_free(PMEM_SUBSYS_OTHER, lpwd);
+  pmem_free(PMEM_SUBSYS_OTHER, ldpwd);
   mul_score(num);
   return score;
 }

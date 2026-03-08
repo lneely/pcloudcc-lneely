@@ -37,6 +37,7 @@
 #include "pfile.h"
 #include "pfscrypto.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "ppagecache.h"
 #include "ppath.h"
 #include "prun.h"
@@ -561,7 +562,7 @@ pfs_crypto_set_sector_log_offset(psync_openfile_t *of,
       return;
     }
   }
-  ntr = malloc(sizeof(psync_sector_inlog_t));
+  ntr = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_sector_inlog_t));
   *pe = &ntr->tree;
   ntr->sectorid = sectorid;
   ntr->logoffset = offset;
@@ -1088,16 +1089,16 @@ static int pfs_crypto_do_finalize_log(psync_openfile_t *of, int fullsync) {
                                                   O_CREAT | O_TRUNC)) ==
                    INVALID_HANDLE_VALUE) ||
       pdbg_unlikely(pfs_crpt_init_log(of))) {
-    free(olog);
-    free(flog);
+    pmem_free(PMEM_SUBSYS_OTHER, olog);
+    pmem_free(PMEM_SUBSYS_OTHER, flog);
     return -EIO;
   }
   ptree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t, tree, free);
   of->sectorsinlog = PSYNC_TREE_EMPTY;
   ret = pfs_crypto_log_flush_and_process(of, flog, 0, 1);
   pfile_delete(flog);
-  free(olog);
-  free(flog);
+  pmem_free(PMEM_SUBSYS_OTHER, olog);
+  pmem_free(PMEM_SUBSYS_OTHER, flog);
   return pdbg_return_neg(ret);
 }
 
@@ -1593,8 +1594,8 @@ retry:
     if (!icnt)
       psync_interval_tree_free(needtodwl);
     else {
-      ranges = malloc(sizeof(psync_pagecache_read_range) * icnt);
-      tmpbuf = malloc(sizeof(char) * isize);
+      ranges = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_pagecache_read_range) * icnt);
+      tmpbuf = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(char) * isize);
       icnt = 0;
       isize = 0;
       itr = psync_interval_tree_get_first(needtodwl);
@@ -1613,8 +1614,8 @@ retry:
       // we are unlocked now
       pfs_lock_file(of);
       if (unlikely(ret)) {
-        free(ranges);
-        free(tmpbuf);
+        pmem_free(PMEM_SUBSYS_OTHER, ranges);
+        pmem_free(PMEM_SUBSYS_OTHER, tmpbuf);
         pdbg_logf(D_NOTICE, "downloading of ranges failed");
         return ret;
       }
@@ -1633,8 +1634,8 @@ retry:
                 (unsigned long)ranges[l].offset,
                 (unsigned long)(ranges[l].offset + ranges[l].size),
                 (unsigned long)itr->from, (unsigned long)itr->to);
-          free(ranges);
-          free(tmpbuf);
+          pmem_free(PMEM_SUBSYS_OTHER, ranges);
+          pmem_free(PMEM_SUBSYS_OTHER, tmpbuf);
           goto retry;
         }
         pdbg_logf(D_NOTICE, "wrote %u bytes to offset %lu",
@@ -1652,8 +1653,8 @@ retry:
       }
       // we do NOT need to fsync of->datafile, as we wrote to positions that
       // were empty
-      free(ranges);
-      free(tmpbuf);
+      pmem_free(PMEM_SUBSYS_OTHER, ranges);
+      pmem_free(PMEM_SUBSYS_OTHER, tmpbuf);
       if (unlikely(ret))
         return ret;
     }
@@ -1777,7 +1778,7 @@ retry:
            ptree_element(tr, psync_sector_inlog_t, tree)->sectorid >
                ptree_element(ntr, psync_sector_inlog_t, tree)->sectorid);
     ptree_del(&of->sectorsinlog, tr);
-    free(tr);
+    pmem_free(PMEM_SUBSYS_OTHER, tr);
     tr = ntr;
   }
   ret = pfs_crypto_write_newfile_full_sector(of, buf, lastsectorid,
@@ -1859,7 +1860,7 @@ static void pfs_extender_thread(void *ptr) {
   of->extender = NULL;
   pthread_mutex_unlock(&of->mutex);
   pthread_cond_destroy(&ext->cond);
-  free(ext);
+  pmem_free(PMEM_SUBSYS_OTHER, ext);
   pfs_dec_of_refcnt(of);
 }
 
@@ -1869,7 +1870,7 @@ static int pfs_crypto_run_extender(psync_openfile_t *of, uint64_t size) {
   pdbg_assert(!of->extender);
   pdbg_logf(D_NOTICE, "will run extender thread to extend from %lu to %lu",
         (unsigned long)of->currentsize, (unsigned long)size);
-  ext = malloc(sizeof(psync_enc_file_extender_t));
+  ext = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_enc_file_extender_t));
   pthread_cond_init(&ext->cond, NULL);
   ext->extendto = size;
   ext->extendedto = of->currentsize;
@@ -2079,7 +2080,7 @@ static void pfs_crypto_check_file(void *ptr, ppath_fast_stat *st) {
     path = putil_strcat((const char *)ptr, "/", st->name,
                         NULL);
     pfs_crypto_check_log(path, st->name);
-    free(path);
+    pmem_free(PMEM_SUBSYS_OTHER, path);
   }
 }
 

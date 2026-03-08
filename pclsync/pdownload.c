@@ -37,6 +37,7 @@
 #include "pdownload.h"
 #include "pfoldersync.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "plocalscan.h"
 #include "pnetlibs.h"
 #include "pp2p.h"
@@ -162,8 +163,8 @@ static void do_move(void *ptr, ppath_stat *st) {
   oldpath = putil_strcat(arr[0], st->name, NULL);
   newpath = putil_strcat(arr[1], st->name, NULL);
   pfile_rename(oldpath, newpath);
-  free(newpath);
-  free(oldpath);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, newpath);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, oldpath);
 }
 
 static int move_folder_contents(const char *oldpath, const char *newpath) {
@@ -243,7 +244,7 @@ static int call_func_for_folder(psync_folderid_t localfolderid,
       psyncer_folder_dec_tasks(localfolderid);
       pdbg_logf(D_NOTICE, "%s %s", debug, localpath);
     }
-    free(localpath);
+    pmem_free(PMEM_SUBSYS_DOWNLOAD, localpath);
   } else {
     pdbg_logf(D_ERROR, "could not get path for local folder id %lu, syncid %u",
           (long unsigned)localfolderid, (unsigned)syncid);
@@ -270,7 +271,7 @@ static int call_func_for_folder_name(psync_folderid_t localfolderid,
       psyncer_folder_dec_tasks(localfolderid);
       pdbg_logf(D_NOTICE, "%s %s", debug, localpath);
     }
-    free(localpath);
+    pmem_free(PMEM_SUBSYS_DOWNLOAD, localpath);
   } else {
     pdbg_logf(D_ERROR, "could not get path for local folder id %lu, syncid %u",
           (long unsigned)localfolderid, (unsigned)syncid);
@@ -376,7 +377,7 @@ static int task_renamefolder(psync_syncid_t newsyncid,
   newpath = pfolder_lpath_lfldr(localfolderid, newsyncid, NULL);
   if (unlikely(!newpath)) {
     psql_rollback();
-    free(oldpath);
+    pmem_free(PMEM_SUBSYS_DOWNLOAD, oldpath);
     pdbg_logf(D_ERROR, "could not get local path for folder id %lu",
           (unsigned long)localfolderid);
     return 0;
@@ -391,8 +392,8 @@ static int task_renamefolder(psync_syncid_t newsyncid,
                            folderid);
     pdbg_logf(D_NOTICE, "local folder renamed from %s to %s", oldpath, newpath);
   }
-  free(newpath);
-  free(oldpath);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, newpath);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, oldpath);
   return ret;
 }
 
@@ -560,6 +561,10 @@ static int rename_and_create_local(download_task_t *dt, unsigned char *checksum,
   return 0;
 }
 
+static void free_download_range_list(psync_range_list_t *elem) {
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, elem);
+}
+
 static int task_download_file(download_task_t *dt) {
   binparam params[] = {PAPI_STR("auth", psync_my_auth),
                        PAPI_NUM("fileid", dt->dwllist.fileid)};
@@ -668,7 +673,7 @@ static int task_download_file(download_task_t *dt) {
         pdbg_logf(D_NOTICE, "file %s copied from %s", dt->localname, tmpold);
     } else
       pdbg_logf(D_WARNING, "failed to copy %s from %s", dt->localname, tmpold);
-    free(tmpold);
+    pmem_free(PMEM_SUBSYS_DOWNLOAD, tmpold);
     tmpold = NULL;
     if (pdbg_likely(rt == PSYNC_NET_OK))
       return 0;
@@ -702,10 +707,10 @@ static int task_download_file(download_task_t *dt) {
     pdbg_logf(D_WARNING, "got error %lu from getfilelink", (long unsigned)result);
     psync_process_api_error(result);
     if (psync_handle_api_result(result) == PSYNC_NET_TEMPFAIL) {
-      free(res);
+      pmem_free(PMEM_SUBSYS_DOWNLOAD, res);
       return -1;
     } else {
-      free(res);
+      pmem_free(PMEM_SUBSYS_DOWNLOAD, res);
       return 0;
     }
   }
@@ -720,7 +725,7 @@ static int task_download_file(download_task_t *dt) {
           putil_strcat(dt->localpath, "/", dt->filename,
                        "-old", PSYNC_APPEND_PARTIAL_FILES, NULL);
       if (pfile_rename_overwrite(dt->tmpname, tmpold)) {
-        free(tmpold);
+        pmem_free(PMEM_SUBSYS_DOWNLOAD, tmpold);
         tmpold = NULL;
       } else
         oldfiles[oldcnt++] = tmpold;
@@ -742,7 +747,7 @@ static int task_download_file(download_task_t *dt) {
   requestpath = papi_find_result2(res, "path", PARAM_STR)->str;
   putil_slprintf(cookie, sizeof(cookie), "Cookie: dwltag=%s\015\012",
                  papi_find_result2(res, "dwltag", PARAM_STR)->str);
-  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = pmem_malloc(PMEM_SUBSYS_DOWNLOAD, PSYNC_COPY_BUFFER_SIZE);
   http = NULL;
   psync_hash_init(&hashctx);
   psync_list_for_each_element(range, &ranges, psync_range_list_t, list) {
@@ -837,7 +842,7 @@ static int task_download_file(download_task_t *dt) {
   }
   if (pdbg_unlikely(pfile_sync(fd)))
     goto err2;
-  free(buff);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, buff);
   psync_hash_final(localhashbin, &hashctx);
   if (pdbg_unlikely(pfile_close(fd)))
     goto err0;
@@ -862,27 +867,27 @@ static int task_download_file(download_task_t *dt) {
   //  fileid);
   pdbg_logf(D_NOTICE, "file downloaded %s", dt->localname);
   pdbg_write_fs_event("file downloaded %s", dt->localname);
-  psync_list_for_each_element_call(&ranges, psync_range_list_t, list, free);
+  psync_list_for_each_element_call(&ranges, psync_range_list_t, list, free_download_range_list);
   if (tmpold) {
     pfile_delete(tmpold);
-    free(tmpold);
+    pmem_free(PMEM_SUBSYS_DOWNLOAD, tmpold);
   }
-  free(res);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, res);
   return 0;
 err2:
   psync_hash_final(localhashbin, &hashctx); /* just in case */
-  free(buff);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, buff);
   if (http)
     psync_http_close(http);
 err1:
   pfile_close(fd);
 err0:
-  psync_list_for_each_element_call(&ranges, psync_range_list_t, list, free);
+  psync_list_for_each_element_call(&ranges, psync_range_list_t, list, free_download_range_list);
   if (tmpold) {
     pfile_delete(tmpold);
-    free(tmpold);
+    pmem_free(PMEM_SUBSYS_DOWNLOAD, tmpold);
   }
-  free(res);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, res);
   return -1;
 }
 
@@ -910,7 +915,7 @@ static int task_delete_file(psync_syncid_t syncid, psync_fileid_t fileid,
               (int)errno);
         if (errno == EBUSY || errno == EROFS) {
           ret = -1;
-          free(name);
+          pmem_free(PMEM_SUBSYS_DOWNLOAD, name);
           continue;
         }
       } else
@@ -919,7 +924,7 @@ static int task_delete_file(psync_syncid_t syncid, psync_fileid_t fileid,
       //      events are not fully implemented anyway
       //      pqevent_queue_sync_event_path(PEVENT_LOCAL_FILE_DELETED, row[1], name,
       //      fileid, remotepath);
-      free(name);
+      pmem_free(PMEM_SUBSYS_DOWNLOAD, name);
     }
     stmt = psql_prepare("DELETE FROM localfile WHERE id=?");
     psql_bind_uint(stmt, 1, row[0]);
@@ -972,7 +977,7 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
     return 0;
   oldpath = pfolder_lpath_lfile(lfileid, NULL);
   if (pdbg_unlikely(!oldpath)) {
-    free(newfolder);
+    pmem_free(PMEM_SUBSYS_DOWNLOAD, newfolder);
     return 0;
   }
   newpath = putil_strcat(newfolder, "/", newname, NULL);
@@ -1003,9 +1008,9 @@ static int task_rename_file(psync_syncid_t oldsyncid, psync_syncid_t newsyncid,
     }
     psync_resume_localscan();
   }
-  free(newpath);
-  free(oldpath);
-  free(newfolder);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, newpath);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, oldpath);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, newfolder);
   return ret;
 }
 
@@ -1038,10 +1043,10 @@ static void free_download_task(download_task_t *dt) {
   }
   if (dt->lock)
     psync_unlock_file(dt->lock);
-  free(dt->localpath);
-  free(dt->localname);
-  free(dt->tmpname);
-  free(dt);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, dt->localpath);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, dt->localname);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, dt->tmpname);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, dt);
 }
 
 static void free_task_timer_thread(void *ptr) {
@@ -1202,7 +1207,7 @@ static int task_run_download_file(uint64_t taskid, psync_syncid_t syncid,
   tmpname = putil_strcat(localpath, "/", filename,
                          PSYNC_APPEND_PARTIAL_FILES, NULL);
   len = strlen(filename);
-  dt = (download_task_t *)malloc(offsetof(download_task_t, filename) +
+  dt = (download_task_t *)pmem_malloc(PMEM_SUBSYS_DOWNLOAD, offsetof(download_task_t, filename) +
                                        len + 1);
   memset(dt, 0, offsetof(download_task_t, filename));
   dt->taskid = taskid;
@@ -1341,7 +1346,7 @@ static void task_del_folder_rec_do(const char *localpath,
                       psync_get_string(vrow[1]), NULL);
     pdbg_logf(D_NOTICE, "deleting %s", nm);
     pfile_delete(nm);
-    free(nm);
+    pmem_free(PMEM_SUBSYS_DOWNLOAD, nm);
   }
   psql_free(res);
   res = psql_prepare(
@@ -1357,7 +1362,7 @@ static void task_del_folder_rec_do(const char *localpath,
     nm = putil_strcat(localpath, "/",
                       psync_get_string(vrow[1]), NULL);
     task_del_folder_rec_do(nm, psync_get_number(vrow[0]), syncid);
-    free(nm);
+    pmem_free(PMEM_SUBSYS_DOWNLOAD, nm);
   }
   psql_free(res);
   res = psql_prepare(
@@ -1467,7 +1472,7 @@ static int download_task(uint64_t taskid, uint32_t type, psync_syncid_t syncid,
     pdbg_logf(D_WARNING, "task of type %u, syncid %u, id %lu localid %lu failed",
           (unsigned)type, (unsigned)syncid, (unsigned long)itemid,
           (unsigned long)localitemid);
-  free(vname);
+  pmem_free(PMEM_SUBSYS_DOWNLOAD, vname);
   return res;
 }
 
@@ -1499,7 +1504,7 @@ static void download_thread() {
         }
       } else if (type != PSYNC_DOWNLOAD_FILE)
         psys_sleep_milliseconds(PSYNC_SLEEP_ON_FAILED_DOWNLOAD);
-      free(row);
+      pmem_free(PMEM_SUBSYS_DOWNLOAD, row);
       continue;
     }
 
@@ -1594,7 +1599,7 @@ download_hashes_t *pdownload_get_hashes() {
   cnt = 0;
   pthread_mutex_lock(&current_downloads_mutex);
   psync_list_for_each_element(dwl, &downloads, download_list_t, list) cnt++;
-  ret = (download_hashes_t *)malloc(
+  ret = (download_hashes_t *)pmem_malloc(PMEM_SUBSYS_DOWNLOAD, 
       offsetof(download_hashes_t, hashes) +
       sizeof(psync_hex_hash) * cnt);
   cnt = 0;

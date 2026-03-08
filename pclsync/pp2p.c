@@ -39,6 +39,7 @@
 #include "pfile.h"
 #include "pfoldersync.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "pnetlibs.h"
 #include "pp2p.h"
 #include "prun.h"
@@ -199,11 +200,11 @@ static int is_downloading(const unsigned char *hashstart,
     if (!memcmp(hashhex, genhash, PSYNC_HASH_DIGEST_HEXLEN)) {
       if (realhash)
         memcpy(realhash, hashsource, PSYNC_HASH_DIGEST_HEXLEN);
-      free(hashes);
+      pmem_free(PMEM_SUBSYS_OTHER, hashes);
       return 1;
     }
   }
-  free(hashes);
+  pmem_free(PMEM_SUBSYS_OTHER, hashes);
   return 0;
 }
 
@@ -313,7 +314,7 @@ static int check_token(char *token, uint32_t tlen, unsigned char *key,
   }
   psync_apipool_release(api);
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
   return result ? 0 : 1;
 }
 
@@ -333,7 +334,7 @@ static void psync_p2p_tcphandler(void *ptr) {
   uint32_t keylen, enctype;
   unsigned char hashhex[PSYNC_HASH_DIGEST_HEXLEN], buff[4096];
   sock = *((int *)ptr);
-  free(ptr);
+  pmem_free(PMEM_SUBSYS_OTHER, ptr);
   pdbg_logf(D_NOTICE, "got tcp connection");
   if (pdbg_unlikely(socket_read_all(sock, &packet, sizeof(packet))))
     goto err0;
@@ -350,20 +351,20 @@ static void psync_p2p_tcphandler(void *ptr) {
   binpubrsa = pssl_alloc_binary_rsa(packet.keylen);
   if (pdbg_unlikely(
           socket_read_all(sock, binpubrsa->data, binpubrsa->datalen))) {
-    free(binpubrsa);
+    pmem_free(PMEM_SUBSYS_OTHER, binpubrsa);
     goto err0;
   }
-  token = malloc(sizeof(char) * packet.tokenlen);
+  token = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(char) * packet.tokenlen);
   if (pdbg_unlikely(socket_read_all(sock, token, packet.tokenlen)) ||
       pdbg_unlikely(!check_token(token, packet.tokenlen, binpubrsa->data,
                                 packet.keylen, hashhex))) {
-    free(binpubrsa);
-    free(token);
+    pmem_free(PMEM_SUBSYS_OTHER, binpubrsa);
+    pmem_free(PMEM_SUBSYS_OTHER, token);
     goto err0;
   }
-  free(token);
+  pmem_free(PMEM_SUBSYS_OTHER, token);
   pubrsa = prsa_binary_to_public(binpubrsa);
-  free(binpubrsa);
+  pmem_free(PMEM_SUBSYS_OTHER, binpubrsa);
   if (pdbg_unlikely(pubrsa == PSYNC_INVALID_RSA))
     goto err0;
   localpath = pfolder_lpath_lfile(localfileid, NULL);
@@ -371,7 +372,7 @@ static void psync_p2p_tcphandler(void *ptr) {
     goto err0;
   fd = pfile_open(localpath, O_RDONLY, 0);
   pdbg_logf(D_NOTICE, "sending file %s to peer", localpath);
-  free(localpath);
+  pmem_free(PMEM_SUBSYS_OTHER, localpath);
   if (fd == INVALID_HANDLE_VALUE) {
     pdbg_logf(D_WARNING, "could not open local file %lu",
           (unsigned long)localfileid);
@@ -390,13 +391,13 @@ static void psync_p2p_tcphandler(void *ptr) {
           socket_write_all(sock, &enctype, sizeof(enctype)) ||
           socket_write_all(sock, encaeskey->data, encaeskey->datalen))) {
     if (encaeskey != PSYNC_INVALID_ENC_SYM_KEY)
-      free(encaeskey);
+      pmem_free(PMEM_SUBSYS_OTHER, encaeskey);
     if (encoder != PSYNC_CRYPTO_INVALID_ENCODER)
       pcrypto_ctr_encdec_free(encoder);
     pfile_close(fd);
     goto err0;
   }
-  free(encaeskey);
+  pmem_free(PMEM_SUBSYS_OTHER, encaeskey);
   off = 0;
   while (off < packet.filesize) {
     if (packet.filesize - off < sizeof(buff))
@@ -509,10 +510,10 @@ static void psync_p2p_thread() {
       else
         psys_sleep_milliseconds(1);
     } else if (sret == 1) {
-      inconn = malloc(sizeof(int));
+      inconn = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(int));
       *inconn = accept(tcpsock, NULL, NULL);
       if (pdbg_unlikely(*inconn == INVALID_SOCKET))
-        free(inconn);
+        pmem_free(PMEM_SUBSYS_OTHER, inconn);
       else
         prun_thread1("p2p tcp", psync_p2p_tcphandler, inconn);
     }
@@ -636,14 +637,14 @@ static int psync_p2p_get_download_token(psync_fileid_t fileid,
   }
   psync_apipool_release(api);
   if (pdbg_unlikely(papi_find_result2(res, "result", PARAM_NUM)->num != 0)) {
-    free(res);
+    pmem_free(PMEM_SUBSYS_OTHER, res);
     return PSYNC_NET_PERMFAIL;
   }
   ctoken = papi_find_result2(res, "token", PARAM_STR);
-  *token = malloc(ctoken->length + 1);
+  *token = pmem_malloc(PMEM_SUBSYS_OTHER, ctoken->length + 1);
   memcpy(*token, ctoken->str, ctoken->length + 1);
   *tlen = ctoken->length;
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
   return PSYNC_NET_OK;
 }
 
@@ -679,10 +680,10 @@ static int psync_p2p_download(int sock, psync_fileid_t fileid,
                         &privkey, &ekey)) == PSYNC_INVALID_SYM_KEY)) {
     // pdbg_unlikely((key=psymkey_decrypt(&psync_rsa_private,
     // &ekey))==PSYNC_INVALID_SYM_KEY)){
-    free(ekey);
+    pmem_free(PMEM_SUBSYS_OTHER, ekey);
     return PSYNC_NET_TEMPFAIL;
   }
-  free(ekey);
+  pmem_free(PMEM_SUBSYS_OTHER, ekey);
   decoder = pcrypto_ctr_encdec_create(key);
   psymkey_free(key);
   if (decoder == PSYNC_CRYPTO_INVALID_ENCODER)
@@ -762,7 +763,7 @@ int pp2p_check_download(psync_fileid_t fileid,
   psync_binhex(pct1.genhash, hashbin, PSYNC_HASH_DIGEST_LEN);
   memcpy(pct1.computername, computername, PSYNC_HASH_DIGEST_HEXLEN);
   il = psock_list_adapters();
-  sockets = malloc(sizeof(int) * il->interfacecnt);
+  sockets = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(int) * il->interfacecnt);
   FD_ZERO(&rfds);
   msock = 0;
   for (i = 0; i < il->interfacecnt; i++) {
@@ -836,8 +837,8 @@ int pp2p_check_download(psync_fileid_t fileid,
   for (i = 0; i < il->interfacecnt; i++)
     if (sockets[i] != INVALID_SOCKET)
       close(sockets[i]);
-  free(il);
-  free(sockets);
+  pmem_free(PMEM_SUBSYS_OTHER, il);
+  pmem_free(PMEM_SUBSYS_OTHER, sockets);
   if (bresp == P2P_RESP_NOPE)
     goto err_perm2;
   else if (bresp == P2P_RESP_WAIT) {
@@ -891,24 +892,24 @@ int pp2p_check_download(psync_fileid_t fileid,
     pdbg_logf(D_WARNING, "writing to socket failed");
     goto err_temp3;
   }
-  free(token);
+  pmem_free(PMEM_SUBSYS_OTHER, token);
   sret = psync_p2p_download(sock, fileid, filehashhex, fsize, filename);
   close(sock);
   return sret;
 err_perm3:
-  free(token);
+  pmem_free(PMEM_SUBSYS_OTHER, token);
   goto err_perm2;
 err_perm:
   for (i = 0; i < il->interfacecnt; i++)
     if (sockets[i] != INVALID_SOCKET)
       close(sockets[i]);
-  free(il);
-  free(sockets);
+  pmem_free(PMEM_SUBSYS_OTHER, il);
+  pmem_free(PMEM_SUBSYS_OTHER, sockets);
 err_perm2:
   return PSYNC_NET_PERMFAIL;
 err_temp3:
   close(sock);
-  free(token);
+  pmem_free(PMEM_SUBSYS_OTHER, token);
 err_temp2:
   return PSYNC_NET_TEMPFAIL;
 }

@@ -36,6 +36,7 @@
 #include "pfs.h"
 #include "plibs.h"
 #include "plocalscan.h"
+#include "pmem.h"
 #include "pp2p.h"
 #include "ppagecache.h"
 #include "ppath.h"
@@ -119,11 +120,11 @@ void psync_settings_reset() {
   home = ppath_home();
   defaultfs = putil_strcat(home, "/",
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
-  free(home);
+  pmem_free(PMEM_SUBSYS_OTHER, home);
   home = ppath_pcloud();
   defaultcache = putil_strcat(home, "/",
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
-  free(home);
+  pmem_free(PMEM_SUBSYS_OTHER, home);
   for (i = 0; i < ARRAY_SIZE(settings); i++)
     if (settings[i].type == PSYNC_TSTRING)
       psync_free_after_sec(settings[i].str, 60);
@@ -161,8 +162,8 @@ void psync_settings_reset() {
         settings[i].fix_callback(&settings[i].boolean);
     }
   }
-  free(defaultfs);
-  free(defaultcache);
+  pmem_free(PMEM_SUBSYS_OTHER, defaultfs);
+  pmem_free(PMEM_SUBSYS_OTHER, defaultcache);
 }
 
 void psync_settings_init() {
@@ -174,11 +175,11 @@ void psync_settings_init() {
   home = ppath_home();
   defaultfs = putil_strcat(home, "/",
                            PSYNC_DEFAULT_FS_FOLDER, NULL);
-  free(home);
+  pmem_free(PMEM_SUBSYS_OTHER, home);
   home = ppath_pcloud();
   defaultcache = putil_strcat(home, "/",
                               PSYNC_DEFAULT_CACHE_FOLDER, NULL);
-  free(home);
+  pmem_free(PMEM_SUBSYS_OTHER, home);
   settings[_PS(ignorepatterns)].str = PSYNC_IGNORE_PATTERNS_DEFAULT;
   settings[_PS(fsroot)].str = defaultfs;
   settings[_PS(fscachepath)].str = defaultcache;
@@ -205,15 +206,15 @@ void psync_settings_init() {
         settings[i].fix_callback(&settings[i].boolean);
     }
   }
-  free(defaultfs);
-  free(defaultcache);
+  pmem_free(PMEM_SUBSYS_OTHER, defaultfs);
+  pmem_free(PMEM_SUBSYS_OTHER, defaultcache);
   res = psql_query("SELECT id, value FROM setting");
   while ((row = psql_fetch_str(res))) {
     name = row[0];
     for (i = 0; i < ARRAY_SIZE(settings); i++)
       if (!strcmp(name, settings[i].name)) {
         if (settings[i].type == PSYNC_TSTRING) {
-          free(settings[i].str);
+          pmem_free(PMEM_SUBSYS_OTHER, settings[i].str);
           settings[i].str = putil_strdup(row[1]);
           if (settings[i].fix_callback)
             settings[i].fix_callback(&settings[i].str);

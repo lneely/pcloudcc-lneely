@@ -32,11 +32,13 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <unistd.h>
 
 #include <netinet/tcp.h>
 
 #include "plibs.h"
+#include "pmem.h"
 #include "psettings.h"
 #include "psock.h"
 #include "psql.h"
@@ -171,8 +173,20 @@ static struct addrinfo *addr_load(const char *host, const char *port) {
     psql_rdunlock();
     return NULL;
   }
-  ret = (struct addrinfo *)malloc(sizeof(struct addrinfo) * row[0] +
-                                        row[1]);
+  size_t struct_size, total_size;
+  if (row[0] != 0 && sizeof(struct addrinfo) > SIZE_MAX / row[0]) {
+    psql_free(res);
+    psql_rdunlock();
+    return NULL;
+  }
+  struct_size = sizeof(struct addrinfo) * row[0];
+  if (struct_size > SIZE_MAX - row[1]) {
+    psql_free(res);
+    psql_rdunlock();
+    return NULL;
+  }
+  total_size = struct_size + row[1];
+  ret = (struct addrinfo *)pmem_malloc(PMEM_SUBSYS_OTHER, total_size);
   data = (char *)(ret + row[0]);
   for (i = 0; i < row[0] - 1; i++)
     ret[i].ai_next = &ret[i + 1];
@@ -283,7 +297,7 @@ static void cb_connect_res(void *h, void *ptr) {
   res = (struct addrinfo *)ptr;
   sock = connect_res(res);
   r = psync_task_complete(h, (void *)(uintptr_t)sock);
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
   if (r && sock != INVALID_SOCKET)
     close(sock);
 }
@@ -388,7 +402,7 @@ int psock_try_write_buffer(psock_t *sock) {
     while ((b = sock->buffer)) {
       if (b->roffset == b->woffset) {
         sock->buffer = b->next;
-        free(b);
+        pmem_free(PMEM_SUBSYS_OTHER, b);
         continue;
       }
       if (sock->ssl) {
@@ -489,7 +503,7 @@ psock_t *psock_connect(const char *host, int unsigned port, int ssl) {
   } else {
     sslc = NULL;
   }
-  ret = malloc(sizeof(psock_t));
+  ret = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psock_t));
   if (!ret) {
     if (sslc)
       pssl_free(sslc);
@@ -516,7 +530,7 @@ void psock_close(psock_t *sock) {
       }
   psock_clear_write_buffered(sock);
   close(sock->sock);
-  free(sock);
+  pmem_free(PMEM_SUBSYS_OTHER, sock);
 }
 
 void psock_close_bad(psock_t *sock) {
@@ -524,14 +538,14 @@ void psock_close_bad(psock_t *sock) {
     pssl_free(sock->ssl);
   psock_clear_write_buffered(sock);
   close(sock->sock);
-  free(sock);
+  pmem_free(PMEM_SUBSYS_OTHER, sock);
 }
 
 void psock_set_write_buffered(psock_t *sock) {
   psock_buf_t *sb;
   if (sock->buffer)
     return;
-  sb = (psock_buf_t *)malloc(offsetof(psock_buf_t, buff) +
+  sb = (psock_buf_t *)pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(psock_buf_t, buff) +
                                    PSYNC_FIRST_SOCK_WRITE_BUFF_SIZE);
   sb->next = NULL;
   sb->size = PSYNC_FIRST_SOCK_WRITE_BUFF_SIZE;
@@ -550,7 +564,7 @@ void psock_clear_write_buffered(psock_t *sock) {
   psock_buf_t *nb;
   while (sock->buffer) {
     nb = sock->buffer->next;
-    free(sock->buffer);
+    pmem_free(PMEM_SUBSYS_OTHER, sock->buffer);
     sock->buffer = nb;
   }
 }
@@ -787,7 +801,7 @@ static int psync_socket_write_to_buf(psock_t *sock, const void *buff, int num) {
     do {
       wr = b->size - b->woffset;
       if (!wr) {
-        b->next = (psock_buf_t *)malloc(
+        b->next = (psock_buf_t *)pmem_malloc(PMEM_SUBSYS_OTHER, 
             offsetof(psock_buf_t, buff) + PSYNC_SECOND_SOCK_WRITE_BUFF_SIZE);
         b = b->next;
         b->next = NULL;
@@ -1125,7 +1139,7 @@ psock_ifaces_t *psock_list_adapters() {
     }
     addr = addr->ifa_next;
   }
-  ret = malloc(offsetof(psock_ifaces_t, interfaces) +
+  ret = pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(psock_ifaces_t, interfaces) +
                      sizeof(psock_iface_t) * cnt);
   memset(ret, 0,
          offsetof(psock_ifaces_t, interfaces) + sizeof(psock_iface_t) * cnt);
@@ -1153,7 +1167,7 @@ psock_ifaces_t *psock_list_adapters() {
   freeifaddrs(addrs);
   return ret;
 empty:
-  ret = malloc(offsetof(psock_ifaces_t, interfaces));
+  ret = pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(psock_ifaces_t, interfaces));
   ret->interfacecnt = 0;
   return ret;
 }

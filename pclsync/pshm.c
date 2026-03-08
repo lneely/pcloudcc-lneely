@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include "pdbg.h"
+#include "pmem.h"
 #include "pshm.h"
 #include "ppath.h"
 
@@ -21,7 +22,7 @@ static key_t get_key() {
         return (key_t)-1;
     }
     snprintf(path, sizeof(path), "%s/.pcloud/data.db", home);
-    free(home);
+    pmem_free(PMEM_SUBSYS_OTHER, home);
     return ftok(path, 'A');
 }
 
@@ -65,7 +66,7 @@ bool pshm_read(void **data, size_t *datasz) {
         *datasz = shm->datasz;
     }
 
-    *data = malloc(shm->datasz);
+    *data = pmem_malloc(PMEM_SUBSYS_OTHER, shm->datasz);
     if(*data == NULL) {
         pdbg_logf(D_ERROR, "Failed to allocate memory for shared data");
         shmdt(shm);

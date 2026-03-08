@@ -334,7 +334,7 @@ static void psync_pagecache_send_page_wait_page(psync_page_wait_t *pw,
     pwt->waiting_for = NULL;
     pthread_cond_broadcast(&pwt->cond);
   }
-  free(pw);
+  pmem_free(PMEM_SUBSYS_CACHE, pw);
 }
 
 static void psync_pagecache_return_free_page_locked(psync_cache_page_t *page) {
@@ -364,13 +364,13 @@ static int psync_pagecache_read_range_from_api(psync_request_t *request,
     return -2;
   dlen = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (unlikely(dlen)) {
-    free(res);
+    pmem_free(PMEM_SUBSYS_CACHE, res);
     pdbg_logf(D_WARNING, "readfile returned error %lu", (long unsigned)dlen);
     psync_process_api_error(dlen);
     return -2;
   }
   dlen = papi_find_result2(res, "data", PARAM_DATA)->num;
-  free(res);
+  pmem_free(PMEM_SUBSYS_CACHE, res);
   for (i = 0; i < len; i++) {
     page = psync_pagecache_get_free_page(0);
     rb = psync_socket_readall_download_thread(
@@ -486,7 +486,7 @@ static int wait_shared_api() {
   psock_t *capi;
   int ret;
   capi = sharedapi;
-  waiter = malloc(sizeof(shared_api_waiter_t));
+  waiter = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(shared_api_waiter_t));
   if (!waiter)
     return -1;
   pthread_cond_init(&waiter->cond, NULL);
@@ -505,7 +505,7 @@ static int wait_shared_api() {
   }
   pthread_mutex_unlock(&sharedapi_mutex);
   pthread_cond_destroy(&waiter->cond);
-  free(waiter);
+  pmem_free(PMEM_SUBSYS_CACHE, waiter);
   return ret;
 }
 
@@ -522,7 +522,7 @@ static void set_urls(psync_urls_t *urls, binresult *res) {
       urls->status = 2;
       pthread_cond_broadcast(&url_cache_cond);
     } else
-      free(urls);
+      pmem_free(PMEM_SUBSYS_CACHE, urls);
   }
   pthread_mutex_unlock(&url_cache_mutex);
 }
@@ -590,7 +590,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
     result = papi_find_result2(ret, "result", PARAM_NUM)->num;
     if (unlikely(result != 0)) {
       pdbg_logf(D_WARNING, "getfilelink returned error %lu", result);
-      free(ret);
+      pmem_free(PMEM_SUBSYS_CACHE, ret);
       mark_shared_api_bad(api);
       psync_apipool_release_bad(api);
       psync_process_api_error(result);
@@ -619,7 +619,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
       if (pdbg_unlikely(psync_crypto_is_error(enc)))
         goto err4;
       pdbg_logf(D_BUG, "got key for fileid %lu", (unsigned long)request->fileid);
-      free(ret);
+      pmem_free(PMEM_SUBSYS_CACHE, ret);
       pfs_lock_file(request->of);
       if (pdbg_likely(request->of->encoder ==
                      PSYNC_CRYPTO_LOADING_SECTOR_ENCODER)) {
@@ -638,7 +638,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
       psync_list_del(l1);
       pdbg_logf(D_BUG, "request for offset %lu, size %lu read from API",
             (unsigned long)range->offset, (unsigned long)range->length);
-      free(range);
+      pmem_free(PMEM_SUBSYS_CACHE, range);
     }
     if (pass_shared_api(api))
       psync_apipool_release(api);
@@ -648,7 +648,7 @@ static int get_urls(psync_request_t *request, psync_urls_t *urls) {
   }
   return -1;
 err4:
-  free(ret);
+  pmem_free(PMEM_SUBSYS_CACHE, ret);
 err3:
   if (request->needkey)
     psync_pagecache_set_bad_encoder(request->of);
@@ -698,11 +698,11 @@ static psync_urls_t *get_urls_for_request(psync_request_t *req) {
       return urls;
     }
     if (--urls->refcnt == 0)
-      free(urls);
+      pmem_free(PMEM_SUBSYS_CACHE, urls);
     pthread_mutex_unlock(&url_cache_mutex);
     return NULL;
   }
-  urls = malloc(sizeof(psync_urls_t));
+  urls = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_urls_t));
   if (!urls) {
     pthread_mutex_unlock(&url_cache_mutex);
     return NULL;
@@ -742,8 +742,8 @@ static void release_urls(psync_urls_t *urls) {
       }
     }
     pthread_mutex_unlock(&url_cache_mutex);
-    free(urls->urls);
-    free(urls);
+    pmem_free(PMEM_SUBSYS_CACHE, urls->urls);
+    pmem_free(PMEM_SUBSYS_CACHE, urls);
     return;
   }
   pthread_mutex_unlock(&url_cache_mutex);
@@ -759,8 +759,8 @@ static void release_bad_urls(psync_urls_t *urls) {
     urls = NULL;
   pthread_mutex_unlock(&url_cache_mutex);
   if (urls) {
-    free(urls->urls);
-    free(urls);
+    pmem_free(PMEM_SUBSYS_CACHE, urls->urls);
+    pmem_free(PMEM_SUBSYS_CACHE, urls);
   }
 }
 
@@ -796,10 +796,9 @@ static unsigned char *has_pages_in_db(uint64_t hash, uint64_t pageid,
   uint32_t fcnt;
   if (unlikely(!pagecnt))
     return NULL;
-  ret = malloc(sizeof(unsigned char) * pagecnt);
+  ret = pmem_malloc_array(PMEM_SUBSYS_CACHE, pagecnt, sizeof(unsigned char));
   if (!ret)
     return NULL;
-  memset(ret, 0, pagecnt);
   fromid = 0;
   fcnt = 0;
   res = psql_query_rdlock(
@@ -1365,7 +1364,7 @@ static void clean_cache() {
   }
   clean_cache_in_progress = 1;
   psql_sync();
-  entries = (pagecache_entry *)malloc(cnt * sizeof(pagecache_entry));
+  entries = (pagecache_entry *)pmem_malloc_array(PMEM_SUBSYS_CACHE, cnt, sizeof(pagecache_entry));
   if (!entries) {
     pthread_mutex_unlock(&clean_cache_mutex);
     return;
@@ -1510,7 +1509,7 @@ static void clean_cache() {
   psql_commit();
   clean_cache_in_progress = 0;
   pthread_mutex_unlock(&clean_cache_mutex);
-  free(oentries);
+  pmem_free(PMEM_SUBSYS_CACHE, oentries);
   pdbg_logf(D_NOTICE, "syncing database");
   psql_sync();
   pdbg_logf(D_NOTICE, "finished cleaning cache, free cache pages %u",
@@ -1867,6 +1866,14 @@ int ppagecache_flush() {
     return 0;
 }
 
+static void free_page_waiter(psync_page_waiter_t *elem) {
+  pmem_free(PMEM_SUBSYS_CACHE, elem);
+}
+
+static void free_crypto_auth_page(psync_crypto_auth_page *elem) {
+  pmem_free(PMEM_SUBSYS_CACHE, elem);
+}
+
 static void ppagecache_flush_timer(psync_timer_t timer, void *ptr) {
   if (!flushedbetweentimers &&
       (cache_pages_in_hash || cachepages_to_update_cnt))
@@ -2080,7 +2087,7 @@ static void check_pages_in_database_by_hash(uint64_t hash,
   }
   if (fres->rows)
     mark_pagescache_used(first_page_id, pagecnt, dbread);
-  free(fres);
+  pmem_free(PMEM_SUBSYS_CACHE, fres);
 }
 
 static long check_page_in_database_by_hash_and_cache(uint64_t hash,
@@ -2229,7 +2236,7 @@ int ppagecache_read_mod_locked(psync_openfile_t *of, char *buf,
 static void psync_pagecache_free_request(psync_request_t *request) {
   psync_list_for_each_element_call(&request->ranges, psync_request_range_t,
                                    list, free);
-  free(request);
+  pmem_free(PMEM_SUBSYS_CACHE, request);
 }
 
 static void psync_pagecache_send_error_page_wait(psync_page_wait_t *pw,
@@ -2242,7 +2249,7 @@ static void psync_pagecache_send_error_page_wait(psync_page_wait_t *pw,
     pwt->ready = 1;
     pthread_cond_broadcast(&pwt->cond);
   }
-  free(pw);
+  pmem_free(PMEM_SUBSYS_CACHE, pw);
 }
 
 static void psync_pagecache_send_range_error(psync_request_range_t *range,
@@ -2550,7 +2557,7 @@ retry:
       err = psync_http_request_range_additional(
           sock, host, path, range->offset, range->offset + range->length - 1,
           range_hdr);
-      free(range_hdr);
+      pmem_free(PMEM_SUBSYS_CACHE, range_hdr);
     } else
       err = psync_http_request(sock, host, path, range->offset,
                                range->offset + range->length - 1, cookie);
@@ -2608,7 +2615,7 @@ static void check_or_request_page(uint64_t fileid, uint64_t hash,
       break;
     }
     if (!found) {
-      pw = malloc(sizeof(psync_page_wait_t));
+      pw = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_page_wait_t));
       if (!pw) {
         unlock_wait(hash);
         return;
@@ -2625,7 +2632,7 @@ static void check_or_request_page(uint64_t fileid, uint64_t hash,
       if (range && range->offset + range->length == pageid * PSYNC_FS_PAGE_SIZE)
         range->length += PSYNC_FS_PAGE_SIZE;
       else {
-        range = malloc(sizeof(psync_request_range_t));
+        range = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_request_range_t));
         if (!range) {
           unlock_wait(hash);
           return;
@@ -2786,10 +2793,10 @@ static void psync_pagecache_read_unmodified_readahead(
     if (found)
       continue;
     //    pdbg_logf(D_NOTICE, "read-aheading page %lu", first_page_id+i);
-    pw = malloc(sizeof(psync_page_wait_t));
+    pw = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_page_wait_t));
     if (!pw) {
       unlock_wait(hash);
-      free(pages_in_db);
+      pmem_free(PMEM_SUBSYS_CACHE, pages_in_db);
       return;
     }
     psync_list_add_tail(&wait_page_hash[h], &pw->list);
@@ -2805,10 +2812,10 @@ static void psync_pagecache_read_unmodified_readahead(
                      (first_page_id + i) * PSYNC_FS_PAGE_SIZE)
       range->length += PSYNC_FS_PAGE_SIZE;
     else {
-      range = malloc(sizeof(psync_request_range_t));
+      range = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_request_range_t));
       if (!range) {
         unlock_wait(hash);
-        free(pages_in_db);
+        pmem_free(PMEM_SUBSYS_CACHE, pages_in_db);
         return;
       }
       psync_list_add_tail(ranges, &range->list);
@@ -2817,7 +2824,7 @@ static void psync_pagecache_read_unmodified_readahead(
     }
   }
   unlock_wait(hash);
-  free(pages_in_db);
+  pmem_free(PMEM_SUBSYS_CACHE, pages_in_db);
   if (!psync_list_isempty(ranges))
     pdbg_logf(D_NOTICE,
           "readahead=%lu, rto=%lu, offset=%lu, size=%lu, currentspeed=%u",
@@ -2827,7 +2834,7 @@ static void psync_pagecache_read_unmodified_readahead(
 
 static void psync_free_page_waiter(psync_page_waiter_t *pwt) {
   pthread_cond_destroy(&pwt->cond);
-  free(pwt);
+  pmem_free(PMEM_SUBSYS_CACHE, pwt);
 }
 
 static psync_page_waiter_t *
@@ -2838,7 +2845,7 @@ add_page_waiter(psync_list *wait_list, psync_list *range_list, uint64_t hash,
   psync_page_wait_t *pw;
   psync_request_range_t *range;
   unsigned long h;
-  pwt = malloc(sizeof(psync_page_waiter_t));
+  pwt = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_page_waiter_t));
   if (!pwt)
     return NULL;
   pthread_cond_init(&pwt->cond, NULL);
@@ -2854,11 +2861,11 @@ add_page_waiter(psync_list *wait_list, psync_list *range_list, uint64_t hash,
                               list) if (pw->hash == hash &&
                                         pw->pageid == pageid) goto found;
   pdbg_logf(D_NOTICE, "page %lu not found", (unsigned long)pageid);
-  pw = malloc(sizeof(psync_page_wait_t));
+  pw = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_page_wait_t));
   if (!pw) {
     psync_list_del(&pwt->listwaiter);
     pthread_cond_destroy(&pwt->cond);
-    free(pwt);
+    pmem_free(PMEM_SUBSYS_CACHE, pwt);
     return NULL;
   }
   psync_list_add_tail(&wait_page_hash[h], &pw->list);
@@ -2873,11 +2880,11 @@ add_page_waiter(psync_list *wait_list, psync_list *range_list, uint64_t hash,
   if (range && range->offset + range->length == pageid * PSYNC_FS_PAGE_SIZE)
     range->length += PSYNC_FS_PAGE_SIZE;
   else {
-    range = malloc(sizeof(psync_request_range_t));
+    range = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_request_range_t));
     if (!range) {
       psync_list_del(&pwt->listwaiter);
       pthread_cond_destroy(&pwt->cond);
-      free(pwt);
+      pmem_free(PMEM_SUBSYS_CACHE, pwt);
       return NULL;
     }
     psync_list_add_tail(range_list, &range->list);
@@ -2931,7 +2938,7 @@ int ppagecache_read_unmod_locked(psync_openfile_t *of, char *buf,
   pagecnt = psize / PSYNC_FS_PAGE_SIZE;
   first_page_id = poffset / PSYNC_FS_PAGE_SIZE;
   psync_list_init(&waiting);
-  rq = malloc(sizeof(psync_request_t));
+  rq = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_request_t));
   if (!rq)
     return 0;
   psync_list_init(&rq->ranges);
@@ -2994,7 +3001,7 @@ int ppagecache_read_unmod_locked(psync_openfile_t *of, char *buf,
     prun_thread1("read unmodified", psync_pagecache_read_unmodified_thread,
                       rq);
   } else
-    free(rq);
+    pmem_free(PMEM_SUBSYS_CACHE, rq);
   ret = size;
   if (!psync_list_isempty(&waiting)) {
     psync_list_for_each_element(pwt, &waiting, psync_page_waiter_t,
@@ -3034,7 +3041,7 @@ static void free_waiters(psync_list *waiters) {
       pw = pwt->waiting_for;
       if (psync_list_isempty(&pw->waiters)) {
         psync_list_del(&pw->list);
-        free(pw);
+        pmem_free(PMEM_SUBSYS_CACHE, pw);
       }
     }
     psync_free_page_waiter(pwt);
@@ -3147,18 +3154,17 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
   psize = size_round_up_to_page(size + pageoff);
   pagecnt = psize / PSYNC_FS_PAGE_SIZE;
   first_page_id = poffset / PSYNC_FS_PAGE_SIZE;
-  rq = malloc(sizeof(psync_request_t));
+  rq = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_request_t));
   if (!rq)
     return 0;
   psync_list_init(&rq->ranges);
   psync_list_init(&waiting);
   psync_list_init(&auth_pages);
-  dp = malloc(sizeof(psync_crypto_data_page) * pagecnt);
+  dp = pmem_malloc_array(PMEM_SUBSYS_CACHE, pagecnt, sizeof(psync_crypto_data_page));
   if (!dp) {
-    free(rq);
+    pmem_free(PMEM_SUBSYS_CACHE, rq);
     return 0;
   }
-  memset(dp, 0, sizeof(psync_crypto_data_page) * pagecnt);
   ap = NULL;
   lock_wait(hash);
   for (i = 0; i < pagecnt; i++) {
@@ -3169,13 +3175,13 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
     }
     pfs_crpt_get_auth_off(first_page_id + i, 0, &offsets,
                                         &aoffset, &asize, &aoff);
-    ap = malloc(sizeof(psync_crypto_auth_page));
+    ap = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_crypto_auth_page));
     if (!ap) {
       for (j = 0; j < i; j++)
         if (dp[j].freebuff)
-          free(dp[j].buff);
-      free(dp);
-      free(rq);
+          pmem_free(PMEM_SUBSYS_CACHE, dp[j].buff);
+      pmem_free(PMEM_SUBSYS_CACHE, dp);
+      pmem_free(PMEM_SUBSYS_CACHE, rq);
       return 0;
     }
     ap->waiter = NULL;
@@ -3197,13 +3203,13 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
       for (l = 1; l <= offsets.treelevels; l++) {
         pfs_crpt_get_auth_off(first_page_id + i, l, &offsets,
                                             &aoffset, &asize, &aoff);
-        cap = malloc(sizeof(psync_crypto_auth_page));
+        cap = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_crypto_auth_page));
         if (!cap) {
           for (j = 0; j < i; j++)
             if (dp[j].freebuff)
-              free(dp[j].buff);
-          free(dp);
-          free(rq);
+              pmem_free(PMEM_SUBSYS_CACHE, dp[j].buff);
+          pmem_free(PMEM_SUBSYS_CACHE, dp);
+          pmem_free(PMEM_SUBSYS_CACHE, rq);
           return 0;
         }
         cap->waiter = NULL;
@@ -3238,13 +3244,13 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
     } else
       pbuff = buf + i * PSYNC_FS_PAGE_SIZE - pageoff;
     if (!pbuff) {
-      pbuff = malloc(sizeof(char) * apsize);
+      pbuff = pmem_malloc_array(PMEM_SUBSYS_CACHE, apsize, sizeof(char));
       if (!pbuff) {
         for (j = 0; j < i; j++)
           if (dp[j].freebuff)
-            free(dp[j].buff);
-        free(dp);
-        free(rq);
+            pmem_free(PMEM_SUBSYS_CACHE, dp[j].buff);
+        pmem_free(PMEM_SUBSYS_CACHE, dp);
+        pmem_free(PMEM_SUBSYS_CACHE, rq);
         return 0;
       }
       dp[i].freebuff = 1;
@@ -3273,7 +3279,7 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
     prun_thread1("crypto read unmodified",
                       psync_pagecache_read_unmodified_thread, rq);
   } else
-    free(rq);
+    pmem_free(PMEM_SUBSYS_CACHE, rq);
   ret = 0;
   if (needkey) {
     pdbg_logf(D_NOTICE, "waiting for key to download");
@@ -3400,12 +3406,12 @@ int ppagecache_read_unmod_enc_locked(psync_openfile_t *of,
   if (!ret)
     ret = size;
 ret0:
-  psync_list_for_each_element_call(&waiting, psync_page_waiter_t, listwaiter, free);
-  psync_list_for_each_element_call(&auth_pages, psync_crypto_auth_page, list, free);
+  psync_list_for_each_element_call(&waiting, psync_page_waiter_t, listwaiter, free_page_waiter);
+  psync_list_for_each_element_call(&auth_pages, psync_crypto_auth_page, list, free_crypto_auth_page);
   for (i = 0; i < pagecnt; i++)
     if (dp[i].freebuff)
-      free(dp[i].buff);
-  free(dp);
+      pmem_free(PMEM_SUBSYS_CACHE, dp[i].buff);
+  pmem_free(PMEM_SUBSYS_CACHE, dp);
   return ret;
 err0:
   free_waiters(&waiting);
@@ -3436,7 +3442,7 @@ int ppagecache_readv_locked(psync_openfile_t *of,
   } else
     needkey = 0;
   pthread_mutex_unlock(&of->mutex);
-  rq = malloc(sizeof(psync_request_t));
+  rq = pmem_malloc(PMEM_SUBSYS_CACHE, sizeof(psync_request_t));
   if (!rq)
     return 0;
   psync_list_init(&rq->ranges);
@@ -3491,7 +3497,7 @@ int ppagecache_readv_locked(psync_openfile_t *of,
   }
   if (psync_list_isempty(&rq->ranges) && !needkey) {
     if (psync_list_isempty(&waiting)) {
-      free(rq);
+      pmem_free(PMEM_SUBSYS_CACHE, rq);
       return 0;
     }
   } else {
@@ -3606,7 +3612,7 @@ static void psync_pagecache_new_upload_to_cache(uint64_t taskid, uint64_t hash,
     pdbg_logf(D_ERROR, "could not open cache file %s for taskid %lu, skipping",
           filename, (unsigned long)taskid);
     pfile_delete(filename);
-    free(filename);
+    pmem_free(PMEM_SUBSYS_CACHE, filename);
     return;
   }
   pdbg_logf(D_NOTICE, "adding file %s to cache for hash %lu (%ld) size %ld",
@@ -3639,7 +3645,7 @@ static void psync_pagecache_new_upload_to_cache(uint64_t taskid, uint64_t hash,
   pfile_delete(filename);
   pdbg_logf(D_NOTICE, "finished adding file %s to cache for hash %lu (%ld)",
         filename, (unsigned long)hash, (long)hash);
-  free(filename);
+  pmem_free(PMEM_SUBSYS_CACHE, filename);
 }
 
 static void switch_pageids(uint64_t hash, uint64_t oldhash, uint64_t *pageids,
@@ -3696,8 +3702,8 @@ static void psync_pagecache_modify_to_cache(uint64_t taskid, uint64_t hash,
           indexname, (unsigned long)taskid);
     pfile_delete(filename);
     pfile_delete(indexname);
-    free(filename);
-    free(indexname);
+    pmem_free(PMEM_SUBSYS_CACHE, filename);
+    pmem_free(PMEM_SUBSYS_CACHE, indexname);
     return;
   }
   tree = NULL;
@@ -3868,9 +3874,9 @@ err2:
 err1:
   psync_interval_tree_free(tree);
   pfile_delete(filename);
-  free(filename);
+  pmem_free(PMEM_SUBSYS_CACHE, filename);
   pfile_delete(indexname);
-  free(indexname);
+  pmem_free(PMEM_SUBSYS_CACHE, indexname);
 }
 
 static void psync_pagecache_check_free_space() {
@@ -3985,7 +3991,7 @@ int ppagecache_have_all_pages(uint64_t hash, uint64_t size) {
   for (i = 0; i < pagecnt; i++)
     if (!db[i] && !has_page_in_cache_by_hash(hash, i))
       break;
-  free(db);
+  pmem_free(PMEM_SUBSYS_CACHE, db);
   return i == pagecnt;
 }
 
@@ -4216,7 +4222,7 @@ void ppagecache_init() {
           (unsigned long)db_cache_max_page);
   }
   readcache = pfile_open(cache_file, O_RDWR, O_CREAT);
-  free(cache_file);
+  pmem_free(PMEM_SUBSYS_CACHE, cache_file);
   if (pdbg_likely(pfile_seek(readcache,
                                  db_cache_max_page * PSYNC_FS_PAGE_SIZE,
                                  SEEK_SET) != -1))
@@ -4267,7 +4273,7 @@ void ppagecache_reopen_read() {
   cache_file = putil_strcat(cache_dir, "/",
                             PSYNC_DEFAULT_READ_CACHE_FILE, NULL);
   readcache = pfile_open(cache_file, O_RDWR, O_CREAT);
-  free(cache_file);
+  pmem_free(PMEM_SUBSYS_CACHE, cache_file);
 }
 
 void ppagecache_clean_read() {
@@ -4315,12 +4321,12 @@ int ppagecache_move(const char *path) {
   rdpath = putil_strcat(path, "/",
                         PSYNC_DEFAULT_READ_CACHE_FILE, NULL);
   if (!stat(rdpath, &st)) {
-    free(rdpath);
+    pmem_free(PMEM_SUBSYS_CACHE, rdpath);
     return pdbg_return_const(PERROR_CACHE_MOVE_NOT_EMPTY);
   }
   newrdcache = pfile_open(rdpath, O_RDWR, O_CREAT | O_EXCL);
   if (newrdcache == INVALID_HANDLE_VALUE) {
-    free(rdpath);
+    pmem_free(PMEM_SUBSYS_CACHE, rdpath);
     return pdbg_return_const(PERROR_CACHE_MOVE_NO_WRITE_ACCESS);
   }
   opath = putil_strdup(psync_setting_get_string(_PS(fscachepath)));
@@ -4345,8 +4351,8 @@ int ppagecache_move(const char *path) {
     pthread_mutex_unlock(&clean_cache_mutex);
     pfile_close(newrdcache);
     pfile_delete(rdpath);
-    free(opath);
-    free(rdpath);
+    pmem_free(PMEM_SUBSYS_CACHE, opath);
+    pmem_free(PMEM_SUBSYS_CACHE, rdpath);
     return pdbg_return_const(PERROR_CACHE_MOVE_DRIVE_HAS_TASKS);
   }
   ordcache = readcache;
@@ -4379,8 +4385,8 @@ int ppagecache_move(const char *path) {
   pdbg_logf(D_NOTICE, "released locks");
   pfile_close(ordcache);
   ppath_ls(opath, clean_cache_del, (void *)1);
-  free(opath);
-  free(rdpath);
+  pmem_free(PMEM_SUBSYS_CACHE, opath);
+  pmem_free(PMEM_SUBSYS_CACHE, rdpath);
   pdbg_logf(D_NOTICE, "end");
   return 0;
 }

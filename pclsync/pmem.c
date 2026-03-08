@@ -1,10 +1,19 @@
 #include <sys/mman.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "pcompiler.h"
 #include "psql.h"
 #include "pdbg.h"
+#include "pmem.h"
+
+static size_t subsystem_stats[6] = {0};
+
+typedef struct {
+  size_t size;
+  pmem_subsystem_t subsystem;
+} pmem_header_t;
 
 void *pmem_mmap(size_t size) {
   void *ret = mmap(NULL, size, PROT_READ | PROT_WRITE,
@@ -68,4 +77,90 @@ void *pmem_calloc_safe(size_t nmemb, size_t size) {
     return NULL;
   }
   return calloc(nmemb, size);
+}
+
+void *pmem_malloc(pmem_subsystem_t subsystem, size_t size) {
+  pmem_header_t *hdr;
+  size_t total_size = sizeof(pmem_header_t) + size;
+  
+  hdr = (pmem_header_t *)malloc(total_size);
+  if (!hdr) {
+    return NULL;
+  }
+  
+  hdr->size = size;
+  hdr->subsystem = subsystem;
+  __atomic_add_fetch(&subsystem_stats[subsystem], size, __ATOMIC_RELAXED);
+  
+  return (void *)(hdr + 1);
+}
+
+void pmem_free(pmem_subsystem_t subsystem, void *ptr) {
+  pmem_header_t *hdr;
+  
+  if (!ptr) {
+    return;
+  }
+  
+  hdr = ((pmem_header_t *)ptr) - 1;
+  __atomic_sub_fetch(&subsystem_stats[hdr->subsystem], hdr->size, __ATOMIC_RELAXED);
+  free(hdr);
+}
+
+void *pmem_realloc(pmem_subsystem_t subsystem, void *ptr, size_t size) {
+  pmem_header_t *hdr, *new_hdr;
+  size_t old_size;
+  size_t total_size = sizeof(pmem_header_t) + size;
+  
+  if (!ptr) {
+    return pmem_malloc(subsystem, size);
+  }
+  
+  hdr = ((pmem_header_t *)ptr) - 1;
+  old_size = hdr->size;
+  
+  new_hdr = (pmem_header_t *)realloc(hdr, total_size);
+  if (!new_hdr) {
+    return NULL;
+  }
+  
+  __atomic_sub_fetch(&subsystem_stats[hdr->subsystem], old_size, __ATOMIC_RELAXED);
+  __atomic_add_fetch(&subsystem_stats[subsystem], size, __ATOMIC_RELAXED);
+  
+  new_hdr->size = size;
+  new_hdr->subsystem = subsystem;
+  
+  return (void *)(new_hdr + 1);
+}
+
+size_t pmem_get_stats(pmem_subsystem_t subsystem) {
+  return __atomic_load_n(&subsystem_stats[subsystem], __ATOMIC_RELAXED);
+}
+
+void *pmem_malloc_array(pmem_subsystem_t subsystem, size_t nmemb, size_t size) {
+  pmem_header_t *hdr;
+  size_t alloc_size;
+  size_t total_size;
+  void *ptr;
+  
+  if (nmemb != 0 && size > SIZE_MAX / nmemb) {
+    return NULL;
+  }
+  
+  alloc_size = nmemb * size;
+  total_size = sizeof(pmem_header_t) + alloc_size;
+  
+  hdr = (pmem_header_t *)malloc(total_size);
+  if (!hdr) {
+    return NULL;
+  }
+  
+  hdr->size = alloc_size;
+  hdr->subsystem = subsystem;
+  __atomic_add_fetch(&subsystem_stats[subsystem], alloc_size, __ATOMIC_RELAXED);
+  
+  ptr = (void *)(hdr + 1);
+  memset(ptr, 0, alloc_size);
+  
+  return ptr;
 }

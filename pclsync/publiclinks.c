@@ -33,6 +33,7 @@
 #include "papi.h"
 #include "pfsfolder.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "pnetlibs.h"
 #include "prun.h"
 #include "psql.h"
@@ -106,14 +107,14 @@ static void modify_screenshot_public_link(void *par) {
                       "account required.");
   }
 
-  free(linkidp);
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, linkidp);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 }
 
 int64_t do_psync_screenshot_public_link(const char *path, int hasdelay,
                                         uint64_t delay, char **link /*OUT*/,
                                         char **err /*OUT*/) {
-  scr_params *params = malloc(sizeof(scr_params));
+  scr_params *params = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(scr_params));
   int64_t ret =
       do_psync_file_public_link(path, &params->linkid, link, err, 0, 0, 0);
   if (hasdelay) {
@@ -121,7 +122,7 @@ int64_t do_psync_screenshot_public_link(const char *path, int hasdelay,
     prun_thread1("Modify link expiration.", modify_screenshot_public_link,
                       params);
   } else
-    free(params);
+    pmem_free(PMEM_SUBSYS_OTHER, params);
   return ret;
 }
 
@@ -153,7 +154,7 @@ int64_t do_psync_file_public_link(const char *path, int64_t *plinkid,
     int numparam = 2 + !!expire + !!maxdownloads + !!maxtraffic;
     int pind = 1;
 
-    t = (binparam *)malloc(numparam * sizeof(binparam));
+    t = (binparam *)pmem_malloc_array(PMEM_SUBSYS_OTHER, numparam, sizeof(binparam));
     init_param_str(t, "auth", psync_my_auth);
     init_param_str(t + pind++, "path", path);
     if (expire)
@@ -166,12 +167,12 @@ int64_t do_psync_file_public_link(const char *path, int64_t *plinkid,
     if (unlikely(!api)) {
       pdbg_logf(D_WARNING, "Can't gat api from the pool. No pool ?\n");
       *err = putil_strndup("Connection error.", 17);
-      free(t);
+      pmem_free(PMEM_SUBSYS_OTHER, t);
       return 1;
     }
     bres = papi_send(api, "getfilepublink", sizeof("getfilepublink") - 1,
                            t, pind, -1, 1);
-    free(t);
+    pmem_free(PMEM_SUBSYS_OTHER, t);
   }
 
   if (likely(bres))
@@ -200,7 +201,7 @@ int64_t do_psync_file_public_link(const char *path, int64_t *plinkid,
     *plinkid = linkid;
 
 free_ret:
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
   return (int64_t)result;
 }
 
@@ -230,7 +231,7 @@ int64_t do_psync_folder_public_link(const char *path, char **link /*OUT*/,
     int numparam = 2 + !!expire + !!maxdownloads + !!maxtraffic;
     int pind = 1;
 
-    t = (binparam *)malloc(numparam * sizeof(binparam));
+    t = (binparam *)pmem_malloc_array(PMEM_SUBSYS_OTHER, numparam, sizeof(binparam));
     init_param_str(t, "auth", psync_my_auth);
     init_param_str(t + pind++, "path", path);
     if (expire)
@@ -247,7 +248,7 @@ int64_t do_psync_folder_public_link(const char *path, char **link /*OUT*/,
     }
     bres = papi_send(api, "getfolderpublink",
                            sizeof("getfolderpublink") - 1, t, pind, -1, 1);
-    free(t);
+    pmem_free(PMEM_SUBSYS_OTHER, t);
   }
   if (likely(bres))
     psync_apipool_release(api);
@@ -274,7 +275,7 @@ int64_t do_psync_folder_public_link(const char *path, char **link /*OUT*/,
   *link = putil_strndup(rescode, strlen(rescode));
   result = papi_find_result2(bres, "linkid", PARAM_NUM)->num;
 
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }
@@ -304,7 +305,7 @@ int64_t do_psync_folder_public_link_full(const char *path, char **link /*OUT*/,
     int numparam = 2 + !!expire + !!maxdownloads + !!maxtraffic + !!password;
     int pind = 1;
 
-    t = (binparam *)malloc(numparam * sizeof(binparam));
+    t = (binparam *)pmem_malloc_array(PMEM_SUBSYS_OTHER, numparam, sizeof(binparam));
     init_param_str(t, "auth", psync_my_auth);
     init_param_str(t + pind++, "path", path);
     if (password)
@@ -323,7 +324,7 @@ int64_t do_psync_folder_public_link_full(const char *path, char **link /*OUT*/,
     }
     bres = papi_send(api, "getfolderpublink",
                            sizeof("getfolderpublink") - 1, t, pind, -1, 1);
-    free(t);
+    pmem_free(PMEM_SUBSYS_OTHER, t);
   }
 
   if (likely(bres))
@@ -352,7 +353,7 @@ int64_t do_psync_folder_public_link_full(const char *path, char **link /*OUT*/,
   *link = putil_strndup(rescode, strlen(rescode));
   result = papi_find_result2(bres, "linkid", PARAM_NUM)->num;
 
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }
@@ -400,7 +401,7 @@ int64_t do_psync_folder_updownlink_link(int canupload,
   }
 
   result = 0;
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }
@@ -431,21 +432,21 @@ int64_t do_ptree_public_link(const char *linkname, const char *root,
   if (unlikely(!(!!root + !!numfolders + !!numfiles)))
     return -3;
 
-  t = (binparam *)malloc(numparam * sizeof(binparam));
+  t = (binparam *)pmem_malloc_array(PMEM_SUBSYS_OTHER, numparam, sizeof(binparam));
 
   init_param_str(t, "auth", psync_my_auth);
 
   init_param_str(t + pind++, "name", linkname);
 
   if (root) {
-    ids = (char *)malloc(FOLDERID_ENTRY_SIZE);
+    ids = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, FOLDERID_ENTRY_SIZE);
     id = pfs_fldr_id_by_path(root, 0);
     k = sprintf(ids, "%lld", (long long)id);
     init_param_str(t + pind++, "folderid", ids);
   }
 
   if (numfolders) {
-    ids1 = (char *)malloc(numfolders * FOLDERID_ENTRY_SIZE);
+    ids1 = (char *)pmem_malloc_array(PMEM_SUBSYS_OTHER, numfolders, FOLDERID_ENTRY_SIZE);
     idsp = ids1;
     for (i = 0; i < numfolders; ++i) {
       id = pfs_fldr_id_by_path(folders[i], 0);
@@ -465,7 +466,7 @@ int64_t do_ptree_public_link(const char *linkname, const char *root,
     psync_uint_row row;
     psync_fspath_t *filep;
 
-    ids2 = (char *)malloc(numfiles * FOLDERID_ENTRY_SIZE);
+    ids2 = (char *)pmem_malloc_array(PMEM_SUBSYS_OTHER, numfiles, FOLDERID_ENTRY_SIZE);
     idsp = ids2;
     for (i = 0; i < numfiles; ++i) {
       psql_rdlock();
@@ -543,14 +544,14 @@ int64_t do_ptree_public_link(const char *linkname, const char *root,
   result = papi_find_result2(bres, "linkid", PARAM_NUM)->num;
 
   if (ids)
-    free(ids);
+    pmem_free(PMEM_SUBSYS_OTHER, ids);
   if (ids1)
-    free(ids1);
+    pmem_free(PMEM_SUBSYS_OTHER, ids1);
   if (ids2)
-    free(ids2);
+    pmem_free(PMEM_SUBSYS_OTHER, ids2);
 
-  free(bres);
-  free(t);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
+  pmem_free(PMEM_SUBSYS_OTHER, t);
 
   return result;
 }
@@ -604,7 +605,7 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
     pdbg_logf(D_WARNING, "Send command returned in valid result.\n");
     //*err = putil_strndup("Connection error.", 17);
     snprintf(err, err_size, "Connection error.");
-    free(bres);
+    pmem_free(PMEM_SUBSYS_OTHER, bres);
     return 0;
   }
   result = papi_find_result2(bres, "result", PARAM_NUM)->num;
@@ -615,7 +616,7 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
     pdbg_logf(D_WARNING, "command listpublinks returned error code %u",
           (unsigned)result);
     psync_process_api_error(result);
-    free(bres);
+    pmem_free(PMEM_SUBSYS_OTHER, bres);
     if (psync_handle_api_result(result) == PSYNC_NET_TEMPFAIL)
       return -result;
     else {
@@ -627,7 +628,7 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
   publinks = papi_find_result2(bres, "publinks", PARAM_ARRAY);
   linkscnt = publinks->length;
   if (!linkscnt) {
-    free(bres);
+    pmem_free(PMEM_SUBSYS_OTHER, bres);
     return 0;
   }
   for (i = 0; i < linkscnt; ++i) {
@@ -711,7 +712,7 @@ int cache_links(char *err, size_t err_size /*OUT*/) {
     psql_run_free(q);
   }
 
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
   return linkscnt;
 }
 
@@ -752,7 +753,7 @@ int do_psync_delete_link(int64_t linkid, char **err /*OUT*/) {
       return -1;
     }
   }
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
   return 0;
 }
 
@@ -801,7 +802,7 @@ int do_psync_change_link(unsigned long long linkid, unsigned long long expire,
   int numparam = 5; // +!!expire + !!maxdownloads + !!maxtraffic + !!password;
   int pind = 1;
 
-  t = (binparam *)malloc(numparam * sizeof(binparam));
+  t = (binparam *)pmem_malloc_array(PMEM_SUBSYS_OTHER, numparam, sizeof(binparam));
   init_param_str(t, "auth", psync_my_auth);
   init_param_num(t + pind++, "linkid", linkid);
   if (linkpassword)
@@ -832,7 +833,7 @@ int do_psync_change_link(unsigned long long linkid, unsigned long long expire,
   }
   bres = papi_send(api, "changepublink", sizeof("changepublink") - 1, t,
                          pind, -1, 1);
-  free(t);
+  pmem_free(PMEM_SUBSYS_OTHER, t);
   result = process_bres("deletepublink", bres, api, err);
   return result;
 }
@@ -862,7 +863,7 @@ int do_change_link_expire(unsigned long long linkid, unsigned long long expire,
   }
 
   result = process_bres("changepublink", bres, api, err);
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }
@@ -891,7 +892,7 @@ int do_change_link_password(unsigned long long linkid, const char *password,
     bres = papi_send2(api, "changepublink", paramsd);
   }
   result = process_bres("changepublink", bres, api, err);
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }
@@ -922,7 +923,7 @@ int do_change_link_enable_upload(unsigned long long linkid,
   }
 
   result = process_bres("changepublink", bres, api, err);
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }
@@ -956,7 +957,7 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
     int numparam = 3 + !!expire + !!maxspace + !!maxfiles;
     int pind = 1;
 
-    t = (binparam *)malloc(numparam * sizeof(binparam));
+    t = (binparam *)pmem_malloc_array(PMEM_SUBSYS_OTHER, numparam, sizeof(binparam));
     init_param_str(t, "auth", psync_my_auth);
     init_param_str(t + pind++, "path", path);
     init_param_str(t + pind++, "comment", comment);
@@ -974,7 +975,7 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
     }
     bres = papi_send(api, "createuploadlink",
                            sizeof("createuploadlink") - 1, t, pind, -1, 1);
-    free(t);
+    pmem_free(PMEM_SUBSYS_OTHER, t);
   }
 
   if (likely(bres))
@@ -1005,7 +1006,7 @@ int64_t do_psync_upload_link(const char *path, const char *comment,
 
   result = papi_find_result2(bres, "uploadlinkid", PARAM_NUM)->num;
 
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }
@@ -1028,7 +1029,7 @@ int do_psync_delete_upload_link(int64_t uploadlinkid, char **err /*OUT*/) {
 
   bres = papi_send2(api, "deleteuploadlink", params);
   result = process_bres("deletepublink", bres, api, err);
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }
@@ -1145,12 +1146,12 @@ plink_contents_t *do_show_link(const char *code, char **err /*OUT*/) {
   if (meta) {
     contents = papi_check_result2(meta, "contents", PARAM_ARRAY);
     if (!contents) {
-      free(bres);
+      pmem_free(PMEM_SUBSYS_OTHER, bres);
       return 0;
     }
     concnt = contents->length;
     if (!concnt) {
-      free(bres);
+      pmem_free(PMEM_SUBSYS_OTHER, bres);
       return 0;
     }
     builder = psync_list_builder_create(sizeof(link_cont_t),
@@ -1174,10 +1175,10 @@ plink_contents_t *do_show_link(const char *code, char **err /*OUT*/) {
       pcont->icon = papi_find_result2(link, "icon", PARAM_NUM)->num;
     }
     ret = (plink_contents_t *)psync_list_builder_finalize(builder);
-    free(bres);
+    pmem_free(PMEM_SUBSYS_OTHER, bres);
     return ret;
   }
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
   return 0;
 }
 
@@ -1299,7 +1300,7 @@ int cache_upload_links(char **err /*OUT*/) {
     psql_run_free(q);
   }
 
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return linkscnt;
 }
@@ -1316,11 +1317,11 @@ void cache_links_all() {
     if (err) {
       pdbg_logf(D_WARNING, "Problem cacheing links errcode %d errmsg[%s]\n", ret,
             err);
-      free(err);
+      pmem_free(PMEM_SUBSYS_OTHER, err);
     }
   }
   if (err)
-    free(err);
+    pmem_free(PMEM_SUBSYS_OTHER, err);
 }
 
 int do_delete_all_links(int64_t folderid, int64_t fileid, char **err) {
@@ -1449,7 +1450,7 @@ preciever_list_t *do_list_email_with_access(unsigned long long linkid,
 
   if (!lcnt) {
     ret = (preciever_list_t *)psync_list_builder_finalize(builder);
-    free(bres);
+    pmem_free(PMEM_SUBSYS_OTHER, bres);
     return ret;
   }
   for (i = 0; i < lcnt; ++i) {
@@ -1466,7 +1467,7 @@ preciever_list_t *do_list_email_with_access(unsigned long long linkid,
   }
   ret = (preciever_list_t *)psync_list_builder_finalize(builder);
 
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return ret;
 }
@@ -1490,7 +1491,7 @@ int do_link_add_access(unsigned long long linkid, const char *mail,
 
   bres = papi_send2(api, "publink/addaccess", params);
   result = process_bres("publink/addaccess", bres, api, err);
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }
@@ -1513,7 +1514,7 @@ int do_link_remove_access(unsigned long long linkid,
 
   bres = papi_send2(api, "publink/removeaccess", params);
   result = process_bres("publink/removeaccess", bres, api, err);
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }
@@ -1569,7 +1570,7 @@ bookmarks_list_t *do_cache_bookmarks(char **err) {
                                       offsetof(bookmarks_list_t, entries));
   if (!lcnt) {
     ret = (bookmarks_list_t *)psync_list_builder_finalize(builder);
-    free(bres);
+    pmem_free(PMEM_SUBSYS_OTHER, bres);
     return ret;
   }
 
@@ -1602,7 +1603,7 @@ bookmarks_list_t *do_cache_bookmarks(char **err) {
   }
   ret = (bookmarks_list_t *)psync_list_builder_finalize(builder);
 
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return ret;
 }
@@ -1624,7 +1625,7 @@ int do_remove_bookmark(const char *code, int locationid, char **err) {
 
   bres = papi_send2(api, "publink/unpin", params);
   result = process_bres("publink/unpin", bres, api, err);
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }
@@ -1649,7 +1650,7 @@ int do_change_bookmark(const char *code, int locationid, const char *name,
 
   bres = papi_send2(api, "publink/changepin", params);
   result = process_bres("publink/changepin", bres, api, err);
-  free(bres);
+  pmem_free(PMEM_SUBSYS_OTHER, bres);
 
   return result;
 }

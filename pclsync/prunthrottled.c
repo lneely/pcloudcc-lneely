@@ -31,6 +31,7 @@
 
 #include "prunthrottled.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "ptimer.h"
 #include "ptree.h"
 #include "prun.h"
@@ -68,7 +69,7 @@ static void ratelimit_timer(psync_timer_t timer, void *ptr) {
     prun_thread(name, call);
   } else {
     ptimer_stop(timer);
-    free(node);
+    pmem_free(PMEM_SUBSYS_OTHER, node);
   }
 }
 
@@ -112,7 +113,7 @@ void prun_throttled(const char *name, prun_throttle_cb call,
       node->scheduled = 1;
     }
   } else {
-    node = malloc(sizeof(psync_rr_tree_node));
+    node = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_rr_tree_node));
     node->call = call;
     node->name = name;
     node->scheduled = 0;

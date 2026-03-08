@@ -35,6 +35,7 @@
 
 #include "pclsync_lib.h"
 #include "pclsync/psettings.h"
+#include "pclsync/psignal.h"
 
 namespace po = boost::program_options;
 namespace ct = control_tools;
@@ -44,6 +45,10 @@ namespace cc = console_client;
 static std::string version = "git-lneely";
 
 int main(int argc, char **argv) {
+  psignal_register(SIGSEGV);
+  psignal_register(SIGABRT);
+  psignal_register(SIGBUS);
+  
   std::cout << "pCloud console client (" << version << ")" << std::endl;
   std::string username = "";
   std::string password = "";

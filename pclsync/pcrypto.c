@@ -36,6 +36,7 @@
 #include "pcompiler.h"
 #include "pcrypto.h"
 #include "pdbg.h"
+#include "pmem.h"
 #include "pssl.h"
 
 typedef struct {
@@ -153,7 +154,7 @@ static void copy_iv_and_xor_with_counter(unsigned char *dest,
 
 psync_symmetric_key_t pcrypto_key_len(size_t len) {
   psync_symmetric_key_t key;
-  key = (psync_symmetric_key_t)malloc(
+  key = (psync_symmetric_key_t)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_symmetric_key_struct_t, key) + len);
   key->keylen = len;
   pssl_rand_strong(key->key, len);
@@ -175,7 +176,7 @@ pcrypto_ctr_encdec_t pcrypto_ctr_encdec_create(psync_symmetric_key_t key) {
   if (pdbg_unlikely(enc == PSYNC_INVALID_ENCODER)) {
     return PSYNC_CRYPTO_INVALID_ENCODER;
   }
-  ret = malloc(sizeof(pcrypto_key_t));
+  ret = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(pcrypto_key_t));
   ret->encoder = enc;
   memcpy(ret->iv, key->key + PSYNC_AES256_KEY_SIZE, PSYNC_AES256_BLOCK_SIZE);
   return ret;
@@ -185,7 +186,7 @@ void pcrypto_ctr_encdec_free(
     pcrypto_ctr_encdec_t enc) {
   paes_free_encoder(enc->encoder);
   putil_wipe(enc->iv, PSYNC_AES256_BLOCK_SIZE);
-  free(enc);
+  pmem_free(PMEM_SUBSYS_OTHER, enc);
 }
 
 void pcrypto_ctr_encdec_decode(
@@ -279,7 +280,7 @@ void pcrypto_encode_text(pcrypto_textenc_t enc,
   aesdst = aessrc + PSYNC_AES256_BLOCK_SIZE;
   hmac = aessrc + PSYNC_AES256_BLOCK_SIZE * 2;
   ol = ALIGN_A256_BS(txtlen);
-  outptr = malloc(sizeof(unsigned char) * ol);
+  outptr = pmem_malloc_array(PMEM_SUBSYS_OTHER, ol, sizeof(unsigned char));
   *out = outptr;
   *outlen = ol;
   if (txtlen <= PSYNC_AES256_BLOCK_SIZE) {
@@ -320,7 +321,7 @@ pcrypto_decode_text(pcrypto_textdec_t enc,
     return NULL;
   aessrc = ALIGN_PTR_A256_BS(buff);
   aesdst = aessrc + PSYNC_AES256_BLOCK_SIZE;
-  outptr = malloc(sizeof(unsigned char) * (datalen + 1));
+  outptr = pmem_malloc_array(PMEM_SUBSYS_OTHER, datalen + 1, sizeof(unsigned char));
   ret = outptr;
   datalen /= PSYNC_AES256_BLOCK_SIZE;
   if (datalen == 1) {
@@ -335,7 +336,7 @@ pcrypto_decode_text(pcrypto_textdec_t enc,
     while (ret + len < outptr) {
       if (unlikely(ret[len] != 0)) {
         pdbg_logf(D_WARNING, "non-zero in the padding found");
-        free(ret);
+        pmem_free(PMEM_SUBSYS_OTHER, ret);
         return NULL;
       }
       len++;
@@ -380,7 +381,7 @@ pcrypto_decode_text(pcrypto_textdec_t enc,
   while (ret + len < outptr) {
     if (unlikely(ret[len] != 0)) {
       pdbg_logf(D_WARNING, "non-zero in the padding found");
-      free(ret);
+      pmem_free(PMEM_SUBSYS_OTHER, ret);
       return NULL;
     }
     len++;
@@ -398,7 +399,7 @@ pcrypto_textenc_create(psync_symmetric_key_t key) {
   enc = paes_create_encoder(key);
   if (pdbg_unlikely(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
-  ret = (pcrypto_textenc_t)malloc(
+  ret = (pcrypto_textenc_t)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(pcrypto_key_iv_t, iv) + key->keylen -
       PSYNC_AES256_KEY_SIZE);
   ret->encoder = enc;
@@ -411,7 +412,7 @@ void pcrypto_textenc_free(
     pcrypto_textenc_t enc) {
   paes_free_encoder(enc->encoder);
   putil_wipe(enc->iv, enc->ivlen);
-  free(enc);
+  pmem_free(PMEM_SUBSYS_OTHER, enc);
 }
 
 pcrypto_textdec_t
@@ -424,7 +425,7 @@ pcrypto_textdec_create(psync_symmetric_key_t key) {
   enc = paes_create_decoder(key);
   if (pdbg_unlikely(enc == PSYNC_INVALID_ENCODER))
     return PSYNC_CRYPTO_INVALID_ENCODER;
-  ret = (pcrypto_textenc_t)malloc(
+  ret = (pcrypto_textenc_t)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(pcrypto_key_iv_t, iv) + key->keylen -
       PSYNC_AES256_KEY_SIZE);
   ret->encoder = enc;
@@ -437,7 +438,7 @@ void pcrypto_textdec_free(
     pcrypto_textdec_t enc) {
   paes_free_encoder(enc->encoder);
   putil_wipe(enc->iv, enc->ivlen);
-  free(enc);
+  pmem_free(PMEM_SUBSYS_OTHER, enc);
 }
 
 pcrypto_sector_encdec_t
@@ -455,7 +456,7 @@ pcrypto_sec_encdec_create(psync_symmetric_key_t key) {
     paes_free_encoder(enc);
     return PSYNC_CRYPTO_INVALID_ENCODER;
   }
-  ret = (pcrypto_sector_encdec_t)malloc(
+  ret = (pcrypto_sector_encdec_t)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(pcrypto_encdec_iv_t, iv) + key->keylen -
       PSYNC_AES256_KEY_SIZE);
   ret->encoder = enc;
@@ -470,7 +471,7 @@ void pcrypto_sec_encdec_free(
   paes_free_encoder(enc->encoder);
   paes_free_decoder(enc->decoder);
   putil_wipe(enc->iv, enc->ivlen);
-  free(enc);
+  pmem_free(PMEM_SUBSYS_OTHER, enc);
 }
 
 static int memcmp_const(const unsigned char *s1, const unsigned char *s2,

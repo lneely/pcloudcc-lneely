@@ -1,4 +1,5 @@
 // debug/psql_debug.c - debug-build strong overrides for psql lock/query functions.
+#include "../pmem.h"
 // Compiled only when BUILD=debug. Strong symbols here override the weak stubs in psql.c.
 
 #include <sqlite3.h>
@@ -98,7 +99,7 @@ static void record_wrunlock() {
 static void record_rdlock(const char *file, unsigned line,
                           struct timespec *tm) {
   rd_lock_data *lock;
-  lock = malloc(sizeof(rd_lock_data));
+  lock = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(rd_lock_data));
   lock->file = file;
   lock->thread = psync_thread_name;
   lock->line = line;
@@ -282,7 +283,7 @@ void psql_rdunlock() {
       pdbg_logf(D_BUG,
             "held database read lock for %lu milliseconds taken at %s:%u", msec,
             lock->file, lock->line);
-    free(lock);
+    pmem_free(PMEM_SUBSYS_OTHER, lock);
   } else
     plocks_unlock(&dblock);
 }
@@ -300,7 +301,7 @@ int psql_tryupgradeLock() {
     pdbg_assert(lockctr == 1);
     lockstart = rdlockstart;
     record_wrlock(lock->file, lock->line);
-    free(lock);
+    pmem_free(PMEM_SUBSYS_OTHER, lock);
     return 0;
   }
 }
@@ -369,7 +370,7 @@ psync_sql_res *psql_do_query_nocache(const char *sql, const char *file,
     return NULL;
   }
   cnt = sqlite3_column_count(stmt);
-  res = (psync_sql_res *)malloc(sizeof(psync_sql_res) +
+  res = (psync_sql_res *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_sql_res) +
                                 cnt * sizeof(psync_variant));
   res->stmt = stmt;
   res->sql = sql;
@@ -408,7 +409,7 @@ psync_sql_res *psql_do_query_rdlock_nocache(const char *sql,
     return NULL;
   }
   cnt = sqlite3_column_count(stmt);
-  res = (psync_sql_res *)malloc(sizeof(psync_sql_res) +
+  res = (psync_sql_res *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_sql_res) +
                                 cnt * sizeof(psync_variant));
   res->stmt = stmt;
   res->sql = sql;
@@ -454,7 +455,7 @@ psync_sql_res *psql_do_query_nolock_nocache(const char *sql, const char *file,
     return NULL;
   }
   cnt = sqlite3_column_count(stmt);
-  res = (psync_sql_res *)malloc(sizeof(psync_sql_res) +
+  res = (psync_sql_res *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_sql_res) +
                                 cnt * sizeof(psync_variant));
   res->stmt = stmt;
   res->sql = sql;
@@ -500,7 +501,7 @@ psync_sql_res *psql_do_prepare_nocache(const char *sql, const char *file,
               sql, sqlite3_errmsg(psync_db), file, line);
     return NULL;
   }
-  res = malloc(sizeof(psync_sql_res));
+  res = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_sql_res));
   res->stmt = stmt;
   res->sql = sql;
   res->column_count = 0;

@@ -7,6 +7,7 @@
 #include "pcompiler.h"
 #include "pfile.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "ppath.h"
 #include "psettings.h"
 #include "psql.h"
@@ -21,24 +22,24 @@ char *ppath_default_db() {
   }
 
   dbp = putil_strcat(pcdir, "/", PSYNC_DEFAULT_DB_NAME, NULL);
-  free(pcdir);
+  pmem_free(PMEM_SUBSYS_OTHER, pcdir);
 
   if (stat(dbp, &st)) {
     // Inline the old database path function here
     if ((home = ppath_home())) {
       oldp = putil_strcat(home, "/", PSYNC_DEFAULT_POSIX_DBNAME, NULL);
-      free(home);
+      pmem_free(PMEM_SUBSYS_OTHER, home);
 
       if (oldp) {
         if (!stat(oldp, &st)) {
           if (psql_reopen(oldp)) {
-            free(dbp);
+            pmem_free(PMEM_SUBSYS_OTHER, dbp);
             return oldp;
           } else {
             pfile_rename(oldp, dbp);
           }
         }
-        free(oldp);
+        pmem_free(PMEM_SUBSYS_OTHER, oldp);
       }
     }
   }
@@ -87,7 +88,7 @@ int ppath_ls(const char *path, ppath_ls_cb callback, void *ptr) {
   }
 
   pl = strlen(path);
-  cpath = (char *)malloc(pl + NAME_MAX + 2);
+  cpath = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, pl + NAME_MAX + 2);
   memcpy(cpath, path, pl);
   if (!pl || cpath[pl - 1] != '/')
     cpath[pl++] = '/';
@@ -109,7 +110,7 @@ int ppath_ls(const char *path, ppath_ls_cb callback, void *ptr) {
     }
   }
 
-  free(cpath);
+  pmem_free(PMEM_SUBSYS_OTHER, cpath);
   closedir(dh);
   return 0;
 }
@@ -129,7 +130,7 @@ int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback, void *ptr) {
   }
 
   pl = strlen(path);
-  cpath = (char *)malloc(pl + NAME_MAX + 2);
+  cpath = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, pl + NAME_MAX + 2);
   memcpy(cpath, path, pl);
   if (!pl || cpath[pl - 1] != '/')
     cpath[pl++] = '/';
@@ -159,7 +160,7 @@ int ppath_ls_fast(const char *path, ppath_ls_fast_cb callback, void *ptr) {
     // Ignore other file types
   }
 
-  free(cpath);
+  pmem_free(PMEM_SUBSYS_OTHER, cpath);
   closedir(dh);
   return 0;
 }
@@ -173,14 +174,14 @@ char *ppath_pcloud() {
   }
 
   path = putil_strcat(homedir, "/", PSYNC_DEFAULT_POSIX_DIR, NULL);
-  free(homedir);
+  pmem_free(PMEM_SUBSYS_OTHER, homedir);
   if (pdbg_unlikely(!path)) {
     return NULL;
   }
 
   if (stat(path, &st) &&
       pdbg_unlikely(mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE))) {
-    free(path);
+    pmem_free(PMEM_SUBSYS_OTHER, path);
     return NULL;
   }
   return path;
@@ -194,11 +195,11 @@ char *ppath_private(char *name) {
     return NULL;
   rpath = putil_strcat(path, "/", name, NULL);
   if (stat(rpath, &st) && mkdir(path, PSYNC_DEFAULT_POSIX_FOLDER_MODE)) {
-    free(rpath);
-    free(path);
+    pmem_free(PMEM_SUBSYS_OTHER, rpath);
+    pmem_free(PMEM_SUBSYS_OTHER, path);
     return NULL;
   }
-  free(path);
+  pmem_free(PMEM_SUBSYS_OTHER, path);
   return rpath;
 }
 

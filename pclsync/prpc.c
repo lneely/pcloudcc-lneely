@@ -48,6 +48,7 @@
 #include <sys/un.h>
 
 #include "pdbg.h"
+#include "pmem.h"
 #include "ppath.h"
 #include "ppathstatus.h"
 #include "prpc.h"
@@ -105,7 +106,7 @@ static void on_request(void *lpvParam) {
   }
 
   request = (rpc_message_t *)rqbuf;
-  response = (rpc_message_t *)malloc(POVERLAY_BUFSIZE);
+  response = (rpc_message_t *)pmem_malloc(PMEM_SUBSYS_OTHER, POVERLAY_BUFSIZE);
   if (request) {
     respond(request, response);
 
@@ -128,10 +129,10 @@ static void on_request(void *lpvParam) {
 cleanup:
   if (sockfd) {
     close(*sockfd);
-    free(sockfd);
+    pmem_free(PMEM_SUBSYS_OTHER, sockfd);
   }
   if (response) {
-    free(response);
+    pmem_free(PMEM_SUBSYS_OTHER, response);
   }
 
   pdbg_logf(D_NOTICE, "InstanceThread exiting.");
@@ -230,7 +231,7 @@ static void respond(rpc_message_t *request, rpc_message_t *response) {
     response->value[value_length] = '\0';
     pdbg_logf(D_WARNING, "Response message truncated to fit buffer");
   }
-  response->length = value_length + 1;
+  response->length = offsetof(rpc_message_t, value) + value_length + 1;
 }
 
 void prpc_main_loop() {
@@ -259,7 +260,7 @@ void prpc_main_loop() {
     return;
   }
   
-  free(sockpath);
+  pmem_free(PMEM_SUBSYS_OTHER, sockpath);
 
   if (listen(fd, 5) == -1) {
     pdbg_logf(D_ERROR, "Unix socket listen error");
@@ -272,7 +273,7 @@ void prpc_main_loop() {
       continue;
     }
 
-    int *cl_ptr = malloc(sizeof(int));
+    int *cl_ptr = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(int));
     if (!cl_ptr) {
       pdbg_logf(D_ERROR, "Failed to allocate memory for socket fd");
       close(cl);
@@ -305,14 +306,14 @@ int prpc_register(int cmdid, prpc_handler h) {
     }
     memcpy(handlers, handlers_old,
            handlers_size_old * sizeof(prpc_handler));
-    free(handlers_old);
+    pmem_free(PMEM_SUBSYS_OTHER, handlers_old);
   }
   handlers[cmdid - calbacks_lower_band] = h;
   return 0;
 }
 
 void prpc_init() {
-  handlers = (prpc_handler *)malloc(sizeof(prpc_handler) * handlers_size);
+  handlers = (prpc_handler *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(prpc_handler) * handlers_size);
   if (!handlers) {
     pdbg_logf(D_ERROR, "Failed to allocate handler table");
     return;
@@ -328,7 +329,7 @@ char *prpc_sockpath() {
 
     const char *subdir = "/.pcloud/prpc.sock";
     size_t len = strlen(home) + strlen(subdir) + 1;
-    char *sockpath = (char *)malloc(len);
+    char *sockpath = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, len);
     if (!sockpath) {
         return NULL;
     }

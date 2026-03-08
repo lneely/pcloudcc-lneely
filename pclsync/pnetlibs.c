@@ -41,6 +41,7 @@
 #include "pdevice.h"
 #include "pfile.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "pnetlibs.h"
 #include "ppath.h"
 #include "prun.h"
@@ -67,10 +68,19 @@ struct _psync_file_lock_t {
   char filename[];
 };
 
+static void free_range_list(psync_range_list_t *elem) {
+  pmem_free(PMEM_SUBSYS_OTHER, elem);
+}
+
+static void free_upload_range_list_net(psync_upload_range_list_t *elem) {
+  pmem_free(PMEM_SUBSYS_OTHER, elem);
+}
+
 typedef struct {
   unsigned char mbedtls_sha1[PSYNC_SHA1_DIGEST_LEN];
   uint32_t adler;
 } psync_block_checksum;
+
 
 typedef struct {
   uint64_t filesize;
@@ -80,16 +90,19 @@ typedef struct {
   psync_block_checksum blocks[];
 } psync_file_checksums;
 
+
 typedef struct {
   unsigned long elementcnt;
   uint32_t elements[];
 } psync_file_checksum_hash;
+
 
 typedef struct {
   uint64_t filesize;
   uint32_t blocksize;
   unsigned char _reserved[12];
 } psync_block_checksum_header;
+
 
 typedef struct {
   uint64_t off;
@@ -279,7 +292,7 @@ static void rm_all(void *vpath, ppath_stat *st) {
     rmdir(path);
   } else
     pfile_delete(path);
-  free(path);
+  pmem_free(PMEM_SUBSYS_OTHER, path);
 }
 
 static void rm_ign(void *vpath, ppath_stat *st) {
@@ -295,7 +308,7 @@ static void rm_ign(void *vpath, ppath_stat *st) {
     rmdir(path);
   } else if (ign)
     pfile_delete(path);
-  free(path);
+  pmem_free(PMEM_SUBSYS_OTHER, path);
 }
 
 int psync_rmdir_with_trashes(const char *path) {
@@ -370,7 +383,7 @@ int psync_get_remote_file_checksum(psync_fileid_t fileid, unsigned char *hexsum,
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     pdbg_logf(D_WARNING, "checksumfile returned error %lu", (unsigned long)result);
-    free(res);
+    pmem_free(PMEM_SUBSYS_OTHER, res);
     return psync_handle_api_result(result);
   }
   meta = papi_find_result2(res, "metadata", PARAM_HASH);
@@ -388,7 +401,7 @@ int psync_get_remote_file_checksum(psync_fileid_t fileid, unsigned char *hexsum,
   psql_bind_lstr(sres, 3, checksum->str, checksum->length);
   psql_run_free(sres);
   memcpy(hexsum, checksum->str, checksum->length);
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
   return PSYNC_NET_OK;
 }
 
@@ -412,7 +425,7 @@ int psync_get_local_file_checksum(const char *restrict filename,
   fd = pfile_open(filename, O_RDONLY, 0);
   if (fd == INVALID_HANDLE_VALUE)
     return PSYNC_NET_PERMFAIL;
-  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = pmem_malloc(PMEM_SUBSYS_OTHER, PSYNC_COPY_BUFFER_SIZE);
   if (!buff) {
     pfile_close(fd);
     return PSYNC_NET_TEMPFAIL;
@@ -456,7 +469,7 @@ retry:
     pfile_seek(fd, 0, SEEK_SET);
     goto retry;
   }
-  free(buff);
+  pmem_free(PMEM_SUBSYS_OTHER, buff);
   pfile_close(fd);
   psync_hash_final(hashbin, &hctx);
   psync_binhex(hexsum, hashbin, PSYNC_HASH_DIGEST_LEN);
@@ -464,7 +477,7 @@ retry:
     *fsize = pfile_stat_size(&st);
   return PSYNC_NET_OK;
 err1:
-  free(buff);
+  pmem_free(PMEM_SUBSYS_OTHER, buff);
   pfile_close(fd);
   return PSYNC_NET_PERMFAIL;
 }
@@ -488,7 +501,7 @@ int psync_get_local_file_checksum_part(const char *restrict filename,
     return PSYNC_NET_PERMFAIL;
   if (pdbg_unlikely(fstat(fd, &st)))
     goto err1;
-  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = pmem_malloc(PMEM_SUBSYS_OTHER, PSYNC_COPY_BUFFER_SIZE);
   if (!buff) {
     pfile_close(fd);
     return PSYNC_NET_TEMPFAIL;
@@ -519,7 +532,7 @@ int psync_get_local_file_checksum_part(const char *restrict filename,
     if (++cnt % 16 == 0)
       psys_sleep_milliseconds(5);
   }
-  free(buff);
+  pmem_free(PMEM_SUBSYS_OTHER, buff);
   pfile_close(fd);
   psync_hash_final(hashbin, &hctx);
   psync_binhex(hexsum, hashbin, PSYNC_HASH_DIGEST_LEN);
@@ -529,7 +542,7 @@ int psync_get_local_file_checksum_part(const char *restrict filename,
     *fsize = pfile_stat_size(&st);
   return PSYNC_NET_OK;
 err2:
-  free(buff);
+  pmem_free(PMEM_SUBSYS_OTHER, buff);
 err1:
   pfile_close(fd);
   return PSYNC_NET_PERMFAIL;
@@ -576,7 +589,7 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
   if (pdbg_unlikely(dfd == INVALID_HANDLE_VALUE))
     goto err1;
   psync_hash_init(&hctx);
-  buff = malloc(PSYNC_COPY_BUFFER_SIZE);
+  buff = pmem_malloc(PMEM_SUBSYS_OTHER, PSYNC_COPY_BUFFER_SIZE);
   if (!buff) {
     pfile_close(dfd);
     pfile_close(sfd);
@@ -601,13 +614,13 @@ int psync_copy_local_file_if_checksum_matches(const char *source,
   if (pdbg_unlikely(memcmp(hexsum, hashhex, PSYNC_HASH_DIGEST_HEXLEN)) ||
       pdbg_unlikely(pfile_sync(dfd)))
     goto err2;
-  free(buff);
+  pmem_free(PMEM_SUBSYS_OTHER, buff);
   if (pdbg_unlikely(pfile_close(dfd)))
     goto err1;
   pfile_close(sfd);
   return PSYNC_NET_OK;
 err2:
-  free(buff);
+  pmem_free(PMEM_SUBSYS_OTHER, buff);
   pfile_close(dfd);
   pfile_delete(destination);
 err1:
@@ -871,7 +884,7 @@ psync_http_socket *psync_http_connect(const char *host, const char *path,
       goto err0;
   } else
     pdbg_logf(D_NOTICE, "got connection to %s from cache", host);
-  readbuff = malloc(PSYNC_HTTP_RESP_BUFFER);
+  readbuff = pmem_malloc(PMEM_SUBSYS_OTHER, PSYNC_HTTP_RESP_BUFFER);
   if (!readbuff) {
     psock_close(sock);
     goto err0;
@@ -965,13 +978,13 @@ cont:
 ex:
   rl = ptr - readbuff;
   if (rl == rb) {
-    free(readbuff);
+    pmem_free(PMEM_SUBSYS_OTHER, readbuff);
     readbuff = NULL;
   }
-  hsock = (psync_http_socket *)malloc(
+  hsock = (psync_http_socket *)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_http_socket, cachekey) + cl);
   if (!hsock) {
-    free(readbuff);
+    pmem_free(PMEM_SUBSYS_OTHER, readbuff);
     psock_close(sock);
     goto err0;
   }
@@ -985,7 +998,7 @@ ex:
   memcpy(hsock->cachekey, cachekey, cl);
   return hsock;
 err1:
-  free(readbuff);
+  pmem_free(PMEM_SUBSYS_OTHER, readbuff);
   psync_socket_close_download(sock);
 err0:
   return NULL;
@@ -1008,8 +1021,8 @@ void psync_http_close(psync_http_socket *http) {
     psync_socket_close_download(http->sock);
   }
   if (http->readbuff)
-    free(http->readbuff);
-  free(http);
+    pmem_free(PMEM_SUBSYS_OTHER, http->readbuff);
+  pmem_free(PMEM_SUBSYS_OTHER, http);
 }
 
 int psync_http_readall(psync_http_socket *http, void *buff, int num) {
@@ -1029,7 +1042,7 @@ int psync_http_readall(psync_http_socket *http, void *buff, int num) {
     http->readbuffoff += cp;
     http->readbytes += cp;
     if (http->readbuffoff >= http->readbuffsize) {
-      free(http->readbuff);
+      pmem_free(PMEM_SUBSYS_OTHER, http->readbuff);
       http->readbuff = NULL;
     }
     if (cp == num)
@@ -1049,6 +1062,7 @@ int psync_http_readall(psync_http_socket *http, void *buff, int num) {
     return num;
   }
 }
+
 
 typedef struct {
   psync_tree tree;
@@ -1090,7 +1104,7 @@ static void connect_cache_thread(void *ptr) {
     pthread_mutex_unlock(&connect_cache_mutex);
     if (sock)
       pdbg_logf(D_NOTICE, "added connection to %s to cache", node->host);
-    free(node);
+    pmem_free(PMEM_SUBSYS_OTHER, node);
   }
 }
 
@@ -1098,7 +1112,7 @@ connect_cache_tree_node_t *connect_cache_create_node(const char *host) {
   connect_cache_tree_node_t *res;
   size_t len;
   len = strlen(host) + 1;
-  res = (connect_cache_tree_node_t *)malloc(
+  res = (connect_cache_tree_node_t *)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(connect_cache_tree_node_t, host) + len);
   if (!res)
     return NULL;
@@ -1219,7 +1233,7 @@ psock_t *connect_cache_wait_for_http_connection(const char *host,
             pthread_cond_wait(&cond, &connect_cache_mutex);
           } while (!node->ready);
           pthread_mutex_unlock(&connect_cache_mutex);
-          free(node);
+          pmem_free(PMEM_SUBSYS_OTHER, node);
           if (sock)
             pdbg_logf(D_NOTICE, "waited successfully for connection to %s", host);
           return sock;
@@ -1288,16 +1302,16 @@ psync_http_socket *psync_http_connect_multihost(const binresult *hosts,
       }
     }
   }
-  hsock = (psync_http_socket *)malloc(
+  hsock = (psync_http_socket *)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_http_socket, cachekey) + cl);
   if (!hsock) {
     psock_close(sock);
     return NULL;
   }
   hsock->sock = sock;
-  hsock->readbuff = malloc(PSYNC_HTTP_RESP_BUFFER);
+  hsock->readbuff = pmem_malloc(PMEM_SUBSYS_OTHER, PSYNC_HTTP_RESP_BUFFER);
   if (!hsock->readbuff) {
-    free(hsock);
+    pmem_free(PMEM_SUBSYS_OTHER, hsock);
     psock_close(sock);
     return NULL;
   }
@@ -1340,16 +1354,16 @@ psync_http_connect_multihost_from_cache(const binresult *hosts,
   }
   if (!sock)
     return NULL;
-  hsock = (psync_http_socket *)malloc(
+  hsock = (psync_http_socket *)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_http_socket, cachekey) + cl);
   if (!hsock) {
     psock_close(sock);
     return NULL;
   }
   hsock->sock = sock;
-  hsock->readbuff = malloc(PSYNC_HTTP_RESP_BUFFER);
+  hsock->readbuff = pmem_malloc(PMEM_SUBSYS_OTHER, PSYNC_HTTP_RESP_BUFFER);
   if (!hsock->readbuff) {
-    free(hsock);
+    pmem_free(PMEM_SUBSYS_OTHER, hsock);
     psock_close(sock);
     return NULL;
   }
@@ -1549,7 +1563,7 @@ char *psync_url_decode(const char *s) {
   size_t slen;
   char unsigned ch1, ch2;
   slen = strlen(s);
-  ret = p = (char *)malloc(slen + 1);
+  ret = p = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, slen + 1);
   if (!ret)
     return NULL;
   while (slen--) {
@@ -1606,7 +1620,7 @@ static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     pdbg_logf(D_ERROR, "getchecksumlink returned error %lu", (unsigned long)result);
-    free(res);
+    pmem_free(PMEM_SUBSYS_OTHER, res);
     return psync_handle_api_result(result);
   }
   hosts = papi_find_result2(res, "hosts", PARAM_ARRAY);
@@ -1618,7 +1632,7 @@ static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
     if ((http = psync_http_connect(hosts->array[i]->str, requestpath, 0, 0,
                                    cookie)))
       break;
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
   if (pdbg_unlikely(!http))
     return PSYNC_NET_TEMPFAIL;
   if (pdbg_unlikely(psync_http_readall(http, &hdr, sizeof(hdr)) != sizeof(hdr)))
@@ -1632,7 +1646,7 @@ static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
     psync_http_close(http);
     return PSYNC_NET_OK;
   }
-  cs = (psync_file_checksums *)malloc(
+  cs = (psync_file_checksums *)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_file_checksums, blocks) +
       (sizeof(psync_block_checksum) + sizeof(uint32_t)) * i);
   if (!cs)
@@ -1653,7 +1667,7 @@ static int psync_net_get_checksums(psock_t *api, psync_fileid_t fileid,
   pdbg_logf(D_NOTICE, "checksums downloaded");
   return PSYNC_NET_OK;
 err1:
-  free(cs);
+  pmem_free(PMEM_SUBSYS_OTHER, cs);
 err0:
   psync_http_close(http);
   return PSYNC_NET_TEMPFAIL;
@@ -1679,10 +1693,10 @@ static int psync_net_get_upload_checksums(psock_t *api,
   if (result) {
     pdbg_logf(D_ERROR, "upload_blockchecksums returned error %lu",
           (unsigned long)result);
-    free(res);
+    pmem_free(PMEM_SUBSYS_OTHER, res);
     return psync_handle_api_result(result);
   }
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
   if (pdbg_unlikely(psync_socket_readall_download(api, &hdr, sizeof(hdr)) !=
                    sizeof(hdr)))
     goto err0;
@@ -1698,7 +1712,7 @@ static int psync_net_get_upload_checksums(psock_t *api,
   }
   if (!hdr.filesize)
     return PSYNC_NET_PERMFAIL;
-  cs = (psync_file_checksums *)malloc(
+  cs = (psync_file_checksums *)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_file_checksums, blocks) +
       (sizeof(psync_block_checksum) + sizeof(uint32_t)) * i);
   if (!cs)
@@ -1717,7 +1731,7 @@ static int psync_net_get_upload_checksums(psock_t *api,
   *checksums = cs;
   return PSYNC_NET_OK;
 err1:
-  free(cs);
+  pmem_free(PMEM_SUBSYS_OTHER, cs);
 err0:
   return PSYNC_NET_TEMPFAIL;
 }
@@ -1734,7 +1748,7 @@ static psync_block_checksum
 **psync_net_get_sorted_checksums(psync_file_checksums *checksums){
   psync_block_checksum **ret;
   uint32_t i;
-  ret=malloc(sizeof(psync_block_checksum *) * checksums->blockcnt);
+  ret=pmem_malloc_array(PMEM_SUBSYS_OTHER, checksums->blockcnt, sizeof(psync_block_checksum *));
   if (!ret)
     return NULL;
   for (i=0; i<checksums->blockcnt; i++)
@@ -1773,7 +1787,7 @@ psync_net_create_hash(const psync_file_checksums *checksums) {
       break;
     cnt += 2;
   }
-  h = (psync_file_checksum_hash *)malloc(
+  h = (psync_file_checksum_hash *)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_file_checksum_hash, elements) + sizeof(uint32_t) * cnt);
   if (!h)
     return NULL;
@@ -1993,7 +2007,7 @@ static void psync_net_check_file_for_blocks(
   else
     buffersize = PSYNC_COPY_BUFFER_SIZE;
   hbuffersize = buffersize / 2;
-  buff = malloc(buffersize);
+  buff = pmem_malloc(PMEM_SUBSYS_OTHER, buffersize);
   if (!buff) {
     pfile_close(fd);
     return;
@@ -2001,7 +2015,7 @@ static void psync_net_check_file_for_blocks(
   rd = pfile_read(fd, buff, hbuffersize);
   if (unlikely(rd < (ssize_t)hbuffersize)) {
     if (rd < (ssize_t)checksums->blocksize) {
-      free(buff);
+      pmem_free(PMEM_SUBSYS_OTHER, buff);
       pfile_close(fd);
       return;
     }
@@ -2067,7 +2081,7 @@ static void psync_net_check_file_for_blocks(
     adler = adler32_roll(adler, buff[outbyteoff++], buff[inbyteoff++],
                          checksums->blocksize);
   }
-  free(buff);
+  pmem_free(PMEM_SUBSYS_OTHER, buff);
   pfile_close(fd);
 }
 
@@ -2088,23 +2102,22 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
   else if (pdbg_unlikely(rt == PSYNC_NET_TEMPFAIL))
     return PSYNC_NET_TEMPFAIL;
   if (pdbg_unlikely(checksums->filesize != filesize)) {
-    free(checksums);
+    pmem_free(PMEM_SUBSYS_OTHER, checksums);
     return PSYNC_NET_TEMPFAIL;
   }
   hash = psync_net_create_hash(checksums);
-  blockactions = malloc(sizeof(psync_block_action) * checksums->blockcnt);
+  blockactions = pmem_malloc_array(PMEM_SUBSYS_OTHER, checksums->blockcnt, sizeof(psync_block_action));
   if (!blockactions) {
-    free(checksums);
+    pmem_free(PMEM_SUBSYS_OTHER, checksums);
     return PSYNC_NET_TEMPFAIL;
   }
-  memset(blockactions, 0, sizeof(psync_block_action) * checksums->blockcnt);
   for (i = 0; i < filecnt; i++)
     psync_net_check_file_for_blocks(files[i], checksums, hash, blockactions, i);
-  free(hash);
-  range = malloc(sizeof(psync_range_list_t));
+  pmem_free(PMEM_SUBSYS_OTHER, hash);
+  range = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_range_list_t));
   if (!range) {
-    free(blockactions);
-    free(checksums);
+    pmem_free(PMEM_SUBSYS_OTHER, blockactions);
+    pmem_free(PMEM_SUBSYS_OTHER, checksums);
     return PSYNC_NET_TEMPFAIL;
   }
   range->len = checksums->blocksize;
@@ -2126,11 +2139,11 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
         (range->type == PSYNC_RANGE_COPY &&
          (range->filename != files[blockactions[i].idx] ||
           range->off + range->len != blockactions[i].off))) {
-      range = malloc(sizeof(psync_range_list_t));
+      range = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_range_list_t));
       if (!range) {
-        psync_list_for_each_element_call(ranges, psync_range_list_t, list, free);
-        free(blockactions);
-        free(checksums);
+        psync_list_for_each_element_call(ranges, psync_range_list_t, list, free_range_list);
+        pmem_free(PMEM_SUBSYS_OTHER, blockactions);
+        pmem_free(PMEM_SUBSYS_OTHER, checksums);
         return PSYNC_NET_TEMPFAIL;
       }
       range->len = bs;
@@ -2144,11 +2157,11 @@ int psync_net_download_ranges(psync_list *ranges, psync_fileid_t fileid,
     } else
       range->len += bs;
   }
-  free(checksums);
-  free(blockactions);
+  pmem_free(PMEM_SUBSYS_OTHER, checksums);
+  pmem_free(PMEM_SUBSYS_OTHER, blockactions);
   return PSYNC_NET_OK;
 fulldownload:
-  range = malloc(sizeof(psync_range_list_t));
+  range = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_range_list_t));
   if (!range)
     return PSYNC_NET_TEMPFAIL;
   range->off = 0;
@@ -2182,12 +2195,12 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
   else
     buffersize = PSYNC_COPY_BUFFER_SIZE;
   hbuffersize = buffersize / 2;
-  buff = malloc(buffersize);
+  buff = pmem_malloc(PMEM_SUBSYS_OTHER, buffersize);
   if (!buff)
     return PSYNC_NET_TEMPFAIL;
   rd = pfile_read(fd, buff, hbuffersize);
   if (unlikely(rd < (ssize_t)hbuffersize)) {
-    free(buff);
+    pmem_free(PMEM_SUBSYS_OTHER, buff);
     return PSYNC_NET_OK;
   } else
     bufferlen = buffersize;
@@ -2223,11 +2236,11 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
             ur->uploadoffset + ur->len == off + buffoff + outbyteoff)
           ur->len += blen;
         else {
-          ur = malloc(sizeof(psync_upload_range_list_t));
+          ur = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_upload_range_list_t));
           if (!ur) {
-            free(buff);
+            pmem_free(PMEM_SUBSYS_OTHER, buff);
             pfile_close(fd);
-            psync_list_for_each_element_call(nr, psync_upload_range_list_t, list, free);
+            psync_list_for_each_element_call(nr, psync_upload_range_list_t, list, free_upload_range_list_net);
             return -1;
           }
           ur->uploadoffset = off + buffoff + outbyteoff;
@@ -2297,7 +2310,7 @@ static int check_range_for_blocks(psync_file_checksums *checksums,
     adler = adler32_roll(adler, buff[outbyteoff++], buff[inbyteoff++],
                          checksums->blocksize);
   }
-  free(buff);
+  pmem_free(PMEM_SUBSYS_OTHER, buff);
   return PSYNC_NET_OK;
 }
 
@@ -2324,7 +2337,7 @@ static void merge_list_to_element(psync_upload_range_list_t *le,
       pdbg_assertw(psync_list_isempty(rlist));
       psync_list_add_after(&le->list, &ur->list);
       psync_list_del(&le->list);
-      free(le);
+      pmem_free(PMEM_SUBSYS_OTHER, le);
     } else if (ur->uploadoffset == le->uploadoffset) {
       psync_list_add_before(&le->list, &ur->list);
       le->uploadoffset += ur->len;
@@ -2334,9 +2347,9 @@ static void merge_list_to_element(psync_upload_range_list_t *le,
       psync_list_add_after(&le->list, &ur->list);
       le->len -= ur->len;
     } else {
-      n = malloc(sizeof(psync_upload_range_list_t));
+      n = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_upload_range_list_t));
       if (!n) {
-        psync_list_for_each_element_call(rlist, psync_upload_range_list_t, list, free);
+        psync_list_for_each_element_call(rlist, psync_upload_range_list_t, list, free_upload_range_list_net);
         return;
       }
       n->uploadoffset = n->off = ur->uploadoffset + ur->len;
@@ -2375,8 +2388,8 @@ int psync_net_scan_file_for_blocks(psock_t *api, psync_list *rlist,
     psync_list_init(&nr);
     if (check_range_for_blocks(checksums, hash, ur->off, ur->len, fd, &nr) ==
         PSYNC_NET_TEMPFAIL) {
-      free(hash);
-      free(checksums);
+      pmem_free(PMEM_SUBSYS_OTHER, hash);
+      pmem_free(PMEM_SUBSYS_OTHER, checksums);
       return PSYNC_NET_TEMPFAIL;
     }
     if (!psync_list_isempty(&nr)) {
@@ -2388,8 +2401,8 @@ int psync_net_scan_file_for_blocks(psock_t *api, psync_list *rlist,
       merge_list_to_element(ur, &nr);
     }
   }
-  free(hash);
-  free(checksums);
+  pmem_free(PMEM_SUBSYS_OTHER, hash);
+  pmem_free(PMEM_SUBSYS_OTHER, checksums);
   return PSYNC_NET_OK;
 }
 
@@ -2416,8 +2429,8 @@ int psync_net_scan_upload_for_blocks(psock_t *api, psync_list *rlist,
     psync_list_init(&nr);
     if (check_range_for_blocks(checksums, hash, ur->off, ur->len, fd, &nr) ==
         PSYNC_NET_TEMPFAIL) {
-      free(hash);
-      free(checksums);
+      pmem_free(PMEM_SUBSYS_OTHER, hash);
+      pmem_free(PMEM_SUBSYS_OTHER, checksums);
       return PSYNC_NET_TEMPFAIL;
     }
     if (!psync_list_isempty(&nr)) {
@@ -2428,8 +2441,8 @@ int psync_net_scan_upload_for_blocks(psock_t *api, psync_list *rlist,
       merge_list_to_element(ur, &nr);
     }
   }
-  free(hash);
-  free(checksums);
+  pmem_free(PMEM_SUBSYS_OTHER, hash);
+  pmem_free(PMEM_SUBSYS_OTHER, checksums);
   return PSYNC_NET_OK;
 }
 
@@ -2475,7 +2488,7 @@ static int download_file_revisions(psync_fileid_t fileid) {
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
     pdbg_logf(D_ERROR, "listrevisions returned error %lu", (unsigned long)result);
-    free(res);
+    pmem_free(PMEM_SUBSYS_OTHER, res);
     return psync_handle_api_result(result);
   }
   revs = papi_find_result2(res, "revisions", PARAM_ARRAY);
@@ -2516,7 +2529,7 @@ static int download_file_revisions(psync_fileid_t fileid) {
                          PSYNC_HASH_DIGEST_HEXLEN);
   psql_run_free(hc);
   psql_commit();
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
   return PSYNC_NET_OK;
 }
 
@@ -2544,7 +2557,7 @@ psync_file_lock_t *psync_lock_file(const char *path) {
   size_t len;
   int cmp;
   len = strlen(path) + 1;
-  lock = malloc(offsetof(psync_file_lock_t, filename) + len);
+  lock = pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(psync_file_lock_t, filename) + len);
   if (!lock)
     return NULL;
   memcpy(lock->filename, path, len);
@@ -2570,7 +2583,7 @@ psync_file_lock_t *psync_lock_file(const char *path) {
       }
     } else {
       pthread_mutex_unlock(&file_lock_mutex);
-      free(lock);
+      pmem_free(PMEM_SUBSYS_OTHER, lock);
       return NULL;
     }
   }
@@ -2584,7 +2597,7 @@ void psync_unlock_file(psync_file_lock_t *lock) {
   pthread_mutex_lock(&file_lock_mutex);
   ptree_del(&file_lock_tree, &lock->tree);
   pthread_mutex_unlock(&file_lock_mutex);
-  free(lock);
+  pmem_free(PMEM_SUBSYS_OTHER, lock);
 }
 
 int psync_get_upload_checksum(psync_uploadid_t uploadid, unsigned char *uhash,
@@ -2604,13 +2617,13 @@ int psync_get_upload_checksum(psync_uploadid_t uploadid, unsigned char *uhash,
   }
   psync_apipool_release(api);
   if (papi_find_result2(res, "result", PARAM_NUM)->num) {
-    free(res);
+    pmem_free(PMEM_SUBSYS_OTHER, res);
     return PSYNC_NET_PERMFAIL;
   }
   *usize = papi_find_result2(res, "size", PARAM_NUM)->num;
   memcpy(uhash, papi_find_result2(res, PSYNC_CHECKSUM, PARAM_STR)->str,
          PSYNC_HASH_DIGEST_HEXLEN);
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
   return PSYNC_NET_OK;
 }
 
@@ -2641,13 +2654,13 @@ static void psync_send_debug_thread(void *ptr) {
     pdbg_logf(D_NOTICE, "sending debug %s", str);
     res = psync_api_run_command("senddebug", params);
     if (res) {
-      free(res);
-      free(last);
+      pmem_free(PMEM_SUBSYS_OTHER, res);
+      pmem_free(PMEM_SUBSYS_OTHER, last);
       last = str;
     } else
-      free(str);
+      pmem_free(PMEM_SUBSYS_OTHER, str);
   } else
-    free(str);
+    pmem_free(PMEM_SUBSYS_OTHER, str);
   pthread_mutex_unlock(&m);
 }
 
@@ -2660,16 +2673,16 @@ int psync_send_pdbg_logf(int thread, const char *file, const char *function,
   ret = pdevice_id();
   snprintf(format, sizeof(format), "%s %s: %s:%u (function %s): %s\n", ret,
            psync_thread_name, file, line, function, fmt);
-  free(ret);
+  pmem_free(PMEM_SUBSYS_OTHER, ret);
   format[sizeof(format) - 1] = 0;
   ret = NULL;
   l = 511;
   do {
     char *tmp;
     sz = l + 1;
-    tmp = (char *)realloc(ret, sz);
+    tmp = (char *)pmem_realloc(PMEM_SUBSYS_OTHER, ret, sz);
     if (!tmp) {
-      free(ret);
+      pmem_free(PMEM_SUBSYS_OTHER, ret);
       return -1;
     }
     ret = tmp;
@@ -2683,7 +2696,7 @@ int psync_send_pdbg_logf(int thread, const char *file, const char *function,
     else
       psync_send_debug_thread(ret);
   } else
-    free(ret);
+    pmem_free(PMEM_SUBSYS_OTHER, ret);
   return 1;
 }
 
@@ -2721,7 +2734,7 @@ int psync_do_run_command_res(const char *cmd, size_t cmdlen,
       *err = putil_strdup(papi_find_result2(res, "error", PARAM_STR)->str);
     psync_process_api_error(result);
   }
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
   return (int)result;
 neterr:
   if (err)

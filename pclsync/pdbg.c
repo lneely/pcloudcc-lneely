@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "pdbg.h"
+#include "pmem.h"
 #include "ppath.h"
 #include "putil.h"
 
@@ -111,7 +112,7 @@ char *psync_debug_path() {
                     custom_path);
         } else {
             size_t len = strlen(custom_path) + 1;
-            char *path = (char *)malloc(len);
+            char *path = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, len);
             if (!path) {
                 return NULL;
             }
@@ -127,14 +128,14 @@ char *psync_debug_path() {
 
     const char *subdir = "/.pcloud/debug.log";
     size_t len = strlen(home) + strlen(subdir) + 1;
-    char *sockpath = (char *)malloc(len);
+    char *sockpath = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, len);
     if (!sockpath) {
-        free(home);
+        pmem_free(PMEM_SUBSYS_OTHER, home);
         return NULL;
     }
 
     snprintf(sockpath, len, "%s%s", home, subdir);
-    free(home);
+    pmem_free(PMEM_SUBSYS_OTHER, home);
     return sockpath;
 }
 
@@ -142,7 +143,7 @@ char *pfs_event_log_path() {
     const char *custom_path = getenv("PCLOUD_FS_EVENT_LOG");
     if (custom_path && custom_path[0] != '\0') {
         size_t len = strlen(custom_path) + 1;
-        char *path = (char *)malloc(len);
+        char *path = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, len);
         if (!path) {
             return NULL;
         }
@@ -189,12 +190,12 @@ int pdbg_printf(const char *file, const char *function, int unsigned line, int u
     char *path = psync_debug_path();
     int fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
     if (fd == -1) {
-      free(path);
+      pmem_free(PMEM_SUBSYS_OTHER, path);
       pthread_mutex_unlock(&log_mutex);
       return 1;
     }
     log_file = fdopen(fd, "a");
-    free(path);
+    pmem_free(PMEM_SUBSYS_OTHER, path);
     if (!log_file) {
       close(fd);
       pthread_mutex_unlock(&log_mutex);
@@ -212,7 +213,7 @@ int pdbg_printf(const char *file, const char *function, int unsigned line, int u
       if (fd != -1) {
         close(fd);
       }
-      free(path);
+      pmem_free(PMEM_SUBSYS_OTHER, path);
     }
   }
 
@@ -252,7 +253,7 @@ static void do_reopen_log() {
   path = psync_debug_path();
   if (path) {
     fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
-    free(path);
+    pmem_free(PMEM_SUBSYS_OTHER, path);
     if (fd != -1) {
       new_log = fdopen(fd, "a");
       if (new_log) {
@@ -274,7 +275,7 @@ static void do_reopen_log() {
     path = pfs_event_log_path();
     if (path) {
       fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
-      free(path);
+      pmem_free(PMEM_SUBSYS_OTHER, path);
       if (fd != -1) {
         new_log = fdopen(fd, "a");
         if (new_log) {
@@ -310,7 +311,7 @@ void pdbg_write_fs_event(const char *fmt, ...) {
       return;
     }
     int fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
-    free(path);
+    pmem_free(PMEM_SUBSYS_OTHER, path);
     if (fd == -1) {
       pthread_mutex_unlock(&log_mutex);
       return;

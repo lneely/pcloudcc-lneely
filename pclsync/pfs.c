@@ -51,6 +51,7 @@
 #include "pfsupload.h"
 #include "pfsxattr.h"
 #include "plibs.h"
+#include "pmem.h"
 #include "pnetlibs.h"
 #include "ppagecache.h"
 #include "ppath.h"
@@ -142,12 +143,12 @@ static void delete_log_files(psync_openfile_t *of) {
   filename =
       putil_strcat(cachepath, "/", fileidhex, NULL);
   pfile_delete(filename);
-  free(filename);
+  pmem_free(PMEM_SUBSYS_OTHER, filename);
   fileidhex[sizeof(psync_fsfileid_t)] = 'f';
   filename =
       putil_strcat(cachepath, "/", fileidhex, NULL);
   pfile_delete(filename);
-  free(filename);
+  pmem_free(PMEM_SUBSYS_OTHER, filename);
 }
 
 int pfs_update_openfile(uint64_t taskid, uint64_t writeid,
@@ -340,7 +341,7 @@ int pfs_rename_openfile_locked(psync_fsfileid_t fileid,
         pthread_mutex_unlock(&fl->mutex);
         return -ENOMEM;
       }
-      free(fl->currentname);
+      pmem_free(PMEM_SUBSYS_OTHER, fl->currentname);
       fl->currentname = newname;
       pthread_mutex_unlock(&fl->mutex);
       return 1;
@@ -652,7 +653,7 @@ static int psync_creat_local_to_file_stat(psync_fstask_creat_t *cr,
     stret = stat(filename, &st);
     if (stret)
       pdbg_logf(D_NOTICE, "could not stat file %s", filename);
-    free(filename);
+    pmem_free(PMEM_SUBSYS_OTHER, filename);
   }
   if (stret)
     return -1;
@@ -661,7 +662,7 @@ static int psync_creat_local_to_file_stat(psync_fstask_creat_t *cr,
     else{
       fileidhex[sizeof(psync_fsfileid_t)]='i';
       filename=putil_strcat(cachepath, "/", fileidhex,
-    NULL); fd=pfile_open(filename, O_RDONLY, 0); free(filename); if
+    NULL); fd=pfile_open(filename, O_RDONLY, 0); pmem_free(PMEM_SUBSYS_OTHER, filename); if
     (fd==INVALID_HANDLE_VALUE) return -EIO; stret=pfile_pread(fd, &osize,
     sizeof(osize), offsetof(index_header, copyfromoriginal));
       pfile_close(fd);
@@ -819,12 +820,12 @@ static int pfs_getattr(const char *path, struct FUSE_STAT *stbuf) {
     if (mk) {
       if (mk->flags & PSYNC_FOLDER_FLAG_INVISIBLE) {
         psql_rdunlock();
-        free(fpath);
+        pmem_free(PMEM_SUBSYS_OTHER, fpath);
         return -ENOENT;
       }
       psync_mkdir_to_folder_stat(mk, stbuf);
       psql_rdunlock();
-      free(fpath);
+      pmem_free(PMEM_SUBSYS_OTHER, fpath);
       return 0;
     }
   }
@@ -839,7 +840,7 @@ static int pfs_getattr(const char *path, struct FUSE_STAT *stbuf) {
     psql_free(res);
     if (row) {
       psql_rdunlock();
-      free(fpath);
+      pmem_free(PMEM_SUBSYS_OTHER, fpath);
       return 0;
     }
   }
@@ -860,7 +861,7 @@ static int pfs_getattr(const char *path, struct FUSE_STAT *stbuf) {
   } else
     crr = -1;
   psql_rdunlock();
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
   if (row || !crr)
     return 0;
   pdbg_logf(D_NOTICE, "returning ENOENT for %s", path);
@@ -877,7 +878,7 @@ static int filler_decoded(pcrypto_textdec_t dec,
     if (!namedec)
       return 0;
     ret = filler(buf, namedec, st, off);
-    free(namedec);
+    pmem_free(PMEM_SUBSYS_OTHER, namedec);
     return ret;
   } else
     return filler(buf, name, st, off);
@@ -1042,10 +1043,10 @@ pfs_create_file(psync_fsfileid_t fileid, psync_fsfileid_t remotefileid,
     }
   }
   if (encoder == PSYNC_CRYPTO_INVALID_ENCODER) {
-    fl = (psync_openfile_t *)malloc(offsetof(psync_openfile_t, encoder));
+    fl = (psync_openfile_t *)pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(psync_openfile_t, encoder));
     memset(fl, 0, offsetof(psync_openfile_t, encoder));
   } else {
-    fl = malloc(sizeof(psync_openfile_t));
+    fl = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_openfile_t));
     memset(fl, 0, sizeof(psync_openfile_t));
     size = pfs_crpt_plain_size(size);
   }
@@ -1161,7 +1162,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
         putil_strcat(cachepath, "/", fileidhex, NULL);
     of->datafile = pfile_open(filename, O_RDWR,
                                    O_CREAT | (trunc ? O_TRUNC : 0));
-    free(filename);
+    pmem_free(PMEM_SUBSYS_OTHER, filename);
     if (of->datafile == INVALID_HANDLE_VALUE) {
       pdbg_logf(D_ERROR, "could not open cache file for fileid %ld",
             (long)of->fileid);
@@ -1187,7 +1188,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
         putil_strcat(cachepath, "/", fileidhex, NULL);
     of->indexfile = pfile_open(filename, O_RDWR,
                                     O_CREAT | (trunc ? O_TRUNC : 0));
-    free(filename);
+    pmem_free(PMEM_SUBSYS_OTHER, filename);
     if (of->indexfile == INVALID_HANDLE_VALUE) {
       pdbg_logf(D_ERROR, "could not open cache index file for fileid %ld",
             (long)of->fileid);
@@ -1206,7 +1207,7 @@ static int open_write_files(psync_openfile_t *of, int trunc) {
       filename =
           putil_strcat(cachepath, "/", fileidhex, NULL);
       of->logfile = pfile_open(filename, O_RDWR, O_CREAT | O_TRUNC);
-      free(filename);
+      pmem_free(PMEM_SUBSYS_OTHER, filename);
       if (of->logfile == INVALID_HANDLE_VALUE) {
         pdbg_logf(D_ERROR, "could not open log file for fileid %ld",
               (long)of->fileid);
@@ -1244,13 +1245,13 @@ static void pfs_del_creat(psync_fspath_t *fpath, psync_openfile_t *of) {
     if (likely((cr = pfs_task_find_creat(folder, fpath->name, 0)))) {
       ptree_del(&folder->creats, &cr->tree);
       folder->taskscnt--;
-      free(cr);
+      pmem_free(PMEM_SUBSYS_OTHER, cr);
     }
     pfs_task_release_folder_tasks_locked(folder);
   }
   pfs_dec_of_refcnt(of);
   psql_unlock();
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
 }
 
 static int pfs_open(const char *path, struct fuse_file_info *fi) {
@@ -1287,14 +1288,14 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
   if ((fi->flags & 3) != O_RDONLY &&
       !(fpath->permissions & PSYNC_PERM_MODIFY)) {
     psql_unlock();
-    free(fpath);
+    pmem_free(PMEM_SUBSYS_OTHER, fpath);
     return -EACCES;
   }
   // even if there are existing files there, just don't allow opening those
   if (fpath->flags & (PSYNC_FOLDER_FLAG_BACKUP_DEVICE_LIST |
                       PSYNC_FOLDER_FLAG_BACKUP_DEVICE)) {
     psql_unlock();
-    free(fpath);
+    pmem_free(PMEM_SUBSYS_OTHER, fpath);
     return -EACCES;
   }
   folder = pfs_task_get_or_create_folder_tasks_locked(fpath->folderid);
@@ -1354,7 +1355,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
         pfs_task_release_folder_tasks_locked(folder);
         psql_unlock();
         pdbg_logf(D_NOTICE, "opening new file %ld %s", (long)fileid, fpath->name);
-        free(fpath);
+        pmem_free(PMEM_SUBSYS_OTHER, fpath);
         of->newfile = 1;
         of->releasedforupload = status != 1;
         ret = open_write_files(of, fi->flags & O_TRUNC);
@@ -1408,7 +1409,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
       of->canmodify = (fpath->permissions & PSYNC_PERM_MODIFY) != 0;
       pfs_task_release_folder_tasks_locked(folder);
       psql_unlock();
-      free(fpath);
+      pmem_free(PMEM_SUBSYS_OTHER, fpath);
       of->newfile = 0;
       of->releasedforupload = status != 1;
       ret = open_write_files(of, fi->flags & O_TRUNC);
@@ -1432,7 +1433,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
       of->canmodify = (fpath->permissions & PSYNC_PERM_MODIFY) != 0;
       pfs_task_release_folder_tasks_locked(folder);
       psql_unlock();
-      free(fpath);
+      pmem_free(PMEM_SUBSYS_OTHER, fpath);
       of->modified = 1;
       of->staticfile = 1;
       of->staticdata = (const char *)lc->data;
@@ -1490,7 +1491,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
         encoder = pcrypto_sec_encdec_create(symkey);
         psymkey_free(symkey);
         if (pdbg_unlikely(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
-          free(encsymkey);
+          pmem_free(PMEM_SUBSYS_OTHER, encsymkey);
           ret = -ENOMEM;
           goto ex0;
         }
@@ -1502,7 +1503,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
     }
     cr =
         pfs_task_add_creat(folder, fpath->name, 0, encsymkey, encsymkeylen);
-    free(encsymkey);
+    pmem_free(PMEM_SUBSYS_OTHER, encsymkey);
     if (pdbg_unlikely(!cr)) {
       ret = -EIO;
       goto ex0;
@@ -1521,7 +1522,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
       pfs_del_creat(fpath, of);
       return ret;
     }
-    free(fpath);
+    pmem_free(PMEM_SUBSYS_OTHER, fpath);
     fi->fh = openfile_to_fh(of);
     return 0;
   } else if (row) {
@@ -1545,7 +1546,7 @@ static int pfs_open(const char *path, struct fuse_file_info *fi) {
 ex0:
   pfs_task_release_folder_tasks_locked(folder);
   psql_unlock();
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
   return ret;
 }
 
@@ -1579,7 +1580,7 @@ static int pfs_creat_fake_locked(psync_fspath_t *fpath,
   size_t len;
   fileid = psync_fake_fileid++;
   len = strlen(fpath->name) + 1;
-  cr = (psync_fstask_creat_t *)malloc(
+  cr = (psync_fstask_creat_t *)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_fstask_creat_t, name) + len);
   cr->fileid = fileid;
   cr->rfileid = 0;
@@ -1594,7 +1595,7 @@ static int pfs_creat_fake_locked(psync_fspath_t *fpath,
   of->newfile = 0;
   of->modified = 0;
   psql_unlock();
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
   fi->fh = openfile_to_fh(of);
   return 0;
 }
@@ -1633,7 +1634,7 @@ static int pfs_creat(const char *path, mode_t mode,
       (fpath->flags & (PSYNC_FOLDER_FLAG_BACKUP_DEVICE_LIST |
                        PSYNC_FOLDER_FLAG_BACKUP_DEVICE))) {
     psql_unlock();
-    free(fpath);
+    pmem_free(PMEM_SUBSYS_OTHER, fpath);
     return -EACCES;
   }
   folder = pfs_task_get_or_create_folder_tasks_locked(fpath->folderid);
@@ -1642,14 +1643,14 @@ static int pfs_creat(const char *path, mode_t mode,
     pdbg_logf(D_NOTICE, "file %s already exists, processing as open", path);
     ret = pfs_open(path, fi);
     psql_unlock();
-    free(fpath);
+    pmem_free(PMEM_SUBSYS_OTHER, fpath);
     return ret;
   }
   if (fpath->flags & PSYNC_FOLDER_FLAG_ENCRYPTED) {
     if (psync_crypto_isexpired()) {
       pfs_task_release_folder_tasks_locked(folder);
       psql_unlock();
-      free(fpath);
+      pmem_free(PMEM_SUBSYS_OTHER, fpath);
       return -pdbg_return_const(PSYNC_FS_ERR_CRYPTO_EXPIRED);
     }
     encsymkey = pcryptofolder_filencoder_key_newplain(
@@ -1657,7 +1658,7 @@ static int pfs_creat(const char *path, mode_t mode,
     if (pdbg_unlikely(psync_crypto_is_error(encsymkey))) {
       pfs_task_release_folder_tasks_locked(folder);
       psql_unlock();
-      free(fpath);
+      pmem_free(PMEM_SUBSYS_OTHER, fpath);
       return -pfs_crypto_err_to_errno(psync_crypto_to_error(encsymkey));
     }
     encoder = pcrypto_sec_encdec_create(symkey);
@@ -1665,8 +1666,8 @@ static int pfs_creat(const char *path, mode_t mode,
     if (pdbg_unlikely(encoder == PSYNC_CRYPTO_INVALID_ENCODER)) {
       pfs_task_release_folder_tasks_locked(folder);
       psql_unlock();
-      free(fpath);
-      free(encsymkey);
+      pmem_free(PMEM_SUBSYS_OTHER, fpath);
+      pmem_free(PMEM_SUBSYS_OTHER, encsymkey);
       return -ENOMEM;
     }
   } else {
@@ -1676,11 +1677,11 @@ static int pfs_creat(const char *path, mode_t mode,
   }
   cr = pfs_task_add_creat(folder, fpath->name, 0, encsymkey, encsymkeylen);
   if (encsymkey)
-    free(encsymkey);
+    pmem_free(PMEM_SUBSYS_OTHER, encsymkey);
   if (pdbg_unlikely(!cr)) {
     pfs_task_release_folder_tasks_locked(folder);
     psql_unlock();
-    free(fpath);
+    pmem_free(PMEM_SUBSYS_OTHER, fpath);
     return -EIO;
   }
   of = pfs_create_file(cr->fileid, 0, 0, 0, 1, 0,
@@ -1696,7 +1697,7 @@ static int pfs_creat(const char *path, mode_t mode,
     pfs_del_creat(fpath, of);
     return ret;
   }
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
   fi->fh = openfile_to_fh(of);
   return 0;
 }
@@ -1757,13 +1758,13 @@ static void pfs_free_openfile(psync_openfile_t *of) {
     if (cr) {
       ptree_del(&of->currentfolder->creats, &cr->tree);
       of->currentfolder->taskscnt--;
-      free(cr);
+      pmem_free(PMEM_SUBSYS_OTHER, cr);
     }
     psql_unlock();
   }
   pfs_task_release_folder_tasks(of->currentfolder);
-  free(of->currentname);
-  free(of);
+  pmem_free(PMEM_SUBSYS_OTHER, of->currentname);
+  pmem_free(PMEM_SUBSYS_OTHER, of);
 }
 
 static void pfs_get_both_locks(psync_openfile_t *of) {
@@ -1837,7 +1838,7 @@ static void pfs_upload_release_timer(void *ptr) {
     psql_run_free(res);
   }
   pfs_dec_of_refcnt(ofw->of);
-  free(ofw);
+  pmem_free(PMEM_SUBSYS_OTHER, ofw);
   pstatus_upload_recalc_async();
 }
 
@@ -1862,7 +1863,7 @@ static void pfs_write_timer(psync_timer_t timer, void *ptr) {
       goto unlock_ex;
     }
     of->releasedforupload = 1;
-    ofw = malloc(sizeof(psync_openfile_writeid_t));
+    ofw = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_openfile_writeid_t));
     ofw->of = of;
     ofw->writeid = of->writeid;
     pthread_mutex_unlock(&of->mutex);
@@ -2184,7 +2185,7 @@ pfs_reopen_file_for_writing(psync_openfile_t *of) {
     if (pdbg_unlikely(!cr)) {
       psql_unlock();
       ppagecache_unlock_pages();
-      free(encsymkey);
+      pmem_free(PMEM_SUBSYS_OTHER, encsymkey);
       return -EIO;
     }
     pfs_update_openfile_fileid_locked(of, cr->fileid);
@@ -2195,7 +2196,7 @@ pfs_reopen_file_for_writing(psync_openfile_t *of) {
     ret = open_write_files(of, 0);
     if (pdbg_unlikely(ret)) {
       ppagecache_unlock_pages();
-      free(encsymkey);
+      pmem_free(PMEM_SUBSYS_OTHER, encsymkey);
       return ret;
     }
     if (of->origctime)
@@ -2205,7 +2206,7 @@ pfs_reopen_file_for_writing(psync_openfile_t *of) {
           of, of->hash, size);
       ppagecache_unlock_pages();
       if (pdbg_unlikely(ret)) {
-        free(encsymkey);
+        pmem_free(PMEM_SUBSYS_OTHER, encsymkey);
         return -EIO;
       }
     }
@@ -2215,7 +2216,7 @@ pfs_reopen_file_for_writing(psync_openfile_t *of) {
   cr = pfs_task_add_modified_file(of->currentfolder, of->currentname,
                                       of->fileid, of->hash, encsymkey,
                                       encsymkeylen);
-  free(encsymkey);
+  pmem_free(PMEM_SUBSYS_OTHER, encsymkey);
   if (pdbg_unlikely(!cr)) {
     psql_unlock();
     return -EIO;
@@ -2271,13 +2272,13 @@ pfs_reopen_static_file_for_writing(psync_openfile_t *of) {
   if (pdbg_likely(cr)) {
     ptree_del(&of->currentfolder->creats, &cr->tree);
     of->currentfolder->taskscnt--;
-    free(cr);
+    pmem_free(PMEM_SUBSYS_OTHER, cr);
   }
   un = pfs_task_find_unlink(of->currentfolder, of->currentname, taskid);
   if (pdbg_likely(un)) {
     ptree_del(&of->currentfolder->unlinks, &un->tree);
     of->currentfolder->taskscnt--;
-    free(un);
+    pmem_free(PMEM_SUBSYS_OTHER, un);
   }
   psql_unlock();
   of->writeid = 0;
@@ -2556,7 +2557,7 @@ static int pfs_mkdir(const char *path, mode_t mode) {
   else
     ret = pfs_task_mkdir(fpath->folderid, fpath->name, fpath->flags);
   psql_unlock();
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
   pdbg_logf(D_NOTICE, "mkdir %s=%d", path, ret);
   return ret;
 }
@@ -2576,7 +2577,7 @@ static int pfs_can_rmdir(const char *path) {
   else
     ret = pfs_task_can_rmdir(fpath->folderid, fpath->flags, fpath->name);
   psql_unlock();
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
   pdbg_logf(D_NOTICE, "can_rmdir %s=%d", path, ret);
   return ret;
 }
@@ -2597,7 +2598,7 @@ static int pfs_rmdir(const char *path) {
   else
     ret = pfs_task_rmdir(fpath->folderid, fpath->flags, fpath->name);
   psql_unlock();
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
   pdbg_logf(D_NOTICE, "rmdir %s=%d", path, ret);
   return ret;
 }
@@ -2617,7 +2618,7 @@ static int pfs_can_unlink(const char *path) {
   else
     ret = pfs_task_can_unlink(fpath->folderid, fpath->name);
   psql_unlock();
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
   pdbg_logf(D_NOTICE, "can_unlink %s=%d", path, ret);
   return ret;
 }
@@ -2648,7 +2649,7 @@ static int pfs_unlink(const char *path) {
                       (void *)PEVENT_BKUP_F_DEL_DRIVE);
   }
 
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
   pdbg_logf(D_NOTICE, "unlink %s=%d", path, ret);
   return ret;
 }
@@ -2669,22 +2670,22 @@ static int pfs_rename_static_file(psync_fstask_folder_t *srcfolder,
     un = pfs_task_find_unlink(dstfolder, new_name, cr->taskid);
     if (un) {
       ptree_del(&dstfolder->unlinks, &un->tree);
-      free(un);
+      pmem_free(PMEM_SUBSYS_OTHER, un);
       dstfolder->taskscnt--;
     }
     ptree_del(&dstfolder->creats, &cr->tree);
-    free(cr);
+    pmem_free(PMEM_SUBSYS_OTHER, cr);
     dstfolder->taskscnt--;
   }
   len = strlen(new_name) + 1;
-  un = (psync_fstask_unlink_t *)malloc(
+  un = (psync_fstask_unlink_t *)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_fstask_unlink_t, name) + len);
   un->fileid = 0;
   un->taskid = srccr->taskid;
   memcpy(un->name, new_name, len);
   pfs_task_inject_unlink(dstfolder, un);
   addlen = pfs_task_creat_local_offset(len - 1);
-  cr = (psync_fstask_creat_t *)malloc(addlen +
+  cr = (psync_fstask_creat_t *)pmem_malloc(PMEM_SUBSYS_OTHER, addlen +
                                             sizeof(psync_fstask_local_creat_t));
   cr->fileid = 0;
   cr->rfileid = 0;
@@ -2697,11 +2698,11 @@ static int pfs_rename_static_file(psync_fstask_folder_t *srcfolder,
   un = pfs_task_find_unlink(srcfolder, srccr->name, srccr->taskid);
   if (pdbg_likely(un)) {
     ptree_del(&srcfolder->unlinks, &un->tree);
-    free(un);
+    pmem_free(PMEM_SUBSYS_OTHER, un);
     srcfolder->taskscnt--;
   }
   ptree_del(&srcfolder->creats, &srccr->tree);
-  free(srccr);
+  pmem_free(PMEM_SUBSYS_OTHER, srccr);
   srcfolder->taskscnt--;
   return 0;
 }
@@ -3018,16 +3019,16 @@ finish:
   if (folder)
     pfs_task_release_folder_tasks_locked(folder);
   psql_unlock();
-  free(fold_path);
-  free(fnew_path);
+  pmem_free(PMEM_SUBSYS_OTHER, fold_path);
+  pmem_free(PMEM_SUBSYS_OTHER, fnew_path);
   return pdbg_returnf(ret, " for rename from %s to %s", old_path,
                              new_path);
 err_enoent:
   if (folder)
     pfs_task_release_folder_tasks_locked(folder);
   psql_unlock();
-  free(fold_path);
-  free(fnew_path);
+  pmem_free(PMEM_SUBSYS_OTHER, fold_path);
+  pmem_free(PMEM_SUBSYS_OTHER, fnew_path);
   pdbg_logf(D_NOTICE, "returning ENOENT, folder not found");
   return -ENOENT;
 }
@@ -3117,7 +3118,7 @@ static int pfs_set_filetime_locked(psync_fsfileid_t fileid,
     pdbg_logf(D_NOTICE, "setting %s time of %s to %lu=%d",
           crtime ? "creation" : "modification", filename,
           (unsigned long)tv->tv_sec, ret);
-    free(filename);
+    pmem_free(PMEM_SUBSYS_OTHER, filename);
     return ret ? -EACCES : 0;
   }
 }
@@ -3216,7 +3217,7 @@ static int pfs_set_time(const char *path, const struct timespec *tv,
   else
     ret = pfs_set_time_locked(fpath->folderid, fpath->name, tv, crtime);
   psql_unlock();
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
   return ret;
 }
 
@@ -3339,7 +3340,7 @@ static void psync_invalidate_os_cache_noret() {
   pthread_mutex_unlock(&start_mutex);
   if (path) {
     pfile_invalidate_os_cache(path);
-    free(path);
+    pmem_free(PMEM_SUBSYS_OTHER, path);
   }
 }
 
@@ -3412,7 +3413,7 @@ void pfs_refresh_folder(psync_folderid_t folderid) {
   } else
     fpath = NULL;
   pthread_mutex_unlock(&start_mutex);
-  free(path);
+  pmem_free(PMEM_SUBSYS_OTHER, path);
   if (!fpath)
     return;
   if (pfile_invalidate_os_cache_needed())
@@ -3425,7 +3426,7 @@ void pfs_refresh_folder(psync_folderid_t folderid) {
       pfile_delete(fpath);
     }
   }
-  free(fpath);
+  pmem_free(PMEM_SUBSYS_OTHER, fpath);
 }
 
 static char *psync_fuse_get_mountpoint() {
@@ -3455,7 +3456,7 @@ static char *psync_fuse_get_mountpoint() {
                 "Please verify the path exists and is accessible.",
                 mp, stat_errno, strerror(stat_errno));
     }
-    free(mp);
+    pmem_free(PMEM_SUBSYS_OTHER, mp);
     return NULL;
   }
 
@@ -3463,7 +3464,7 @@ static char *psync_fuse_get_mountpoint() {
   if (!S_ISDIR(st.st_mode)) {
     pdbg_logf(D_CRITICAL,
               "Mount point %s exists but is not a directory", mp);
-    free(mp);
+    pmem_free(PMEM_SUBSYS_OTHER, mp);
     return NULL;
   }
 
@@ -3498,12 +3499,12 @@ char *pfs_get_path_by_folderid(psync_folderid_t folderid) {
   path =
       pfolder_path_sep(folderid, "/", NULL);
   if (path == PSYNC_INVALID_PATH) {
-    free(mp);
+    pmem_free(PMEM_SUBSYS_OTHER, mp);
     return NULL;
   }
   ret = putil_strcat(mp, path, NULL);
-  free(mp);
-  free(path);
+  pmem_free(PMEM_SUBSYS_OTHER, mp);
+  pmem_free(PMEM_SUBSYS_OTHER, path);
   return ret;
 }
 
@@ -3519,12 +3520,12 @@ char *pfs_get_path_by_fileid(psync_fileid_t fileid) {
     return NULL;
   path = pfolder_file_path(fileid, NULL);
   if (path == PSYNC_INVALID_PATH) {
-    free(mp);
+    pmem_free(PMEM_SUBSYS_OTHER, mp);
     return NULL;
   }
   ret = putil_strcat(mp, path, NULL);
-  free(mp);
-  free(path);
+  pmem_free(PMEM_SUBSYS_OTHER, mp);
+  pmem_free(PMEM_SUBSYS_OTHER, path);
   return ret;
 }
 
@@ -3586,7 +3587,7 @@ static void pfs_do_stop(void) {
     }
 
     pfs_debug_dump_internals();
-    free(mp);
+    pmem_free(PMEM_SUBSYS_OTHER, mp);
   }
   pthread_mutex_unlock(&start_mutex);
 }
@@ -3643,7 +3644,7 @@ static void psync_fuse_thread() {
   pthread_mutex_lock(&start_mutex);
   fuse_destroy(psync_fuse);
   pdbg_logf(D_NOTICE, "fuse_destroy exited");
-  free(psync_current_mountpoint);
+  pmem_free(PMEM_SUBSYS_OTHER, psync_current_mountpoint);
   started = 0;
   pthread_cond_broadcast(&start_cond);
   pthread_mutex_unlock(&start_mutex);
@@ -3691,7 +3692,7 @@ static int pfs_do_start() {
   // Add user-specified FUSE options from environment variable
   const char *fuse_opts_env = getenv("PCLOUD_FUSE_OPTS");
   if (fuse_opts_env && fuse_opts_env[0] != '\0') {
-    char *fuse_opts = strdup(fuse_opts_env);
+    char *fuse_opts = putil_strdup(fuse_opts_env);
     if (fuse_opts) {
       char *saveptr = NULL;
       char *token = strtok_r(fuse_opts, ",", &saveptr);
@@ -3713,7 +3714,7 @@ static int pfs_do_start() {
         }
         token = strtok_r(NULL, ",", &saveptr);
       }
-      free(fuse_opts);
+      pmem_free(PMEM_SUBSYS_OTHER, fuse_opts);
     }
   }
 
@@ -3790,7 +3791,7 @@ static int pfs_do_start() {
 err1:
   fuse_unmount(mp, psync_fuse_channel);
 err0:
-  free(mp);
+  pmem_free(PMEM_SUBSYS_OTHER, mp);
 err00:
   pthread_mutex_unlock(&start_mutex);
   fuse_opt_free_args(&args);

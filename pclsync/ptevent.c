@@ -1,4 +1,5 @@
 #include "pdbg.h"
+#include "pmem.h"
 #include "prun.h"
 #include "ptevent.h"
 #include <pthread.h>
@@ -21,9 +22,9 @@ static void proc_send_data_event(void *ptr) {
   }
   pthread_mutex_unlock(&data_event_fptr_mutex);
 
-  free((void *)data->str1);
-  free((void *)data->str2);
-  free(ptr);
+  pmem_free(PMEM_SUBSYS_OTHER, (void *)data->str1);
+  pmem_free(PMEM_SUBSYS_OTHER, (void *)data->str2);
+  pmem_free(PMEM_SUBSYS_OTHER, ptr);
 }
 
 void ptevent_init(void *ptr) {
@@ -41,12 +42,12 @@ void ptevent_process(event_data_struct *data) {
   pthread_mutex_unlock(&data_event_fptr_mutex);
 
   if (has_callback) {
-    event_data = malloc(sizeof(event_data_struct));
+    event_data = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(event_data_struct));
     event_data->eventid = data->eventid;
     event_data->uint1 = data->uint1;
     event_data->uint2 = data->uint2;
-    event_data->str1 = data->str1 ? strdup(data->str1) : NULL;
-    event_data->str2 = data->str2 ? strdup(data->str2) : NULL;
+    event_data->str1 = data->str1 ? putil_strdup(data->str1) : NULL;
+    event_data->str2 = data->str2 ? putil_strdup(data->str2) : NULL;
 
     prun_thread1("Data Event", proc_send_data_event, event_data);
   } else {

@@ -104,16 +104,16 @@ int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
   if (unlikely(numparam == 1))
     return -3;
 
-  t = (binparam *)pmem_calloc_safe(numparam, sizeof(binparam));
+  t = (binparam *)pmem_malloc_array(PMEM_SUBSYS_API, numparam, sizeof(binparam));
   if (!t)
     return -1;
 
   init_param_str(t, "auth", psync_my_auth);
 
   if (nusershareid) {
-    ids1 = (char *)pmem_calloc_safe(nusershareid, FOLDERID_ENTRY_SIZE);
+    ids1 = (char *)pmem_malloc_array(PMEM_SUBSYS_API, nusershareid, FOLDERID_ENTRY_SIZE);
     if (!ids1) {
-      free(t);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
     idsp = ids1;
@@ -131,11 +131,11 @@ int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
   }
 
   if (nteamshareid) {
-    ids2 = (char *)pmem_calloc_safe(nteamshareid, FOLDERID_ENTRY_SIZE);
+    ids2 = (char *)pmem_malloc_array(PMEM_SUBSYS_API, nteamshareid, FOLDERID_ENTRY_SIZE);
     if (!ids2) {
       if (nusershareid)
-        free(ids1);
-      free(t);
+        pmem_free(PMEM_SUBSYS_API, ids1);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
     idsp = ids2;
@@ -191,12 +191,12 @@ int do_psync_account_stopshare(psync_shareid_t usershareids[], int nusershareid,
   }
 
   if (ids1)
-    free(ids1);
+    pmem_free(PMEM_SUBSYS_API, ids1);
   if (ids2)
-    free(ids2);
+    pmem_free(PMEM_SUBSYS_API, ids2);
 
-  free(bres);
-  free(t);
+  pmem_free(PMEM_SUBSYS_API, bres);
+  pmem_free(PMEM_SUBSYS_API, t);
 
   return result;
 }
@@ -222,23 +222,23 @@ int do_psync_account_modifyshare(psync_shareid_t usrshrids[], uint32_t uperms[],
   if (unlikely(numparam == 1))
     return -3;
 
-  t = (binparam *)pmem_calloc_safe(numparam, sizeof(binparam));
+  t = (binparam *)pmem_malloc_array(PMEM_SUBSYS_API, numparam, sizeof(binparam));
   if (!t)
     return -1;
 
   init_param_str(t, "auth", psync_my_auth);
 
   if (nushid) {
-    ids1 = (char *)pmem_calloc_safe(nushid, FOLDERID_ENTRY_SIZE);
+    ids1 = (char *)pmem_malloc_array(PMEM_SUBSYS_API, nushid, FOLDERID_ENTRY_SIZE);
     if (!ids1) {
-      free(t);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
     idsp = ids1;
-    perms1 = (char *)pmem_calloc_safe(nushid, FOLDERID_ENTRY_SIZE);
+    perms1 = (char *)pmem_malloc_array(PMEM_SUBSYS_API, nushid, FOLDERID_ENTRY_SIZE);
     if (!perms1) {
-      free(ids1);
-      free(t);
+      pmem_free(PMEM_SUBSYS_API, ids1);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
     permsp = perms1;
@@ -265,24 +265,24 @@ int do_psync_account_modifyshare(psync_shareid_t usrshrids[], uint32_t uperms[],
   }
 
   if (ntmshid) {
-    ids2 = (char *)pmem_calloc_safe(ntmshid, FOLDERID_ENTRY_SIZE);
+    ids2 = (char *)pmem_malloc_array(PMEM_SUBSYS_API, ntmshid, FOLDERID_ENTRY_SIZE);
     if (!ids2) {
       if (nushid) {
-        free(perms1);
-        free(ids1);
+        pmem_free(PMEM_SUBSYS_API, perms1);
+        pmem_free(PMEM_SUBSYS_API, ids1);
       }
-      free(t);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
     idsp = ids2;
-    perms2 = (char *)pmem_calloc_safe(ntmshid, FOLDERID_ENTRY_SIZE);
+    perms2 = (char *)pmem_malloc_array(PMEM_SUBSYS_API, ntmshid, FOLDERID_ENTRY_SIZE);
     if (!perms2) {
-      free(ids2);
+      pmem_free(PMEM_SUBSYS_API, ids2);
       if (nushid) {
-        free(perms1);
-        free(ids1);
+        pmem_free(PMEM_SUBSYS_API, perms1);
+        pmem_free(PMEM_SUBSYS_API, ids1);
       }
-      free(t);
+      pmem_free(PMEM_SUBSYS_API, t);
       return -1;
     }
     permsp = perms2;
@@ -348,16 +348,16 @@ int do_psync_account_modifyshare(psync_shareid_t usrshrids[], uint32_t uperms[],
   }
 
   if (ids1)
-    free(ids1);
+    pmem_free(PMEM_SUBSYS_API, ids1);
   if (ids2)
-    free(ids2);
+    pmem_free(PMEM_SUBSYS_API, ids2);
   if (perms1)
-    free(perms1);
+    pmem_free(PMEM_SUBSYS_API, perms1);
   if (perms2)
-    free(perms2);
+    pmem_free(PMEM_SUBSYS_API, perms2);
 
-  free(bres);
-  free(t);
+  pmem_free(PMEM_SUBSYS_API, bres);
+  pmem_free(PMEM_SUBSYS_API, t);
 
   return result;
 }
@@ -372,7 +372,7 @@ void get_ba_member_email(uint64_t userid, char **email /*OUT*/,
   psql_bind_uint(res, 1, userid);
   if ((row = psql_fetch(res))) {
     cstr = psync_get_lstring(row[0], length);
-    *email = (char *)malloc(*length);
+    *email = (char *)pmem_malloc(PMEM_SUBSYS_API, *length);
     memcpy(*email, cstr, *length);
     psql_free(res);
     return;
@@ -399,7 +399,7 @@ void get_ba_member_email(uint64_t userid, char **email /*OUT*/,
 
     users = papi_find_result2(bres, "users", PARAM_ARRAY);
     if (!users->length) {
-      free(bres);
+      pmem_free(PMEM_SUBSYS_API, bres);
       pdbg_logf(D_WARNING, "Account_users returned empty result!\n");
       return;
     } else {
@@ -410,7 +410,7 @@ void get_ba_member_email(uint64_t userid, char **email /*OUT*/,
       fname = papi_find_result2(users->array[0], "firstname", PARAM_STR)->str;
       lname = papi_find_result2(users->array[0], "lastname", PARAM_STR)->str;
     }
-    free(bres);
+    pmem_free(PMEM_SUBSYS_API, bres);
 
     if (*length) {
       psync_sql_res *q;
@@ -438,7 +438,7 @@ void get_ba_team_name(uint64_t teamid, char **name /*OUT*/,
   psql_bind_uint(res, 1, teamid);
   if ((row = psql_fetch(res))) {
     cstr = psync_get_lstring(row[0], length);
-    *name = (char *)malloc(*length);
+    *name = (char *)pmem_malloc(PMEM_SUBSYS_API, *length);
     memcpy(*name, cstr, *length);
     psql_free(res);
     return;
@@ -464,7 +464,7 @@ void get_ba_team_name(uint64_t teamid, char **name /*OUT*/,
   // pdbg_logf(D_NOTICE, "Result contains %d teams\n", users->length);
 
   if (!teams->length) {
-    free(bres);
+    pmem_free(PMEM_SUBSYS_API, bres);
     pdbg_logf(D_WARNING, "Account_teams returned empty result!\n");
     return;
   } else {
@@ -473,7 +473,7 @@ void get_ba_team_name(uint64_t teamid, char **name /*OUT*/,
     *length = strlen(teamret);
     *name = putil_strndup(teamret, *length);
   }
-  free(bres);
+  pmem_free(PMEM_SUBSYS_API, bres);
 
   psync_sql_res *q;
   q = psql_prepare(
@@ -557,7 +557,7 @@ void cache_account_emails() {
     psql_commit();
   }
 end_close:
-  free(bres);
+  pmem_free(PMEM_SUBSYS_API, bres);
 }
 
 void cache_account_teams() {
@@ -591,7 +591,7 @@ void cache_account_teams() {
   // pdbg_logf(D_NOTICE, "Result contains %d teams\n", users->length);
 
   if (!users->length) {
-    free(bres);
+    pmem_free(PMEM_SUBSYS_API, bres);
     pdbg_logf(D_WARNING, "Account_teams returned empty result!\n");
     return;
   } else {
@@ -619,7 +619,7 @@ void cache_account_teams() {
     }
     psql_commit();
   }
-  free(bres);
+  pmem_free(PMEM_SUBSYS_API, bres);
   return;
 }
 
@@ -664,7 +664,7 @@ void cache_ba_my_teams() {
   users = papi_find_result2(bres, "users", PARAM_ARRAY);
 
   if (!users->length) {
-    free(bres);
+    pmem_free(PMEM_SUBSYS_API, bres);
     pdbg_logf(D_WARNING, "Account_users returned empty result!\n");
     return;
   }
@@ -676,7 +676,7 @@ void cache_ba_my_teams() {
   teams = papi_find_result2(user, "teams", PARAM_ARRAY);
   for (i = 0; i < teams->length; i++)
     cache_my_team(teams->array[i]);
-  free(bres);
+  pmem_free(PMEM_SUBSYS_API, bres);
   psql_unlock();
 }
 
@@ -684,7 +684,7 @@ int api_error_result(binresult *res) {
   uint64_t result;
   result = papi_find_result2(res, "result", PARAM_NUM)->num;
   if (result) {
-    free(res);
+    pmem_free(PMEM_SUBSYS_API, res);
     psync_process_api_error(result);
     return 1;
   }
@@ -783,20 +783,20 @@ static psync_folderid_t create_index_folder(const char *path) {
   while (ind < 100) {
     bufflen = strlen(path) + 1 /*zero char*/ + 3 /*parenthesis*/ +
               3 /*up to 3 digit index*/;
-    buff = (char *)malloc(bufflen);
+    buff = (char *)pmem_malloc(PMEM_SUBSYS_API, bufflen);
     snprintf(buff, bufflen - 1, "%s (%d)", path, ind);
     if (psync_create_remote_folder_by_path(buff, &err) != 0)
       pdbg_logf(D_NOTICE, "Unable to create folder %s error is %s.", buff, err);
     folderid = pfolder_id(buff);
     if ((folderid != PSYNC_INVALID_FOLDERID) &&
         check_write_permissions(folderid)) {
-      free(buff);
+      pmem_free(PMEM_SUBSYS_API, buff);
       break;
     }
     ++ind;
     if (err)
-      free(err);
-    free(buff);
+      pmem_free(PMEM_SUBSYS_API, err);
+    pmem_free(PMEM_SUBSYS_API, buff);
   }
   return folderid;
 }
@@ -807,7 +807,7 @@ psync_folderid_t psync_check_and_create_folder(const char *path) {
   if (folderid == PSYNC_INVALID_FOLDERID) {
     if (psync_create_remote_folder_by_path(path, &err) != 0) {
       pdbg_logf(D_NOTICE, "Unable to create folder %s error is %s.", path, err);
-      free(err);
+      pmem_free(PMEM_SUBSYS_API, err);
       folderid = create_index_folder(path);
     }
   } else if (!check_write_permissions(folderid))
