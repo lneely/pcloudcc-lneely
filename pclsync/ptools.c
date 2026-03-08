@@ -50,6 +50,7 @@
 #include "psettings.h"
 #include "psql.h"
 #include "ptools.h"
+#include "pmem.h"
 
 #define PTOOLS_MAX_PARAMS 30
 
@@ -135,7 +136,10 @@ int ptools_create_backend_event(const char *binapi, const char *category,
   paramsLocal[5] = (binparam)PAPI_NUM(EPARAM_TIME, etime);
 
   if (pCnt > 0) {
-    keyParams = (char *)malloc(258 * pCnt);
+    keyParams = (char *)pmem_calloc_safe(pCnt, 258);
+    if (!keyParams) {
+      return -1;
+    }
     keyParams[0] = 0;
 
     for (i = 0; i < pCnt; i++) {
@@ -371,7 +375,10 @@ int ptools_backend_call(const char *binapi, const char *wsPath,
     if (strlen(payloadName) > 0) {
       payload = (binresult *)papi_find_result2(res, payloadName, PARAM_HASH);
 
-      *resData = (binresult *)malloc(payload->length * sizeof(binresult));
+      *resData = (binresult *)pmem_calloc_safe(payload->length, sizeof(binresult));
+      if (!*resData) {
+        return -1;
+      }
       memcpy(*resData, payload, (payload->length * sizeof(binresult)));
     }
   }
@@ -450,7 +457,10 @@ void ptools_send_psyncs_event(const char *binapi, const char *auth) {
   int intRes;
   int syncCnt = 0;
 
-  errMsg = (char *)malloc(1024 * sizeof(char));
+  errMsg = (char *)pmem_calloc_safe(1024, sizeof(char));
+  if (!errMsg) {
+    return;
+  }
   errMsg[0] = 0;
 
   time(&rawtime);

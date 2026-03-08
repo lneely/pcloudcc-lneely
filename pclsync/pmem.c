@@ -1,4 +1,6 @@
 #include <sys/mman.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 #include "pcompiler.h"
 #include "psql.h"
@@ -59,4 +61,11 @@ int pmem_munlock(void *ptr, size_t size) {
 
 void pmem_reset(void *ptr, size_t size) {
   madvise(ptr, size, MADV_DONTNEED);
+}
+
+void *pmem_calloc_safe(size_t nmemb, size_t size) {
+  if (nmemb != 0 && size > SIZE_MAX / nmemb) {
+    return NULL;
+  }
+  return calloc(nmemb, size);
 }

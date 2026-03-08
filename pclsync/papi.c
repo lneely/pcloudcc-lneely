@@ -39,6 +39,7 @@
 #include "psynclib.h"
 #include "ptimer.h"
 #include "pdbg.h"
+#include "pmem.h"
 
 /*
   commented definitions are unused, but kept because they may be
@@ -313,7 +314,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     arr = NULL;
     cnt = 0;
     alloc = 128;
-    arr = (binresult **)malloc(sizeof(binresult *) * alloc);
+    arr = (binresult **)pmem_calloc_safe(alloc, sizeof(binresult *));
     if (!arr)
       return NULL;
     while (**indata != RPARAM_END) {
@@ -346,7 +347,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
     arr = NULL;
     cnt = 0;
     alloc = 32;
-    arr = (struct _hashpair *)malloc(sizeof(struct _hashpair) * alloc);
+    arr = (struct _hashpair *)pmem_calloc_safe(alloc, sizeof(struct _hashpair));
     if (!arr)
       return NULL;
     while (**indata != RPARAM_END) {
@@ -398,10 +399,10 @@ static binresult *parse_result(unsigned char *data, size_t datalen) {
   retlen = calc_ret_len(&datac, &datalenc, &strcnt);
   if (retlen == -1)
     return NULL;
-  datac = malloc(sizeof(unsigned char) * retlen);
+  datac = pmem_calloc_safe(retlen, sizeof(unsigned char));
   if (!datac)
     return NULL;
-  strings = malloc(sizeof(binresult *) * strcnt);
+  strings = pmem_calloc_safe(strcnt, sizeof(binresult *));
   if (!strings) {
     free(datac);
     return NULL;
