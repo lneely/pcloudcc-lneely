@@ -35,6 +35,7 @@
 #include "prun.h"
 #include "psys.h"
 #include "ptimer.h"
+#include "psignal.h"
 
 /* Maximum timeout possible is TIMER_ARRAY_SIZE^TIMER_LEVELS seconds, in the
  * worst case TIMER_LEVELS operations will be preformed for each timer to
@@ -145,8 +146,15 @@ PSYNC_NOINLINE static void timer_process_timers(psync_list *timers) {
 static void timer_thread() {
   psync_list timers;
   time_t lt;
+  int sig;
   lt = __atomic_load_n(&psync_current_time, __ATOMIC_RELAXED);
   while (psync_do_run) {
+    sig = psignal_check_pending();
+    if (sig) {
+      pdbg_logf(D_NOTICE, "received signal %d, shutting down", sig);
+      psync_do_run = 0;
+      break;
+    }
     psync_list_init(&timers);
     psys_sleep_milliseconds(1000);
     __atomic_store_n(&psync_current_time, psys_time_seconds(), __ATOMIC_RELAXED);

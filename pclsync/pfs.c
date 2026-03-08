@@ -3601,28 +3601,7 @@ static void psync_usr2_handler(int sig) {
   pdbg_reopen_log();
 }
 
-static void psync_set_signal(int sig, void (*handler)(int)) {
-  struct sigaction sa;
-
-  if (pdbg_unlikely(sigaction(sig, NULL, &sa)))
-    return;
-
-  if (sa.sa_handler == SIG_DFL) {
-    memset(&sa, 0, sizeof(struct sigaction));
-    sigemptyset(&(sa.sa_mask));
-    sa.sa_handler = handler;
-    sa.sa_flags = 0;
-    sigaction(sig, &sa, NULL);
-  }
-}
-
-static void psync_setup_signals() {
-  psync_set_signal(SIGTERM, psync_signal_handler);
-  psync_set_signal(SIGINT, psync_signal_handler);
-  psync_set_signal(SIGHUP, psync_signal_handler);
-  pfs_debug_register_signal_handlers();
-  psync_set_signal(SIGUSR2, psync_usr2_handler);
-}
+#include "psignal.h"
 
 static void pfs_init_once() {
 #if pfs_need_per_folder_refresh_const()
@@ -3637,7 +3616,8 @@ static void pfs_init_once() {
   pfs_task_init();
   ppagecache_init();
   atexit(pfs_do_stop);
-  psync_setup_signals();
+  pfs_debug_register_signal_handlers();
+  psignal_set_custom_handler(SIGUSR2, psync_usr2_handler);
   pfs_stat_add_files();
   pfs_task_add_banned_folders();
 }
