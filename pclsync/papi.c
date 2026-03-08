@@ -321,7 +321,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
       if (cnt == alloc) {
         binresult **tmp;
         alloc *= 2;
-        tmp = (binresult **)realloc(arr, sizeof(binresult *) * alloc);
+        tmp = (binresult **)pmem_realloc(PMEM_SUBSYS_API, arr, sizeof(binresult *) * alloc);
         if (!tmp) {
           pmem_free(PMEM_SUBSYS_API, arr);
           return NULL;
@@ -354,7 +354,7 @@ static binresult *do_parse_result(unsigned char **restrict indata,
       if (cnt == alloc) {
         struct _hashpair *tmp;
         alloc *= 2;
-        tmp = (struct _hashpair *)realloc(arr, sizeof(struct _hashpair) *
+        tmp = (struct _hashpair *)pmem_realloc(PMEM_SUBSYS_API, arr, sizeof(struct _hashpair) *
                                                          alloc);
         if (!tmp) {
           pmem_free(PMEM_SUBSYS_API, arr);

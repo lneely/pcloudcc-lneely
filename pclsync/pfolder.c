@@ -568,12 +568,12 @@ static folder_list *folder_list_init() {
 static void folder_list_add(folder_list *list, pentry_t *entry) {
   if (list->entriescnt >= list->entriesalloc) {
     list->entriesalloc *= 2;
-    list->entries = (pentry_t *)realloc(
+    list->entries = (pentry_t *)pmem_realloc(PMEM_SUBSYS_OTHER, 
         list->entries, sizeof(pentry_t) * list->entriesalloc);
   }
   while (list->nameoff + entry->namelen >= list->namealloc) {
     list->namealloc *= 2;
-    list->namebuff = (char *)realloc(list->namebuff, list->namealloc);
+    list->namebuff = (char *)pmem_realloc(PMEM_SUBSYS_OTHER, list->namebuff, list->namealloc);
   }
   memcpy(&list->entries[list->entriescnt++], entry, sizeof(pentry_t));
   memcpy(list->namebuff + list->nameoff, entry->name, entry->namelen);
@@ -847,7 +847,7 @@ psync_folder_list_t *pfolder_sync_folders(char *syncTypes) {
   while ((row = psql_fetch(res))) {
     if (alloced == lastfolder) {
       alloced = (alloced + 32) * 2;
-      folders = (psync_tmp_folder_t *)realloc(
+      folders = (psync_tmp_folder_t *)pmem_realloc(PMEM_SUBSYS_OTHER, 
           folders, sizeof(psync_tmp_folder_t) * alloced);
     }
     cstr = psync_get_lstring(row[2], &l);

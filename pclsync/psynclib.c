@@ -1772,7 +1772,7 @@ psync_folderid_t *psync_crypto_folderids() {
     ret[l] = row[0];
     if (++l == alloc) {
       alloc *= 2;
-      ret = (psync_folderid_t *)realloc(ret,
+      ret = (psync_folderid_t *)pmem_realloc(PMEM_SUBSYS_OTHER, ret,
                                               sizeof(psync_folderid_t) * alloc);
     }
   }

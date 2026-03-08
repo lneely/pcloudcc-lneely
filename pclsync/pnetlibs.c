@@ -2680,7 +2680,7 @@ int psync_send_pdbg_logf(int thread, const char *file, const char *function,
   do {
     char *tmp;
     sz = l + 1;
-    tmp = (char *)realloc(ret, sz);
+    tmp = (char *)pmem_realloc(PMEM_SUBSYS_OTHER, ret, sz);
     if (!tmp) {
       pmem_free(PMEM_SUBSYS_OTHER, ret);
       return -1;

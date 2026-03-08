@@ -198,7 +198,7 @@ static void add_ignored_dir(const char *path) {
       ign_paths_alloc = 8;
     else
       ign_paths_alloc *= 2;
-    ignored_paths = (device_inode_t *)realloc(
+    ignored_paths = (device_inode_t *)pmem_realloc(PMEM_SUBSYS_SYNC, 
         ignored_paths, sizeof(device_inode_t) * ign_paths_alloc);
   }
   ignored_paths[ign_paths_cnt].deviceid = pfile_stat_device_full(&st);

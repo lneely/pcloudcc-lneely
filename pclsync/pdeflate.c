@@ -172,7 +172,7 @@ static int psync_deflate_finish_flush_add_buffer(psync_deflate_t *def,
     }
     used += current;
     alloced *= 2;
-    buff = (unsigned char *)realloc(buff, alloced);
+    buff = (unsigned char *)pmem_realloc(PMEM_SUBSYS_OTHER, buff, alloced);
     current = alloced - used;
   }
 }
