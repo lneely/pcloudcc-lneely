@@ -50,6 +50,7 @@
 #include "pclsync/pdbg.h"
 #include "pclsync/psock.h"
 #include "pclsync/plibs.h"
+#include "pclsync/psignal.h"
 
 #include "pclsync_lib.h"
 
@@ -667,6 +668,10 @@ int clib::pclsync_lib::init() {
   }
 
   was_init_ = true;
+
+  psignal_register(SIGINT);
+  psignal_register(SIGTERM);
+  psignal_register(SIGHUP);
 
   if (!get_mount().empty()) {
     psync_set_string_setting("fsroot", get_mount().c_str());

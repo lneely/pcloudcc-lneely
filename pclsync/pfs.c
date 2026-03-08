@@ -3616,14 +3616,6 @@ static void psync_set_signal(int sig, void (*handler)(int)) {
   }
 }
 
-static void psync_setup_signals() {
-  psync_set_signal(SIGTERM, psync_signal_handler);
-  psync_set_signal(SIGINT, psync_signal_handler);
-  psync_set_signal(SIGHUP, psync_signal_handler);
-  pfs_debug_register_signal_handlers();
-  psync_set_signal(SIGUSR2, psync_usr2_handler);
-}
-
 static void pfs_init_once() {
 #if pfs_need_per_folder_refresh_const()
   unsigned char rndbuff[16];
@@ -3637,7 +3629,8 @@ static void pfs_init_once() {
   pfs_task_init();
   ppagecache_init();
   atexit(pfs_do_stop);
-  psync_setup_signals();
+  pfs_debug_register_signal_handlers();
+  psync_set_signal(SIGUSR2, psync_usr2_handler);
   pfs_stat_add_files();
   pfs_task_add_banned_folders();
 }
