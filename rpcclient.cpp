@@ -13,6 +13,7 @@
 #include "pdbg.h"
 #include "prpc.h"
 #include "putil.h"
+#include "pmem.h"
 
 
 #define POVERLAY_BUFSIZE 512
@@ -188,7 +189,7 @@ int RpcClient::Call(int id, const char *path, char **errm, size_t *errmsz) {
 
   char *sockpath = prpc_sockpath();
   sockfd = this->connectSocket(sockpath, errm, errmsz);
-  free(sockpath);
+  pmem_free(PMEM_SUBSYS_OTHER, sockpath);
   if (sockfd >= 0) {
     if ((result = this->writeRequest(sockfd, id, path, errm, errmsz)) == 0) {
       result = this->readResponse(sockfd, errm, errmsz);
