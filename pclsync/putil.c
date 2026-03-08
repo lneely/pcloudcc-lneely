@@ -189,8 +189,14 @@ unsigned char *putil_base32_encode(const unsigned char *str, size_t length,
   unsigned char *result;
   unsigned char *p;
   uint32_t bits, buff;
+  size_t temp, alloc_size;
 
-  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, ((length + 4) / 5) * 8 + 1);
+  temp = (length + 4) / 5;
+  if (temp != 0 && 8 > SIZE_MAX / temp) {
+    return NULL;
+  }
+  alloc_size = temp * 8 + 1;
+  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, alloc_size);
   p = result;
 
   bits = 0;
@@ -226,7 +232,14 @@ unsigned char *putil_base32_decode(const unsigned char *str, size_t length,
   unsigned char *result, *p;
   uint32_t bits, buff;
   unsigned char ch;
-  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, (length + 7) / 8 * 5 + 1);
+  size_t temp, alloc_size;
+  
+  temp = (length + 7) / 8;
+  if (temp != 0 && 5 > SIZE_MAX / temp) {
+    return NULL;
+  }
+  alloc_size = temp * 5 + 1;
+  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, alloc_size);
   p = result;
   bits = 0;
   buff = 0;
@@ -258,8 +271,14 @@ unsigned char *putil_base64_encode(const unsigned char *str, size_t length,
   const unsigned char *current = str;
   unsigned char *p;
   unsigned char *result;
+  size_t temp, alloc_size;
 
-  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, ((length + 2) / 3) * 4 + 1);
+  temp = (length + 2) / 3;
+  if (temp != 0 && 4 > SIZE_MAX / temp) {
+    return NULL;
+  }
+  alloc_size = temp * 4 + 1;
+  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, alloc_size);
   p = result;
 
   while (length > 2) {
@@ -295,8 +314,14 @@ unsigned char *putil_base64_decode(const unsigned char *str, size_t length,
   unsigned char *result;
   size_t i = 0, j = 0;
   ssize_t ch;
+  size_t temp, alloc_size;
 
-  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, (length + 3) / 4 * 3 + 1);
+  temp = (length + 3) / 4;
+  if (temp != 0 && 3 > SIZE_MAX / temp) {
+    return NULL;
+  }
+  alloc_size = temp * 3 + 1;
+  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, alloc_size);
 
   while (length-- > 0) {
     ch = base64_reverse_table[*current++];
