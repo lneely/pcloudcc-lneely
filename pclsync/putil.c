@@ -10,6 +10,7 @@
 #include <sys/random.h>
 
 #include "pdbg.h"
+#include "pmem.h"
 #include "putil.h"
 
 static char normalize_table[256];
@@ -120,14 +121,14 @@ void putil_time_format(time_t tm, unsigned long ns, char *result) {
 char *putil_strdup(const char *str) {
   size_t len;
   len = strlen(str) + 1;
-  return (char *)memcpy(malloc(sizeof(char) * len), str, len);
+  return (char *)memcpy(pmem_malloc_array(PMEM_SUBSYS_OTHER, len, sizeof(char)), str, len);
 }
 
 char *putil_strnormalize_filename(const char *str) {
   size_t len, i;
   char *ptr;
   len = strlen(str) + 1;
-  ptr = malloc(sizeof(char) * len);
+  ptr = pmem_malloc_array(PMEM_SUBSYS_OTHER, len, sizeof(char));
   for (i = 0; i < len; i++)
     ptr[i] = normalize_table[(unsigned char)str[i]];
   return ptr;
@@ -135,7 +136,7 @@ char *putil_strnormalize_filename(const char *str) {
 
 char *putil_strndup(const char *str, size_t len) {
   char *ptr;
-  ptr = (char *)memcpy(malloc(sizeof(char) * len + 1), str, len);
+  ptr = (char *)memcpy(pmem_malloc_array(PMEM_SUBSYS_OTHER, len + 1, sizeof(char)), str, len);
   ptr[len] = 0;
   return ptr;
 }
@@ -161,7 +162,7 @@ char *putil_strcat(const char *str, ...) {
     size += len;
   }
   va_end(ap);
-  ptr2 = ptr3 = (char *)malloc(size);
+  ptr2 = ptr3 = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, size);
   for (size = 0; size < i; size++) {
     memcpy(ptr2, strs[size], lengths[size]);
     ptr2 += lengths[size];
@@ -189,7 +190,7 @@ unsigned char *putil_base32_encode(const unsigned char *str, size_t length,
   unsigned char *p;
   uint32_t bits, buff;
 
-  result = (unsigned char *)malloc(((length + 4) / 5) * 8 + 1);
+  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, ((length + 4) / 5) * 8 + 1);
   p = result;
 
   bits = 0;
@@ -225,7 +226,7 @@ unsigned char *putil_base32_decode(const unsigned char *str, size_t length,
   unsigned char *result, *p;
   uint32_t bits, buff;
   unsigned char ch;
-  result = (unsigned char *)malloc((length + 7) / 8 * 5 + 1);
+  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, (length + 7) / 8 * 5 + 1);
   p = result;
   bits = 0;
   buff = 0;
@@ -237,7 +238,7 @@ unsigned char *putil_base32_decode(const unsigned char *str, size_t length,
     else if (ch >= '2' && ch <= '7')
       ch -= '2' - 26;
     else {
-      free(result);
+      pmem_free(PMEM_SUBSYS_OTHER, result);
       return NULL;
     }
     buff = (buff << 5) + ch;
@@ -258,7 +259,7 @@ unsigned char *putil_base64_encode(const unsigned char *str, size_t length,
   unsigned char *p;
   unsigned char *result;
 
-  result = (unsigned char *)malloc(((length + 2) / 3) * 4 + 1);
+  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, ((length + 2) / 3) * 4 + 1);
   p = result;
 
   while (length > 2) {
@@ -295,14 +296,14 @@ unsigned char *putil_base64_decode(const unsigned char *str, size_t length,
   size_t i = 0, j = 0;
   ssize_t ch;
 
-  result = (unsigned char *)malloc((length + 3) / 4 * 3 + 1);
+  result = (unsigned char *)pmem_malloc(PMEM_SUBSYS_OTHER, (length + 3) / 4 * 3 + 1);
 
   while (length-- > 0) {
     ch = base64_reverse_table[*current++];
     if (ch == -1)
       continue;
     else if (ch == -2) {
-      free(result);
+      pmem_free(PMEM_SUBSYS_OTHER, result);
       return NULL;
     }
     switch (i % 4) {
