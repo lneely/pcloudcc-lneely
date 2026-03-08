@@ -6,6 +6,7 @@
 #include "pdatabase.h"
 #include "pdbg.h"
 #include "plocks.h"
+#include "pmem.h"
 #include "pnetlibs.h"
 #include "prun.h"
 #include "psettings.h"
@@ -86,7 +87,7 @@ static void psync_sql_free_cache(void *ptr) {
   sqlite3_finalize(res->stmt);
   if (IS_DEBUG)
     memset(res, 0xff, sizeof(psync_sql_res));
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
 }
 
 static void psync_sql_res_unlock(psync_sql_res *res) {
@@ -146,7 +147,7 @@ static void commit(int success) {
       cb->commit(cb->ptr);
     else
       cb->rollback(cb->ptr);
-    free(cb);
+    pmem_free(PMEM_SUBSYS_OTHER, cb);
   }
 }
 
@@ -306,7 +307,7 @@ void psql_list_add(psync_list_builder_t *builder, psync_sql_res *res, psync_list
   while ((row = psql_fetch(res))) {
     if (!builder->last_elements ||
         builder->last_elements->used >= builder->elements_per_list) {
-      builder->last_elements = (psync_list_element_list *)malloc(
+      builder->last_elements = (psync_list_element_list *)pmem_malloc(PMEM_SUBSYS_OTHER, 
           offsetof(psync_list_element_list, elements) +
           builder->element_size * builder->elements_per_list);
       psync_list_add_tail(&builder->element_list,
@@ -392,7 +393,7 @@ int psql_rollback() {
 void psql_translation_add_cb(psync_transaction_callback_t commit, psync_transaction_callback_t rollback, void *ptr) {
   tran_callback_t *cb;
   pdbg_assert(in_transaction);
-  cb = malloc(sizeof(tran_callback_t));
+  cb = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(tran_callback_t));
   cb->commit = commit;
   cb->rollback = rollback;
   cb->ptr = ptr;
@@ -487,7 +488,7 @@ char **psql_rowstr(const char *sql) {
       lens[i] = l;
     }
     ln += (sizeof(char *) + 1) * cnt;
-    arr = (char **)malloc(ln);
+    arr = (char **)pmem_malloc(PMEM_SUBSYS_OTHER, ln);
     nstr = ((char *)arr) + sizeof(char *) * cnt;
     for (i = 0; i < cnt; i++) {
       str = (char *)sqlite3_column_blob(stmt, i);
@@ -548,7 +549,7 @@ psync_variant *psql_row(const char *sql) {
         lens[i] = l;
       }
     }
-    arr = (psync_variant *)malloc(ln);
+    arr = (psync_variant *)pmem_malloc(PMEM_SUBSYS_OTHER, ln);
     nstr = ((char *)arr) + sizeof(psync_variant) * cnt;
     for (i = 0; i < cnt; i++) {
       t = types[i];
@@ -632,7 +633,7 @@ int psql_run_free_nocache(psync_sql_res *res) {
     code = 0;
   sqlite3_finalize(res->stmt);
   psync_sql_res_unlock(res);
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
   return code;
 }
 
@@ -650,7 +651,7 @@ int psql_run_free(psync_sql_res *res) {
       pdbg_logf(D_BUG, "transaction query failed, this may lead to restarting "
                    "transaction over and over");
     psync_sql_res_unlock(res);
-    free(res);
+    pmem_free(PMEM_SUBSYS_OTHER, res);
     return -1;
   } else {
     psync_sql_res_unlock(res);
@@ -789,12 +790,12 @@ psync_full_result_int *psql_fetchall_int(psync_sql_res *res) {
   if (unlikely(code != SQLITE_DONE))
     pdbg_logf(D_ERROR, "sqlite3_step returned error: %s", sqlite3_errmsg(psync_db));
   psql_free(res);
-  ret = (psync_full_result_int *)malloc(
+  ret = (psync_full_result_int *)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_full_result_int, data) + sizeof(uint64_t) * off);
   ret->rows = rows;
   ret->cols = cols;
   memcpy(ret->data, data, sizeof(uint64_t) * off);
-  free(data);
+  pmem_free(PMEM_SUBSYS_OTHER, data);
   return ret;
 }
 
@@ -904,7 +905,7 @@ __attribute__((weak)) psync_sql_res *psql_query_nocache(const char *sql) {
     return NULL;
   }
   cnt = sqlite3_column_count(stmt);
-  res = (psync_sql_res *)malloc(sizeof(psync_sql_res) +
+  res = (psync_sql_res *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_sql_res) +
                                       cnt * sizeof(psync_variant));
   res->stmt = stmt;
   res->sql = sql;
@@ -940,7 +941,7 @@ __attribute__((weak)) psync_sql_res *psql_rdlock_nocache(const char *sql) {
     return NULL;
   }
   cnt = sqlite3_column_count(stmt);
-  res = (psync_sql_res *)malloc(sizeof(psync_sql_res) +
+  res = (psync_sql_res *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_sql_res) +
                                       cnt * sizeof(psync_variant));
   res->stmt = stmt;
   res->sql = sql;
@@ -974,7 +975,7 @@ __attribute__((weak)) psync_sql_res *psql_query_nolock_nocache(const char *sql) 
     return NULL;
   }
   cnt = sqlite3_column_count(stmt);
-  res = (psync_sql_res *)malloc(sizeof(psync_sql_res) +
+  res = (psync_sql_res *)pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_sql_res) +
                                       cnt * sizeof(psync_variant));
   res->stmt = stmt;
   res->sql = sql;
@@ -1011,7 +1012,7 @@ void psql_free_nocache(psync_sql_res *res) {
   psync_sql_res_unlock(res);
   if (IS_DEBUG)
     memset(res, 0xff, sizeof(psync_sql_res));
-  free(res);
+  pmem_free(PMEM_SUBSYS_OTHER, res);
 }
 
 __attribute__((weak)) psync_sql_res *psql_prepare_nocache(const char *sql) {
@@ -1028,7 +1029,7 @@ __attribute__((weak)) psync_sql_res *psql_prepare_nocache(const char *sql) {
               sqlite3_errmsg(psync_db));
     return NULL;
   }
-  res = malloc(sizeof(psync_sql_res));
+  res = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_sql_res));
   res->stmt = stmt;
   res->sql = sql;
   res->column_count = 0;
