@@ -10,16 +10,14 @@ I aim to support as many distributions as possible. I maintain a package for [AU
 
 # Compatibility Matrix
 
-The following configurations are built and verified in CI on every commit:
-
-| Distribution | FUSE | Status |
-|---|---|---|
-| Debian trixie | 2.x | [![CI](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml) |
-| Ubuntu 24.04 | 3.16 | [![CI](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml) |
-| Arch Linux (rolling) | 3.x latest | [![CI](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml) |
-| Fedora 41 | 3.x | [![CI](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml) |
-| Fedora (latest) | 3.x latest | [![CI](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml) |
-| Debian forky | 3.18+ | [![CI](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/lneely/pcloudcc-lneely/actions/workflows/c-cpp.yml) |
+| Distribution | FUSE |
+|---|---|
+| Debian trixie | 2.x |
+| Debian trixie | 3.x |
+| Arch Linux (rolling) | 3.x latest |
+| Fedora 41 | 3.x |
+| Fedora (latest) | 3.x latest |
+| Debian forky | 3.18+ |
 
 All configurations require **mbedTLS 3.x**. Runtime mount testing was performed manually on FUSE 2 (libfuse 2.9.x), FUSE 3 (libfuse3 3.10.5), and FUSE 3.18+ (Debian forky container).
 

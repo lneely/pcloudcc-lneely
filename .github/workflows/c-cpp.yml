@@ -28,15 +28,13 @@ jobs:
         ldd pcloudcc | grep libfuse.so.2
 
   fuse3-current:
-    name: FUSE 3 current / 3.16 (ubuntu:24.04)
+    name: FUSE 3 current (debian:trixie)
     runs-on: ubuntu-latest
     container:
-      image: ubuntu:24.04
+      image: debian:trixie
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
-      env:
-        DEBIAN_FRONTEND: noninteractive
       run: |
         apt-get update
         apt-get install -y build-essential pkg-config libreadline-dev libudev-dev \
@@ -78,7 +76,7 @@ jobs:
       run: |
         dnf install -y gcc gcc-c++ make pkg-config binutils \
           readline-devel systemd-devel fuse3-devel sqlite-devel zlib-devel \
-          boost-devel boost-program-options mbedtls3-devel
+          boost-devel boost-program-options mbedtls3.6-devel
     - name: Build (FUSE 3 Fedora 41)
       run: make FORCE_FUSE=3 BUILD=release
     - name: Verify symbols
@@ -97,7 +95,7 @@ jobs:
       run: |
         dnf install -y gcc gcc-c++ make pkg-config binutils \
           readline-devel systemd-devel fuse3-devel sqlite-devel zlib-devel \
-          boost-devel boost-program-options mbedtls3-devel
+          boost-devel boost-program-options mbedtls-devel
     - name: Build (FUSE 3 Fedora latest)
       run: make FORCE_FUSE=3 BUILD=release
     - name: Verify symbols
