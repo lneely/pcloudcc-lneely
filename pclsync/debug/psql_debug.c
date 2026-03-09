@@ -227,6 +227,10 @@ void psql_do_rdlock(const char *file, unsigned line) {
 // Strong overrides for same-named functions (weak in psql.c)
 // --------------------------------------------------------------------------
 
+int psql_trylock() {
+  return psql_do_trylock(__FILE__, __LINE__);
+}
+
 void psql_lock() {
   psql_do_lock(__FILE__, __LINE__);
 }
