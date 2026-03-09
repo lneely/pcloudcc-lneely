@@ -92,8 +92,10 @@ typedef off_t fuse_off_t;
 
 static int shutdown_in_progress = 0;
 volatile sig_atomic_t shutdown_requested = 0;
-static struct fuse_chan *psync_fuse_channel = NULL;
 static struct fuse *psync_fuse = NULL;
+#if FUSE_USE_VERSION < 30
+static struct fuse_chan *psync_fuse_channel = NULL;
+#endif
 static char *psync_current_mountpoint = NULL;
 static psync_generic_callback_t psync_start_callback = NULL;
 char *pfs_fake_prefix = NULL;
@@ -786,7 +788,11 @@ static int pfs_getrootattr(struct FUSE_STAT *stbuf) {
     }                                                                          \
   } while (0)
 
+#if FUSE_USE_VERSION >= 30
+static int pfs_getattr(const char *path, struct FUSE_STAT *stbuf, struct fuse_file_info *fi) {
+#else
 static int pfs_getattr(const char *path, struct FUSE_STAT *stbuf) {
+#endif
   psync_sql_res *res;
   psync_variant_row row;
   psync_fspath_t *fpath;
@@ -877,15 +883,29 @@ static int filler_decoded(pcrypto_textdec_t dec,
     namedec = pcryptofolder_flddecode_filename(dec, name);
     if (!namedec)
       return 0;
+#if FUSE_USE_VERSION >= 30
+    ret = filler(buf, namedec, st, off, FUSE_FILL_DIR_PLUS);
+#else
     ret = filler(buf, namedec, st, off);
+#endif
     pmem_free(PMEM_SUBSYS_OTHER, namedec);
     return ret;
   } else
+#if FUSE_USE_VERSION >= 30
+    return filler(buf, name, st, off, FUSE_FILL_DIR_PLUS);
+#else
     return filler(buf, name, st, off);
+#endif
 }
 
+#if FUSE_USE_VERSION >= 30
+static int pfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+                            fuse_off_t offset, struct fuse_file_info *fi,
+                            enum fuse_readdir_flags readdir_flags) {
+#else
 static int pfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                             fuse_off_t offset, struct fuse_file_info *fi) {
+#endif
   psync_sql_res *res;
   psync_variant_row row;
   psync_fsfolderid_t folderid;
@@ -918,9 +938,15 @@ static int pfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     }
   } else
     dec = NULL;
+#if FUSE_USE_VERSION >= 30
+  filler(buf, ".", NULL, 0, FUSE_FILL_DIR_PLUS);
+  if (folderid != 0)
+    filler(buf, "..", NULL, 0, FUSE_FILL_DIR_PLUS);
+#else
   filler(buf, ".", NULL, 0);
   if (folderid != 0)
     filler(buf, "..", NULL, 0);
+#endif
   folder = pfs_task_get_folder_tasks_rdlocked(folderid);
   if (folderid >= 0) {
     res = psql_query_nolock(
@@ -1689,6 +1715,7 @@ static int pfs_creat(const char *path, mode_t mode,
                             encoder);
   pfs_task_release_folder_tasks_locked(folder);
   psql_unlock();
+  of->canmodify = (fpath->permissions & PSYNC_PERM_MODIFY) != 0;
   of->newfile = 1;
   of->modified = 1;
   ret = open_write_files(of, 1);
@@ -2885,7 +2912,11 @@ static int pfs_is_nonempty_folder(psync_fsfolderid_t parent_folderid,
   return ret;
 }
 
+#if FUSE_USE_VERSION >= 30
+static int pfs_rename(const char *old_path, const char *new_path, unsigned int rename_flags) {
+#else
 static int pfs_rename(const char *old_path, const char *new_path) {
+#endif
   psync_fspath_t *fold_path, *fnew_path;
   psync_sql_res *res;
   psync_fstask_folder_t *folder;
@@ -3057,13 +3088,21 @@ static int pfs_statfs(const char *path, struct statvfs *stbuf) {
   return 0;
 }
 
+#if FUSE_USE_VERSION >= 30
+static int pfs_chmod(const char *path, mode_t mode, struct fuse_file_info *fi) {
+#else
 static int pfs_chmod(const char *path, mode_t mode) {
+#endif
   pfs_set_thread_name();
   pdbg_logf(D_NOTICE, "chmod %s %u", path, (unsigned)mode);
   return 0;
 }
 
+#if FUSE_USE_VERSION >= 30
+static int pfs_chown(const char *path, uid_t uid, gid_t gid, struct fuse_file_info *fi) {
+#else
 static int pfs_chown(const char *path, uid_t uid, gid_t gid) {
+#endif
   pfs_set_thread_name();
   pdbg_logf(D_NOTICE, "chown %s %u %u", path, (unsigned)uid, (unsigned)gid);
   return 0;
@@ -3229,7 +3268,11 @@ static int pfs_setcrtime(const char *path, const struct timespec *tv) {
 }
 #endif
 
+#if FUSE_USE_VERSION >= 30
+static int pfs_utimens(const char *path, const struct timespec tv[2], struct fuse_file_info *fi) {
+#else
 static int pfs_utimens(const char *path, const struct timespec tv[2]) {
+#endif
   pfs_set_thread_name();
   pdbg_logf(D_NOTICE, "utimens %s %lu", path, tv[1].tv_sec);
   return pfs_set_time(path, &tv[1], 0);
@@ -3286,6 +3329,27 @@ static int pfs_ftruncate(const char *path, fuse_off_t size,
                              (unsigned long)size);
 }
 
+#if FUSE_USE_VERSION >= 30
+static int pfs_truncate(const char *path, fuse_off_t size, struct fuse_file_info *fi) {
+  struct fuse_file_info fi_local;
+  int ret;
+  pfs_set_thread_name();
+  pdbg_logf(D_NOTICE, "truncate %s %lu", path, (unsigned long)size);
+  
+  if (fi) {
+    return pfs_ftruncate(path, size, fi);
+  }
+  
+  memset(&fi_local, 0, sizeof(fi_local));
+  ret = pfs_open(path, &fi_local);
+  if (ret)
+    return ret;
+  ret = pfs_ftruncate(path, size, &fi_local);
+  pfs_flush(path, &fi_local);
+  pfs_release(path, &fi_local);
+  return ret;
+}
+#else
 static int pfs_truncate(const char *path, fuse_off_t size) {
   struct fuse_file_info fi;
   int ret;
@@ -3300,6 +3364,7 @@ static int pfs_truncate(const char *path, fuse_off_t size) {
   pfs_release(path, &fi);
   return ret;
 }
+#endif
 
 static void pfs_start_callback_timer(psync_timer_t timer, void *ptr) {
   psync_generic_callback_t callback;
@@ -3309,7 +3374,11 @@ static void pfs_start_callback_timer(psync_timer_t timer, void *ptr) {
     prun_thread("fs start callback", callback);
 }
 
+#if FUSE_USE_VERSION >= 30
+static void *pfs_init(struct fuse_conn_info *conn, struct fuse_config *cfg) {
+#else
 static void *pfs_init(struct fuse_conn_info *conn) {
+#endif
 #if defined(FUSE_CAP_ASYNC_READ)
   conn->want |= FUSE_CAP_ASYNC_READ;
 #endif
@@ -3546,8 +3615,12 @@ static void pfs_do_stop(void) {
     mp = psync_fuse_get_mountpoint();
     if (mp) {
       if (stat(mp, &st_before) == 0) {
+#if FUSE_USE_VERSION >= 30
+        fuse_unmount(psync_fuse);
+#else
         fuse_unmount(mp, psync_fuse_channel);
         psync_fuse_channel = NULL;
+#endif
         clock_gettime(CLOCK_REALTIME, &ts);
 
         // Check if the mountpoint is still accessible
@@ -3633,13 +3706,16 @@ static void psync_fuse_thread() {
   }
   pthread_mutex_unlock(&start_mutex);
   pdbg_logf(D_NOTICE, "running fuse_loop_mt");
+#if FUSE_USE_VERSION >= 32
+  struct fuse_loop_config loop_config;
+  loop_config.clone_fd = 1;
+  loop_config.max_idle_threads = 10;
+  fr = fuse_loop_mt(psync_fuse, &loop_config);
+#elif FUSE_USE_VERSION >= 30
+  fr = fuse_loop_mt_31(psync_fuse, 1);
+#else
   fr = fuse_loop_mt(psync_fuse);
-
-  if (shutdown_requested) {
-    pdbg_logf(D_NOTICE, "shutdown requested, exiting fuse loop");
-    pfs_do_stop();
-  }
-
+#endif
   pdbg_logf(D_NOTICE, "fuse_loop_mt exited with code %d, running fuse_destroy", fr);
   pthread_mutex_lock(&start_mutex);
   fuse_destroy(psync_fuse);
@@ -3650,28 +3726,6 @@ static void psync_fuse_thread() {
   pthread_mutex_unlock(&start_mutex);
 }
 
-// Returns true if FUSE 3 is installed on the user's machine.
-// Returns false if FUSE version is less than 3.
-static char is_fuse3_installed_on_system() {
-  // Assuming that fusermount3 is only available on FUSE 3.
-  FILE *pipe = popen("which fusermount3", "r");
-
-  if (!pipe) {
-    return 0;
-  }
-
-  char output[1024];
-  memset(output, 0, sizeof(output));
-
-  if (fgets(output, sizeof(output), pipe) != NULL) {
-    return 0;
-  }
-
-  pclose(pipe);
-  size_t outlen = strlen(output);
-
-  return outlen > 0;
-}
 
 static int pfs_do_start() {
   char *mp;
@@ -3684,10 +3738,6 @@ static int pfs_do_start() {
   fuse_opt_add_arg(&args, "argv");
   fuse_opt_add_arg(&args, "-oauto_unmount");
   fuse_opt_add_arg(&args, "-ofsname=" DEFAULT_FUSE_MOUNT_POINT ".fs");
-  if (!is_fuse3_installed_on_system()) {
-    fuse_opt_add_arg(&args, "-ononempty");
-  }
-  fuse_opt_add_arg(&args, "-ohard_remove");
 
   // Add user-specified FUSE options from environment variable
   const char *fuse_opts_env = getenv("PCLOUD_FUSE_OPTS");
@@ -3739,8 +3789,12 @@ static int pfs_do_start() {
   psync_oper.chmod = pfs_chmod;
   psync_oper.chown = pfs_chown;
   psync_oper.utimens = pfs_utimens;
+#if FUSE_USE_VERSION >= 30
+  psync_oper.truncate = pfs_truncate;
+#else
   psync_oper.ftruncate = pfs_ftruncate;
   psync_oper.truncate = pfs_truncate;
+#endif
 
   psync_oper.setxattr = pfs_xatr_set;
   psync_oper.getxattr = pfs_xatr_get;
@@ -3770,18 +3824,45 @@ static int pfs_do_start() {
     goto err00;
   }
 
-  psync_fuse_channel = fuse_mount(mp, &args);
-  if (pdbg_unlikely(!psync_fuse_channel)) {
+#if FUSE_USE_VERSION >= 30
+  psync_fuse = fuse_new(&args, &psync_oper, sizeof(psync_oper), NULL);
+  if (pdbg_unlikely(!psync_fuse)) {
+    pdbg_logf(D_CRITICAL,
+              "CRITICAL ERROR: fuse_new() failed. "
+              "The FUSE filesystem cannot be started. errno=%d (%s)", 
+              errno, strerror(errno));
+    goto err0;
+  }
+  
+  if (fuse_mount(psync_fuse, mp) != 0) {
+    pdbg_logf(D_CRITICAL,
+              "CRITICAL ERROR: fuse_mount() failed for mount point %s. "
+              "The FUSE filesystem cannot be started. errno=%d (%s)", 
+              mp, errno, strerror(errno));
+    goto err1;
+  }
+#else
+  struct fuse_chan *ch = fuse_mount(mp, &args);
+  if (pdbg_unlikely(!ch)) {
     pdbg_logf(D_CRITICAL,
               "CRITICAL ERROR: fuse_mount() failed for mount point %s. "
               "The FUSE filesystem cannot be started. errno=%d (%s)", 
               mp, errno, strerror(errno));
     goto err0;
   }
-  psync_fuse = fuse_new(psync_fuse_channel, &args, &psync_oper,
-                        sizeof(psync_oper), NULL);
-  if (pdbg_unlikely(!psync_fuse))
-    goto err1;
+  
+  psync_fuse = fuse_new(ch, &args, &psync_oper, sizeof(psync_oper), NULL);
+  if (pdbg_unlikely(!psync_fuse)) {
+    pdbg_logf(D_CRITICAL,
+              "CRITICAL ERROR: fuse_new() failed. "
+              "The FUSE filesystem cannot be started. errno=%d (%s)", 
+              errno, strerror(errno));
+    fuse_unmount(mp, ch);
+    goto err0;
+  }
+  psync_fuse_channel = ch;
+#endif
+  
   psync_current_mountpoint = mp;
   started = 1;
   pthread_mutex_unlock(&start_mutex);
@@ -3789,7 +3870,7 @@ static int pfs_do_start() {
   prun_thread("fuse", psync_fuse_thread);
   return 0;
 err1:
-  fuse_unmount(mp, psync_fuse_channel);
+  fuse_destroy(psync_fuse);
 err0:
   pmem_free(PMEM_SUBSYS_OTHER, mp);
 err00:

@@ -8,6 +8,19 @@ The target operating system and platform for this program is `linux/amd64`, and 
 
 I aim to support as many distributions as possible. I maintain a package for [AUR](https://aur.archlinux.org/packages/pcloudcc-lneely) and [Nix](https://github.com/lneely/nixpkgs). I do not plan on providing or maintaining any other packages, but encourage anyone interested in doing so for their own distributions.
 
+# Compatibility Matrix
+
+| Distribution | FUSE |
+|---|---|
+| Debian trixie | 2.x |
+| Debian trixie | 3.x |
+| Arch Linux (rolling) | 3.x latest |
+| Fedora 41 | 3.x |
+| Fedora (latest) | 3.x latest |
+| Debian forky | 3.18+ |
+
+All configurations require **mbedTLS 3.x**. Runtime mount testing was performed manually on FUSE 2 (libfuse 2.9.x), FUSE 3 (libfuse3 3.10.5), and FUSE 3.18+ (Debian forky container).
+
 # Notices
 
 ## Security Notice

@@ -7,7 +7,8 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  fuse2:
+    name: FUSE 2 (debian:trixie)
     runs-on: ubuntu-latest
     container:
       image: debian:trixie
@@ -16,6 +17,108 @@ jobs:
     - name: Install dependencies
       run: |
         apt-get update
-        apt-get install -y build-essential libreadline-dev libudev-dev libfuse-dev libsqlite3-dev zlib1g-dev libboost-dev libboost-system-dev libboost-program-options-dev libmbedtls-dev
-    - name: make
-      run: make
+        apt-get install -y build-essential pkg-config libreadline-dev libudev-dev \
+          libfuse-dev libsqlite3-dev zlib1g-dev \
+          libboost-dev libboost-program-options-dev libmbedtls-dev
+    - name: Build (FUSE 2)
+      run: make FORCE_FUSE=2 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep -E 'fuse_loop_mt@|fuse_mount@|psync_fuse_channel'
+        ldd pcloudcc | grep libfuse.so.2
+
+  fuse3-current:
+    name: FUSE 3 current (debian:trixie)
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        apt-get update
+        apt-get install -y build-essential pkg-config libreadline-dev libudev-dev \
+          libfuse3-dev libsqlite3-dev zlib1g-dev \
+          libboost-dev libboost-program-options-dev libmbedtls-dev
+    - name: Build (FUSE 3 current)
+      run: make FORCE_FUSE=3 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep 'fuse_loop_mt_31'
+        ldd pcloudcc | grep libfuse3
+
+  fuse3-arch:
+    name: FUSE 3 rolling (archlinux:latest)
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        pacman -Sy --noconfirm base-devel pkg-config readline fuse3 sqlite3 \
+          zlib boost mbedtls
+    - name: Build (FUSE 3 rolling)
+      run: make FORCE_FUSE=3 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep 'fuse_loop_mt'
+        ldd pcloudcc | grep libfuse3
+
+  fuse3-fedora41:
+    name: FUSE 3 (fedora:41)
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:41
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        dnf install -y gcc gcc-c++ make pkg-config binutils \
+          readline-devel systemd-devel fuse3-devel sqlite-devel zlib-devel \
+          boost-devel boost-program-options mbedtls3.6-devel
+    - name: Build (FUSE 3 Fedora 41)
+      run: make FORCE_FUSE=3 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep 'fuse_loop_mt'
+        ldd pcloudcc | grep libfuse3
+
+  fuse3-fedora-latest:
+    name: FUSE 3 (fedora:latest)
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        dnf install -y gcc gcc-c++ make pkg-config binutils \
+          readline-devel systemd-devel fuse3-devel sqlite-devel zlib-devel \
+          boost-devel boost-program-options mbedtls-devel
+    - name: Build (FUSE 3 Fedora latest)
+      run: make FORCE_FUSE=3 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep 'fuse_loop_mt'
+        ldd pcloudcc | grep libfuse3
+
+  fuse3-forky:
+    name: FUSE 3.18+ (debian:forky)
+    runs-on: ubuntu-latest
+    container:
+      image: debian:forky
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        apt-get update
+        apt-get install -y build-essential pkg-config libreadline-dev libudev-dev \
+          libfuse3-dev libsqlite3-dev zlib1g-dev \
+          libboost-dev libboost-program-options-dev libmbedtls-dev
+    - name: Build (FUSE 3.18+)
+      run: make FORCE_FUSE=3 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep 'fuse_loop_mt_31'
+        ldd pcloudcc | grep libfuse3

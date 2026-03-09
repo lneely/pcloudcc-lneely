@@ -29,8 +29,6 @@
    DAMAGE.
 */
 
-#define FUSE_USE_VERSION 26
-
 #include <errno.h>
 #include <fuse.h>
 #include <string.h>
