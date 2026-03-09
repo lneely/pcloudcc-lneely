@@ -67,6 +67,44 @@ jobs:
         nm pcloudcc | grep 'fuse_loop_mt'
         ldd pcloudcc | grep libfuse3
 
+  fuse3-fedora41:
+    name: FUSE 3 (fedora:41)
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:41
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        dnf install -y gcc gcc-c++ make pkg-config binutils \
+          readline-devel systemd-devel fuse3-devel sqlite-devel zlib-devel \
+          boost-devel boost-program-options mbedtls3-devel
+    - name: Build (FUSE 3 Fedora 41)
+      run: make FORCE_FUSE=3 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep 'fuse_loop_mt'
+        ldd pcloudcc | grep libfuse3
+
+  fuse3-fedora-latest:
+    name: FUSE 3 (fedora:latest)
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        dnf install -y gcc gcc-c++ make pkg-config binutils \
+          readline-devel systemd-devel fuse3-devel sqlite-devel zlib-devel \
+          boost-devel boost-program-options mbedtls3-devel
+    - name: Build (FUSE 3 Fedora latest)
+      run: make FORCE_FUSE=3 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep 'fuse_loop_mt'
+        ldd pcloudcc | grep libfuse3
+
   fuse3-forky:
     name: FUSE 3.18+ (debian:forky)
     runs-on: ubuntu-latest
