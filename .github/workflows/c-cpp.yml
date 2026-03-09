@@ -7,7 +7,8 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  fuse2:
+    name: FUSE 2 (debian:trixie)
     runs-on: ubuntu-latest
     container:
       image: debian:trixie
@@ -16,6 +17,76 @@ jobs:
     - name: Install dependencies
       run: |
         apt-get update
-        apt-get install -y build-essential libreadline-dev libudev-dev libfuse-dev libsqlite3-dev zlib1g-dev libboost-dev libboost-system-dev libboost-program-options-dev libmbedtls-dev
-    - name: make
-      run: make
+        apt-get install -y build-essential pkg-config libreadline-dev libudev-dev \
+          libfuse-dev libsqlite3-dev zlib1g-dev \
+          libboost-dev libboost-program-options-dev libmbedtls-dev
+    - name: Build (FUSE 2)
+      run: make FORCE_FUSE=2 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep -E 'fuse_loop_mt@|fuse_mount@|psync_fuse_channel'
+        ldd pcloudcc | grep libfuse.so.2
+
+  fuse3-legacy:
+    name: FUSE 3 legacy / <3.12 (ubuntu:20.04)
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        apt-get update
+        apt-get install -y build-essential pkg-config libreadline-dev libudev-dev \
+          libfuse3-dev libsqlite3-dev zlib1g-dev \
+          libboost-dev libboost-program-options-dev libmbedtls-dev
+    - name: Build (FUSE 3 legacy)
+      run: make FORCE_FUSE=3 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep 'fuse_loop_mt_31'
+        ldd pcloudcc | grep libfuse3
+
+  fuse3-current:
+    name: FUSE 3 current / 3.12+ (ubuntu:22.04)
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:22.04
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        apt-get update
+        apt-get install -y build-essential pkg-config libreadline-dev libudev-dev \
+          libfuse3-dev libsqlite3-dev zlib1g-dev \
+          libboost-dev libboost-program-options-dev libmbedtls-dev
+    - name: Build (FUSE 3 current)
+      run: make FORCE_FUSE=3 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep 'fuse_loop_mt_31'
+        ldd pcloudcc | grep libfuse3
+
+  fuse3-forky:
+    name: FUSE 3.18+ (debian:forky)
+    runs-on: ubuntu-latest
+    container:
+      image: debian:forky
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        apt-get update
+        apt-get install -y build-essential pkg-config libreadline-dev libudev-dev \
+          libfuse3-dev libsqlite3-dev zlib1g-dev \
+          libboost-dev libboost-program-options-dev libmbedtls-dev
+    - name: Build (FUSE 3.18+)
+      run: make FORCE_FUSE=3 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep 'fuse_loop_mt_31'
+        ldd pcloudcc | grep libfuse3
