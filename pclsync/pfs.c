@@ -1715,6 +1715,7 @@ static int pfs_creat(const char *path, mode_t mode,
                             encoder);
   pfs_task_release_folder_tasks_locked(folder);
   psql_unlock();
+  of->canmodify = (fpath->permissions & PSYNC_PERM_MODIFY) != 0;
   of->newfile = 1;
   of->modified = 1;
   ret = open_write_files(of, 1);
