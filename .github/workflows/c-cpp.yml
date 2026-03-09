@@ -49,6 +49,24 @@ jobs:
         nm pcloudcc | grep 'fuse_loop_mt_31'
         ldd pcloudcc | grep libfuse3
 
+  fuse3-arch:
+    name: FUSE 3 rolling (archlinux:latest)
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        pacman -Sy --noconfirm base-devel pkg-config readline fuse3 sqlite3 \
+          zlib boost mbedtls
+    - name: Build (FUSE 3 rolling)
+      run: make FORCE_FUSE=3 BUILD=release
+    - name: Verify symbols
+      run: |
+        nm pcloudcc | grep 'fuse_loop_mt'
+        ldd pcloudcc | grep libfuse3
+
   fuse3-forky:
     name: FUSE 3.18+ (debian:forky)
     runs-on: ubuntu-latest
