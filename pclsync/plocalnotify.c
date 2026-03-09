@@ -57,7 +57,7 @@ typedef struct {
   psync_syncid_t syncid;
 } localnotify_msg;
 
-static int pipe_read, pipe_write, epoll_fd;
+static int pipe_read, pipe_write, epoll_fd, signal_fd;
 static psync_list dirs = PSYNC_LIST_STATIC_INIT(dirs);
 
 #define WATCH_HASH 512
@@ -259,7 +259,7 @@ static uint32_t process_notification(localnotify_dir *dir) {
 static void psync_localnotify_thread() {
   struct epoll_event ev;
   uint32_t ncnt;
-  int cnt;
+  int cnt, sig;
   ncnt = 0;
   while (psync_do_run) {
     if ((cnt = epoll_wait(epoll_fd, &ev, 1, 1000)) != 1) {
@@ -271,7 +271,11 @@ static void psync_localnotify_thread() {
         psync_wake_localscan();
       }
     } else {
-      if (ev.data.ptr)
+      if (ev.data.fd == signal_fd) {
+        sig = psignal_read_signalfd(signal_fd);
+        if (sig > 0)
+          psignal_check_pending();
+      } else if (ev.data.ptr)
         ncnt += process_notification((localnotify_dir *)ev.data.ptr);
       else
         process_pipe();
@@ -293,6 +297,15 @@ int psync_localnotify_init() {
   e.data.ptr = NULL;
   if (pdbg_unlikely(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pipe_read, &e)))
     goto err2;
+  signal_fd = psignal_init_signalfd();
+  if (signal_fd != -1) {
+    e.events = EPOLLIN;
+    e.data.fd = signal_fd;
+    if (pdbg_unlikely(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, signal_fd, &e))) {
+      close(signal_fd);
+      signal_fd = -1;
+    }
+  }
   prun_thread("localnotify", psync_localnotify_thread);
   return 0;
 err2:
