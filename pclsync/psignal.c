@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/signalfd.h>
+#include <errno.h>
 
 #define PSIGNAL_MAX_CLEANUPS 16
 static void (*cleanup_fns[PSIGNAL_MAX_CLEANUPS])(void);
@@ -128,4 +130,41 @@ int psignal_check_pending(void) {
     return SIGHUP;
   }
   return 0;
+}
+
+int psignal_init_signalfd(void) {
+  sigset_t mask;
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGTERM);
+  sigaddset(&mask, SIGINT);
+  sigaddset(&mask, SIGHUP);
+  
+  if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1)
+    return -1;
+  
+  int fd = signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
+  return fd;
+}
+
+int psignal_read_signalfd(int fd) {
+  struct signalfd_siginfo fdsi;
+  ssize_t s = read(fd, &fdsi, sizeof(struct signalfd_siginfo));
+  
+  if (s != sizeof(struct signalfd_siginfo)) {
+    if (s == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+      return 0;
+    return -1;
+  }
+  
+  int signum = fdsi.ssi_signo;
+  
+  if (signum == SIGINT) {
+    sigint_flag = 1;
+  } else if (signum == SIGTERM) {
+    sigterm_flag = 1;
+  } else if (signum == SIGHUP) {
+    sighup_flag = 1;
+  }
+  
+  return signum;
 }
