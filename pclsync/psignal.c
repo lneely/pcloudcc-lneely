@@ -4,6 +4,16 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+
+#define PSIGNAL_MAX_CLEANUPS 16
+static void (*cleanup_fns[PSIGNAL_MAX_CLEANUPS])(void);
+static int cleanup_count = 0;
+
+void psignal_register_cleanup(void (*fn)(void)) {
+  if (cleanup_count < PSIGNAL_MAX_CLEANUPS)
+    cleanup_fns[cleanup_count++] = fn;
+}
 
 static volatile sig_atomic_t sigint_flag = 0;
 static volatile sig_atomic_t sigterm_flag = 0;
@@ -42,8 +52,15 @@ void panic(const char *msg) {
   signal(SIGSEGV, SIG_DFL);
   signal(SIGABRT, SIG_DFL);
   signal(SIGBUS, SIG_DFL);
-  
-  abort();
+
+  for (int i = 0; i < cleanup_count; i++)
+    cleanup_fns[i]();
+
+  /* Use _exit() instead of abort(): _exit closes all file descriptors
+   * immediately, releasing POSIX advisory locks (including SQLite's WAL
+   * locks). abort() is intercepted by ASan which can hang indefinitely,
+   * leaving the process as a zombie and the DB locked. */
+  _exit(1);
 }
 
 static void panic_handler(int sig) {

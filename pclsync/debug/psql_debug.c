@@ -39,6 +39,10 @@
 
 extern PSYNC_THREAD const char *psync_thread_name;
 
+/* Forward declaration */
+psync_sql_res *psql_do_prepare(const char *sql, const char *file,
+                               unsigned line);
+
 // --------------------------------------------------------------------------
 // Debug-only state
 // --------------------------------------------------------------------------
@@ -222,6 +226,10 @@ void psql_do_rdlock(const char *file, unsigned line) {
 // --------------------------------------------------------------------------
 // Strong overrides for same-named functions (weak in psql.c)
 // --------------------------------------------------------------------------
+
+int psql_trylock() {
+  return psql_do_trylock(__FILE__, __LINE__);
+}
 
 void psql_lock() {
   psql_do_lock(__FILE__, __LINE__);
