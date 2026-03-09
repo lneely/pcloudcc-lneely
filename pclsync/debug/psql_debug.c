@@ -39,6 +39,10 @@
 
 extern PSYNC_THREAD const char *psync_thread_name;
 
+/* Forward declaration */
+psync_sql_res *psql_do_prepare(const char *sql, const char *file,
+                               unsigned line);
+
 // --------------------------------------------------------------------------
 // Debug-only state
 // --------------------------------------------------------------------------

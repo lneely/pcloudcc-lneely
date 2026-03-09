@@ -12,6 +12,7 @@
 #include "psettings.h"
 #include "psql.h"
 #include "psql_internal.h"
+#include "psignal.h"
 #include "psys.h"
 
 // psql.h defines function-like macros (e.g. psql_lock() -> psql_do_lock())
@@ -80,6 +81,12 @@ psync_list commitcbs;
 
 static void on_error(void *ptr, int code, const char *msg) {
   pdbg_logf(D_WARNING, "database warning %d: %s", code, msg);
+}
+
+static void psql_panic_cleanup(void) {
+  if (psync_db)
+    sqlite3_close_v2(psync_db);
+  psync_db = NULL;
 }
 
 static void psync_sql_free_cache(void *ptr) {
@@ -199,6 +206,7 @@ int psql_connect(const char *db) {
       pthread_mutex_init(&cpmutex, &mattr);
       pthread_mutexattr_destroy(&mattr);
       initmutex = 0;
+      psignal_register_cleanup(psql_panic_cleanup);
     }
     if (IS_DEBUG) {
       sqlite3_config(SQLITE_CONFIG_LOG, on_error, NULL);

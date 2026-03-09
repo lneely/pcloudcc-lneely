@@ -10,6 +10,7 @@ extern "C" {
 void psignal_register(int signum);
 int psignal_check_pending(void);
 void psignal_set_custom_handler(int sig, void (*handler)(int));
+void psignal_register_cleanup(void (*fn)(void));
 void panic(const char *msg) __attribute__((noreturn));
 
 #ifdef __cplusplus
