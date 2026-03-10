@@ -124,12 +124,14 @@ static void test_cascade_delete(void) {
     snprintf(sql, sizeof(sql),
              "INSERT INTO fstaskdepend (fstaskid, dependfstaskid) VALUES (%lld, %lld)",
              (long long)child, (long long)parent);
-    psql_test_exec(sql);
+    if (psql_test_exec(sql) != SQLITE_OK)
+        { FAIL("cascade: insert depend", "exec failed"); return; }
 
     /* Delete the parent task */
     snprintf(sql, sizeof(sql), "DELETE FROM fstask WHERE id=%lld",
              (long long)parent);
-    psql_test_exec(sql);
+    if (psql_test_exec(sql) != SQLITE_OK)
+        { FAIL("cascade: delete parent", "exec failed"); return; }
 
     /* Both the parent row AND the dependency row should be gone */
     char where[128];
@@ -230,14 +232,14 @@ static void test_creat_after_unlink(void) {
     snprintf(sql, sizeof(sql),
              "INSERT INTO fstaskdepend (fstaskid, dependfstaskid) VALUES (%lld, %lld)",
              (long long)creat_id, (long long)unlink_id);
-    psql_test_exec(sql);
+    if (psql_test_exec(sql) != SQLITE_OK)
+        { FAIL("creat-after-unlink: insert depend", "exec failed"); return; }
 
     /* Verify both tasks exist for this folderid+name */
     int unlink_cnt = psql_test_count_fstask(
         "type=4 AND folderid=600 AND text1='data.bin'");
     int creat_cnt  = psql_test_count_fstask(
         "type=3 AND folderid=600 AND text1='data.bin'");
-    int dep_cnt    = psql_test_count_fstaskdepend(NULL);
 
     if (unlink_cnt == 1 && creat_cnt == 1)
         PASS("creat-after-unlink: UNLINK and CREAT tasks both recorded");
@@ -255,8 +257,6 @@ static void test_creat_after_unlink(void) {
         PASS("creat-after-unlink: CREAT depends on UNLINK in fstaskdepend");
     else
         FAIL("creat-after-unlink dependency", "dep_count=%d expected 1", d);
-
-    (void)dep_cnt;
 }
 
 /* ------------------------------------------------------------------ */

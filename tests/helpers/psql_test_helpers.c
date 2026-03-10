@@ -88,7 +88,7 @@ int64_t psql_test_insert_fstask(int type, int status, int64_t folderid,
     sqlite3_bind_int64(stmt, 3, folderid);
     sqlite3_bind_int64(stmt, 4, folderid);
     if (text1)
-        sqlite3_bind_text(stmt, 5, text1, -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 5, text1, -1, SQLITE_TRANSIENT);
     else
         sqlite3_bind_null(stmt, 5);
     int rc = sqlite3_step(stmt);
