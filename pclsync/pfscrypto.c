@@ -531,6 +531,10 @@ int pfs_crpt_read_new(psync_openfile_t *of, char *buf,
   return rd;
 }
 
+static void free_sector_inlog(psync_sector_inlog_t *e) {
+  pmem_free(PMEM_SUBSYS_OTHER, e);
+}
+
 static void
 pfs_crypto_set_sector_log_offset(psync_openfile_t *of,
                                       psync_crypto_sectorid_t sectorid,
@@ -1093,7 +1097,7 @@ static int pfs_crypto_do_finalize_log(psync_openfile_t *of, int fullsync) {
     pmem_free(PMEM_SUBSYS_OTHER, flog);
     return -EIO;
   }
-  ptree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t, tree, free);
+  ptree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t, tree, free_sector_inlog);
   of->sectorsinlog = PSYNC_TREE_EMPTY;
   ret = pfs_crypto_log_flush_and_process(of, flog, 0, 1);
   pfile_delete(flog);
@@ -1690,7 +1694,7 @@ static int pfs_crpt_truncate_to_zero(psync_openfile_t *of) {
     psync_interval_tree_add(&of->writeintervals, 0,
                             pfs_crpt_crypto_size(of->initialsize));
   }
-  ptree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t, tree, free);
+  ptree_for_each_element_call_safe(of->sectorsinlog, psync_sector_inlog_t, tree, free_sector_inlog);
   of->sectorsinlog = PSYNC_TREE_EMPTY;
   of->currentsize = 0;
   pfs_crypto_kill_extender_locked(of);
