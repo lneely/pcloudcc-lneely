@@ -2240,6 +2240,7 @@ pfs_reopen_file_for_writing(psync_openfile_t *of) {
       }
     }
     of->currentsize = of->initialsize;
+    pmem_free(PMEM_SUBSYS_OTHER, encsymkey);
     return 1;
   }
   cr = pfs_task_add_modified_file(of->currentfolder, of->currentname,
