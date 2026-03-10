@@ -191,8 +191,12 @@ tests/test_ptools_params: $(UNIT_DIR)/test_ptools_params.c $(LIBDIR)/ptools.c $(
 tests/test_pfs_lock_ordering: $(UNIT_DIR)/test_pfs_lock_ordering.c
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $< -lpthread
 
-tests/test_ptask_free: $(UNIT_DIR)/test_ptask_free.c
-	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $< -lpthread
+tests/test_ptask_free: $(UNIT_DIR)/test_ptask_free.c $(LIBDIR)/ptask_free.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
+		-Wl,--wrap=pthread_mutex_lock \
+		-Wl,--wrap=pthread_mutex_unlock \
+		-Wl,--wrap=pmem_free \
+		-lpthread
 
 tests/test_prun: $(UNIT_DIR)/test_prun.c $(LIBDIR)/prun.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
 	$(CC) -D_POSIX_C_SOURCE=199309L $(CFLAGS) -o $@ $^ \
