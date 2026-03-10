@@ -18,6 +18,97 @@ extern "C" {
 /* Thread-local storage stub */
 __thread const char *psync_thread_name = "test";
 
+/* Global stubs */
+const char *psync_my_auth = "test_auth";
+const char *apiserver = "https://api.pcloud.com";
+
+/* psync_setting stubs */
+int psync_setting_get_bool(int setting) {
+    (void)setting;
+    return 0;
+}
+
+/* papi stubs */
+void *papi_connect(const char *binapi, int ssl) {
+    (void)binapi;
+    (void)ssl;
+    return NULL;
+}
+
+int papi_send(void *sock, void *params, int count) {
+    (void)sock;
+    (void)params;
+    (void)count;
+    return -1;
+}
+
+void *papi_find_result(void *res, const char *name, int type) {
+    (void)res;
+    (void)name;
+    (void)type;
+    return NULL;
+}
+
+/* psock stubs */
+void psock_close(void *sock) {
+    (void)sock;
+}
+
+/* psql stubs */
+long long psql_cellint(void *res, int row, int col) {
+    (void)res;
+    (void)row;
+    (void)col;
+    return 0;
+}
+
+void *psql_prepare(const char *sql) {
+    (void)sql;
+    return NULL;
+}
+
+void psql_bind_uint(void *stmt, int idx, unsigned long val) {
+    (void)stmt;
+    (void)idx;
+    (void)val;
+}
+
+void psql_run_free(void *stmt) {
+    (void)stmt;
+}
+
+void *psql_query(const char *sql) {
+    (void)sql;
+    return NULL;
+}
+
+void **psql_fetch(void *res) {
+    (void)res;
+    return NULL;
+}
+
+void psql_free(void *res) {
+    (void)res;
+}
+
+const char *psql_expect_str(void *res, int row, int col) {
+    (void)res;
+    (void)row;
+    (void)col;
+    return "";
+}
+
+long long psql_expect_num(void *res, int row, int col) {
+    (void)res;
+    (void)row;
+    (void)col;
+    return 0;
+}
+
+void psql_try_free(void *res) {
+    (void)res;
+}
+
 /* pmem stubs */
 void *pmem_malloc(pmem_subsystem_t subsystem, size_t size) {
     (void)subsystem;
