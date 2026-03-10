@@ -155,6 +155,8 @@ TESTS_DIR := tests
 TEST_CFLAGS  := -D_POSIX_C_SOURCE=200809L
 TEST_CXXFLAGS := -D_POSIX_C_SOURCE=200809L
 
+HELPERS_DIR := tests/helpers
+
 TEST_BINS := \
 	tests/test_pdbg_path \
 	tests/test_ptools_params \
@@ -163,7 +165,11 @@ TEST_BINS := \
 	tests/test_prun \
 	tests/test_ptools_errptr \
 	tests/test_read_response \
-	tests/test_signal_safety
+	tests/test_signal_safety \
+	tests/test_ptree \
+	tests/test_pintervaltree \
+	tests/test_pfstasks_tree \
+	tests/test_pfstasks_db
 
 .PHONY: test tests check clean-tests
 
@@ -210,6 +216,18 @@ tests/test_ptools_errptr: $(UNIT_DIR)/test_ptools_errptr.c $(LIBDIR)/ptools.c $(
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
 		-Wl,--wrap=malloc \
 		-Wl,--wrap=free
+
+tests/test_ptree: $(UNIT_DIR)/test_ptree.c $(LIBDIR)/ptree.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^
+
+tests/test_pintervaltree: $(UNIT_DIR)/test_pintervaltree.c $(LIBDIR)/pintervaltree.c $(LIBDIR)/ptree.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^
+
+tests/test_pfstasks_tree: $(UNIT_DIR)/test_pfstasks_tree.c $(LIBDIR)/pfstasks_tree.c $(LIBDIR)/ptree.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^
+
+tests/test_pfstasks_db: $(UNIT_DIR)/test_pfstasks_db.c $(HELPERS_DIR)/psql_test_helpers.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -I$(HELPERS_DIR) -o $@ $^ -lsqlite3
 
 tests/test_read_response: $(UNIT_DIR)/test_read_response.cpp rpcclient.cpp tests/stubs/test_stubs_cpp.c
 	$(CXX) $(TEST_CXXFLAGS) $(CXXFLAGS) -o $@ $^
