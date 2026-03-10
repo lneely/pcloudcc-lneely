@@ -39,6 +39,27 @@ psock_t *papi_connect(const char *hostname, int usessl) {
     return NULL;
 }
 
+binresult *papi_send(psock_t *sock, const char *command, size_t cmdlen, const binparam *params, size_t paramcnt, int64_t datalen, int readres) {
+    (void)sock;
+    (void)command;
+    (void)cmdlen;
+    (void)params;
+    (void)paramcnt;
+    (void)datalen;
+    (void)readres;
+    return NULL;
+}
+
+const binresult *papi_find_result(const binresult *res, const char *name, uint32_t type, const char *file, const char *function, unsigned int line) {
+    (void)res;
+    (void)name;
+    (void)type;
+    (void)file;
+    (void)function;
+    (void)line;
+    return NULL;
+}
+
 /* psock stubs */
 void psock_close(psock_t *sock) {
     (void)sock;

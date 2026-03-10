@@ -185,7 +185,7 @@ clean-tests:
 tests/test_pdbg_path: $(UNIT_DIR)/test_pdbg_path.c tests/stubs/test_stubs.c
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^
 
-tests/test_ptools_params: $(UNIT_DIR)/test_ptools_params.c $(LIBDIR)/ptools.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c
+tests/test_ptools_params: $(UNIT_DIR)/test_ptools_params.c tests/stubs/test_stubs.c
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^
 
 tests/test_pfs_lock_ordering: $(UNIT_DIR)/test_pfs_lock_ordering.c $(LIBDIR)/pfs.c
@@ -202,7 +202,7 @@ tests/test_prun: $(UNIT_DIR)/test_prun.c $(LIBDIR)/prun.c tests/stubs/test_stubs
 		-Wl,--wrap=free \
 		-lpthread
 
-tests/test_ptools_errptr: $(UNIT_DIR)/test_ptools_errptr.c $(LIBDIR)/ptools.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c
+tests/test_ptools_errptr: $(UNIT_DIR)/test_ptools_errptr.c tests/stubs/test_stubs.c
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
 		-Wl,--wrap=malloc \
 		-Wl,--wrap=free
