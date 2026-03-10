@@ -58,12 +58,14 @@ int64_t ppath_free_space(const char *path) {
 char *ppath_home() {
   struct stat st;
   const char *dir;
+  /* buff must be function-scoped: dir may point into it (via pw_dir) and
+   * must remain valid through the putil_strdup(dir) call below. */
+  char buff[4096];
   dir = getenv("HOME");
   if (pdbg_unlikely(!dir) || pdbg_unlikely(stat(dir, &st)) ||
       pdbg_unlikely(!pfile_stat_mode_ok(&st, 7))) {
     struct passwd pwd;
     struct passwd *result;
-    char buff[4096];
     if (pdbg_unlikely(getpwuid_r(getuid(), &pwd, buff, sizeof(buff), &result)) ||
         pdbg_unlikely(stat(result->pw_dir, &st)) ||
         pdbg_unlikely(!pfile_stat_mode_ok(&st, 7)))
