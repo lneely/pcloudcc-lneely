@@ -33,3 +33,4 @@ tests/test_ptools_errptr
 tests/test_ptools_params
 tests/test_read_response
 tests/test_ptask_free
+tests/test_*
