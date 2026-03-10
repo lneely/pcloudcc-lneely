@@ -106,6 +106,73 @@ else
 	EXECLDFLAGS += $(LIBLDFLAGS)
 endif
 
+# ---------------------------------------------------------------------------
+# Unit tests — standalone, no main-binary deps
+# ---------------------------------------------------------------------------
+UNIT_DIR := tests/unit-tests
+TESTS_DIR := tests
+
+TEST_CFLAGS  := -D_POSIX_C_SOURCE=200809L
+TEST_CXXFLAGS := -D_POSIX_C_SOURCE=200809L
+
+TEST_BINS := \
+	tests/test_pdbg_path \
+	tests/test_ptools_params \
+	tests/test_pfs_lock_ordering \
+	tests/test_ptask_free \
+	tests/test_prun \
+	tests/test_ptools_errptr \
+	tests/test_read_response \
+	tests/test_signal_safety
+
+.PHONY: tests check clean-tests
+
+tests: $(TEST_BINS)
+
+check: tests
+	@rc=0; \
+	for t in $(TEST_BINS); do \
+		echo "=== $$t ==="; \
+		$$t || rc=$$?; \
+	done; \
+	exit $$rc
+
+clean-tests:
+	rm -f $(TEST_BINS)
+
+tests/test_pdbg_path: $(UNIT_DIR)/test_pdbg_path.c
+	$(CC) $(TEST_CFLAGS) -o $@ $<
+
+tests/test_ptools_params: $(UNIT_DIR)/test_ptools_params.c
+	$(CC) $(TEST_CFLAGS) -o $@ $<
+
+tests/test_pfs_lock_ordering: $(UNIT_DIR)/test_pfs_lock_ordering.c
+	$(CC) $(TEST_CFLAGS) -o $@ $< -lpthread
+
+tests/test_ptask_free: $(UNIT_DIR)/test_ptask_free.c
+	$(CC) $(TEST_CFLAGS) -o $@ $< -lpthread
+
+tests/test_prun: $(UNIT_DIR)/test_prun.c
+	$(CC) -D_POSIX_C_SOURCE=199309L -o $@ $< \
+		-Wl,--wrap=pthread_create \
+		-Wl,--wrap=pthread_attr_destroy \
+		-Wl,--wrap=malloc \
+		-Wl,--wrap=free \
+		-lpthread
+
+tests/test_ptools_errptr: $(UNIT_DIR)/test_ptools_errptr.c
+	$(CC) $(TEST_CFLAGS) -o $@ $< \
+		-Wl,--wrap=malloc \
+		-Wl,--wrap=free
+
+tests/test_read_response: $(UNIT_DIR)/test_read_response.cpp
+	$(CXX) $(TEST_CXXFLAGS) -o $@ $<
+
+tests/test_signal_safety: $(TESTS_DIR)/test_signal_safety.c
+	$(CC) -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200809L -o $@ $< -lpthread -lrt
+
+# ---------------------------------------------------------------------------
+
 .PHONY: all clean install install-logrotate uninstall
 
 all: $(TARGETS)
