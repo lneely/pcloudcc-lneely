@@ -14,6 +14,10 @@ extern "C" {
 #include "../pclsync/pdbg.h"
 #include "../pclsync/ppath.h"
 #include "../pclsync/putil.h"
+#include "../pclsync/psock.h"
+#include "../pclsync/papi.h"
+#include "../pclsync/psql.h"
+#include "../pclsync/psettings.h"
 
 /* Thread-local storage stub */
 __thread const char *psync_thread_name = "test";
@@ -29,28 +33,14 @@ int psync_setting_get_bool(int setting) {
 }
 
 /* papi stubs */
-void *papi_connect(const char *binapi, int ssl) {
-    (void)binapi;
-    (void)ssl;
-    return NULL;
-}
-
-int papi_send(void *sock, void *params, int count) {
-    (void)sock;
-    (void)params;
-    (void)count;
-    return -1;
-}
-
-void *papi_find_result(void *res, const char *name, int type) {
-    (void)res;
-    (void)name;
-    (void)type;
+psock_t *papi_connect(const char *hostname, int usessl) {
+    (void)hostname;
+    (void)usessl;
     return NULL;
 }
 
 /* psock stubs */
-void psock_close(void *sock) {
+void psock_close(psock_t *sock) {
     (void)sock;
 }
 
