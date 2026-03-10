@@ -45,57 +45,58 @@ void psock_close(psock_t *sock) {
 }
 
 /* psql stubs */
-long long psql_cellint(void *res, int row, int col) {
-    (void)res;
-    (void)row;
-    (void)col;
-    return 0;
+int64_t psql_cellint(const char *sql, int64_t dflt) {
+    (void)sql;
+    return dflt;
 }
 
-void *psql_prepare(const char *sql) {
+psync_sql_res *psql_prepare(const char *sql) {
     (void)sql;
     return NULL;
 }
 
-void psql_bind_uint(void *stmt, int idx, unsigned long val) {
-    (void)stmt;
-    (void)idx;
+void psql_bind_uint(psync_sql_res *res, int n, uint64_t val) {
+    (void)res;
+    (void)n;
     (void)val;
 }
 
-void psql_run_free(void *stmt) {
-    (void)stmt;
+int psql_run_free(psync_sql_res *res) {
+    (void)res;
+    return -1;
 }
 
-void *psql_query(const char *sql) {
+psync_sql_res *psql_query(const char *sql) {
     (void)sql;
     return NULL;
 }
 
-void **psql_fetch(void *res) {
+psync_variant_row psql_fetch(psync_sql_res *res) {
     (void)res;
     return NULL;
 }
 
-void psql_free(void *res) {
+void psql_free(psync_sql_res *res) {
     (void)res;
 }
 
-const char *psql_expect_str(void *res, int row, int col) {
-    (void)res;
+const char *psql_expect_str(const char *name, const char *sql, uint32_t row, const psync_variant *params) {
+    (void)name;
+    (void)sql;
     (void)row;
-    (void)col;
+    (void)params;
     return "";
 }
 
-long long psql_expect_num(void *res, int row, int col) {
-    (void)res;
+uint64_t psql_expect_num(const char *name, const char *sql, uint32_t row, const psync_variant *params) {
+    (void)name;
+    (void)sql;
     (void)row;
-    (void)col;
+    (void)params;
     return 0;
 }
 
-void psql_try_free(void *res) {
+void psql_try_free(psync_sql_res *res) {
     (void)res;
 }
 
