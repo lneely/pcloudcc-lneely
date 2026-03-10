@@ -509,6 +509,10 @@ static int wait_shared_api() {
   return ret;
 }
 
+static void free_binresult_cache(void *ptr) {
+  pmem_free(PMEM_SUBSYS_CACHE, ptr);
+}
+
 static void set_urls(psync_urls_t *urls, binresult *res) {
   pthread_mutex_lock(&url_cache_mutex);
   if (res) {
@@ -737,7 +741,7 @@ static void release_urls(psync_urls_t *urls) {
       etime = papi_find_result2(urls->urls, "expires", PARAM_NUM)->num;
       if (etime > ctime + 3600) {
         psync_get_string_id(buff, "URLS", urls->hash);
-        pcache_add(buff, urls->urls, etime - ctime - 3600, free, 2);
+        pcache_add(buff, urls->urls, etime - ctime - 3600, free_binresult_cache, 2);
         urls->urls = NULL;
       }
     }
