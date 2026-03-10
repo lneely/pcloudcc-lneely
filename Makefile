@@ -147,7 +147,7 @@ uninstall:
 	rm -f /etc/logrotate.d/pcloudcc
 
 # ---------------------------------------------------------------------------
-# Unit tests — standalone, no main-binary deps
+# Unit tests — link against actual production code from pclsync/
 # ---------------------------------------------------------------------------
 UNIT_DIR := tests/unit-tests
 TESTS_DIR := tests
@@ -165,7 +165,9 @@ TEST_BINS := \
 	tests/test_read_response \
 	tests/test_signal_safety
 
-.PHONY: tests check clean-tests
+.PHONY: test tests check clean-tests
+
+test: check
 
 tests: $(TEST_BINS)
 
@@ -180,33 +182,33 @@ check: tests
 clean-tests:
 	rm -f $(TEST_BINS)
 
-tests/test_pdbg_path: $(UNIT_DIR)/test_pdbg_path.c
-	$(CC) $(TEST_CFLAGS) -o $@ $<
+tests/test_pdbg_path: $(UNIT_DIR)/test_pdbg_path.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^
 
-tests/test_ptools_params: $(UNIT_DIR)/test_ptools_params.c
-	$(CC) $(TEST_CFLAGS) -o $@ $<
+tests/test_ptools_params: $(UNIT_DIR)/test_ptools_params.c $(LIBDIR)/ptools.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^
 
-tests/test_pfs_lock_ordering: $(UNIT_DIR)/test_pfs_lock_ordering.c
-	$(CC) $(TEST_CFLAGS) -o $@ $< -lpthread
+tests/test_pfs_lock_ordering: $(UNIT_DIR)/test_pfs_lock_ordering.c $(LIBDIR)/pfs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ -lpthread
 
-tests/test_ptask_free: $(UNIT_DIR)/test_ptask_free.c
-	$(CC) $(TEST_CFLAGS) -o $@ $< -lpthread
+tests/test_ptask_free: $(UNIT_DIR)/test_ptask_free.c $(LIBDIR)/ptask.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ -lpthread
 
-tests/test_prun: $(UNIT_DIR)/test_prun.c
-	$(CC) -D_POSIX_C_SOURCE=199309L -o $@ $< \
+tests/test_prun: $(UNIT_DIR)/test_prun.c $(LIBDIR)/prun.c tests/stubs/test_stubs.c
+	$(CC) -D_POSIX_C_SOURCE=199309L $(CFLAGS) -o $@ $^ \
 		-Wl,--wrap=pthread_create \
 		-Wl,--wrap=pthread_attr_destroy \
 		-Wl,--wrap=malloc \
 		-Wl,--wrap=free \
 		-lpthread
 
-tests/test_ptools_errptr: $(UNIT_DIR)/test_ptools_errptr.c
-	$(CC) $(TEST_CFLAGS) -o $@ $< \
+tests/test_ptools_errptr: $(UNIT_DIR)/test_ptools_errptr.c $(LIBDIR)/ptools.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
 		-Wl,--wrap=malloc \
 		-Wl,--wrap=free
 
-tests/test_read_response: $(UNIT_DIR)/test_read_response.cpp
-	$(CXX) $(TEST_CXXFLAGS) -o $@ $<
+tests/test_read_response: $(UNIT_DIR)/test_read_response.cpp rpcclient.cpp tests/stubs/test_stubs.c
+	$(CXX) $(TEST_CXXFLAGS) $(CXXFLAGS) -o $@ $^
 
 tests/test_signal_safety: $(TESTS_DIR)/test_signal_safety.c
 	$(CC) -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200809L -o $@ $< -lpthread -lrt
