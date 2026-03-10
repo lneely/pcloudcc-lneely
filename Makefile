@@ -106,6 +106,46 @@ else
 	EXECLDFLAGS += $(LIBLDFLAGS)
 endif
 
+.PHONY: all clean install install-logrotate uninstall
+
+all: $(TARGETS)
+
+clean:
+	rm -f $(COBJ) $(CPPOBJ) $(EXECOUT) $(LIBOUT)
+
+$(EXECOUT): $(CPPOBJ) $(if $(filter 0,$(STATIC)),$(LIBOUT),$(COBJ))
+	$(CXX) -o $@ $(CPPOBJ) $(if $(filter 0,$(STATIC)),,$(COBJ)) $(EXECLDFLAGS)
+
+$(CPPOBJ): %.o: $(SRCDIR)/%.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(DEBUGOBJ): %.o: $(LIBDIR)/debug/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(filter-out $(DEBUGOBJ),$(COBJ)): %.o: $(LIBDIR)/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(LIBOUT): $(COBJ)
+	$(CC) -shared -fPIC -o $@ $^ $(LIBLDFLAGS)
+
+install:
+	install -m 755 pcloudcc $(DESTDIR)/bin/pcloudcc
+ifeq ($(STATIC), 0)
+	install -m 755 libpcloudcc_lib.so $(DESTDIR)/lib/libpcloudcc_lib.so
+endif
+
+install-logrotate:
+	@echo "Installing logrotate configuration (requires root)..."
+	install -D -m 644 pcloudcc.logrotate /etc/logrotate.d/pcloudcc
+	@echo "Logrotate configuration installed to /etc/logrotate.d/pcloudcc"
+	@echo "Note: This handles system-wide logs at /var/log/pcloudcc.log"
+	@echo "For user-specific logs, see comments in pcloudcc.logrotate"
+
+uninstall:
+	rm -f $(DESTDIR)/bin/pcloudcc
+	rm -f $(DESTDIR)/lib/libpcloudcc_lib.so
+	rm -f /etc/logrotate.d/pcloudcc
+
 # ---------------------------------------------------------------------------
 # Unit tests — standalone, no main-binary deps
 # ---------------------------------------------------------------------------
@@ -170,45 +210,3 @@ tests/test_read_response: $(UNIT_DIR)/test_read_response.cpp
 
 tests/test_signal_safety: $(TESTS_DIR)/test_signal_safety.c
 	$(CC) -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=200809L -o $@ $< -lpthread -lrt
-
-# ---------------------------------------------------------------------------
-
-.PHONY: all clean install install-logrotate uninstall
-
-all: $(TARGETS)
-
-clean:
-	rm -f $(COBJ) $(CPPOBJ) $(EXECOUT) $(LIBOUT)
-
-$(EXECOUT): $(CPPOBJ) $(if $(filter 0,$(STATIC)),$(LIBOUT),$(COBJ))
-	$(CXX) -o $@ $(CPPOBJ) $(if $(filter 0,$(STATIC)),,$(COBJ)) $(EXECLDFLAGS)
-
-$(CPPOBJ): %.o: $(SRCDIR)/%.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-$(DEBUGOBJ): %.o: $(LIBDIR)/debug/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(filter-out $(DEBUGOBJ),$(COBJ)): %.o: $(LIBDIR)/%.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-$(LIBOUT): $(COBJ)
-	$(CC) -shared -fPIC -o $@ $^ $(LIBLDFLAGS)
-
-install:
-	install -m 755 pcloudcc $(DESTDIR)/bin/pcloudcc
-ifeq ($(STATIC), 0)
-	install -m 755 libpcloudcc_lib.so $(DESTDIR)/lib/libpcloudcc_lib.so
-endif
-
-install-logrotate:
-	@echo "Installing logrotate configuration (requires root)..."
-	install -D -m 644 pcloudcc.logrotate /etc/logrotate.d/pcloudcc
-	@echo "Logrotate configuration installed to /etc/logrotate.d/pcloudcc"
-	@echo "Note: This handles system-wide logs at /var/log/pcloudcc.log"
-	@echo "For user-specific logs, see comments in pcloudcc.logrotate"
-
-uninstall:
-	rm -f $(DESTDIR)/bin/pcloudcc
-	rm -f $(DESTDIR)/lib/libpcloudcc_lib.so
-	rm -f /etc/logrotate.d/pcloudcc
