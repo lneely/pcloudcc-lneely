@@ -29,6 +29,8 @@
 */
 
 #include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <fuse.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -3516,9 +3518,13 @@ static char *psync_fuse_get_mountpoint() {
                 "Mount point %s has a stale FUSE mount (Transport endpoint is not connected). "
                 "Please unmount it first with: fusermount -u %s", mp, mp);
     } else if (stat_errno == ENOENT) {
+      if (mkdir(mp, 0755) == 0) {
+        pdbg_logf(D_NOTICE, "Mount point %s did not exist, created it.", mp);
+        return mp;
+      }
       pdbg_logf(D_CRITICAL,
-                "Mount point %s does not exist. "
-                "Please create the directory first with: mkdir -p %s", mp, mp);
+                "Mount point %s does not exist and could not be created: %s",
+                mp, strerror(errno));
     } else {
       pdbg_logf(D_CRITICAL,
                 "Cannot access mount point %s (errno=%d: %s). "

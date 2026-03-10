@@ -118,13 +118,14 @@ void *pmem_realloc(pmem_subsystem_t subsystem, void *ptr, size_t size) {
   
   hdr = ((pmem_header_t *)ptr) - 1;
   old_size = hdr->size;
-  
+  pmem_subsystem_t old_subsystem = hdr->subsystem;
+
   new_hdr = (pmem_header_t *)realloc(hdr, total_size);
   if (!new_hdr) {
     return NULL;
   }
-  
-  __atomic_sub_fetch(&subsystem_stats[hdr->subsystem], old_size, __ATOMIC_RELAXED);
+
+  __atomic_sub_fetch(&subsystem_stats[old_subsystem], old_size, __ATOMIC_RELAXED);
   __atomic_add_fetch(&subsystem_stats[subsystem], size, __ATOMIC_RELAXED);
   
   new_hdr->size = size;
