@@ -154,11 +154,19 @@ char *pfs_event_log_path() {
 }
 
 int pdbg_printf(const char *file, const char *function, int unsigned line, int unsigned level, const char *fmt, ...) {
+  /* Recursion guard */
+  static __thread int in_pdbg_printf = 0;
+  if (in_pdbg_printf)
+    return 1;
+  in_pdbg_printf = 1;
+
   /* Initialize debug level from environment on first call */
   pdbg_init_level();
 
-  if (!IS_DEBUG)
+  if (!IS_DEBUG) {
+    in_pdbg_printf = 0;
     return 1;
+  }
 
   static const struct {
     unsigned long level;
@@ -229,6 +237,7 @@ int pdbg_printf(const char *file, const char *function, int unsigned line, int u
   va_end(ap);
   fflush(log_file);
   pthread_mutex_unlock(&log_mutex);
+  in_pdbg_printf = 0;
   return 1;
 }
 
