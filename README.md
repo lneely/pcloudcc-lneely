@@ -18,6 +18,7 @@ I aim to support as many distributions as possible. I maintain a package for [AU
 | Fedora 41 | 3.x |
 | Fedora (latest) | 3.x latest |
 | Debian forky | 3.18+ |
+| Slackware 15 | 3.10.5 | 
 
 All configurations require **mbedTLS 3.x**. Runtime mount testing was performed manually on FUSE 2 (libfuse 2.9.x), FUSE 3 (libfuse3 3.10.5), and FUSE 3.18+ (Debian forky container).
 
