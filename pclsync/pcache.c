@@ -81,7 +81,7 @@ static void cache_timer(psync_timer_t timer, void *ptr) {
   pthread_mutex_lock(&cachelocks[hash_to_lock(he->hash)]);
   psync_list_del(&he->list);
   pthread_mutex_unlock(&cachelocks[hash_to_lock(he->hash)]);
-  pmem_free(PMEM_SUBSYS_OTHER, he->value);
+  he->free(he->value);
   pmem_free(PMEM_SUBSYS_OTHER, he);
   ptimer_stop(timer);
 }
@@ -229,7 +229,7 @@ void pcache_clean() {
       he = psync_list_element(l1, cache_entry_t, list);
       if (!ptimer_stop(he->timer)) {
         psync_list_del(l1);
-        pmem_free(PMEM_SUBSYS_OTHER, he->value);
+        he->free(he->value);
         pmem_free(PMEM_SUBSYS_OTHER, he);
       }
     }
@@ -256,7 +256,7 @@ void pcache_clean_oneof(const char **prefixes, size_t cnt) {
         continue;
       if (!ptimer_stop(he->timer)) {
         psync_list_del(l1);
-        pmem_free(PMEM_SUBSYS_OTHER, he->value);
+        he->free(he->value);
         pmem_free(PMEM_SUBSYS_OTHER, he);
       }
     }

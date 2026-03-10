@@ -318,6 +318,7 @@ static int clean_uploads_for_task(psock_t *api, psync_uploadid_t taskid) {
     } else
       pmem_free(PMEM_SUBSYS_UPLOAD, res);
   }
+  pmem_free(PMEM_SUBSYS_UPLOAD, fr);
   sql = psql_prepare("DELETE FROM fstaskupload WHERE fstaskid=?");
   psql_bind_uint(sql, 1, taskid);
   psql_run_free(sql);

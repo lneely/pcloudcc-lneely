@@ -143,9 +143,13 @@ void psync_interval_tree_remove(psync_interval_tree_t **tree, uint64_t from,
   }
 }
 
+static void free_interval_tree_node(psync_interval_tree_t *e) {
+  pmem_free(PMEM_SUBSYS_OTHER, e);
+}
+
 void psync_interval_tree_free(psync_interval_tree_t *tree) {
   if (tree)
-    ptree_for_each_element_call_safe(&tree->tree, psync_interval_tree_t, tree, free);
+    ptree_for_each_element_call_safe(&tree->tree, psync_interval_tree_t, tree, free_interval_tree_node);
 }
 
 static psync_interval_tree_t *

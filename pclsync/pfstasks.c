@@ -1116,6 +1116,10 @@ int pfs_task_unlink(psync_fsfolderid_t folderid, const char *name) {
   return 0;
 }
 
+static void free_file_history_record(void *ptr) {
+  pmem_free(PMEM_SUBSYS_SYNC, ptr);
+}
+
 static void add_history_record(psync_fileid_t fileid, psync_folderid_t folderid,
                                const char *name) {
   file_history_record *rec;
@@ -1131,7 +1135,7 @@ static void add_history_record(psync_fileid_t fileid, psync_folderid_t folderid,
     return;
   rec->folderid = folderid;
   memcpy(rec->name, name, len);
-  pcache_add(key, rec, PSYNC_FS_FILE_LOC_HIST_SEC, free, 1);
+  pcache_add(key, rec, PSYNC_FS_FILE_LOC_HIST_SEC, free_file_history_record, 1);
 }
 
 int pfs_task_rename_file(psync_fsfileid_t fileid,

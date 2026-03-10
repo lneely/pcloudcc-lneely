@@ -2240,6 +2240,7 @@ pfs_reopen_file_for_writing(psync_openfile_t *of) {
       }
     }
     of->currentsize = of->initialsize;
+    pmem_free(PMEM_SUBSYS_OTHER, encsymkey);
     return 1;
   }
   cr = pfs_task_add_modified_file(of->currentfolder, of->currentname,
@@ -3615,29 +3616,15 @@ static void pfs_do_stop(void) {
   if (started == 1) {
 
     char *mp;
-    struct stat st_before, st_after;
     struct timespec ts = {0, 100000000};
 
     mp = psync_fuse_get_mountpoint();
+#if FUSE_USE_VERSION < 30
     if (mp) {
+      struct stat st_before;
       if (stat(mp, &st_before) == 0) {
-#if FUSE_USE_VERSION >= 30
-        fuse_unmount(psync_fuse);
-#else
         fuse_unmount(mp, psync_fuse_channel);
         psync_fuse_channel = NULL;
-#endif
-        clock_gettime(CLOCK_REALTIME, &ts);
-
-        // Check if the mountpoint is still accessible
-        if (stat(mp, &st_after) == 0) {
-          if (st_before.st_dev == st_after.st_dev) {
-            pdbg_logf(D_WARNING, "FUSE filesystem may not have unmounted properly");
-          }
-        } else if (errno != ENOENT) {
-          pdbg_logf(D_WARNING, "Unexpected error after unmount: %s",
-                strerror(errno));
-        }
       } else {
         pdbg_logf(D_WARNING, "Mountpoint not accessible before unmount: %s",
               strerror(errno));
@@ -3645,6 +3632,7 @@ static void pfs_do_stop(void) {
     } else {
       pdbg_logf(D_ERROR, "Failed to get mountpoint");
     }
+#endif
 
     pdbg_logf(D_NOTICE, "running fuse_exit");
     fuse_exit(psync_fuse);
