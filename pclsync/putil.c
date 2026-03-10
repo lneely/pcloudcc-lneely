@@ -120,8 +120,12 @@ void putil_time_format(time_t tm, unsigned long ns, char *result) {
 
 char *putil_strdup(const char *str) {
   size_t len;
+  char *ptr;
   len = strlen(str) + 1;
-  return (char *)memcpy(pmem_malloc_array(PMEM_SUBSYS_OTHER, len, sizeof(char)), str, len);
+  ptr = (char *)pmem_malloc_array(PMEM_SUBSYS_OTHER, len, sizeof(char));
+  if (!ptr)
+    return NULL;
+  return (char *)memcpy(ptr, str, len);
 }
 
 char *putil_strnormalize_filename(const char *str) {

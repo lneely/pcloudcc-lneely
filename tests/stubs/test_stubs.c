@@ -4,16 +4,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdint.h>
+#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Include headers before implementation */
-#include "../pclsync/pmem.h"
-#include "../pclsync/pdbg.h"
-#include "../pclsync/ppath.h"
-#include "../pclsync/putil.h"
 #include "../pclsync/psock.h"
 #include "../pclsync/papi.h"
 #include "../pclsync/psql.h"
@@ -21,6 +19,7 @@ extern "C" {
 
 /* Thread-local storage stub */
 __thread const char *psync_thread_name = "test";
+__thread uint32_t psync_error = 0;
 
 /* Global stubs */
 const char *psync_my_auth = "test_auth";
@@ -117,64 +116,27 @@ uint64_t psql_expect_num(const char *name, const char *sql, uint32_t row, const 
     return 0;
 }
 
-void psql_try_free(psync_sql_res *res) {
-    (void)res;
+void psql_try_free(void) {
+    /* no-op */
 }
 
-/* pmem stubs */
-void *pmem_malloc(pmem_subsystem_t subsystem, size_t size) {
-    (void)subsystem;
-    return malloc(size);
+int psql_reopen(const char *path) {
+    (void)path;
+    return 0;
 }
 
-void pmem_free(pmem_subsystem_t subsystem, void *ptr) {
-    (void)subsystem;
-    free(ptr);
+/* pfile stubs */
+int pfile_stat_mode_ok(mode_t mode) {
+    (void)mode;
+    return 1;
 }
 
-/* ppath stub */
-char *ppath_home(void) {
-    const char *home = getenv("HOME");
-    if (!home) return NULL;
-    return strdup(home);
-}
-
-/* putil stubs */
-void putil_time_format(time_t tm, unsigned long ns, char *result) {
-    struct tm t;
-    localtime_r(&tm, &t);
-    snprintf(result, 36, "%04d-%02d-%02d %02d:%02d:%02d.%09lu",
-             t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
-             t.tm_hour, t.tm_min, t.tm_sec, ns);
-}
-
-void putil_wipe(void *mem, size_t sz) {
-    if (!mem || sz == 0) return;
-    volatile unsigned char *p = (volatile unsigned char *)mem;
-    memset((void*)p, 0x00, sz);
-    memset((void*)p, 0xFF, sz);
-    memset((void*)p, 0x00, sz);
-}
-
-/* prpc stub */
-char *prpc_sockpath(void) {
-    char *home = ppath_home();
-    if (!home) return NULL;
-    const char *subdir = "/.pcloud/prpc.sock";
-    size_t len = strlen(home) + strlen(subdir) + 1;
-    char *sockpath = (char *)pmem_malloc(PMEM_SUBSYS_OTHER, len);
-    if (!sockpath) {
-        free(home);
-        return NULL;
-    }
-    snprintf(sockpath, len, "%s%s", home, subdir);
-    free(home);
-    return sockpath;
+int pfile_rename(const char *oldpath, const char *newpath) {
+    (void)oldpath;
+    (void)newpath;
+    return 0;
 }
 
 #ifdef __cplusplus
 }
 #endif
-
-/* Include actual pdbg.c implementation */
-#include "../pclsync/pdbg.c"
