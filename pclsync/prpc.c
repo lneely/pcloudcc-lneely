@@ -241,11 +241,13 @@ void prpc_main_loop() {
   char *sockpath = prpc_sockpath();
   if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
     pdbg_logf(D_ERROR, "Unix socket error failed to open %s", sockpath);
+    pmem_free(PMEM_SUBSYS_OTHER, sockpath);
     return;
   }
 
   if (fchmod(fd, 0600) == -1) {
     pdbg_logf(D_ERROR, "Failed to set socket permissions");
+    pmem_free(PMEM_SUBSYS_OTHER, sockpath);
     return;
   }
 
@@ -257,9 +259,10 @@ void prpc_main_loop() {
 
   if (bind(fd, (struct sockaddr *)&addr, strlen(sockpath) + sizeof(addr.sun_family)) == -1) {
     pdbg_logf(D_ERROR, "Unix socket bind error");
+    pmem_free(PMEM_SUBSYS_OTHER, sockpath);
     return;
   }
-  
+
   pmem_free(PMEM_SUBSYS_OTHER, sockpath);
 
   if (listen(fd, 5) == -1) {
@@ -335,5 +338,6 @@ char *prpc_sockpath() {
     }
 
     snprintf(sockpath, len, "%s%s", home, subdir);
+    pmem_free(PMEM_SUBSYS_OTHER, home);
     return sockpath;
 }
