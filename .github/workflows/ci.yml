@@ -17,7 +17,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libfuse3-dev
+          sudo apt-get install -y build-essential libfuse3-dev libmbedtls-dev libsqlite3-dev libreadline-dev libudev-dev zlib1g-dev
 
       - name: Build test binaries
         run: make tests
