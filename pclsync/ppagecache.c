@@ -358,8 +358,8 @@ static int psync_pagecache_read_range_from_api(psync_request_t *request,
   binresult *res;
   unsigned long len, i, h;
   int rb;
-  first_page_id = range->offset / PSYNC_FS_PAGE_SIZE;
-  len = range->length / PSYNC_FS_PAGE_SIZE;
+  first_page_id = ppagecache_range_first_page_id(range->offset);
+  len = (unsigned long)ppagecache_range_page_count(range->length);
   res = papi_result_thread(api);
   if (pdbg_unlikely(!res))
     return -2;
@@ -2304,21 +2304,20 @@ static int psync_pagecache_read_range_from_sock(psync_request_t *request,
   psync_cache_page_t *page;
   unsigned long len, i, h;
   int rb;
-  first_page_id = range->offset / PSYNC_FS_PAGE_SIZE;
-  len = range->length / PSYNC_FS_PAGE_SIZE;
+  first_page_id = ppagecache_range_first_page_id(range->offset);
+  len = (unsigned long)ppagecache_range_page_count(range->length);
   rb = psync_http_next_request(sock);
   if (unlikely(rb)) {
-    if (rb == 410 || rb == 404 || rb == -1) {
+    int retry = ppagecache_http_status_should_retry(rb);
+    if (retry == 1)
       pdbg_logf(D_WARNING,
             "got %d from psync_http_next_request, freeing URLs and requesting "
             "retry, range from %lu",
             rb, (long unsigned)range->offset);
-      return 1;
-    } else {
+    else
       pdbg_logf(D_WARNING, "got %d from psync_http_next_request, returning error",
             rb);
-      return -1;
-    }
+    return retry;
   }
   for (i = 0; i < len; i++) {
     page = psync_pagecache_get_free_page(0);

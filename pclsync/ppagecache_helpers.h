@@ -23,6 +23,41 @@
 #define PPAGECACHE_TIER4_THRESHOLD 16u
 
 /*
+ * Page size — must match PSYNC_FS_PAGE_SIZE from psettings.h.
+ * Kept here so unit tests do not need to pull in psettings.h and its
+ * transitive SSL/compiler dependencies.
+ */
+#define PPAGECACHE_PAGE_SIZE 4096u
+
+/*
+ * ppagecache_range_first_page_id — return the ID of the first page that
+ * covers byte offset `offset`.  Pure arithmetic, no side effects.
+ */
+static inline uint64_t ppagecache_range_first_page_id(uint64_t offset) {
+    return offset / PPAGECACHE_PAGE_SIZE;
+}
+
+/*
+ * ppagecache_range_page_count — return the number of whole pages in a
+ * byte-length range.  Pure arithmetic, no side effects.
+ */
+static inline uint64_t ppagecache_range_page_count(uint64_t length) {
+    return length / PPAGECACHE_PAGE_SIZE;
+}
+
+/*
+ * ppagecache_http_status_should_retry — classify a status code returned by
+ * psync_http_next_request:
+ *
+ *   0  — success (status == 0)
+ *   1  — retryable: URL expired or connection lost (410, 404, -1)
+ *  -1  — hard error: any other non-zero status
+ *
+ * Pure function: no side effects, no I/O.
+ */
+int ppagecache_http_status_should_retry(int status);
+
+/*
  * ppagecache_compute_page_priority — assign an eviction-priority tier to a
  * cached page based on its access count.
  *

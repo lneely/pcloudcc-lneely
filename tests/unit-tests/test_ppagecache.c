@@ -144,10 +144,130 @@ static void test_download_url_override(void) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Test 4: ppagecache_range_first_page_id                              */
+/* ------------------------------------------------------------------ */
+static void test_range_first_page_id(void) {
+    /* Offset exactly at page boundary → page N */
+    if (ppagecache_range_first_page_id(0) != 0)
+        FAIL("first_page_id(0)", "expected 0, got %lu",
+             (unsigned long)ppagecache_range_first_page_id(0));
+    else
+        PASS("first_page_id: offset 0 → page 0");
+
+    if (ppagecache_range_first_page_id(PPAGECACHE_PAGE_SIZE) != 1)
+        FAIL("first_page_id(PAGE_SIZE)", "expected 1, got %lu",
+             (unsigned long)ppagecache_range_first_page_id(PPAGECACHE_PAGE_SIZE));
+    else
+        PASS("first_page_id: offset PAGE_SIZE → page 1");
+
+    if (ppagecache_range_first_page_id(3 * PPAGECACHE_PAGE_SIZE) != 3)
+        FAIL("first_page_id(3*PAGE_SIZE)", "expected 3, got %lu",
+             (unsigned long)ppagecache_range_first_page_id(3 * PPAGECACHE_PAGE_SIZE));
+    else
+        PASS("first_page_id: offset 3*PAGE_SIZE → page 3");
+
+    /* Interior byte of a page → same page ID */
+    if (ppagecache_range_first_page_id(PPAGECACHE_PAGE_SIZE + 1) != 1)
+        FAIL("first_page_id(PAGE_SIZE+1)", "expected 1, got %lu",
+             (unsigned long)ppagecache_range_first_page_id(PPAGECACHE_PAGE_SIZE + 1));
+    else
+        PASS("first_page_id: PAGE_SIZE+1 → page 1 (interior byte)");
+
+    if (ppagecache_range_first_page_id(2 * PPAGECACHE_PAGE_SIZE - 1) != 1)
+        FAIL("first_page_id(2*PAGE_SIZE-1)", "expected 1, got %lu",
+             (unsigned long)ppagecache_range_first_page_id(2 * PPAGECACHE_PAGE_SIZE - 1));
+    else
+        PASS("first_page_id: 2*PAGE_SIZE-1 → page 1 (last byte of page)");
+}
+
+/* ------------------------------------------------------------------ */
+/* Test 5: ppagecache_range_page_count                                 */
+/* ------------------------------------------------------------------ */
+static void test_range_page_count(void) {
+    if (ppagecache_range_page_count(0) != 0)
+        FAIL("page_count(0)", "expected 0, got %lu",
+             (unsigned long)ppagecache_range_page_count(0));
+    else
+        PASS("page_count: length 0 → 0 pages");
+
+    if (ppagecache_range_page_count(PPAGECACHE_PAGE_SIZE) != 1)
+        FAIL("page_count(PAGE_SIZE)", "expected 1, got %lu",
+             (unsigned long)ppagecache_range_page_count(PPAGECACHE_PAGE_SIZE));
+    else
+        PASS("page_count: length PAGE_SIZE → 1 page");
+
+    if (ppagecache_range_page_count(4 * PPAGECACHE_PAGE_SIZE) != 4)
+        FAIL("page_count(4*PAGE_SIZE)", "expected 4, got %lu",
+             (unsigned long)ppagecache_range_page_count(4 * PPAGECACHE_PAGE_SIZE));
+    else
+        PASS("page_count: length 4*PAGE_SIZE → 4 pages");
+
+    /* Partial page rounds down */
+    if (ppagecache_range_page_count(PPAGECACHE_PAGE_SIZE + 1) != 1)
+        FAIL("page_count(PAGE_SIZE+1)", "expected 1, got %lu",
+             (unsigned long)ppagecache_range_page_count(PPAGECACHE_PAGE_SIZE + 1));
+    else
+        PASS("page_count: PAGE_SIZE+1 → 1 page (partial trailing page ignored)");
+}
+
+/* ------------------------------------------------------------------ */
+/* Test 6: ppagecache_http_status_should_retry                         */
+/* ------------------------------------------------------------------ */
+static void test_http_status_should_retry(void) {
+    /* 0 → success */
+    if (ppagecache_http_status_should_retry(0) != 0)
+        FAIL("http_retry(0)", "expected 0 (success), got %d",
+             ppagecache_http_status_should_retry(0));
+    else
+        PASS("http_retry: status 0 → success (0)");
+
+    /* Retryable statuses: 410, 404, -1 */
+    if (ppagecache_http_status_should_retry(410) != 1)
+        FAIL("http_retry(410)", "expected 1 (retry), got %d",
+             ppagecache_http_status_should_retry(410));
+    else
+        PASS("http_retry: 410 Gone → retry (1)");
+
+    if (ppagecache_http_status_should_retry(404) != 1)
+        FAIL("http_retry(404)", "expected 1 (retry), got %d",
+             ppagecache_http_status_should_retry(404));
+    else
+        PASS("http_retry: 404 Not Found → retry (1)");
+
+    if (ppagecache_http_status_should_retry(-1) != 1)
+        FAIL("http_retry(-1)", "expected 1 (retry), got %d",
+             ppagecache_http_status_should_retry(-1));
+    else
+        PASS("http_retry: -1 connection lost → retry (1)");
+
+    /* Hard errors: other non-zero statuses */
+    if (ppagecache_http_status_should_retry(500) != -1)
+        FAIL("http_retry(500)", "expected -1 (hard error), got %d",
+             ppagecache_http_status_should_retry(500));
+    else
+        PASS("http_retry: 500 Internal Server Error → hard error (-1)");
+
+    if (ppagecache_http_status_should_retry(403) != -1)
+        FAIL("http_retry(403)", "expected -1 (hard error), got %d",
+             ppagecache_http_status_should_retry(403));
+    else
+        PASS("http_retry: 403 Forbidden → hard error (-1)");
+
+    if (ppagecache_http_status_should_retry(200) != -1)
+        FAIL("http_retry(200)", "expected -1 (hard error), got %d",
+             ppagecache_http_status_should_retry(200));
+    else
+        PASS("http_retry: 200 unexpected non-zero → hard error (-1)");
+}
+
+/* ------------------------------------------------------------------ */
 int main(void) {
     test_priority_tiers();
     test_verify_crc();
     test_download_url_override();
+    test_range_first_page_id();
+    test_range_page_count();
+    test_http_status_should_retry();
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures ? 1 : 0;
