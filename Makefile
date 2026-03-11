@@ -169,7 +169,9 @@ TEST_BINS := \
 	tests/test_ptree \
 	tests/test_pintervaltree \
 	tests/test_pfstasks_tree \
-	tests/test_pfstasks_db
+	tests/test_pfstasks_db \
+	tests/test_plocks \
+	tests/test_pfsupload
 
 .PHONY: test tests check clean-tests
 
@@ -228,6 +230,13 @@ tests/test_pfstasks_tree: $(UNIT_DIR)/test_pfstasks_tree.c $(LIBDIR)/pfstasks_tr
 
 tests/test_pfstasks_db: $(UNIT_DIR)/test_pfstasks_db.c $(HELPERS_DIR)/psql_test_helpers.c
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) -I$(HELPERS_DIR) -o $@ $^ -lsqlite3
+
+tests/test_plocks: $(UNIT_DIR)/test_plocks.c $(LIBDIR)/plocks.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ -lpthread
+
+tests/test_pfsupload: $(UNIT_DIR)/test_pfsupload.c $(LIBDIR)/pfsupload_send.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
+		-Wl,--wrap=papi_send
 
 tests/test_read_response: $(UNIT_DIR)/test_read_response.cpp rpcclient.cpp tests/stubs/test_stubs_cpp.c
 	$(CXX) $(TEST_CXXFLAGS) $(CXXFLAGS) -o $@ $^

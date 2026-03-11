@@ -41,6 +41,7 @@
 #include "pfscrypto.h"
 #include "pfstasks.h"
 #include "pfsupload.h"
+#include "pfsupload_send.h"
 #include "pfsxattr.h"
 #include "plibs.h"
 #include "plist.h"
@@ -57,23 +58,6 @@
 #include "pupload.h"
 #include "putil.h"
 
-
-typedef struct {
-  psync_list list;
-  binresult *res;
-  uint64_t id;
-  uint64_t type;
-  psync_folderid_t folderid;
-  psync_folderid_t sfolderid;
-  psync_fileid_t fileid;
-  const char *text1;
-  const char *text2;
-  int64_t int1;
-  int64_t int2;
-  unsigned char ccreat;
-  unsigned char needprocessing;
-  unsigned char status;
-} fsupload_task_t;
 
 static void free_fsupload_task(fsupload_task_t *elem) {
   pmem_free(PMEM_SUBSYS_UPLOAD, elem);
@@ -97,31 +81,6 @@ static const uint32_t requiredstatusesnooverquota[] = {
     PSTATUS_COMBINE(PSTATUS_TYPE_AUTH, PSTATUS_AUTH_PROVIDED),
     PSTATUS_COMBINE(PSTATUS_TYPE_RUN, PSTATUS_RUN_RUN),
     PSTATUS_COMBINE(PSTATUS_TYPE_ONLINE, PSTATUS_ONLINE_ONLINE)};
-
-static int psync_send_task_mkdir(psock_t *api, fsupload_task_t *task) {
-  if (task->text2) {
-    binparam params[] = {
-        PAPI_STR("auth", psync_my_auth), PAPI_NUM("folderid", task->folderid),
-        PAPI_STR("name", task->text1),   PAPI_STR("timeformat", "timestamp"),
-        PAPI_BOOL("encrypted", 1),       PAPI_STR("key", task->text2),
-        PAPI_NUM("ctime", task->int1)};
-    if (pdbg_likely(papi_send_no_res(api, "createfolderifnotexists",
-                                       params) == PTR_OK))
-      return 0;
-    else
-      return -1;
-  } else {
-    binparam params[] = {
-        PAPI_STR("auth", psync_my_auth), PAPI_NUM("folderid", task->folderid),
-        PAPI_STR("name", task->text1), PAPI_STR("timeformat", "timestamp"),
-        PAPI_NUM("ctime", task->int1)};
-    if (pdbg_likely(papi_send_no_res(api, "createfolderifnotexists",
-                                       params) == PTR_OK))
-      return 0;
-    else
-      return -1;
-  }
-}
 
 static void handle_mkdir_api_error(uint64_t result, fsupload_task_t *task) {
   psync_sql_res *res;
@@ -182,15 +141,7 @@ static int psync_process_task_mkdir(fsupload_task_t *task) {
   return 0;
 }
 
-static int psync_send_task_rmdir(psock_t *api, fsupload_task_t *task) {
-  binparam params[] = {PAPI_STR("auth", psync_my_auth),
-                       PAPI_NUM("folderid", task->sfolderid),
-                       PAPI_STR("timeformat", "timestamp")};
-  if (pdbg_likely(papi_send_no_res(api, "deletefolder", params) == PTR_OK))
-    return 0;
-  else
-    return -1;
-}
+/* psync_send_task_rmdir extracted to pfsupload_send.c as pfsupload_send_rmdir */
 
 static int handle_rmdir_api_error(uint64_t result, fsupload_task_t *task) {
   pdbg_logf(D_ERROR, "deletefolder returned error %u", (unsigned)result);
@@ -1795,8 +1746,8 @@ typedef int (*psync_cancel_task_ptr)(fsupload_task_t *);
 
 static psync_send_task_ptr psync_send_task_func[] = {
     NULL,
-    psync_send_task_mkdir,
-    psync_send_task_rmdir,
+    pfsupload_send_mkdir,
+    pfsupload_send_rmdir,
     psync_send_task_creat,
     psync_send_task_unlink,
     NULL,
