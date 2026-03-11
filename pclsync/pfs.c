@@ -63,6 +63,7 @@
 #include "pssl.h"
 #include "pstatus.h"
 #include "psys.h"
+#include "pfs_helpers.h"
 #include "ptimer.h"
 
 
@@ -3806,6 +3807,9 @@ static int pfs_do_start() {
 
   myuid = getuid();
   mygid = getgid();
+  /* Keep pfs_helpers.c in sync for helper-based callers */
+  pfs_stat_uid = myuid;
+  pfs_stat_gid = mygid;
   pthread_mutex_lock(&start_mutex);
   if (started)
     goto err00;
