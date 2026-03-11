@@ -173,7 +173,9 @@ TEST_BINS := \
 	tests/test_plocks \
 	tests/test_pfsupload \
 	tests/test_ppagecache \
-	tests/test_pfs_helpers
+	tests/test_pfs_helpers \
+	tests/test_pdiff_helpers \
+	tests/test_plocalscan_helpers
 
 .PHONY: test tests check clean-tests
 
@@ -249,6 +251,22 @@ tests/test_pfs_helpers: $(UNIT_DIR)/test_pfs_helpers.c $(LIBDIR)/pfs_helpers.c $
 		-Wl,--wrap=pfs_task_get_folder_tasks_rdlocked \
 		-Wl,--wrap=ptimer_time
 		# ^ GNU ld only; --wrap stubs out encrypted-size, folder-task lookup, and timer
+
+tests/test_plocalscan_helpers: $(UNIT_DIR)/test_plocalscan_helpers.c $(LIBDIR)/plocalscan_helpers.c $(LIBDIR)/plist.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
+		-Wl,--wrap=psync_is_name_to_ignore \
+		-Wl,--wrap=psync_send_backup_del_event
+		# ^ GNU ld only; wraps filter/side-effect calls in extracted helpers
+
+tests/test_pdiff_helpers: $(UNIT_DIR)/test_pdiff_helpers.c $(LIBDIR)/pdiff_helpers.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
+		-Wl,--wrap=papi_find_result \
+		-Wl,--wrap=papi_check_result \
+		-Wl,--wrap=psql_bind_uint \
+		-Wl,--wrap=psql_bind_lstr \
+		-Wl,--wrap=psql_bind_null \
+		-Wl,--wrap=psql_bind_double
+		# ^ GNU ld only; --wrap overrides papi lookup stubs and intercepts SQL binds
 
 
 tests/test_read_response: $(UNIT_DIR)/test_read_response.cpp rpcclient.cpp tests/stubs/test_stubs_cpp.c

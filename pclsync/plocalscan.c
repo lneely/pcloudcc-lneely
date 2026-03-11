@@ -40,6 +40,7 @@
 #include "plist.h"
 #include "plocalnotify.h"
 #include "plocalscan.h"
+#include "plocalscan_helpers.h"
 #include "pmem.h"
 #include "ppath.h"
 #include "ppathstatus.h"
@@ -65,21 +66,7 @@ typedef struct {
   char localpath[];
 } sync_list;
 
-typedef struct {
-  psync_list list;
-  psync_fileorfolderid_t localid;
-  psync_fileorfolderid_t remoteid;
-  psync_folderid_t localparentfolderid;
-  psync_folderid_t parentfolderid;
-  uint64_t inode;
-  uint64_t deviceid;
-  uint64_t mtimenat;
-  uint64_t size;
-  psync_syncid_t syncid;
-  psync_synctype_t synctype;
-  uint8_t isfolder;
-  char name[1];
-} sync_folderlist;
+/* sync_folderlist moved to plocalscan_helpers.h */
 
 typedef struct {
   psync_list list;
@@ -409,166 +396,40 @@ static void scanner_db_folder_to_list(psync_syncid_t syncid,
   psql_free(res);
 }
 
+/* folderlist_cmp, copy_folderlist_element, add_new_element moved to
+ * plocalscan_helpers.c; local aliases for plocalscan.c callers. */
+
 static int folderlist_cmp(const psync_list *l1, const psync_list *l2) {
-  return strcmp(
-      psync_list_element(l1, sync_folderlist, list)->name,
-      psync_list_element(l2, sync_folderlist, list)->name);
+  return plocalscan_folderlist_cmp(l1, l2);
 }
 
-static sync_folderlist *copy_folderlist_element(const sync_folderlist *e,
-                                                psync_folderid_t folderid,
-                                                psync_folderid_t localfolderid,
-                                                psync_syncid_t syncid,
-                                                psync_synctype_t synctype) {
-  sync_folderlist *ret;
-  size_t l;
-  l = offsetof(sync_folderlist, name) + strlen(e->name) + 1;
-  ret = (sync_folderlist *)pmem_malloc(PMEM_SUBSYS_SYNC, l);
-  memcpy(ret, e, l);
-  ret->localparentfolderid = localfolderid;
-  ret->parentfolderid = folderid;
-  ret->syncid = syncid;
-  ret->synctype = synctype;
-  return ret;
-}
-
-static void add_element_to_scan_list(unsigned long id, sync_folderlist *e) {
-  psync_list_add_tail(&scan_lists[id], &e->list);
-  localsleepperfolder = 0;
-  changes++;
-}
-
-static void add_new_element(const sync_folderlist *e, psync_folderid_t folderid,
-                            psync_folderid_t localfolderid,
-                            psync_syncid_t syncid, psync_synctype_t synctype,
-                            uint64_t deviceid) {
-  sync_folderlist *c;
-  if (e->isfolder && e->deviceid != deviceid)
-    return;
-  if (psync_is_name_to_ignore(e->name))
-    return;
-  if (!putil_is_valid_utf8(e->name)) {
-    pdbg_logf(D_WARNING, "ignoring %s with invalid UTF8 name %s",
-          e->isfolder ? "folder" : "file", e->name);
-    return;
-  }
-  pdbg_logf(D_NOTICE, "found new %s %s", e->isfolder ? "folder" : "file", e->name);
-  c = copy_folderlist_element(e, folderid, localfolderid, syncid, synctype);
-  if (e->isfolder)
-    add_element_to_scan_list(SCAN_LIST_NEWFOLDERS, c);
-  else
-    add_element_to_scan_list(SCAN_LIST_NEWFILES, c);
-}
-
-static void add_deleted_element(const sync_folderlist *e,
-                                psync_folderid_t folderid,
-                                psync_folderid_t localfolderid,
-                                psync_syncid_t syncid,
-                                psync_synctype_t synctype) {
-  sync_folderlist *c;
-  pdbg_logf(D_NOTICE, "found deleted %s %s", e->isfolder ? "folder" : "file",
-        e->name);
-  c = copy_folderlist_element(e, folderid, localfolderid, syncid, synctype);
-
-  if (e->isfolder) {
-    add_element_to_scan_list(SCAN_LIST_DELFOLDERS, c);
-  } else {
-    // Send events only for backups, not for other syncs
-    if (synctype == 7) {
-      psync_send_backup_del_event(c->remoteid);
-    }
-
-    add_element_to_scan_list(SCAN_LIST_DELFILES, c);
-  }
-}
-
-static void
-add_modified_file(const sync_folderlist *e, const sync_folderlist *dbe,
-                  psync_folderid_t folderid, psync_folderid_t localfolderid,
-                  psync_syncid_t syncid, psync_synctype_t synctype) {
-  pdbg_logf(D_NOTICE,
-        "found modified file %s on disk: size=%llu mtime=%llu inode=%llu in "
-        "db: size=%llu mtime=%llu inode=%llu",
-        e->name, (long long unsigned)e->size, (long long unsigned)e->mtimenat,
-        (long long unsigned)e->inode, (long long unsigned)dbe->size,
-        (long long unsigned)dbe->mtimenat, (long long unsigned)dbe->inode);
-  add_element_to_scan_list(
-      SCAN_LIST_MODFILES,
-      copy_folderlist_element(e, folderid, localfolderid, syncid, synctype));
-}
+/* add_deleted_element and add_modified_file moved to plocalscan_helpers.c */
 
 static void
 scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
                     psync_folderid_t localfolderid, psync_syncid_t syncid,
                     psync_synctype_t synctype, uint64_t deviceid) {
-  psync_list disklist, dblist, *ldisk, *ldb;
-  sync_folderlist *l, *fdisk, *fdb;
+  psync_list disklist, dblist;
+  sync_folderlist *l;
   char *subpath;
-  int cmp;
-  // pdbg_logf(D_NOTICE, "scanning folder %s deviceid: %llu", localpath, deviceid);
-  if (pdbg_unlikely(scanner_local_folder_to_list(localpath, &disklist))) {
+  size_t added;
+  if (pdbg_unlikely(scanner_local_folder_to_list(localpath, &disklist)))
     return;
-  }
 
   scanner_db_folder_to_list(syncid, localfolderid, &dblist);
-
   psync_list_sort(&dblist, folderlist_cmp);
   psync_list_sort(&disklist, folderlist_cmp);
 
-  ldisk = disklist.next;
-  ldb = dblist.next;
-
-  while (ldisk != &disklist && ldb != &dblist) {
-    fdisk = psync_list_element(ldisk, sync_folderlist, list);
-    fdb = psync_list_element(ldb, sync_folderlist, list);
-    cmp = strcmp(fdisk->name, fdb->name);
-    if (cmp == 0) {
-      if (fdisk->isfolder == fdb->isfolder) {
-        fdisk->localid = fdb->localid;
-        fdisk->remoteid = fdb->remoteid;
-        if (!fdisk->isfolder &&
-            (fdisk->mtimenat != fdb->mtimenat || fdisk->size != fdb->size ||
-             fdisk->inode != fdb->inode))
-          add_modified_file(fdisk, fdb, folderid, localfolderid, syncid,
-                            synctype);
-        if (fdisk->isfolder &&
-            pdevice_id_short(fdisk->deviceid) != fdb->deviceid &&
-            fdisk->inode != fdb->inode) {
-          if (fdisk->deviceid == deviceid) {
-            pdbg_logf(D_NOTICE,
-                  "deviceid of localfolder %s %lu is different, skipping",
-                  fdisk->name, (unsigned long)fdisk->localid);
-            fdisk->localid = 0;
-          }
-        }
-      } else {
-        add_deleted_element(fdb, folderid, localfolderid, syncid, synctype);
-        add_new_element(fdisk, folderid, localfolderid, syncid, synctype,
-                        deviceid);
-      }
-      ldisk = ldisk->next;
-      ldb = ldb->next;
-    } else if (cmp < 0) { // new element on disk
-      add_new_element(fdisk, folderid, localfolderid, syncid, synctype,
-                      deviceid);
-      ldisk = ldisk->next;
-    } else { // deleted element from disk
-      add_deleted_element(fdb, folderid, localfolderid, syncid, synctype);
-      ldb = ldb->next;
-    }
+  added = plocalscan_merge_folder_lists(&disklist, &dblist, scan_lists,
+                                         folderid, localfolderid, syncid,
+                                         synctype, deviceid);
+  if (added) {
+    localsleepperfolder = 0;
+    changes += added;
   }
 
-  while (ldisk != &disklist) {
-    fdisk = psync_list_element(ldisk, sync_folderlist, list);
-    add_new_element(fdisk, folderid, localfolderid, syncid, synctype, deviceid);
-    ldisk = ldisk->next;
-  }
-  while (ldb != &dblist) {
-    fdb = psync_list_element(ldb, sync_folderlist, list);
-    add_deleted_element(fdb, folderid, localfolderid, syncid, synctype);
-    ldb = ldb->next;
-  }
-  psync_list_for_each_element_call(&dblist, sync_folderlist, list, free_sync_folderlist);
+  psync_list_for_each_element_call(&dblist, sync_folderlist, list,
+                                   free_sync_folderlist);
   if (localsleepperfolder) {
     psys_sleep_milliseconds(localsleepperfolder);
     if (__atomic_load_n(&psync_current_time, __ATOMIC_RELAXED) - starttime >=
@@ -583,46 +444,18 @@ scanner_scan_folder(const char *localpath, psync_folderid_t folderid,
                         deviceid);
     pmem_free(PMEM_SUBSYS_SYNC, subpath);
   }
-
-  psync_list_for_each_element_call(&disklist, sync_folderlist, list, free_sync_folderlist);
+  psync_list_for_each_element_call(&disklist, sync_folderlist, list,
+                                   free_sync_folderlist);
 }
 
+/* compare_sizeinodemtime and compare_inode moved to plocalscan_helpers.c */
+
 static int compare_sizeinodemtime(const psync_list *l1, const psync_list *l2) {
-  const sync_folderlist *f1, *f2;
-  int64_t d;
-  f1 = psync_list_element(l1, sync_folderlist, list);
-  f2 = psync_list_element(l2, sync_folderlist, list);
-  d = f1->size - f2->size;
-  if (d < 0)
-    return -1;
-  else if (d > 0)
-    return 1;
-  d = f1->inode - f2->inode;
-  if (d < 0)
-    return -1;
-  else if (d > 0)
-    return 1;
-  d = f1->mtimenat - f2->mtimenat;
-  if (d < 0)
-    return -1;
-  else if (d > 0)
-    return 1;
-  else
-    return 0;
+  return plocalscan_compare_sizeinodemtime(l1, l2);
 }
 
 static int compare_inode(const psync_list *l1, const psync_list *l2) {
-  const sync_folderlist *f1, *f2;
-  int64_t d;
-  f1 = psync_list_element(l1, sync_folderlist, list);
-  f2 = psync_list_element(l2, sync_folderlist, list);
-  d = f1->inode - f2->inode;
-  if (d < 0)
-    return -1;
-  else if (d > 0)
-    return 1;
-  else
-    return 0;
+  return plocalscan_compare_inode(l1, l2);
 }
 
 static void scan_rename_file(sync_folderlist *rnfr, sync_folderlist *rnto) {

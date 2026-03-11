@@ -29,6 +29,18 @@ int ppagecache_verify_crc(const void *data, size_t size, uint32_t stored_crc) {
 }
 
 /* ------------------------------------------------------------------ */
+/* HTTP status classification                                           */
+/* ------------------------------------------------------------------ */
+
+int ppagecache_http_status_should_retry(int status) {
+    if (status == 0)
+        return 0;
+    if (status == 410 || status == 404 || status == -1)
+        return 1;
+    return -1;
+}
+
+/* ------------------------------------------------------------------ */
 /* Download-URL seam (weak default: no-op)                             */
 /* ------------------------------------------------------------------ */
 
