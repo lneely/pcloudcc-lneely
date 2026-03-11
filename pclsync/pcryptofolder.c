@@ -1620,7 +1620,7 @@ static int get_fldr_name(psync_folderid_t folderid,
   }
 }
 
-int psync_cloud_crypto_send_mkdir(psync_folderid_t folderid, const char *name,
+static int psync_cloud_crypto_send_mkdir(psync_folderid_t folderid, const char *name,
                                   const char **err, const char *b64key,
                                   size_t b64keylen,
                                   psync_encrypted_symmetric_key_t encsym,
@@ -1789,7 +1789,7 @@ int pcryptofolder_mkdir(psync_folderid_t folderid, const char *name,
   return ret;
 }
 
-int psync_pcloud_crypto_reencode_key(
+static int psync_pcloud_crypto_reencode_key(
     const unsigned char *rsapub, size_t rsapublen, const unsigned char *rsapriv,
     size_t rsaprivlen, const char *oldpassphrase, const char *newpassphrase,
     uint32_t flags, char **privenc, char **sign) {
@@ -1919,7 +1919,7 @@ err_ph_1:
   return PSYNC_CRYPTO_BAD_PASSPHRASE;
 }
 
-int psync_pcloud_crypto_encode_key(const char *newpassphrase, uint32_t flags,
+static int psync_pcloud_crypto_encode_key(const char *newpassphrase, uint32_t flags,
                                    char **privenc, char **sign) {
   unsigned char *newpriv;
   priv_key_ver1 *rsapriv_struct;

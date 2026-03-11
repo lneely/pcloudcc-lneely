@@ -13,7 +13,7 @@
 // Internal helpers (debug-only)
 // --------------------------------------------------------------------------
 
-void pident(int ident) {
+static void pident(int ident) {
   VAR_ARRAY(b, char, ident + 1);
   memset(b, '\t', ident);
   b[ident] = 0;

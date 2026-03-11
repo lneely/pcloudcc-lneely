@@ -757,7 +757,7 @@ int do_psync_delete_link(int64_t linkid, char **err /*OUT*/) {
   return 0;
 }
 
-int process_bres(const char *cmd, binresult *bres, psock_t *api,
+static int process_bres(const char *cmd, binresult *bres, psock_t *api,
                  char **err) {
   const char *errorret;
   int result;
@@ -1324,7 +1324,7 @@ void cache_links_all() {
     pmem_free(PMEM_SUBSYS_OTHER, err);
 }
 
-int do_delete_all_links(int64_t folderid, int64_t fileid, char **err) {
+static int do_delete_all_links(int64_t folderid, int64_t fileid, char **err) {
   psync_sql_res *res;
   psync_uint_row row;
   int ret = 0;

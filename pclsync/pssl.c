@@ -164,7 +164,7 @@ void pssl_debug_cb(pssl_debug_callback_t cb, void *ctx) {
   debug_ctx = ctx;
 }
 
-int rng_get(void *p_rng, unsigned char *output, size_t output_len) {
+static int rng_get(void *p_rng, unsigned char *output, size_t output_len) {
   rng_ctx *rng;
   int ret;
   rng = (rng_ctx *)p_rng;

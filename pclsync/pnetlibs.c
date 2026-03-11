@@ -660,7 +660,7 @@ psock_t *psync_api_connect_download() {
   return sock;
 }
 
-void psync_socket_close_download(psock_t *sock) {
+static void psync_socket_close_download(psock_t *sock) {
   psock_close(sock);
 }
 

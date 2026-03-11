@@ -323,7 +323,7 @@ static int task_renamefile(uint64_t taskid, psync_syncid_t syncid,
     return task_renameremotefile(fileid, folderid, newname);
 }
 
-int handle_api_errors(sync_err_struct *err_struct) {
+static int handle_api_errors(sync_err_struct *err_struct) {
   int ret = -1;
   event_data_struct *event_data;
   psync_syncid_t syncId;
