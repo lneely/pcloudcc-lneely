@@ -130,7 +130,7 @@ static void ssl_debug_cb(void *ctx, int level, const char *msg, int TODO1,
         TODO1); // trying to figure out what these are...
 }
 
-void psync_set_ssl_debug_callback(pssl_debug_callback_t cb) {
+static void psync_set_ssl_debug_callback(pssl_debug_callback_t cb) {
   pssl_log_threshold(PSYNC_SSL_DEBUG_LEVEL);
   pssl_debug_cb(cb, NULL);
 }
@@ -436,7 +436,7 @@ apiservers_list_t *psync_get_apiservers(char **err) {
   return ret;
 }
 
-void psync_reset_apiserver() {
+static void psync_reset_apiserver() {
   psync_set_apiserver(PSYNC_API_HOST, PSYNC_LOCATIONID_DEFAULT);
 }
 
@@ -2296,7 +2296,7 @@ int psync_is_folder_syncable(char *localPath, char **errMsg) {
   return 0;
 }
 
-psync_folderid_t create_bup_mach_folder(char **msgErr) {
+static psync_folderid_t create_bup_mach_folder(char **msgErr) {
   binresult *rootFolIdObj;
   binresult *retData;
 
@@ -2518,7 +2518,7 @@ char *get_backup_root_name() {
 
 char *get_pc_name() { return ptools_get_machine_name(); }
 
-void psync_async_delete_sync(void *ptr) {
+static void psync_async_delete_sync(void *ptr) {
   psync_syncid_t syncId = (psync_syncid_t)(uintptr_t)ptr;
   int res;
 

@@ -819,7 +819,7 @@ static psync_fsfileid_t get_file_at_old_location(psync_fsfileid_t fileid) {
   return ret;
 }
 
-void pfs_task_stop_and_delete_file(psync_fsfileid_t fileid) {
+static void pfs_task_stop_and_delete_file(psync_fsfileid_t fileid) {
   psync_sql_res *res;
   pdbg_logf(D_NOTICE, "trying to stop upload of task %lu", (unsigned long)-fileid);
   if (pfs_upld_in_current_small_uploads_batch_locked(-fileid)) {

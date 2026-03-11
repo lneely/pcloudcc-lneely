@@ -4247,7 +4247,7 @@ void ppagecache_init() {
                        NULL);
 }
 
-void clean_cache_del(void *delcache, ppath_stat *st) {
+static void clean_cache_del(void *delcache, ppath_stat *st) {
   int ret;
   if (!pfile_stat_isfolder(&st->stat) &&
       (delcache ||

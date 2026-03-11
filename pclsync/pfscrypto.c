@@ -1455,7 +1455,7 @@ int pfs_crpt_read_mod(psync_openfile_t *of, char *buf,
   return pfs_unlock_ret(of, size);
 }
 
-int pfs_crpt_write_mod_nu(psync_openfile_t *of,
+static int pfs_crpt_write_mod_nu(psync_openfile_t *of,
                                              const char *buf, uint64_t size,
                                              uint64_t offset,
                                              int checkextender);
@@ -1487,7 +1487,7 @@ static int pfs_modfile_fillzero(psync_openfile_t *of, uint64_t size,
   return 0;
 }
 
-int pfs_crpt_write_mod_nu(psync_openfile_t *of,
+static int pfs_crpt_write_mod_nu(psync_openfile_t *of,
                                              const char *buf, uint64_t size,
                                              uint64_t offset,
                                              int checkextender) {

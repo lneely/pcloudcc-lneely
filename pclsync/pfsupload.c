@@ -926,7 +926,7 @@ static int upload_modify_read_req(psock_t *api) {
     return PSYNC_NET_OK;
 }
 
-int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
+static int upload_modify(uint64_t taskid, psync_folderid_t folderid, const char *name,
                   const char *filename, const char *indexname,
                   psync_fileid_t fileid, uint64_t hash, uint64_t writeid,
                   const char *key) {
