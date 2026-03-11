@@ -44,6 +44,7 @@
 #include "pcontacts.h"
 #include "pdevice.h"
 #include "pdiff.h"
+#include "pdiff_helpers.h"
 #include "pdownload.h"
 #include "pfileops.h"
 #include "pfoldersync.h"
@@ -248,19 +249,7 @@ static binresult *get_userinfo_user_pass(psock_t *sock, const char *username,
 }
 
 static int check_active_subscribtion(const binresult *res) {
-  const binresult *sub;
-  char *status;
-  sub = papi_check_result2(res, "lastsubscription", PARAM_HASH);
-  if (sub) {
-    status = putil_strdup(papi_find_result2(sub, "status", PARAM_STR)->str);
-    if (!strcmp(status, "active")) {
-      pmem_free(PMEM_SUBSYS_SYNC, status);
-      return 1;
-    }
-    pmem_free(PMEM_SUBSYS_SYNC, status);
-  }
-
-  return 0;
+  return pdiff_check_active_subscribtion(res);
 }
 
 static int check_user_relocated(uint64_t luserid, psock_t *sock) {
@@ -828,24 +817,7 @@ static psock_t *get_connected_socket() {
 }
 
 static uint64_t extract_meta_folder_flags(const binresult *meta) {
-  const binresult *res;
-  uint64_t flags = 0;
-  if ((res = papi_check_result2(meta, "encrypted", PARAM_BOOL)) && res->num)
-    flags |= PSYNC_FOLDER_FLAG_ENCRYPTED;
-  if ((res = papi_check_result2(meta, "ispublicroot", PARAM_BOOL)) && res->num)
-    flags |= PSYNC_FOLDER_FLAG_PUBLIC_ROOT;
-  if ((res = papi_check_result2(meta, "isbackupdevicelist", PARAM_BOOL)) &&
-      res->num)
-    flags |= PSYNC_FOLDER_FLAG_BACKUP_DEVICE_LIST;
-  if ((res = papi_check_result2(meta, "isbackupdevice", PARAM_BOOL)) &&
-      res->num)
-    flags |= PSYNC_FOLDER_FLAG_BACKUP_DEVICE;
-  if ((res = papi_check_result2(meta, "isbackuproot", PARAM_BOOL)) && res->num)
-    flags |= PSYNC_FOLDER_FLAG_BACKUP_ROOT;
-  if ((res = papi_check_result2(meta, "isbackup", PARAM_BOOL)) && res->num)
-    flags |= PSYNC_FOLDER_FLAG_BACKUP;
-
-  return flags;
+  return pdiff_extract_meta_folder_flags(meta);
 }
 
 static void process_createfolder(const binresult *entry) {
@@ -979,28 +951,7 @@ static void process_createfolder(const binresult *entry) {
 static void group_results_by_col(psync_full_result_int *restrict r1,
                                  psync_full_result_int *restrict r2,
                                  uint32_t col) {
-  VAR_ARRAY(buff, uint64_t, r1->cols);
-  size_t rowsize;
-  uint32_t i, j, l;
-  l = 0;
-  rowsize = sizeof(r1->data[0]) * r1->cols;
-  pdbg_assert(r1->cols == r2->cols);
-  for (i = 0; i < r1->rows; i++)
-    for (j = 0; j < r2->rows; j++)
-      if (psync_get_result_cell(r1, i, col) ==
-          psync_get_result_cell(r2, j, col)) {
-        if (i != l) {
-          memcpy(buff, r1->data + i * r1->cols, rowsize);
-          memcpy(r1->data + i * r1->cols, r1->data + l * r1->cols, rowsize);
-          memcpy(r1->data + l * r1->cols, buff, rowsize);
-        }
-        if (j != l) {
-          memcpy(buff, r2->data + j * r2->cols, rowsize);
-          memcpy(r2->data + j * r2->cols, r2->data + l * r2->cols, rowsize);
-          memcpy(r2->data + l * r2->cols, buff, rowsize);
-        }
-        l++;
-      }
+  pdiff_group_results_by_col(r1, r2, col);
 }
 
 static void del_synced_folder_rec(psync_folderid_t folderid,
@@ -1339,28 +1290,7 @@ static void check_for_deletedfileid(const binresult *meta) {
 }
 
 static int bind_meta(psync_sql_res *res, const binresult *meta, int off) {
-  const binresult *br;
-  bind_num("created");
-  bind_num("modified");
-  bind_num("category");
-  bind_bool("thumb");
-  bind_str("icon");
-  bind_opt_str("artist");
-  bind_opt_str("album");
-  bind_opt_str("title");
-  bind_opt_str("genre");
-  bind_opt_num("trackno");
-  bind_opt_num("width");
-  bind_opt_num("height");
-  bind_opt_double("duration");
-  bind_opt_double("fps");
-  bind_opt_str("videocodec");
-  bind_opt_str("audiocodec");
-  bind_opt_num("videobitrate");
-  bind_opt_num("audiobitrate");
-  bind_opt_num("audiosamplerate");
-  bind_opt_num("rotate");
-  return off;
+  return pdiff_bind_meta(res, meta, off);
 }
 
 static void insert_revision(psync_fileid_t fileid, uint64_t hash,
@@ -2817,14 +2747,7 @@ static void handle_exception(psock_t **sock, subscribed_ids *ids,
 }
 
 static int cmp_folderid(const void *ptr1, const void *ptr2) {
-  psync_folderid_t *folderid1 = (psync_folderid_t *)ptr1;
-  psync_folderid_t *folderid2 = (psync_folderid_t *)ptr2;
-  if (folderid1 < folderid2)
-    return -1;
-  else if (folderid1 > folderid2)
-    return 1;
-  else
-    return 0;
+  return pdiff_cmp_folderid(ptr1, ptr2);
 }
 
 static void psync_diff_refresh_fs_add_folder(psync_folderid_t folderid) {
