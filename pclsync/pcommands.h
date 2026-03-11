@@ -10,5 +10,6 @@ enum command_ids_ {
   SYNCRESUME,
   SENDTFA,
   SENDAUTH,
+  SENDAUTHSAVE,
   GETSTATUS
 };

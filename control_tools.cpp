@@ -73,6 +73,7 @@ static char* command_generator(const char* text, int state) {
     "status", "st",
     "tfa",
     "auth",
+    "authsave",
     "finalize", "f",
     "quit", "q",
     nullptr
@@ -120,6 +121,7 @@ void setup_app(CLI::App *app) {
               << "  status(st): Show current sync state" << std::endl
               << "  tfa <code>: Supply 2FA code to a running daemon" << std::endl
               << "  auth <password>: Supply password to a running daemon" << std::endl
+              << "  authsave <password>: Supply password and save to database" << std::endl
               << "  finalize(f): Kill daemon and quit" << std::endl
               << "  quit(q): Exit this program" << std::endl;
   });
@@ -206,6 +208,29 @@ void setup_app(CLI::App *app) {
     }
     delete rpc;
     std::cout << "Auth sent." << std::endl;
+    if (errm) { free(errm); }
+    return 0;
+  });
+
+  // authsave command
+  auto authsave_cmd = app->add_subcommand("authsave", "Supply password to a running daemon and save to database");
+  static std::string authsave_pass_input;
+  authsave_cmd->add_option("password", authsave_pass_input, "Password")->required();
+  authsave_cmd->callback([] {
+    char *errm = NULL;
+    size_t errm_size = 0;
+    RpcClient *rpc = new RpcClient();
+    int result = rpc->Call(SENDAUTHSAVE, authsave_pass_input.c_str(), &errm, &errm_size);
+    putil_wipe(authsave_pass_input.data(), authsave_pass_input.size());
+    authsave_pass_input.clear();
+    if (result != 0) {
+      std::cerr << "Failed to send auth: " << (errm ? errm : "no message") << std::endl;
+      if (errm) { free(errm); }
+      delete rpc;
+      return result;
+    }
+    delete rpc;
+    std::cout << "Auth sent and saved." << std::endl;
     if (errm) { free(errm); }
     return 0;
   });
