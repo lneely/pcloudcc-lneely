@@ -192,7 +192,8 @@ int clib::pclsync_lib::receive_auth(const char *pass) {
 }
 
 int clib::pclsync_lib::receive_auth_save(const char *pass) {
-  psync_set_pass(pass, 1);
+  const char *username = get_lib().username_.c_str();
+  psync_set_user_pass(username, pass, 1);
   pthread_mutex_lock(&auth_mtx);
   get_lib().password_ = std::string(pass);
   pthread_cond_signal(&auth_cond);
