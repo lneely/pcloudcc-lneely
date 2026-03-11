@@ -236,7 +236,7 @@ tests/test_plocks: $(UNIT_DIR)/test_plocks.c $(LIBDIR)/plocks.c $(LIBDIR)/pdbg.c
 
 tests/test_pfsupload: $(UNIT_DIR)/test_pfsupload.c $(LIBDIR)/pfsupload_send.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
-		-Wl,--wrap=papi_send
+		-Wl,--wrap=papi_send  # redirect papi_send → __wrap_papi_send; GNU ld only (not macOS Apple ld)
 
 tests/test_read_response: $(UNIT_DIR)/test_read_response.cpp rpcclient.cpp tests/stubs/test_stubs_cpp.c
 	$(CXX) $(TEST_CXXFLAGS) $(CXXFLAGS) -o $@ $^

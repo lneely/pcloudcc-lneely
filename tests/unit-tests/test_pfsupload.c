@@ -80,10 +80,11 @@ static void reset_wrap(void) {
 /* Find a string parameter by name; returns its value or NULL */
 static const char *find_str_param(const char *name) {
     if (!g_last_params) return NULL;
+    size_t nlen = strlen(name);
     for (size_t i = 0; i < g_last_nparams; i++) {
         if (g_last_params[i].paramtype == PARAM_STR &&
-            strcmp(g_last_params[i].paramnamelen == strlen(name) ?
-                   g_last_params[i].paramname : "", name) == 0)
+            g_last_params[i].paramnamelen == nlen &&
+            strncmp(g_last_params[i].paramname, name, nlen) == 0)
             return g_last_params[i].str;
     }
     return NULL;
@@ -103,13 +104,13 @@ static int find_num_param(const char *name, uint64_t *out) {
     return 0;
 }
 
-/* Build a minimal fake psock_t wrapping one end of a socketpair */
-static psock_t *make_fake_api(int sv[2]) {
-    static psock_t fake;
+/* Build a minimal fake psock_t wrapping one end of a socketpair.
+ * The caller provides a stack-allocated psock_t; no static storage is used
+ * so multiple calls within the same test function are safe. */
+static void make_fake_api(psock_t *out, int sv[2]) {
     socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
-    memset(&fake, 0, sizeof(fake));
-    fake.sock = sv[1];
-    return &fake;
+    memset(out, 0, sizeof(*out));
+    out->sock = sv[1];
 }
 
 /* ------------------------------------------------------------------ */
@@ -128,7 +129,7 @@ static void task_init(fsupload_task_t *t) {
 static void test_send_mkdir_basic(void) {
     reset_wrap();
     int sv[2];
-    psock_t *api = make_fake_api(sv);
+    psock_t api_s; make_fake_api(&api_s, sv); psock_t *api = &api_s;
 
     fsupload_task_t task;
     task_init(&task);
@@ -155,7 +156,7 @@ static void test_send_mkdir_basic(void) {
 static void test_send_mkdir_encrypted(void) {
     reset_wrap();
     int sv[2];
-    psock_t *api = make_fake_api(sv);
+    psock_t api_s; make_fake_api(&api_s, sv); psock_t *api = &api_s;
 
     fsupload_task_t task;
     task_init(&task);
@@ -183,7 +184,7 @@ static void test_send_mkdir_encrypted(void) {
 static void test_send_rmdir(void) {
     reset_wrap();
     int sv[2];
-    psock_t *api = make_fake_api(sv);
+    psock_t api_s; make_fake_api(&api_s, sv); psock_t *api = &api_s;
 
     fsupload_task_t task;
     task_init(&task);
@@ -210,7 +211,7 @@ static void test_api_error_path(void) {
     reset_wrap();
     g_wrap_rc = 0;  /* simulate papi_send failure */
     int sv[2];
-    psock_t *api = make_fake_api(sv);
+    psock_t api_s; make_fake_api(&api_s, sv); psock_t *api = &api_s;
 
     fsupload_task_t task;
     task_init(&task);

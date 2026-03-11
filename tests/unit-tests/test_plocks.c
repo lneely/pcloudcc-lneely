@@ -141,6 +141,13 @@ static void *upgrade_reader_thread(void *arg) {
     return NULL;
 }
 
+/*
+ * test_upgrade_under_contention verifies that plocks_towrlock() completes
+ * (returns 0) and that the upgrading thread holds the write lock on return.
+ * Concurrent exclusivity — that no reader is simultaneously active once the
+ * write lock is granted — is covered by the counter-integrity check in
+ * test_stress().
+ */
 static void test_upgrade_under_contention(void) {
     struct upgrade_state s;
     plocks_init(&s.rw);
