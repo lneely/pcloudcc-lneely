@@ -48,19 +48,11 @@
 #include "pstatus.h"
 #include "psys.h"
 #include "ptask.h"
+#include "ptask_free_internal.h"
 #include "ptree.h"
 #include "pupload.h"
 
 #define get_len(t) (sizeof(t) - offsetof(t, request))
-
-#define PSYNC_TASK_STATUS_RUNNING 0
-#define PSYNC_TASK_STATUS_READY 1
-#define PSYNC_TASK_STATUS_DONE 2
-#define PSYNC_TASK_STATUS_RETURNED 3
-
-// #define PSYNC_WAIT_ANYBODY -1 // unused, but may be important later
-#define PSYNC_WAIT_NOBODY -2
-#define PSYNC_WAIT_FREED -3
 
 #define TASK_TYPE_EXIT 0
 #define TASK_TYPE_FILE_DWL 1
@@ -162,22 +154,6 @@ typedef struct {
   uint64_t remsize;
   int fd;
 } download_context_t;
-
-struct psync_task_t_ {
-  psync_task_callback_t callback;
-  void *param;
-  pthread_cond_t cond;
-  int id;
-  int status;
-};
-
-struct psync_task_manager_t_ {
-  pthread_mutex_t mutex;
-  int taskcnt;
-  int refcnt;
-  int waitfor;
-  struct psync_task_t_ tasks[];
-};
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static int running = 0;
@@ -845,35 +821,6 @@ static int task_send_async(const void *task, size_t len) {
   return ret;
 }
 
-static void psync_task_destroy(psync_task_manager_t tm) {
-  int i;
-  for (i = 0; i < tm->taskcnt; i++)
-    pthread_cond_destroy(&tm->tasks[i].cond);
-  pthread_mutex_destroy(&tm->mutex);
-  pmem_free(PMEM_SUBSYS_OTHER, tm);
-}
-
-static void psync_task_dec_refcnt(psync_task_manager_t tm) {
-  int refcnt;
-  pthread_mutex_lock(&tm->mutex);
-  refcnt = --tm->refcnt;
-  pthread_mutex_unlock(&tm->mutex);
-  if (!refcnt)
-    psync_task_destroy(tm);
-}
-
-static psync_task_manager_t psync_get_manager_of_task(struct psync_task_t_ *t) {
-  return (psync_task_manager_t)(((char *)(t - t->id)) -
-                                offsetof(struct psync_task_manager_t_, tasks));
-}
-
-static void psync_task_entry(void *ptr) {
-  struct psync_task_t_ *t;
-  t = (struct psync_task_t_ *)ptr;
-  t->callback(ptr, t->param);
-  psync_task_dec_refcnt(psync_get_manager_of_task(t));
-}
-
 void ptask_ldir_mk(psync_syncid_t syncid,
                                     psync_folderid_t folderid,
                                     psync_folderid_t localfolderid) {
@@ -1179,28 +1126,6 @@ void *psync_task_papi_result(psync_task_manager_t tm, int id) {
   }
   pthread_mutex_unlock(&tm->mutex);
   return ret;
-}
-
-void psync_task_free(psync_task_manager_t tm) {
-  int refcnt, i;
-  pthread_mutex_lock(&tm->mutex);
-  if (tm->refcnt == 1) {
-    pthread_mutex_unlock(&tm->mutex);
-    psync_task_destroy(tm);
-  }
-  else {
-    tm->waitfor = PSYNC_WAIT_FREED;
-    for (i = 0; i < tm->taskcnt; i++)
-      if (tm->tasks[i].status == PSYNC_TASK_STATUS_READY) {
-        tm->tasks[i].status = PSYNC_TASK_STATUS_RETURNED;
-        pthread_cond_signal(&tm->tasks[i].cond);
-      }
-    refcnt = --tm->refcnt;
-    pthread_mutex_unlock(&tm->mutex);
-    if (!refcnt) {
-      psync_task_destroy(tm);
-    }
-  }
 }
 
 int psync_task_complete(void *h, void *data) {

@@ -155,6 +155,8 @@ TESTS_DIR := tests
 TEST_CFLAGS  := -D_POSIX_C_SOURCE=200809L
 TEST_CXXFLAGS := -D_POSIX_C_SOURCE=200809L
 
+HELPERS_DIR := tests/helpers
+
 TEST_BINS := \
 	tests/test_pdbg_path \
 	tests/test_ptools_params \
@@ -163,7 +165,13 @@ TEST_BINS := \
 	tests/test_prun \
 	tests/test_ptools_errptr \
 	tests/test_read_response \
-	tests/test_signal_safety
+	tests/test_signal_safety \
+	tests/test_ptree \
+	tests/test_pintervaltree \
+	tests/test_pfstasks_tree \
+	tests/test_pfstasks_db \
+	tests/test_plocks \
+	tests/test_pfsupload
 
 .PHONY: test tests check clean-tests
 
@@ -191,8 +199,12 @@ tests/test_ptools_params: $(UNIT_DIR)/test_ptools_params.c $(LIBDIR)/ptools.c $(
 tests/test_pfs_lock_ordering: $(UNIT_DIR)/test_pfs_lock_ordering.c
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $< -lpthread
 
-tests/test_ptask_free: $(UNIT_DIR)/test_ptask_free.c
-	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $< -lpthread
+tests/test_ptask_free: $(UNIT_DIR)/test_ptask_free.c $(LIBDIR)/ptask_free.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
+		-Wl,--wrap=pthread_mutex_lock \
+		-Wl,--wrap=pthread_mutex_unlock \
+		-Wl,--wrap=pmem_free \
+		-lpthread
 
 tests/test_prun: $(UNIT_DIR)/test_prun.c $(LIBDIR)/prun.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
 	$(CC) -D_POSIX_C_SOURCE=199309L $(CFLAGS) -o $@ $^ \
@@ -206,6 +218,25 @@ tests/test_ptools_errptr: $(UNIT_DIR)/test_ptools_errptr.c $(LIBDIR)/ptools.c $(
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
 		-Wl,--wrap=malloc \
 		-Wl,--wrap=free
+
+tests/test_ptree: $(UNIT_DIR)/test_ptree.c $(LIBDIR)/ptree.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^
+
+tests/test_pintervaltree: $(UNIT_DIR)/test_pintervaltree.c $(LIBDIR)/pintervaltree.c $(LIBDIR)/ptree.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^
+
+tests/test_pfstasks_tree: $(UNIT_DIR)/test_pfstasks_tree.c $(LIBDIR)/pfstasks_tree.c $(LIBDIR)/ptree.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^
+
+tests/test_pfstasks_db: $(UNIT_DIR)/test_pfstasks_db.c $(HELPERS_DIR)/psql_test_helpers.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -I$(HELPERS_DIR) -o $@ $^ -lsqlite3
+
+tests/test_plocks: $(UNIT_DIR)/test_plocks.c $(LIBDIR)/plocks.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ -lpthread
+
+tests/test_pfsupload: $(UNIT_DIR)/test_pfsupload.c $(LIBDIR)/pfsupload_send.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
+		-Wl,--wrap=papi_send  # redirect papi_send → __wrap_papi_send; GNU ld only (not macOS Apple ld)
 
 tests/test_read_response: $(UNIT_DIR)/test_read_response.cpp rpcclient.cpp tests/stubs/test_stubs_cpp.c
 	$(CXX) $(TEST_CXXFLAGS) $(CXXFLAGS) -o $@ $^

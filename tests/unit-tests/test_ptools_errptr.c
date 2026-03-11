@@ -18,6 +18,28 @@
 #include <string.h>
 #include <stdint.h>
 
+/* Suppress LSAN reports for intentional leaks used to verify bug behaviour.
+ * GCC sets __SANITIZE_ADDRESS__; Clang exposes __has_feature as a built-in.
+ * Use nested #if so the __has_feature() call is only evaluated when the
+ * compiler actually understands it (avoids "missing binary operator" on GCC). */
+#ifdef __SANITIZE_ADDRESS__
+# include <sanitizer/lsan_interface.h>
+# define LSAN_DISABLE() __lsan_disable()
+# define LSAN_ENABLE()  __lsan_enable()
+#elif defined(__has_feature)
+# if __has_feature(address_sanitizer)
+#  include <sanitizer/lsan_interface.h>
+#  define LSAN_DISABLE() __lsan_disable()
+#  define LSAN_ENABLE()  __lsan_enable()
+# else
+#  define LSAN_DISABLE() do {} while (0)
+#  define LSAN_ENABLE()  do {} while (0)
+# endif
+#else
+# define LSAN_DISABLE() do {} while (0)
+# define LSAN_ENABLE()  do {} while (0)
+#endif
+
 /* ------------------------------------------------------------------ */
 /* Allocation tracking via --wrap                                       */
 /* ------------------------------------------------------------------ */
@@ -119,6 +141,9 @@ static int run_unfixed(void) {
     char *errPtr = NULL;
     int callRes;
 
+    /* Intentional leak: suppress LSAN so the process exits cleanly and
+     * stdio flushes before the sanitizer reports it. */
+    LSAN_DISABLE();
     callRes = mock_backend_call_1(&errPtr);
     (void)callRes;
 
@@ -129,6 +154,7 @@ static int run_unfixed(void) {
 
     if (errPtr)
         free(errPtr);
+    LSAN_ENABLE();
 
     return 0;
 }
