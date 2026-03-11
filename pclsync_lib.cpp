@@ -191,6 +191,16 @@ int clib::pclsync_lib::receive_auth(const char *pass) {
   return 0;
 }
 
+int clib::pclsync_lib::receive_auth_save(const char *pass) {
+  psync_set_pass(pass, 1);
+  pthread_mutex_lock(&auth_mtx);
+  get_lib().password_ = std::string(pass);
+  pthread_cond_signal(&auth_cond);
+  pthread_mutex_unlock(&auth_mtx);
+  std::cout << "Auth received and saved." << std::endl;
+  return 0;
+}
+
 void clib::pclsync_lib::read_tfa_code(bool auto_sms)
 {
   if (daemon_) {
@@ -713,6 +723,7 @@ int clib::pclsync_lib::init() {
   prpc_register(SYNCRESUME, &resume_sync);
   prpc_register(SENDTFA, &receive_tfa_code);
   prpc_register(SENDAUTH, &receive_auth);
+  prpc_register(SENDAUTHSAVE, &receive_auth_save);
   prpc_register(GETSTATUS, &get_status);
 
   return 0;
