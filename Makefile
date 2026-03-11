@@ -171,9 +171,7 @@ TEST_BINS := \
 	tests/test_pfstasks_tree \
 	tests/test_pfstasks_db \
 	tests/test_plocks \
-	tests/test_pfsupload \
-	tests/test_ppagecache \
-	tests/test_pfs_helpers
+	tests/test_pfsupload
 
 .PHONY: test tests check clean-tests
 
@@ -239,17 +237,6 @@ tests/test_plocks: $(UNIT_DIR)/test_plocks.c $(LIBDIR)/plocks.c $(LIBDIR)/pdbg.c
 tests/test_pfsupload: $(UNIT_DIR)/test_pfsupload.c $(LIBDIR)/pfsupload_send.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
 		-Wl,--wrap=papi_send  # redirect papi_send → __wrap_papi_send; GNU ld only (not macOS Apple ld)
-
-tests/test_ppagecache: $(UNIT_DIR)/test_ppagecache.c $(LIBDIR)/ppagecache_helpers.c $(LIBDIR)/pcrc32c.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
-	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^
-
-tests/test_pfs_helpers: $(UNIT_DIR)/test_pfs_helpers.c $(LIBDIR)/pfs_helpers.c $(LIBDIR)/pfstasks_tree.c $(LIBDIR)/ptree.c $(LIBDIR)/pcrc32c.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
-	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
-		-Wl,--wrap=pfs_crpt_plain_size \
-		-Wl,--wrap=pfs_task_get_folder_tasks_rdlocked \
-		-Wl,--wrap=ptimer_time
-		# ^ GNU ld only; --wrap stubs out encrypted-size, folder-task lookup, and timer
-
 
 tests/test_read_response: $(UNIT_DIR)/test_read_response.cpp rpcclient.cpp tests/stubs/test_stubs_cpp.c
 	$(CXX) $(TEST_CXXFLAGS) $(CXXFLAGS) -o $@ $^

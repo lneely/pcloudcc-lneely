@@ -148,7 +148,7 @@ static void check_userid(uint64_t userid, uint64_t folderid,
     do_check_userid(userid, folderid, shareid);
 }
 
-__attribute__((weak)) psync_fspath_t *pfs_fldr_resolve_path(const char *path) {
+psync_fspath_t *pfs_fldr_resolve_path(const char *path) {
   psync_fsfolderid_t cfolderid;
   const char *sl;
   psync_fstask_folder_t *folder;
