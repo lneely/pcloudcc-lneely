@@ -67,6 +67,12 @@ static psync_tree *psync_new_sd_folder(psync_folderid_t folderid) {
   return &f->tree;
 }
 
+/* Free a synced_down_folder node allocated via pmem_malloc.  Used as the
+ * callback for ptree_for_each_element_call_safe when bulk-freeing the tree. */
+static void free_synced_down_folder(synced_down_folder *f) {
+  pmem_free(PMEM_SUBSYS_OTHER, f);
+}
+
 static void psync_add_folder_to_downloadlist_locked(psync_folderid_t folderid) {
   synced_down_folder *f;
   if (!synced_down_folders) {
@@ -127,7 +133,7 @@ void psyncer_dl_queue_del(psync_folderid_t folderid) {
 
 void psyncer_dl_queue_clear() {
   pthread_mutex_lock(&sync_down_mutex);
-  ptree_for_each_element_call_safe(synced_down_folders, synced_down_folder, tree, free);
+  ptree_for_each_element_call_safe(synced_down_folders, synced_down_folder, tree, free_synced_down_folder);
   synced_down_folders = PSYNC_TREE_EMPTY;
   pthread_mutex_unlock(&sync_down_mutex);
 }

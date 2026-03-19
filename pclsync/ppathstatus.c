@@ -135,6 +135,7 @@ static psync_tree *folder_tasks = PSYNC_TREE_EMPTY;
 
 static void sync_data_free(sync_data_t *sd);
 static void load_sync_tasks();
+static void free_folder_tasks_node(folder_tasks_t *ft);
 
 static inline int psync_crypto_is_error(const void *ptr) {
   return (uintptr_t)ptr <= PSYNC_CRYPTO_MAX_ERROR;
@@ -162,7 +163,7 @@ void ppathstatus_init() {
     psync_list_add_tail(&parent_cache_lru, &parent_cache_entries[i].list_lru);
     psync_list_add_tail(&cache_free, &parent_cache_entries[i].list_hash);
   }
-  ptree_for_each_element_call_safe(folder_tasks, folder_tasks_t, tree, free);
+  ptree_for_each_element_call_safe(folder_tasks, folder_tasks_t, tree, free_folder_tasks_node);
   folder_tasks = PSYNC_TREE_EMPTY;
   ptree_for_each_element_call_safe(sync_data, sync_data_t, tree,
                                         sync_data_free);
@@ -298,6 +299,12 @@ static folder_tasks_t *get_folder_tasks(psync_folderid_t folderid, int create) {
 static void free_folder_tasks(folder_tasks_t *ft) {
   pdbg_logf(D_NOTICE, "marking folderid %lu as clean", (unsigned long)ft->folderid);
   ptree_del(&folder_tasks, &ft->tree);
+  pmem_free(PMEM_SUBSYS_OTHER, ft);
+}
+
+/* Free a folder_tasks_t node allocated via pmem_malloc.  Used as the callback
+ * for ptree_for_each_element_call_safe when bulk-freeing a tree. */
+static void free_folder_tasks_node(folder_tasks_t *ft) {
   pmem_free(PMEM_SUBSYS_OTHER, ft);
 }
 
@@ -447,7 +454,7 @@ void ppathstatus_fldr_deleted(psync_folderid_t folderid) {
 }
 
 static void sync_data_free(sync_data_t *sd) {
-  ptree_for_each_element_call_safe(sd->folder_tasks, folder_tasks_t, tree, free);
+  ptree_for_each_element_call_safe(sd->folder_tasks, folder_tasks_t, tree, free_folder_tasks_node);
   pmem_free(PMEM_SUBSYS_OTHER, sd);
 }
 
