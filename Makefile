@@ -175,7 +175,8 @@ TEST_BINS := \
 	tests/test_ppagecache \
 	tests/test_pfs_helpers \
 	tests/test_pdiff_helpers \
-	tests/test_plocalscan_helpers
+	tests/test_plocalscan_helpers \
+	tests/test_pcl26j_free
 
 .PHONY: test tests check clean-tests
 
@@ -257,6 +258,11 @@ tests/test_plocalscan_helpers: $(UNIT_DIR)/test_plocalscan_helpers.c $(LIBDIR)/p
 		-Wl,--wrap=psync_is_name_to_ignore \
 		-Wl,--wrap=psync_send_backup_del_event
 		# ^ GNU ld only; wraps filter/side-effect calls in extracted helpers
+
+tests/test_pcl26j_free: $(UNIT_DIR)/test_pcl26j_free.c $(LIBDIR)/ptree.c $(LIBDIR)/pmem.c $(LIBDIR)/pdbg.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
+	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
+		-Wl,--wrap=malloc \
+		-Wl,--wrap=free
 
 tests/test_pdiff_helpers: $(UNIT_DIR)/test_pdiff_helpers.c $(LIBDIR)/pdiff_helpers.c $(LIBDIR)/pdbg.c $(LIBDIR)/pmem.c $(LIBDIR)/putil.c $(LIBDIR)/ppath.c tests/stubs/test_stubs.c
 	$(CC) $(TEST_CFLAGS) $(CFLAGS) -o $@ $^ \
