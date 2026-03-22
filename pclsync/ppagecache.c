@@ -2238,9 +2238,15 @@ int ppagecache_read_mod_locked(psync_openfile_t *of, char *buf,
   return rd;
 }
 
+/* Free a psync_request_range_t node allocated via pmem_malloc.  Used as the
+ * callback for psync_list_for_each_element_call when bulk-freeing the list. */
+static void free_request_range(psync_request_range_t *range) {
+  pmem_free(PMEM_SUBSYS_CACHE, range);
+}
+
 static void psync_pagecache_free_request(psync_request_t *request) {
   psync_list_for_each_element_call(&request->ranges, psync_request_range_t,
-                                   list, free);
+                                   list, free_request_range);
   pmem_free(PMEM_SUBSYS_CACHE, request);
 }
 

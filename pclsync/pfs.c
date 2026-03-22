@@ -1745,6 +1745,12 @@ static void close_if_valid(int fd) {
     pfile_close(fd);
 }
 
+/* Free a psync_sector_inlog_t node allocated via pmem_malloc.  Used as the
+ * callback for ptree_for_each_element_call_safe when bulk-freeing the tree. */
+static void free_sector_inlog_node(psync_sector_inlog_t *e) {
+  pmem_free(PMEM_SUBSYS_OTHER, e);
+}
+
 static void pfs_free_openfile(psync_openfile_t *of) {
   pdbg_logf(D_NOTICE, "releasing file %s", of->currentname);
   if (unlikely(of->writetimer != PSYNC_INVALID_TIMER))
@@ -1770,7 +1776,7 @@ static void pfs_free_openfile(psync_openfile_t *of) {
     }
     close_if_valid(of->logfile);
     ptree_for_each_element_call_safe(
-        of->sectorsinlog, psync_sector_inlog_t, tree, free);
+        of->sectorsinlog, psync_sector_inlog_t, tree, free_sector_inlog_node);
     delete_log_files(of);
     if (of->authenticatedints)
       psync_interval_tree_free(of->authenticatedints);
