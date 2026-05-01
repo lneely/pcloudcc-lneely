@@ -103,7 +103,7 @@ build_container() {
         sudo vim nano curl wget git htop tmux man-db \
         bash-completion ca-certificates openssh \
         base-devel gcc gcc-libs make fuse2 systemd sqlite3 \
-        mbedtls zlib boost llvm gdb iproute \
+        mbedtls zlib llvm gdb iproute \
         rsync readline
 
     # verify fuse

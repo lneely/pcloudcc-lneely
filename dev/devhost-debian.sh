@@ -106,8 +106,7 @@ build_container() {
         sudo vim nano curl wget git htop tmux man-db locales \
         bash-completion ca-certificates ssh systemd systemd-sysv \
         build-essential libfuse-dev libudev-dev libsqlite3-dev \
-        libmbedtls-dev zlib1g-dev libboost-system-dev \
-        libboost-program-options-dev fuse llvm gdb iproute2 \
+        libmbedtls-dev zlib1g-dev fuse llvm gdb iproute2 \
         openssh-server rsync libreadline-dev
 
     # verify fuse

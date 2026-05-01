@@ -93,26 +93,26 @@ case $IMAGE in
         echo "Setting up Debian/Ubuntu-based container..."
         ctrid=$(buildah from "$FULL_IMAGE")
         buildah run "$ctrid" -- apt update
-        buildah run "$ctrid" -- apt install -y build-essential git libfuse-dev libudev-dev libsqlite3-dev libmbedtls-dev zlib1g-dev libboost-system-dev libboost-program-options-dev fuse llvm gdb
+        buildah run "$ctrid" -- apt install -y build-essential git libfuse-dev libudev-dev libsqlite3-dev libmbedtls-dev zlib1g-dev fuse llvm gdb
         ;;
     fedora)
         echo "Setting up Fedora-based container..."
         ctrid=$(buildah from "$FULL_IMAGE")
         buildah run "$ctrid" -- dnf update -y
         buildah run "$ctrid" -- dnf group install -y "C Development Tools and Libraries"
-        buildah run "$ctrid" -- dnf install -y git fuse-devel systemd-devel sqlite-devel mbedtls-devel zlib-devel boost-devel boost-program-options fuse llvm gdb fuse udev libasan
+        buildah run "$ctrid" -- dnf install -y git fuse-devel systemd-devel sqlite-devel mbedtls-devel zlib-devel fuse llvm gdb fuse udev libasan
         ;;
     archlinux|arch)
         echo "Setting up Arch Linux-based container..."
         ctrid=$(buildah from "$FULL_IMAGE")
         buildah run "$ctrid" -- pacman -Syu --noconfirm
-        buildah run "$ctrid" -- pacman -S --noconfirm base-devel git fuse2 systemd sqlite mbedtls2 zlib boost boost-libs llvm gdb udev gcc make
+        buildah run "$ctrid" -- pacman -S --noconfirm base-devel git fuse2 systemd sqlite mbedtls2 zlib llvm gdb udev gcc make
         ;;
     opensuse/tumbleweed|opensuse/leap)
         echo "Setting up openSUSE-based container..."
         ctrid=$(buildah from "$FULL_IMAGE")
         buildah run "$ctrid" -- zypper refresh
-        buildah run "$ctrid" -- zypper install -y gcc gcc-c++ make git fuse-devel systemd-devel sqlite3-devel zlib-devel libboost_system-devel libboost_program_options-devel fuse llvm gdb udev mbedtls-2-devel
+        buildah run "$ctrid" -- zypper install -y gcc gcc-c++ make git fuse-devel systemd-devel sqlite3-devel zlib-devel fuse llvm gdb udev mbedtls-2-devel
         ;;
     *)
         echo "Unsupported image: $IMAGE"

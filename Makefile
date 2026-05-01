@@ -31,11 +31,11 @@ else
 endif
 
 COMMONFLAGS	= -fsanitize=address
-CFLAGS		= -fPIC $(COMMONFLAGS) -I./pclsync -I/usr/include $(FUSE_CFLAGS) $(shell pkg-config --cflags $$(pkg-config --list-all | grep -o 'mbedtls[0-9.]*\s' | head -1) 2>/dev/null || pkg-config --cflags mbedtls 2>/dev/null || echo "-I/usr/local/include")
+CFLAGS		= -fPIC $(COMMONFLAGS) -I. -I./pclsync -I/usr/include $(FUSE_CFLAGS) $(shell pkg-config --cflags $$(pkg-config --list-all | grep -o 'mbedtls[0-9.]*\s' | head -1) 2>/dev/null || pkg-config --cflags mbedtls 2>/dev/null || echo "-I/usr/local/include")
 ifneq (,$(filter clang%,$(CC)))
     CFLAGS += -Wthread-safety
 endif
-CXXFLAGS	= $(CFLAGS)
+CXXFLAGS	= $(CFLAGS) -std=c++11
 LIBLDFLAGS	= $(COMMONFLAGS) -lreadline -lpthread -ludev -lsqlite3 -lz $(shell \
 	MBEDTLS_PKG=$$(pkg-config --list-all 2>/dev/null | grep -o 'mbedtls[0-9.]*\s' | head -1 | tr -d ' '); \
 	if [ -n "$$MBEDTLS_PKG" ]; then \
