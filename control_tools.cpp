@@ -198,7 +198,9 @@ void setup_app(CLI::App *app) {
     size_t errm_size = 0;
     RpcClient *rpc = new RpcClient();
     int result = rpc->Call(SENDAUTH, auth_pass_input.c_str(), &errm, &errm_size);
-    putil_wipe(auth_pass_input.data(), auth_pass_input.size());
+    if (!auth_pass_input.empty()) {
+      putil_wipe(&auth_pass_input[0], auth_pass_input.size());
+    }
     auth_pass_input.clear();
     if (result != 0) {
       std::cerr << "Failed to send auth: " << (errm ? errm : "no message") << std::endl;
@@ -221,7 +223,9 @@ void setup_app(CLI::App *app) {
     size_t errm_size = 0;
     RpcClient *rpc = new RpcClient();
     int result = rpc->Call(SENDAUTHSAVE, authsave_pass_input.c_str(), &errm, &errm_size);
-    putil_wipe(authsave_pass_input.data(), authsave_pass_input.size());
+    if (!authsave_pass_input.empty()) {
+      putil_wipe(&authsave_pass_input[0], authsave_pass_input.size());
+    }
     authsave_pass_input.clear();
     if (result != 0) {
       std::cerr << "Failed to send auth: " << (errm ? errm : "no message") << std::endl;
@@ -440,7 +444,7 @@ void setup_app(CLI::App *app) {
 }
 
 int process_command(const std::string &command) {
-  CLI::App app = CLI::App{"pcloudcc-lneely"};
+  CLI::App app{"pcloudcc-lneely"};
   setup_app(&app);
   try {
     app.parse(command);
@@ -480,9 +484,6 @@ int process_command(const std::string &command) {
 }
 
 void process_commands() {
-  CLI::App app = CLI::App{"pcloudcc-lneely"};
-  setup_app(&app);
-
   using_history();
   rl_attempted_completion_function = command_completion;
 

@@ -39,6 +39,7 @@
 #include "pclsync_lib.h"
 #include "pclsync/psettings.h"
 #include "pclsync/psignal.h"
+#include "pclsync/putil.h"
 
 namespace ct = control_tools;
 namespace cc = console_client;
@@ -53,7 +54,6 @@ int main(int argc, char **argv) {
 
   std::cout << "pCloud console client (" << version << ")" << std::endl;
   std::string username = "";
-  std::string password = "";
   std::string tfa_code = "";
   bool daemon = false;
   bool commands = false;
@@ -62,8 +62,8 @@ int main(int argc, char **argv) {
   bool passwordsw = false;
   bool save_pass = false;
   bool crypto = false;
+  bool passascrypto_sw = false;
   bool trusted_device = false;
-  std::string passascrypto = "";
   std::string mountpoint = "";
   uint64_t cache_size_gb = 0;
   std::string log_path = "";
@@ -74,12 +74,13 @@ int main(int argc, char **argv) {
   CLI::App app{"Allowed options"};
   app.set_help_flag("-h,--help", "Show this help message.");
   
-  app.add_option("-u,--username", username, "pCloud account name.");
+  app.add_option("-u,--username", username, "pCloud account name.")
+    ->envname("PCLOUD_USER");
   app.add_flag("-p,--password", passwordsw, "Ask for pCloud account password.");
   app.add_option("-t,--tfa_code", tfa_code, "pCloud tfa code");
   app.add_flag("-r,--trusted_device", trusted_device, "Trust this device.");
   app.add_flag("-c,--crypto", crypto, "Ask for crypto password.");
-  app.add_option("-y,--passascrypto", passascrypto, "User password is the same as crypto password.");
+  app.add_flag("-y,--passascrypto", passascrypto_sw, "User password is the same as crypto password.");
   app.add_flag("-d,--daemonize", daemon, "Run the process as a background daemon.");
   app.add_flag("-o,--commands", commands, "Keep parent process alive and process commands.");
   app.add_option("-m,--mountpoint", mountpoint, "Specify where pCloud filesystem is mounted.");
@@ -110,13 +111,6 @@ int main(int argc, char **argv) {
       }
     }
 
-    // Environment variable fallbacks
-    if (app.count("--username") == 0 && app.count("-u") == 0) {
-      const char *env_user = std::getenv("PCLOUD_USER");
-      if (env_user && env_user[0])
-        username = env_user;
-    }
-
     if (username.empty()) {
       std::cout << "Username option is required, specify with "
                 << "-u or --username, or set PCLOUD_USER." << std::endl;
@@ -127,7 +121,7 @@ int main(int argc, char **argv) {
       memset(argv[i], 0, strlen(argv[i]));
     }
     if (daemon) {
-      strncpy(argv[0], "pCloudDriveDeamon", strlen(argv[0]));
+      strncpy(argv[0], "pCloudDriveDaemon", strlen(argv[0]));
     } else {
       strncpy(argv[0], "pCloudDrive", strlen(argv[0]));
     }
@@ -145,8 +139,8 @@ int main(int argc, char **argv) {
     cc::clibrary::pclsync_lib::get_lib().set_trusted_device(trusted_device);
     if (crypto) {
       cc::clibrary::pclsync_lib::get_lib().setup_crypto_ = true;
-      if (app.count("--passascrypto") > 0 || app.count("-y") > 0) {
-        cc::clibrary::pclsync_lib::get_lib().set_crypto_pass(password);
+      if (passascrypto_sw) {
+        cc::clibrary::pclsync_lib::get_lib().set_crypto_pass(cc::clibrary::pclsync_lib::get_lib().get_password());
       } else {
         const char *env_crypto = std::getenv("PCLOUD_CRYPTO_PASSWORD");
         if (env_crypto && env_crypto[0]) {
@@ -228,6 +222,14 @@ int main(int argc, char **argv) {
       sleep(360000);
     }
   }
+
+  if (!tfa_code.empty()) {
+    putil_wipe(&tfa_code[0], tfa_code.size());
+  }
+
+  cc::clibrary::pclsync_lib::get_lib().wipe_password();
+  cc::clibrary::pclsync_lib::get_lib().wipe_crypto_pass();
+  cc::clibrary::pclsync_lib::get_lib().wipe_tfa_code();
 
   return 0;
 }
