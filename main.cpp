@@ -28,8 +28,11 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <vector>
+#include <cstring>
+#include <unistd.h>
 
-#include <boost/program_options.hpp>
+#include "CLI11.hpp"
 
 #include "control_tools.h"
 
@@ -37,7 +40,6 @@
 #include "pclsync/psettings.h"
 #include "pclsync/psignal.h"
 
-namespace po = boost::program_options;
 namespace ct = control_tools;
 namespace cc = console_client;
 
@@ -48,7 +50,7 @@ int main(int argc, char **argv) {
   psignal_register(SIGSEGV);
   psignal_register(SIGABRT);
   psignal_register(SIGBUS);
-  
+
   std::cout << "pCloud console client (" << version << ")" << std::endl;
   std::string username = "";
   std::string password = "";
@@ -61,42 +63,39 @@ int main(int argc, char **argv) {
   bool save_pass = false;
   bool crypto = false;
   bool trusted_device = false;
-  po::variables_map vm;
+  std::string passascrypto = "";
+  std::string mountpoint = "";
+  uint64_t cache_size_gb = 0;
+  std::string log_path = "";
+  std::string log_level = "";
+  std::string fs_event_log = "";
+  std::string fuse_opts = "";
+
+  CLI::App app{"Allowed options"};
+  app.set_help_flag("-h,--help", "Show this help message.");
+  
+  app.add_option("-u,--username", username, "pCloud account name.");
+  app.add_flag("-p,--password", passwordsw, "Ask for pCloud account password.");
+  app.add_option("-t,--tfa_code", tfa_code, "pCloud tfa code");
+  app.add_flag("-r,--trusted_device", trusted_device, "Trust this device.");
+  app.add_flag("-c,--crypto", crypto, "Ask for crypto password.");
+  app.add_option("-y,--passascrypto", passascrypto, "User password is the same as crypto password.");
+  app.add_flag("-d,--daemonize", daemon, "Run the process as a background daemon.");
+  app.add_flag("-o,--commands", commands, "Keep parent process alive and process commands.");
+  app.add_option("-m,--mountpoint", mountpoint, "Specify where pCloud filesystem is mounted.");
+  app.add_flag("-k,--commands_only", commands_only, "Open command prompt to interact with running daemon.");
+  app.add_flag("-n,--newuser", newuser, "Register a new pCloud user account.");
+  app.add_flag("-s,--savepassword", save_pass, "Save user password in the database.");
+  app.add_option("--cache-size", cache_size_gb, "Maximum cache size in GB (default: 5GB).");
+  app.add_option("--log-path", log_path, "Custom path for debug.log (default: ~/.pcloud/debug.log).");
+  app.add_option("--log-level", log_level, "Logging level: NONE, ERROR, WARNING, INFO (default), NOTICE, DEBUG.");
+  app.add_option("--fs-event-log", fs_event_log, "Path to filesystem events log (default: disabled).");
+  app.add_option("-O,--fuse-opts", fuse_opts, "FUSE mount options (e.g., 'allow_other,allow_root').");
+
+  app.allow_extras();
 
   try {
-    po::options_description desc("Allowed options");
-    desc.add_options()
-    ("help,h", "Show this help message.")
-    ("username,u", po::value<std::string>(&username), "pCloud account name.")
-    ("password,p", po::bool_switch(&passwordsw), "Ask for pCloud account password.")
-    ("tfa_code,t", po::value<std::string>(&tfa_code), "pCloud tfa code")
-    ("trusted_device,r", po::bool_switch(&trusted_device), "Trust this device.")
-    ("crypto,c", po::bool_switch(&crypto), "Ask for crypto password.")
-    ("passascrypto,y", po::value<std::string>(), "User password is the same as crypto password.")
-    ("daemonize,d", po::bool_switch(&daemon), "Run the process as a background daemon.")
-    ("commands ,o", po::bool_switch(&commands), "Keep parent process alive and process commands. ")
-    ("mountpoint,m", po::value<std::string>(), "Specify where pCloud filesystem is mounted.")
-    ("commands_only,k", po::bool_switch(&commands_only), "Open command prompt to interact with running daemon.")
-    ("newuser,n", po::bool_switch(&newuser), "Register a new pCloud user account.")
-    ("savepassword,s", po::bool_switch(&save_pass), "Save user password in the database.")
-    ("cache-size", po::value<uint64_t>(), "Maximum cache size in GB (default: 5GB).")
-    ("log-path", po::value<std::string>(), "Custom path for debug.log (default: ~/.pcloud/debug.log).")
-    ("log-level", po::value<std::string>(), "Logging level: NONE, ERROR, WARNING, INFO (default), NOTICE, DEBUG.")
-    ("fs-event-log", po::value<std::string>(), "Path to filesystem events log (default: disabled).")
-    ("fuse-opts,O", po::value<std::string>(), "FUSE mount options (e.g., 'allow_other,allow_root').");
-
-    po::command_line_parser parser{argc, argv};
-    po::positional_options_description p;
-    parser.options(desc).positional(p).allow_unregistered();
-    po::parsed_options parsed_options = parser.run();
-    po::store(parsed_options, vm);
-
-    po::notify(vm);
-
-    if (vm.count("help")) {
-      std::cout << desc << "\n";
-      return 0;
-    }
+    app.parse(argc, argv);
 
     if (commands_only) {
       ct::process_commands();
@@ -104,22 +103,21 @@ int main(int argc, char **argv) {
     }
 
     bool has_piped_input = !isatty(STDIN_FILENO);
-    if (has_piped_input && !vm.count("help")) {
+    if (has_piped_input && app.count("-h") == 0 && app.count("--help") == 0) {
       std::string line;
       if (std::getline(std::cin, line) && !line.empty()) {
         return ct::process_command(line);
       }
     }
 
-
     // Environment variable fallbacks
-    if (!vm.count("username")) {
+    if (app.count("--username") == 0 && app.count("-u") == 0) {
       const char *env_user = std::getenv("PCLOUD_USER");
       if (env_user && env_user[0])
         username = env_user;
     }
 
-    if (!vm.count("username") && username.empty()) {
+    if (username.empty()) {
       std::cout << "Username option is required, specify with "
                 << "-u or --username, or set PCLOUD_USER." << std::endl;
       return 1;
@@ -147,7 +145,7 @@ int main(int argc, char **argv) {
     cc::clibrary::pclsync_lib::get_lib().set_trusted_device(trusted_device);
     if (crypto) {
       cc::clibrary::pclsync_lib::get_lib().setup_crypto_ = true;
-      if (vm.count("passascrypto")) {
+      if (app.count("--passascrypto") > 0 || app.count("-y") > 0) {
         cc::clibrary::pclsync_lib::get_lib().set_crypto_pass(password);
       } else {
         const char *env_crypto = std::getenv("PCLOUD_CRYPTO_PASSWORD");
@@ -161,13 +159,11 @@ int main(int argc, char **argv) {
     } else
       cc::clibrary::pclsync_lib::get_lib().setup_crypto_ = false;
 
-    if (vm.count("mountpoint")) {
-      cc::clibrary::pclsync_lib::get_lib().set_mount(
-          vm["mountpoint"].as<std::string>());
+    if (app.count("--mountpoint") > 0 || app.count("-m") > 0) {
+      cc::clibrary::pclsync_lib::get_lib().set_mount(mountpoint);
     }
 
-    if (vm.count("cache-size")) {
-      uint64_t cache_size_gb = vm["cache-size"].as<uint64_t>();
+    if (app.count("--cache-size") > 0) {
       /* Validate cache size: minimum 1GB, maximum 1TB */
       if (cache_size_gb < 1 || cache_size_gb > 1024) {
         std::cerr << "error: cache-size must be between 1 and 1024 GB" << std::endl;
@@ -180,8 +176,7 @@ int main(int argc, char **argv) {
       setenv("PCLOUD_CACHE_SIZE", cache_size_str, 1);
     }
 
-    if (vm.count("log-path")) {
-      std::string log_path = vm["log-path"].as<std::string>();
+    if (app.count("--log-path") > 0) {
       /* Validate log path: must not be empty or start with /etc or /sys */
       if (log_path.empty() || log_path.compare(0, 5, "/etc/") == 0 || log_path.compare(0, 5, "/sys/") == 0) {
         std::cerr << "error: invalid log-path" << std::endl;
@@ -190,15 +185,14 @@ int main(int argc, char **argv) {
       setenv("PCLOUD_LOG_PATH", log_path.c_str(), 1);
     }
 
-    if (vm.count("log-level")) {
-      setenv("PCLOUD_LOG_LEVEL", vm["log-level"].as<std::string>().c_str(), 1);
+    if (app.count("--log-level") > 0) {
+      setenv("PCLOUD_LOG_LEVEL", log_level.c_str(), 1);
     } else {
       /* Set default log level to INFO */
       setenv("PCLOUD_LOG_LEVEL", "INFO", 1);
     }
 
-    if (vm.count("fs-event-log")) {
-      std::string fs_event_log = vm["fs-event-log"].as<std::string>();
+    if (app.count("--fs-event-log") > 0) {
       /* Validate fs-event-log path: must not be empty or start with /etc or /sys */
       if (fs_event_log.empty() || fs_event_log.compare(0, 5, "/etc/") == 0 || fs_event_log.compare(0, 5, "/sys/") == 0) {
         std::cerr << "error: invalid fs-event-log" << std::endl;
@@ -207,14 +201,16 @@ int main(int argc, char **argv) {
       setenv("PCLOUD_FS_EVENT_LOG", fs_event_log.c_str(), 1);
     }
 
-    if (vm.count("fuse-opts")) {
-      setenv("PCLOUD_FUSE_OPTS", vm["fuse-opts"].as<std::string>().c_str(), 1);
+    if (app.count("--fuse-opts") > 0 || app.count("-O") > 0) {
+      setenv("PCLOUD_FUSE_OPTS", fuse_opts.c_str(), 1);
     }
 
     cc::clibrary::pclsync_lib::get_lib().newuser_ = newuser;
     cc::clibrary::pclsync_lib::get_lib().set_savepass(save_pass);
     cc::clibrary::pclsync_lib::get_lib().set_daemon(daemon);
-  } catch (std::exception &e) {
+  } catch (const CLI::ParseError &e) {
+    return app.exit(e);
+  } catch (const std::exception &e) {
     std::cerr << "error: " << e.what() << std::endl;
     return 1;
   } catch (...) {

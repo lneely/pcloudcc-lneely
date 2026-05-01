@@ -45,7 +45,7 @@ LIBLDFLAGS	= $(COMMONFLAGS) -lreadline -lpthread -ludev -lsqlite3 -lz $(shell \
 	else \
 		pkg-config --libs mbedtls mbedx509 mbedcrypto 2>/dev/null || echo "-L/usr/local/lib -lmbedtls -lmbedx509 -lmbedcrypto"; \
 	fi)
-EXECLDFLAGS	= $(COMMONFLAGS) -lboost_program_options $(FUSE_LIBS)
+EXECLDFLAGS	= $(COMMONFLAGS) $(FUSE_LIBS)
 
 SCAN		:= 0
 SRCDIR 		:= .

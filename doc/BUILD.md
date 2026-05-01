@@ -1,6 +1,6 @@
 # Dependencies
 - zlib (-lz)
-- boost (-lboost_system, -lboost_program_options)
+- CLI11 (included as CLI11.hpp)
 - pthread (lpthread)
 - udev (-ludev)
 - fuse (-lfuse)
