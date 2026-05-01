@@ -185,9 +185,9 @@ int psql_connect(const char *db) {
   int initdbneeded = 0;
   int code;
 
-  pdbg_assert(sqlite3_libversion_number() == SQLITE_VERSION_NUMBER);
-  pdbg_assert(!strcmp(sqlite3_sourceid(), SQLITE_SOURCE_ID));
-  pdbg_assert(!strcmp(sqlite3_libversion(), SQLITE_VERSION));
+  pdbg_assertw(sqlite3_libversion_number() == SQLITE_VERSION_NUMBER);
+  pdbg_assertw(!strcmp(sqlite3_sourceid(), SQLITE_SOURCE_ID));
+  pdbg_assertw(!strcmp(sqlite3_libversion(), SQLITE_VERSION));
   pdbg_logf(D_NOTICE, "Using sqlite version %s source %s", sqlite3_libversion(),
         sqlite3_sourceid());
   if (!sqlite3_threadsafe()) {
