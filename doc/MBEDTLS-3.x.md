@@ -1,3 +1,7 @@
+## 2026.05.06 Notice
+
+This guide is probably losing relevance in most cases, as the latest distributions have now migrated to (or at least support) `mbedtls` 3.x. If you run an older distribution, you can still follow the guide below to install `mbedtls` 3.x side-by-side with any existing 2.x installations.
+
 ## mbedtls 3.x Migration Notice
 
 `pcloudcc` now uses `mbedtls` version 3.x. This may already be included in your distribution, and if it is, you can ignore this section. If you're unlucky enough that your distribution still ships with `mbedtls` 2.x *(looking at you, Debian...)*, then try the following instructions. This has been tested on debian bookworm, **but you may have to adjust for your own distribution -- the command sequence below uses `apt` to install known build dependencies.**
@@ -24,9 +28,9 @@ The symbolic link at the end resolves the ambiguity between `/usr/include/mbedtl
 ```
 # run from the source root directory (e.g., pcloudcc-lneely)
 
-sed -i 's/-lmbedtls/-l:libmbedtls.a/;s/-lmbedcrypto/-l:libmbedcrypto.a/;s/-lmbedx509/-l:libmbedx509.a/' Makefile
-sed -i 's/LIBLDFLAGS\t= \$(COMMONFLAGS)/LIBLDFLAGS\t= $(COMMONFLAGS) -L\/usr\/local\/lib\//' Makefile
-sed -i '5s/$/ -I\/usr\/local\/include/' Makefile
+sed -i 's|[$](shell pkg-config --cflags.*|-I/usr/local/include|' Makefile
+sed -i '/^\tMBEDTLS_PKG/,/^\tfi)/d' Makefile
+sed -i 's|[$](shell \\$|-L/usr/local/lib -l:libmbedtls.a -l:libmbedx509.a -l:libmbedcrypto.a|' Makefile
 find . -type f -name "*.[ch]" -exec sed -i 's/#include <mbedtls/#include <mbedtls3/' {} +
 make clean all
 ```
