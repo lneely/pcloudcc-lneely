@@ -545,6 +545,8 @@ int daemonize(bool do_commands) {
       break;
     }
   }
+
+  return 0;
 }
 
 } // namespace control_tools
