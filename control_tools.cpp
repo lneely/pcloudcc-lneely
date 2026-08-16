@@ -284,7 +284,8 @@ void setup_app(CLI::App *app) {
     char *errm = NULL;
     size_t errm_size = 0;
     RpcClient *rpc = new RpcClient();
-    if(int result = rpc->Call(STARTCRYPTO, start_crypto_pwd.c_str(), &errm, &errm_size) != 0) {
+    int result = rpc->Call(STARTCRYPTO, start_crypto_pwd.c_str(), &errm, &errm_size);
+    if (result != 0) {
       std::cerr << "Start Crypto failed: " << (errm ? errm : "no message") << std::endl;
       if (errm) { free(errm); }
       delete rpc;
@@ -545,6 +546,8 @@ int daemonize(bool do_commands) {
       break;
     }
   }
+
+  return 0;
 }
 
 } // namespace control_tools

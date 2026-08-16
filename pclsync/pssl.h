@@ -32,13 +32,9 @@
 #ifndef _PSYNC_SSL_H
 #define _PSYNC_SSL_H
 
-#include <mbedtls/aes.h>
-#include <mbedtls/rsa.h>
-#include <mbedtls/sha1.h>
-#include <mbedtls/sha256.h>
-#include <mbedtls/sha512.h>
-
+#include "pssl_crypto_compat.h"
 #include "pcompiler.h"
+#include "pdbg.h"
 
 // No need to edit this directly, just pass -DPSYNC_SSL_DEBUG_LEVEL as a
 // compile option. Possible values are in the range [0, 5]
@@ -55,41 +51,63 @@
 #define PSYNC_SHA1_BLOCK_LEN 64
 #define PSYNC_SHA1_DIGEST_LEN 20
 #define PSYNC_SHA1_DIGEST_HEXLEN 40
+#define PSYNC_SHA256_BLOCK_LEN 64
+#define PSYNC_SHA256_DIGEST_LEN 32
+#define PSYNC_SHA256_DIGEST_HEXLEN 64
+#define PSYNC_SHA512_BLOCK_LEN 128
+#define PSYNC_SHA512_DIGEST_LEN 64
+#define PSYNC_SHA512_DIGEST_HEXLEN 128
+#if MBEDTLS_VERSION_MAJOR >= 4
+static inline void psync_sha1(const unsigned char *data, size_t datalen, unsigned char *checksum) {
+  size_t olen;
+  pdbg_assert(psa_hash_compute(PSA_ALG_SHA_1, data, datalen, checksum, PSYNC_SHA1_DIGEST_LEN, &olen) == PSA_SUCCESS && olen == PSYNC_SHA1_DIGEST_LEN);
+}
+static inline void psync_sha1_init(psync_sha1_context *ctx) {
+  ctx->operation = psa_hash_operation_init();
+  pdbg_assert(psa_hash_setup(&ctx->operation, PSA_ALG_SHA_1) == PSA_SUCCESS);
+}
+static inline void psync_sha1_update(psync_sha1_context *ctx, const void *data, size_t len) {
+  pdbg_assert(psa_hash_update(&ctx->operation, (const uint8_t *)data, len) == PSA_SUCCESS);
+}
+static inline void psync_sha1_final(unsigned char *checksum, psync_sha1_context *ctx) {
+  size_t olen;
+  pdbg_assert(psa_hash_finish(&ctx->operation, checksum, PSYNC_SHA1_DIGEST_LEN, &olen) == PSA_SUCCESS && olen == PSYNC_SHA1_DIGEST_LEN);
+}
+#define psync_sha256(data, datalen, checksum) psync_sha256_one_shot(data, datalen, checksum)
+static inline void psync_sha256_one_shot(const unsigned char *data, size_t datalen, unsigned char *checksum) {
+  size_t olen;
+  pdbg_assert(psa_hash_compute(PSA_ALG_SHA_256, data, datalen, checksum, PSYNC_SHA256_DIGEST_LEN, &olen) == PSA_SUCCESS && olen == PSYNC_SHA256_DIGEST_LEN);
+}
+static inline void psync_sha256_init(psync_sha256_context *ctx) { ctx->operation = psa_hash_operation_init(); pdbg_assert(psa_hash_setup(&ctx->operation, PSA_ALG_SHA_256) == PSA_SUCCESS); }
+static inline void psync_sha256_update(psync_sha256_context *ctx, const void *data, size_t len) { pdbg_assert(psa_hash_update(&ctx->operation, (const uint8_t *)data, len) == PSA_SUCCESS); }
+static inline void psync_sha256_final(unsigned char *checksum, psync_sha256_context *ctx) { size_t olen; pdbg_assert(psa_hash_finish(&ctx->operation, checksum, PSYNC_SHA256_DIGEST_LEN, &olen) == PSA_SUCCESS && olen == PSYNC_SHA256_DIGEST_LEN); }
+#define psync_sha512(data, datalen, checksum) psync_sha512_one_shot(data, datalen, checksum)
+static inline void psync_sha512_one_shot(const unsigned char *data, size_t datalen, unsigned char *checksum) { size_t olen; pdbg_assert(psa_hash_compute(PSA_ALG_SHA_512, data, datalen, checksum, PSYNC_SHA512_DIGEST_LEN, &olen) == PSA_SUCCESS && olen == PSYNC_SHA512_DIGEST_LEN); }
+static inline void psync_sha512_init(psync_sha512_context *ctx) { ctx->operation = psa_hash_operation_init(); pdbg_assert(psa_hash_setup(&ctx->operation, PSA_ALG_SHA_512) == PSA_SUCCESS); }
+static inline void psync_sha512_update(psync_sha512_context *ctx, const void *data, size_t len) { pdbg_assert(psa_hash_update(&ctx->operation, (const uint8_t *)data, len) == PSA_SUCCESS); }
+static inline void psync_sha512_final(unsigned char *checksum, psync_sha512_context *ctx) { size_t olen; pdbg_assert(psa_hash_finish(&ctx->operation, checksum, PSYNC_SHA512_DIGEST_LEN, &olen) == PSA_SUCCESS && olen == PSYNC_SHA512_DIGEST_LEN); }
+#else
 #define psync_sha1_ctx mbedtls_sha1_context
 #define psync_sha1(data, datalen, checksum) mbedtls_sha1(data, datalen, checksum)
 #define psync_sha1_init(pctx) mbedtls_sha1_starts(pctx)
 #define psync_sha1_update(pctx, data, datalen) mbedtls_sha1_update(pctx, (const unsigned char *)data, datalen)
 #define psync_sha1_final(checksum, pctx) mbedtls_sha1_finish(pctx, checksum)
-
-#define PSYNC_SHA256_BLOCK_LEN 64
-#define PSYNC_SHA256_DIGEST_LEN 32
-#define PSYNC_SHA256_DIGEST_HEXLEN 64
-#define psync_sha256_ctx mbedtls_sha256_context
+#define psync_sha256_ctx psync_sha256_context
 #define psync_sha256(data, datalen, checksum) mbedtls_sha256(data, datalen, checksum, 0)
 #define psync_sha256_init(pctx) mbedtls_sha256_starts(pctx, 0)
 #define psync_sha256_update(pctx, data, datalen) mbedtls_sha256_update(pctx, (const unsigned char *)data, datalen)
 #define psync_sha256_final(checksum, pctx) mbedtls_sha256_finish(pctx, checksum)
-
-#define PSYNC_SHA512_BLOCK_LEN 128
-#define PSYNC_SHA512_DIGEST_LEN 64
-#define PSYNC_SHA512_DIGEST_HEXLEN 128
 #define psync_sha512_ctx mbedtls_sha512_context
 #define psync_sha512(data, datalen, checksum) mbedtls_sha512(data, datalen, checksum, 0)
 #define psync_sha512_init(pctx) mbedtls_sha512_starts(pctx, 0)
 #define psync_sha512_update(pctx, data, datalen) mbedtls_sha512_update(pctx, (const unsigned char *)data, datalen)
 #define psync_sha512_final(checksum, pctx) mbedtls_sha512_finish(pctx, checksum)
-
-typedef mbedtls_rsa_context *psync_rsa_t;
-typedef mbedtls_rsa_context *psync_rsa_publickey_t;
-typedef mbedtls_rsa_context *psync_rsa_privatekey_t;
+#endif
 
 typedef struct {
   size_t keylen;
   unsigned char key[];
 } psync_symmetric_key_struct_t, *psync_symmetric_key_t;
-
-typedef mbedtls_aes_context *psync_aes256_encoder;
-typedef mbedtls_aes_context *psync_aes256_decoder;
 
 // ctx, level, message, ???, ???
 typedef void (*pssl_debug_callback_t)(void *, int, const char *, int,
@@ -97,35 +115,15 @@ typedef void (*pssl_debug_callback_t)(void *, int, const char *, int,
 void pssl_log_threshold(int threshold);
 void pssl_debug_cb(pssl_debug_callback_t cb, void *ctx);
 
-static inline void psync_aes256_encode_block(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst) {
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
-}
+void psync_aes256_encode_block(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst);
 
-static inline void psync_aes256_decode_block(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
-}
+void psync_aes256_decode_block(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst);
 
-static inline void psync_aes256_encode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src, dst);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_ENCRYPT, src + PSYNC_AES256_BLOCK_SIZE, dst + PSYNC_AES256_BLOCK_SIZE);
-}
+void psync_aes256_encode_2blocks_consec(psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst);
 
-static inline void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst) {
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE, dst + PSYNC_AES256_BLOCK_SIZE);
-}
+void psync_aes256_decode_2blocks_consec(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst);
 
-static inline void psync_aes256_decode_4blocks_consec_xor(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor) {
-  unsigned long i;
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src, dst);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE, dst + PSYNC_AES256_BLOCK_SIZE);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE * 2, dst + PSYNC_AES256_BLOCK_SIZE * 2);
-  mbedtls_aes_crypt_ecb(enc, MBEDTLS_AES_DECRYPT, src + PSYNC_AES256_BLOCK_SIZE * 3, dst + PSYNC_AES256_BLOCK_SIZE * 3);
-  for (i = 0; i < PSYNC_AES256_BLOCK_SIZE * 4 / sizeof(unsigned long); i++) {
-    ((unsigned long *)dst)[i] ^= ((unsigned long *)bxor)[i];
-  }
-}
-
+void psync_aes256_decode_4blocks_consec_xor(psync_aes256_decoder enc, const unsigned char *src, unsigned char *dst, unsigned char *bxor);
 
 extern PSYNC_THREAD int psync_ssl_errno;
 
@@ -148,6 +146,7 @@ typedef psync_encrypted_data_t psync_rsa_signature_t;
 
 #define PSYNC_INVALID_ENC_SYM_KEY NULL
 #define PSYNC_INVALID_ENCODER NULL
+#define PSYNC_INVALID_DECODER NULL
 #define PSYNC_INVALID_BIN_RSA NULL
 
 #define pssl_alloc_binary_rsa psymkey_alloc_encrypted
@@ -187,8 +186,8 @@ psync_encrypted_symmetric_key_t psymkey_encrypt(psync_rsa_publickey_t rsa, const
 psync_symmetric_key_t psymkey_decrypt(psync_rsa_privatekey_t rsa, const psync_encrypted_symmetric_key_t enckey);
 psync_aes256_encoder paes_create_encoder(psync_symmetric_key_t key);
 void paes_free_encoder(psync_aes256_encoder aes);
-psync_aes256_encoder paes_create_decoder(psync_symmetric_key_t key);
-void paes_free_decoder(psync_aes256_encoder aes);
+psync_aes256_decoder paes_create_decoder(psync_symmetric_key_t key);
+void paes_free_decoder(psync_aes256_decoder aes);
 psync_rsa_signature_t prsa_sign_sha256_hash(psync_rsa_privatekey_t rsa, const unsigned char *data);
 psync_symmetric_key_t prsa_decrypt_symm_key_lock(psync_rsa_privatekey_t *rsa, const psync_encrypted_symmetric_key_t *enckey);
 

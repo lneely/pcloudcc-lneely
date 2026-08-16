@@ -141,7 +141,7 @@ static uint64_t trailing_num_score(uint64_t num, size_t numlen,
 static int keyboard_buddies(int ch1, int ch2) {
   static const char *kb = "qwertyuiop[]asdfghjkl;'\\zxcvbnm,./"
                           "QWERTYUIOP{}ASDFGHJKL:\"|ZXCVBNM<>?~!@#$%^&*()_+";
-  char *f;
+  const char *f;
   f = strchr(kb, ch1);
   return f && (f[1] == ch2 || (f > kb && *(f - 1) == ch2));
 }

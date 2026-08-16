@@ -164,7 +164,7 @@ int RpcClient::readResponse(int fd, char **out, size_t *out_size) {
     (*out)[value_length] = '\0';
     *out_size = value_length;
 
-    return 0;
+    return msg->type;
 }
 
 int RpcClient::GetState(pCloud_FileState *state, char *path) {

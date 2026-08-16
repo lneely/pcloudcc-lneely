@@ -384,7 +384,8 @@ static int lib_setup_cripto() {
       << "pcloud website." << std::endl;
   }
 
-  if(int ret = pcryptofolder_unlock(pwd) != PSYNC_CRYPTO_START_SUCCESS) {
+  int ret = pcryptofolder_unlock(pwd);
+  if (ret != PSYNC_CRYPTO_START_SUCCESS) {
     std::cout << "Failed to unlock crypto folder: error code was " << ret << std::endl;
     clib::pclsync_lib::get_lib().wipe_crypto_pass();
     return ret;

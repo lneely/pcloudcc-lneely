@@ -29,6 +29,7 @@
    DAMAGE.
 */
 
+#include "pssl_crypto_compat.h"
 #include <ctype.h>
 #include <errno.h>
 #include <pthread.h>
@@ -38,17 +39,14 @@
 #include <unistd.h>
 
 #include <mbedtls/asn1.h>
-#include <mbedtls/ctr_drbg.h>
 #include <mbedtls/debug.h>
-#include <mbedtls/entropy.h>
 #include <mbedtls/error.h>
 #include <mbedtls/md.h>
 #include <mbedtls/net_sockets.h>
-#include <mbedtls/pkcs5.h>
-#include <mbedtls/rsa.h>
-#include <mbedtls/sha256.h>
+#include <mbedtls/pk.h>
 #include <mbedtls/ssl.h>
 
+#include "pssl_crypto_compat.h"
 #include "pcache.h"
 #include "pcompiler.h"
 #include "plibs.h"
@@ -62,6 +60,68 @@
 
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void psync_aes256_encode_block(psync_aes256_encoder enc,
+                                             const unsigned char *src,
+                                             unsigned char *dst) {
+#if MBEDTLS_VERSION_MAJOR >= 4
+  size_t output_len;
+  pdbg_assert(psa_cipher_encrypt(enc->key_id, PSA_ALG_ECB_NO_PADDING, src,
+                                 PSYNC_AES256_BLOCK_SIZE, dst,
+                                 PSYNC_AES256_BLOCK_SIZE, &output_len) ==
+              PSA_SUCCESS);
+  pdbg_assert(output_len == PSYNC_AES256_BLOCK_SIZE);
+#else
+  pdbg_assert(mbedtls_aes_crypt_ecb(&enc->ctx, MBEDTLS_AES_ENCRYPT, src, dst) ==
+              0);
+#endif
+}
+
+void psync_aes256_decode_block(psync_aes256_decoder dec,
+                                             const unsigned char *src,
+                                             unsigned char *dst) {
+#if MBEDTLS_VERSION_MAJOR >= 4
+  size_t output_len;
+  pdbg_assert(psa_cipher_decrypt(dec->key_id, PSA_ALG_ECB_NO_PADDING, src,
+                                 PSYNC_AES256_BLOCK_SIZE, dst,
+                                 PSYNC_AES256_BLOCK_SIZE, &output_len) ==
+              PSA_SUCCESS);
+  pdbg_assert(output_len == PSYNC_AES256_BLOCK_SIZE);
+#else
+  pdbg_assert(mbedtls_aes_crypt_ecb(&dec->ctx, MBEDTLS_AES_DECRYPT, src, dst) ==
+              0);
+#endif
+}
+
+void psync_aes256_encode_2blocks_consec(
+    psync_aes256_encoder enc, const unsigned char *src, unsigned char *dst) {
+  psync_aes256_encode_block(enc, src, dst);
+  psync_aes256_encode_block(enc, src + PSYNC_AES256_BLOCK_SIZE,
+                            dst + PSYNC_AES256_BLOCK_SIZE);
+}
+
+void psync_aes256_decode_2blocks_consec(
+    psync_aes256_decoder dec, const unsigned char *src, unsigned char *dst) {
+  psync_aes256_decode_block(dec, src, dst);
+  psync_aes256_decode_block(dec, src + PSYNC_AES256_BLOCK_SIZE,
+                            dst + PSYNC_AES256_BLOCK_SIZE);
+}
+
+void psync_aes256_decode_4blocks_consec_xor(
+    psync_aes256_decoder dec, const unsigned char *src, unsigned char *dst,
+    unsigned char *bxor) {
+  size_t i;
+
+  psync_aes256_decode_block(dec, src, dst);
+  psync_aes256_decode_block(dec, src + PSYNC_AES256_BLOCK_SIZE,
+                            dst + PSYNC_AES256_BLOCK_SIZE);
+  psync_aes256_decode_block(dec, src + PSYNC_AES256_BLOCK_SIZE * 2,
+                            dst + PSYNC_AES256_BLOCK_SIZE * 2);
+  psync_aes256_decode_block(dec, src + PSYNC_AES256_BLOCK_SIZE * 3,
+                            dst + PSYNC_AES256_BLOCK_SIZE * 3);
+  for (i = 0; i < PSYNC_AES256_BLOCK_SIZE * 4; ++i)
+    dst[i] ^= bxor[i];
+}
 
 static void ssl_pdbg_logf(int loglevel, int errnum, const char *msg) {
     char ebuf[100];
@@ -120,20 +180,18 @@ psync_symmetric_key_t prsa_decrypt_symm_key_lock(
 static const int ciphersuites[] = {
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA384,
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_256_CBC_SHA256,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,
     MBEDTLS_TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
     MBEDTLS_TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
-    MBEDTLS_TLS_DHE_RSA_WITH_AES_128_CBC_SHA256,
     0};
 
 typedef struct {
+#if MBEDTLS_VERSION_MAJOR < 4
   mbedtls_ctr_drbg_context rnd;
+#endif
   pthread_mutex_t mutex;
 } rng_ctx;
 
@@ -147,7 +205,9 @@ typedef struct {
 } ssl_connection_t;
 
 static rng_ctx rng;
+#if MBEDTLS_VERSION_MAJOR < 4
 static mbedtls_entropy_context entropy;
+#endif
 static mbedtls_x509_crt ca_chain;
 
 PSYNC_THREAD int psync_ssl_errno;
@@ -165,11 +225,16 @@ void pssl_debug_cb(pssl_debug_callback_t cb, void *ctx) {
 }
 
 int rng_get(void *p_rng, unsigned char *output, size_t output_len) {
-  rng_ctx *rng;
+  rng_ctx *rng = (rng_ctx *)p_rng;
   int ret;
-  rng = (rng_ctx *)p_rng;
+
   pthread_mutex_lock(&rng->mutex);
+#if MBEDTLS_VERSION_MAJOR >= 4
+  (void)p_rng;
+  ret = (int)psa_generate_random(output, output_len);
+#else
   ret = mbedtls_ctr_drbg_random(&rng->rnd, output, output_len);
+#endif
   pthread_mutex_unlock(&rng->mutex);
   return ret;
 }
@@ -182,6 +247,13 @@ int pssl_init() {
   if (pthread_mutex_init(&rng.mutex, NULL))
     return pdbg_return(-1);
 
+#if MBEDTLS_VERSION_MAJOR >= 4
+  result = psa_crypto_init();
+  if (result != PSA_SUCCESS) {
+    pdbg_logf(D_ERROR, "psa_crypto_init failed with return code %d", result);
+    return pdbg_return(-1);
+  }
+#else
   mbedtls_entropy_init(&entropy);
   prand_seed(seed, seed, sizeof(seed), 0);
   mbedtls_entropy_update_manual(&entropy, seed, sizeof(seed));
@@ -189,10 +261,11 @@ int pssl_init() {
   mbedtls_ctr_drbg_init(&rng.rnd);
   if ((result = mbedtls_ctr_drbg_seed(&rng.rnd, mbedtls_entropy_func,
                                       &entropy, NULL, 0))) {
-    pdbg_logf(D_ERROR, "mbedtls_ctr_drbg_seed failed with return code %d", result);
+    pdbg_logf(D_ERROR,
+              "mbedtls_ctr_drbg_seed failed with return code %d", result);
     return pdbg_return(-1);
   }
-  
+#endif
 
   mbedtls_x509_crt_init(&ca_chain);
   for (i = 0; i < ARRAY_SIZE(psync_ssl_trusted_certs); i++) {
@@ -292,36 +365,62 @@ static int check_peer_pubkey(ssl_connection_t *conn) {
   unsigned char buff[1024], sigbin[32];
   char sighex[66];
   int i;
+  int match = 0;
 
-  // TODO: returning null, why?
   cert = mbedtls_ssl_get_peer_cert(&conn->ssl);
   if (!cert) {
     pdbg_logf(D_WARNING, "ssl_get_peer_cert returned NULL");
     return -1;
   }
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+  psa_key_type_t type;
+  int ret = mbedtls_pk_get_psa_attributes(&cert->pk, PSA_KEY_USAGE_VERIFY_HASH, &attributes);
+  if (ret) {
+    pdbg_logf(D_WARNING, "pk_get_psa_attributes failed with code %d", ret);
+    return -1;
+  }
+  type = psa_get_key_type(&attributes);
+  psa_reset_key_attributes(&attributes);
+  if (type != PSA_KEY_TYPE_RSA_PUBLIC_KEY &&
+      type != PSA_KEY_TYPE_RSA_KEY_PAIR) {
+    pdbg_logf(D_WARNING, "public key is not RSA");
+    return -1;
+  }
+#else
   if (mbedtls_pk_get_type(&cert->pk) != MBEDTLS_PK_RSA) {
     pdbg_logf(D_WARNING, "public key is not RSA");
     return -1;
   }
-  i = mbedtls_pk_write_pubkey_der((mbedtls_pk_context *)&cert->pk, buff,
-                                  sizeof(buff));
+#endif
+  i = mbedtls_pk_write_pubkey_der((const mbedtls_pk_context *)&cert->pk,
+                                  buff, sizeof(buff));
   if (i <= 0 || i > (int)sizeof(buff)) {
-    pdbg_logf(D_WARNING, "pk_write_pubkey_der returned %d (buffer size %zu)", 
+    pdbg_logf(D_WARNING, "pk_write_pubkey_der returned %d (buffer size %zu)",
               i, sizeof(buff));
     return -1;
   }
+#if MBEDTLS_VERSION_MAJOR >= 4
+  size_t hash_len;
+  if (psa_hash_compute(PSA_ALG_SHA_256, buff + sizeof(buff) - i, i,
+                       sigbin, sizeof(sigbin), &hash_len) != PSA_SUCCESS ||
+      hash_len != sizeof(sigbin)) {
+    pdbg_logf(D_WARNING, "psa_hash_compute failed");
+    return -1;
+  }
+#else
   mbedtls_sha256(buff + sizeof(buff) - i, i, sigbin, 0);
+#endif
   psync_binhex(sighex, sigbin, 32);
   sighex[64] = 0;
-  int match = 0;
   for (i = 0; i < ARRAY_SIZE(psync_ssl_trusted_pk_sha256); i++)
     match |= (memcmp(sighex, psync_ssl_trusted_pk_sha256[i], 64) == 0);
   if (match)
     return 0;
   pdbg_logf(D_ERROR,
-        "got sha256hex of public key %s that does not match any approved "
-        "fingerprint",
-        sighex);
+            "got sha256hex of public key %s that does not match any approved "
+            "fingerprint",
+            sighex);
   return -1;
 }
 
@@ -347,15 +446,24 @@ int pssl_connect(int sock, void **sslconn,
     goto err0;
   }
 
-  mbedtls_ssl_conf_max_version(&conn->cfg, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);
-  mbedtls_ssl_conf_min_version(&conn->cfg, MBEDTLS_SSL_MAJOR_VERSION_3, MBEDTLS_SSL_MINOR_VERSION_3);      
+#if MBEDTLS_VERSION_MAJOR >= 4
+  mbedtls_ssl_conf_max_tls_version(&conn->cfg, MBEDTLS_SSL_VERSION_TLS1_2);
+  mbedtls_ssl_conf_min_tls_version(&conn->cfg, MBEDTLS_SSL_VERSION_TLS1_2);
+#else
+  mbedtls_ssl_conf_max_version(&conn->cfg, MBEDTLS_SSL_MAJOR_VERSION_3,
+                               MBEDTLS_SSL_MINOR_VERSION_3);
+  mbedtls_ssl_conf_min_version(&conn->cfg, MBEDTLS_SSL_MAJOR_VERSION_3,
+                               MBEDTLS_SSL_MINOR_VERSION_3);
+#endif
 
   mbedtls_ssl_conf_endpoint(&conn->cfg, MBEDTLS_SSL_IS_CLIENT);
   mbedtls_ssl_conf_dbg(&conn->cfg, debug_cb, debug_ctx);
   mbedtls_ssl_conf_authmode(&conn->cfg, MBEDTLS_SSL_VERIFY_REQUIRED);
   mbedtls_ssl_conf_ca_chain(&conn->cfg, &ca_chain, NULL);
   mbedtls_ssl_conf_ciphersuites(&conn->cfg, ciphersuites);
+#if MBEDTLS_VERSION_MAJOR < 4
   mbedtls_ssl_conf_rng(&conn->cfg, rng_get, &rng);
+#endif
 
   mbedtls_ssl_set_bio(&conn->ssl, &conn->srv, mbed_write, mbed_read, NULL);
   mbedtls_ssl_set_hostname(&conn->ssl, hostname);
@@ -480,22 +588,46 @@ void pssl_rand_strong(unsigned char *buf, int num) {
 }
 
 psync_rsa_t pssl_gen_rsa(int bits) {
-  mbedtls_rsa_context *ctx;
-  ctx = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(mbedtls_rsa_context));
-  mbedtls_rsa_init(ctx);
-  mbedtls_rsa_set_padding(ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+  psync_rsa_t rsa;
 
-  if (mbedtls_rsa_gen_key(ctx, rng_get, &rng, bits,
-                          65537)) {
-    mbedtls_rsa_free(ctx);
-    pmem_free(PMEM_SUBSYS_OTHER, ctx);
+  rsa = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(*rsa));
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+  psa_status_t status;
+
+  psa_set_key_type(&attributes, PSA_KEY_TYPE_RSA_KEY_PAIR);
+  psa_set_key_bits(&attributes, bits);
+  psa_set_key_usage_flags(&attributes,
+                          PSA_KEY_USAGE_EXPORT | PSA_KEY_USAGE_ENCRYPT |
+                              PSA_KEY_USAGE_DECRYPT | PSA_KEY_USAGE_SIGN_HASH);
+  psa_set_key_algorithm(&attributes, PSA_ALG_NONE);
+  status = psa_generate_key(&attributes, &rsa->key_id);
+  if (status != PSA_SUCCESS) {
+    psa_reset_key_attributes(&attributes);
+    pmem_free(PMEM_SUBSYS_OTHER, rsa);
     return PSYNC_INVALID_RSA;
-  } else
-    return ctx;
+  }
+  psa_reset_key_attributes(&attributes);
+  rsa->bits = bits;
+#else
+  mbedtls_rsa_init(&rsa->ctx);
+  mbedtls_rsa_set_padding(&rsa->ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+  if (mbedtls_rsa_gen_key(&rsa->ctx, rng_get, &rng, bits, 65537)) {
+    mbedtls_rsa_free(&rsa->ctx);
+    pmem_free(PMEM_SUBSYS_OTHER, rsa);
+    return PSYNC_INVALID_RSA;
+  }
+#endif
+  return rsa;
 }
 
 void pssl_free_rsa(psync_rsa_t rsa) {
-  mbedtls_rsa_free(rsa);
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psa_destroy_key(rsa->key_id);
+#else
+  mbedtls_rsa_free(&rsa->ctx);
+#endif
+  putil_wipe(rsa, sizeof(*rsa));
   pmem_free(PMEM_SUBSYS_OTHER, rsa);
 }
 
@@ -515,61 +647,93 @@ void prsa_free_public(psync_rsa_publickey_t key) {
 }
 
 psync_rsa_privatekey_t prsa_get_private(psync_rsa_t rsa) {
-  mbedtls_rsa_context *ctx;
-  ctx = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(mbedtls_rsa_context));
-  mbedtls_rsa_init(ctx);
-  mbedtls_rsa_set_padding(ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
-
-  if (unlikely(mbedtls_rsa_copy(ctx, rsa))) {
-    mbedtls_rsa_free(ctx);
-    pmem_free(PMEM_SUBSYS_OTHER, ctx);
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psync_rsa_struct *ret = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(*ret));
+  ret->key_id = rsa->key_id;
+  ret->bits = rsa->bits;
+  return ret;
+#else
+  psync_rsa_struct *rsactx;
+  rsactx = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(psync_rsa_struct));
+  mbedtls_rsa_init(&rsactx->ctx);
+  mbedtls_rsa_set_padding(&rsactx->ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+  if (unlikely(mbedtls_rsa_copy(&rsactx->ctx, &rsa->ctx))) {
+    mbedtls_rsa_free(&rsactx->ctx);
+    pmem_free(PMEM_SUBSYS_OTHER, rsactx);
     return PSYNC_INVALID_RSA;
-  } else
-    return ctx;
+  }
+  return rsactx;
+#endif
 }
 
 void prsa_free_private(psync_rsa_privatekey_t key) {
   pssl_free_rsa(key);
 }
 
-psync_binary_rsa_key_t
-prsa_public_to_binary(psync_rsa_publickey_t rsa) {
+psync_binary_rsa_key_t prsa_public_to_binary(psync_rsa_publickey_t rsa) {
   unsigned char buff[4096], *p;
   mbedtls_pk_context ctx;
   psync_binary_rsa_key_t ret;
   int len;
+  int result;
+
   mbedtls_pk_init(&ctx);
-  if (mbedtls_pk_setup(&ctx, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA)) ||
-      mbedtls_rsa_copy(mbedtls_pk_rsa(ctx), rsa))
+#if MBEDTLS_VERSION_MAJOR >= 4
+  result = mbedtls_pk_copy_public_from_psa(rsa->key_id, &ctx);
+#else
+  result = mbedtls_pk_setup(&ctx, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
+  if (!result)
+    result = mbedtls_rsa_copy(mbedtls_pk_rsa(ctx), &rsa->ctx);
+#endif
+  if (result) {
+    mbedtls_pk_free(&ctx);
     return PSYNC_INVALID_BIN_RSA;
+  }
+
   p = buff + sizeof(buff);
+#if MBEDTLS_VERSION_MAJOR >= 4
+  len = mbedtls_pk_write_pubkey_der(&ctx, buff, sizeof(buff));
+  if (len > 0)
+    p = buff + sizeof(buff) - len;
+#else
   len = mbedtls_pk_write_pubkey(&p, buff, &ctx);
+#endif
   mbedtls_pk_free(&ctx);
   if (len <= 0)
     return PSYNC_INVALID_BIN_RSA;
-  ret =
-      pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(psync_encrypted_data_struct_t, data) + len);
+  ret = pmem_malloc(PMEM_SUBSYS_OTHER,
+                    offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
-  memcpy(ret->data, buff + sizeof(buff) - len, len);
+  memcpy(ret->data, p, len);
   return ret;
 }
 
-psync_binary_rsa_key_t
-prsa_private_to_binary(psync_rsa_privatekey_t rsa) {
+psync_binary_rsa_key_t prsa_private_to_binary(psync_rsa_privatekey_t rsa) {
   unsigned char buff[4096];
   mbedtls_pk_context ctx;
   psync_binary_rsa_key_t ret;
   int len;
+  int result;
+
   mbedtls_pk_init(&ctx);
-  if (mbedtls_pk_setup(&ctx, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA)) ||
-      mbedtls_rsa_copy(mbedtls_pk_rsa(ctx), rsa))
+#if MBEDTLS_VERSION_MAJOR >= 4
+  result = mbedtls_pk_copy_from_psa(rsa->key_id, &ctx);
+#else
+  result = mbedtls_pk_setup(&ctx, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
+  if (!result)
+    result = mbedtls_rsa_copy(mbedtls_pk_rsa(ctx), &rsa->ctx);
+#endif
+  if (result) {
+    mbedtls_pk_free(&ctx);
     return PSYNC_INVALID_BIN_RSA;
+  }
+
   len = mbedtls_pk_write_key_der(&ctx, buff, sizeof(buff));
   mbedtls_pk_free(&ctx);
   if (len <= 0)
     return PSYNC_INVALID_BIN_RSA;
-  ret =
-      pmem_malloc(PMEM_SUBSYS_OTHER, offsetof(psync_encrypted_data_struct_t, data) + len);
+  ret = pmem_malloc(PMEM_SUBSYS_OTHER,
+                    offsetof(psync_encrypted_data_struct_t, data) + len);
   ret->datalen = len;
   memcpy(ret->data, buff + sizeof(buff) - len, len);
   putil_wipe(buff + sizeof(buff) - len, len);
@@ -577,31 +741,58 @@ prsa_private_to_binary(psync_rsa_privatekey_t rsa) {
 }
 
 psync_rsa_publickey_t prsa_load_public(const unsigned char *keydata,
-                                                size_t keylen) {
+                                       size_t keylen) {
   mbedtls_pk_context ctx;
-  mbedtls_rsa_context *rsa;
   int ret;
 
   mbedtls_pk_init(&ctx);
 
-  if (unlikely(ret = mbedtls_pk_parse_public_key(&ctx, keydata, keylen))) {
-    pdbg_logf(D_WARNING, "pk_parse_public_key failed with code %d (-0x%04x); resorting to " "mbedtls 1.x RSA fallback", ret, -ret);
+  ret = mbedtls_pk_parse_public_key(&ctx, keydata, keylen);
+  if (unlikely(ret)) {
+    pdbg_logf(D_WARNING,
+              "pk_parse_public_key failed with code %d (-0x%04x); "
+              "resorting to mbedtls 1.x RSA fallback",
+              ret, -ret);
+    mbedtls_pk_free(&ctx);
     return PSYNC_INVALID_RSA;
   }
-  rsa = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(mbedtls_rsa_context));
-  mbedtls_rsa_init(rsa);
-  mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
-  ret = mbedtls_rsa_copy(rsa, mbedtls_pk_rsa(ctx));
+
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psync_rsa_publickey_t rsa;
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+
+  rsa = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(*rsa));
+  ret = mbedtls_pk_get_psa_attributes(&ctx, PSA_KEY_USAGE_ENCRYPT,
+                                      &attributes);
+  if (!ret)
+    ret = mbedtls_pk_import_into_psa(&ctx, &attributes, &rsa->key_id);
+  if (!ret) {
+    rsa->bits = psa_get_key_bits(&attributes);
+    psa_reset_key_attributes(&attributes);
+    mbedtls_pk_free(&ctx);
+    return rsa;
+  }
+  psa_reset_key_attributes(&attributes);
+  mbedtls_pk_free(&ctx);
+  pmem_free(PMEM_SUBSYS_OTHER, rsa);
+  return PSYNC_INVALID_RSA;
+#else
+  psync_rsa_publickey_t rsa;
+
+  rsa = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(*rsa));
+  mbedtls_rsa_init(&rsa->ctx);
+  mbedtls_rsa_set_padding(&rsa->ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+  ret = mbedtls_rsa_copy(&rsa->ctx, mbedtls_pk_rsa(ctx));
   mbedtls_pk_free(&ctx);
   if (unlikely(ret)) {
     pdbg_logf(D_WARNING, "rsa_copy failed with code %d", ret);
-    mbedtls_rsa_free(rsa);
+    mbedtls_rsa_free(&rsa->ctx);
     pmem_free(PMEM_SUBSYS_OTHER, rsa);
     return PSYNC_INVALID_RSA;
-  } else {
-    mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
-    return rsa;
   }
+  mbedtls_rsa_set_padding(&rsa->ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+  return rsa;
+#endif
 }
 
 // mbedtls 3.x: mbedtls_pk_parse_key rejects keys with trailing garbage. This
@@ -635,63 +826,104 @@ static void trim_der_key(unsigned char *keydata, size_t *keylen) {
 
 psync_rsa_privatekey_t prsa_load_private(const unsigned char *keydata, size_t keylen) {
   mbedtls_pk_context ctx;
-  mbedtls_rsa_context *rsa;
   int ret;
 
   trim_der_key((unsigned char *)keydata, &keylen);
-  
+
   mbedtls_pk_init(&ctx);
+#if MBEDTLS_VERSION_MAJOR >= 4
+  ret = mbedtls_pk_parse_key(&ctx, keydata, keylen, NULL, 0);
+#else
   ret = mbedtls_pk_parse_key(&ctx, keydata, keylen, NULL, 0, rng_get, &rng);
-  if(unlikely(ret)) {
+#endif
+  if (unlikely(ret)) {
     ssl_pdbg_logf(D_WARNING, ret, "pk_parse_key failed");
+    mbedtls_pk_free(&ctx);
     return PSYNC_INVALID_RSA;
   }
-  rsa = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(mbedtls_rsa_context));
-  mbedtls_rsa_init(rsa);
-  mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
-  ret = mbedtls_rsa_copy(rsa, mbedtls_pk_rsa(ctx));
+
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psync_rsa_privatekey_t rsa;
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+
+  rsa = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(*rsa));
+  ret = mbedtls_pk_get_psa_attributes(&ctx, PSA_KEY_USAGE_DECRYPT,
+                                      &attributes);
+  if (!ret)
+    ret = mbedtls_pk_import_into_psa(&ctx, &attributes, &rsa->key_id);
+  if (!ret) {
+    rsa->bits = psa_get_key_bits(&attributes);
+    psa_reset_key_attributes(&attributes);
+    mbedtls_pk_free(&ctx);
+    return rsa;
+  }
+  psa_reset_key_attributes(&attributes);
+  mbedtls_pk_free(&ctx);
+  pmem_free(PMEM_SUBSYS_OTHER, rsa);
+  return PSYNC_INVALID_RSA;
+#else
+  psync_rsa_privatekey_t rsa;
+
+  rsa = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(*rsa));
+  mbedtls_rsa_init(&rsa->ctx);
+  mbedtls_rsa_set_padding(&rsa->ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+  ret = mbedtls_rsa_copy(&rsa->ctx, mbedtls_pk_rsa(ctx));
   mbedtls_pk_free(&ctx);
   if (unlikely(ret)) {
     pdbg_logf(D_WARNING, "rsa_copy failed with code %d", ret);
-    mbedtls_rsa_free(rsa);
+    mbedtls_rsa_free(&rsa->ctx);
     pmem_free(PMEM_SUBSYS_OTHER, rsa);
     return PSYNC_INVALID_RSA;
-  } else {
-    mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
-    return rsa;
   }
+  mbedtls_rsa_set_padding(&rsa->ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+  return rsa;
+#endif
 }
 
-psync_rsa_publickey_t
-prsa_binary_to_public(psync_binary_rsa_key_t bin) {
+psync_rsa_publickey_t prsa_binary_to_public(psync_binary_rsa_key_t bin) {
   return prsa_load_public(bin->data, bin->datalen);
 }
 
-psync_rsa_privatekey_t
-prsa_binary_to_private(psync_binary_rsa_key_t bin) {
+psync_rsa_privatekey_t prsa_binary_to_private(psync_binary_rsa_key_t bin) {
   return prsa_load_private(bin->data, bin->datalen);
 }
 
-psync_symmetric_key_t
-psymkey_generate(const char *password, size_t keylen,
-                                      const unsigned char *salt, size_t saltlen,
-                                      size_t iterations) {
-  psync_symmetric_key_t key = (psync_symmetric_key_t)pmem_malloc(PMEM_SUBSYS_OTHER, 
+psync_symmetric_key_t psymkey_generate(const char *password, size_t keylen, const unsigned char *salt, size_t saltlen, size_t iterations) {
+  psync_symmetric_key_t key = (psync_symmetric_key_t)pmem_malloc(PMEM_SUBSYS_OTHER,
       keylen + offsetof(psync_symmetric_key_struct_t, key));
+  key->keylen = keylen;
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psa_key_derivation_operation_t op = psa_key_derivation_operation_init();
+  psa_status_t status;
+  status = psa_key_derivation_setup(&op, PSA_ALG_PBKDF2_HMAC(PSA_ALG_SHA_512));
+  if (status == PSA_SUCCESS)
+    status = psa_key_derivation_input_integer(&op, PSA_KEY_DERIVATION_INPUT_COST, iterations);
+  if (status == PSA_SUCCESS)
+    status = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_SALT, salt, saltlen);
+  if (status == PSA_SUCCESS)
+    status = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_PASSWORD, (const uint8_t *)password, strlen(password));
+  if (status == PSA_SUCCESS)
+    status = psa_key_derivation_set_capacity(&op, keylen);
+  if (status == PSA_SUCCESS)
+    status = psa_key_derivation_output_bytes(&op, key->key, keylen);
+  psa_key_derivation_abort(&op);
+  if (status != PSA_SUCCESS) {
+    pdbg_logf(D_ERROR, "PSA PBKDF2 failed with status %d", status);
+    pmem_free(PMEM_SUBSYS_OTHER, key);
+    return PSYNC_INVALID_SYM_KEY;
+  }
+#else
   mbedtls_md_context_t ctx;
   mbedtls_md_init(&ctx);
   const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA512);
   mbedtls_md_setup(&ctx, md_info, 1);
-  key->keylen = keylen;
-  mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char *)password,
-                           strlen(password), salt, saltlen, iterations,
-                           keylen, key->key);
+  mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char *)password, strlen(password), salt, saltlen, iterations, keylen, key->key);
   mbedtls_md_free(&ctx);
+#endif
   return key;
 }
 
-char *psymkey_derive(const char *username,
-                                                const char *passphrase) {
+char *psymkey_derive(const char *username, const char *passphrase) {
   unsigned char *usercopy;
   unsigned char usersha512[PSYNC_SHA512_DIGEST_LEN], passwordbin[32];
   mbedtls_md_context_t ctx;
@@ -705,12 +937,33 @@ char *psymkey_derive(const char *username,
       usercopy[i] = '*';
   psync_sha512(usercopy, userlen, usersha512);
   pmem_free(PMEM_SUBSYS_OTHER, usercopy);
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psa_key_derivation_operation_t op = psa_key_derivation_operation_init();
+  psa_status_t status;
+  status = psa_key_derivation_setup(&op, PSA_ALG_PBKDF2_HMAC(PSA_ALG_SHA_512));
+  if (status == PSA_SUCCESS)
+    status = psa_key_derivation_input_integer(&op, PSA_KEY_DERIVATION_INPUT_COST, 5000);
+  if (status == PSA_SUCCESS)
+    status = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_SALT, usersha512, sizeof(usersha512));
+  if (status == PSA_SUCCESS)
+    status = psa_key_derivation_input_bytes(&op, PSA_KEY_DERIVATION_INPUT_PASSWORD, (const uint8_t *)passphrase, strlen(passphrase));
+  if (status == PSA_SUCCESS)
+    status = psa_key_derivation_set_capacity(&op, sizeof(passwordbin));
+  if (status == PSA_SUCCESS)
+    status = psa_key_derivation_output_bytes(&op, passwordbin, sizeof(passwordbin));
+  psa_key_derivation_abort(&op);
+  if (status != PSA_SUCCESS) {
+    pdbg_logf(D_ERROR, "PSA PBKDF2 failed with status %d", status);
+    return NULL;
+  }
+#else
   mbedtls_md_init(&ctx);
   const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA512);
   mbedtls_md_setup(&ctx, md_info, 1);
   mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char *)passphrase, strlen(passphrase), usersha512,
     PSYNC_SHA512_DIGEST_LEN, 5000, sizeof(passwordbin), passwordbin);
   mbedtls_md_free(&ctx);
+#endif
   usercopy = putil_base64_encode(passwordbin, sizeof(passwordbin), &userlen);
   return (char *)usercopy;
 }
@@ -720,12 +973,23 @@ prsa_encrypt_data(psync_rsa_publickey_t rsa, const unsigned char *data,
                            size_t datalen) {
   psync_encrypted_symmetric_key_t ret;
   int code;
-  size_t rsalen = mbedtls_rsa_get_len(rsa);
+  size_t rsalen;
+#if MBEDTLS_VERSION_MAJOR >= 4
+  rsalen = (rsa->bits + 7) / 8;
+#else
+  rsalen = mbedtls_rsa_get_len(&rsa->ctx);
+#endif
 
   ret = (psync_encrypted_symmetric_key_t)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_encrypted_data_struct_t, data) + rsalen);
+#if MBEDTLS_VERSION_MAJOR >= 4
+  size_t olen;
+  if (psa_asymmetric_encrypt(rsa->key_id, PSA_ALG_RSA_OAEP(PSA_ALG_SHA_1), data, datalen, NULL, 0, ret->data, rsalen, &olen) != PSA_SUCCESS) { pmem_free(PMEM_SUBSYS_OTHER, ret); return PSYNC_INVALID_ENC_SYM_KEY; }
+  ret->datalen = olen;
+  return ret;
+#else
   if ((code = mbedtls_rsa_rsaes_oaep_encrypt(
-           rsa, rng_get, &rng,
+           &rsa->ctx, rng_get, &rng,
            NULL, 0, datalen, data, ret->data))) {
     pmem_free(PMEM_SUBSYS_OTHER, ret);
     pdbg_logf(
@@ -737,6 +1001,7 @@ prsa_encrypt_data(psync_rsa_publickey_t rsa, const unsigned char *data,
   ret->datalen = rsalen;
   pdbg_logf(D_NOTICE, "datalen=%lu", (unsigned long)ret->datalen);
   return ret;
+#endif
 }
 
 psync_symmetric_key_t prsa_decrypt_data(psync_rsa_privatekey_t rsa,
@@ -745,10 +1010,14 @@ psync_symmetric_key_t prsa_decrypt_data(psync_rsa_privatekey_t rsa,
   unsigned char buff[2048];
   psync_symmetric_key_t ret;
   size_t len;
-  if (mbedtls_rsa_rsaes_oaep_decrypt(rsa, rng_get,
+#if MBEDTLS_VERSION_MAJOR >= 4
+  if (psa_asymmetric_decrypt(rsa->key_id, PSA_ALG_RSA_OAEP(PSA_ALG_SHA_1), data, datalen, NULL, 0, buff, sizeof(buff), &len) != PSA_SUCCESS) return PSYNC_INVALID_SYM_KEY;
+#else
+  if (mbedtls_rsa_rsaes_oaep_decrypt(&rsa->ctx, rng_get,
                                      &rng,
                                      NULL, 0, &len, data, buff, sizeof(buff)))
     return PSYNC_INVALID_SYM_KEY;
+#endif
   ret = (psync_symmetric_key_t)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_symmetric_key_struct_t, key) + len);
   ret->keylen = len;
@@ -770,29 +1039,77 @@ psync_symmetric_key_t psymkey_decrypt(
 
 psync_aes256_encoder
 paes_create_encoder(psync_symmetric_key_t key) {
-  mbedtls_aes_context *aes;
+  psync_aes256_encoder aes;
+
   pdbg_assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
-  aes = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(mbedtls_aes_context));
-  mbedtls_aes_setkey_enc(aes, key->key, 256);
+  aes = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(*aes));
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+  psa_status_t status;
+
+  psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+  psa_set_key_bits(&attributes, 256);
+  psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_ENCRYPT);
+  psa_set_key_algorithm(&attributes, PSA_ALG_ECB_NO_PADDING);
+  status = psa_import_key(&attributes, key->key, PSYNC_AES256_KEY_SIZE,
+                          &aes->key_id);
+  psa_reset_key_attributes(&attributes);
+  if (status != PSA_SUCCESS) {
+    pmem_free(PMEM_SUBSYS_OTHER, aes);
+    return PSYNC_INVALID_ENCODER;
+  }
+#else
+  if (mbedtls_aes_setkey_enc(&aes->ctx, key->key, 256)) {
+    pmem_free(PMEM_SUBSYS_OTHER, aes);
+    return PSYNC_INVALID_ENCODER;
+  }
+#endif
   return aes;
 }
 
 void paes_free_encoder(psync_aes256_encoder aes) {
-  putil_wipe(aes, sizeof(mbedtls_aes_context));
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psa_destroy_key(aes->key_id);
+#endif
+  putil_wipe(aes, sizeof(*aes));
   pmem_free(PMEM_SUBSYS_OTHER, aes);
 }
 
-psync_aes256_encoder
+psync_aes256_decoder
 paes_create_decoder(psync_symmetric_key_t key) {
-  mbedtls_aes_context *aes;
+  psync_aes256_decoder aes;
+
   pdbg_assert(key->keylen >= PSYNC_AES256_KEY_SIZE);
-  aes = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(mbedtls_aes_context));
-  mbedtls_aes_setkey_dec(aes, key->key, 256);
+  aes = pmem_malloc(PMEM_SUBSYS_OTHER, sizeof(*aes));
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
+  psa_status_t status;
+
+  psa_set_key_type(&attributes, PSA_KEY_TYPE_AES);
+  psa_set_key_bits(&attributes, 256);
+  psa_set_key_usage_flags(&attributes, PSA_KEY_USAGE_DECRYPT);
+  psa_set_key_algorithm(&attributes, PSA_ALG_ECB_NO_PADDING);
+  status = psa_import_key(&attributes, key->key, PSYNC_AES256_KEY_SIZE,
+                          &aes->key_id);
+  psa_reset_key_attributes(&attributes);
+  if (status != PSA_SUCCESS) {
+    pmem_free(PMEM_SUBSYS_OTHER, aes);
+    return PSYNC_INVALID_DECODER;
+  }
+#else
+  if (mbedtls_aes_setkey_dec(&aes->ctx, key->key, 256)) {
+    pmem_free(PMEM_SUBSYS_OTHER, aes);
+    return PSYNC_INVALID_DECODER;
+  }
+#endif
   return aes;
 }
 
-void paes_free_decoder(psync_aes256_encoder aes) {
-  putil_wipe(aes, sizeof(mbedtls_aes_context));
+void paes_free_decoder(psync_aes256_decoder aes) {
+#if MBEDTLS_VERSION_MAJOR >= 4
+  psa_destroy_key(aes->key_id);
+#endif
+  putil_wipe(aes, sizeof(*aes));
   pmem_free(PMEM_SUBSYS_OTHER, aes);
 }
 
@@ -801,24 +1118,36 @@ prsa_sign_sha256_hash(psync_rsa_privatekey_t rsa,
                                const unsigned char *data) {
   psync_rsa_signature_t ret;
   int padding, hash_id;
-  size_t rsalen = mbedtls_rsa_get_len(rsa);
+  size_t rsalen;
+#if MBEDTLS_VERSION_MAJOR >= 4
+  rsalen = (rsa->bits + 7) / 8;
+#else
+  rsalen = mbedtls_rsa_get_len(&rsa->ctx);
+#endif
 
   ret = (psync_rsa_signature_t)pmem_malloc(PMEM_SUBSYS_OTHER, 
       offsetof(psync_symmetric_key_struct_t, key) + rsalen);
   if (!ret)
     return (psync_rsa_signature_t)(void *)PERROR_NO_MEMORY;
   ret->datalen = rsalen;
+#if MBEDTLS_VERSION_MAJOR >= 4
+  size_t olen;
+  if (psa_sign_hash(rsa->key_id, PSA_ALG_RSA_PSS(PSA_ALG_SHA_256), data, PSYNC_SHA256_DIGEST_LEN, ret->data, rsalen, &olen) != PSA_SUCCESS) { pmem_free(PMEM_SUBSYS_OTHER, ret); return (psync_rsa_signature_t)(void *)PSYNC_CRYPTO_NOT_STARTED; }
+  ret->datalen = olen;
+  return ret;
+#else
   /* Save current padding settings using getter functions */
-  padding = mbedtls_rsa_get_padding_mode(rsa);
-  hash_id = mbedtls_rsa_get_md_alg(rsa);
-  mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
-  if (mbedtls_rsa_rsassa_pss_sign(rsa, rng_get, &rng,
+  padding = mbedtls_rsa_get_padding_mode(&rsa->ctx);
+  hash_id = mbedtls_rsa_get_md_alg(&rsa->ctx);
+  mbedtls_rsa_set_padding(&rsa->ctx, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA256);
+  if (mbedtls_rsa_rsassa_pss_sign(&rsa->ctx, rng_get, &rng,
                                   MBEDTLS_MD_SHA256,
                                   PSYNC_SHA256_DIGEST_LEN, data, ret->data)) {
     pmem_free(PMEM_SUBSYS_OTHER, ret);
-    mbedtls_rsa_set_padding(rsa, padding, hash_id);
+    mbedtls_rsa_set_padding(&rsa->ctx, padding, hash_id);
     return (psync_rsa_signature_t)(void *)PSYNC_CRYPTO_NOT_STARTED;
   }
-  mbedtls_rsa_set_padding(rsa, padding, hash_id);
+  mbedtls_rsa_set_padding(&rsa->ctx, padding, hash_id);
   return ret;
+#endif
 }
